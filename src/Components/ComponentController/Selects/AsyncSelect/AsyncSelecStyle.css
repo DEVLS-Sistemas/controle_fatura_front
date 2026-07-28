@@ -1,0 +1,27 @@
+.react-select-container {
+    width: 100% !important;
+}
+
+.react-select__control {
+    width: 100% !important;
+    min-width: 0 !important;
+}
+
+.react-select__menu {
+    width: 100% !important;
+}
+
+/* Estilos para validação inválida */
+.react-select-container.select.is-invalid .react-select__control {
+    border-color: #dc3545 !important;
+    box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25) !important;
+}
+
+.react-select-container.select.is-invalid .react-select__control:hover {
+    border-color: #dc3545 !important;
+}
+
+.react-select-container.select.is-invalid .react-select__control--is-focused {
+    border-color: #dc3545 !important;
+    box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25) !important;
+}
