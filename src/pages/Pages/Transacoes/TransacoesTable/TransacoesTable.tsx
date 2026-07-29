@@ -12,6 +12,7 @@ import { useNavegacao } from "helpers/functions_helpers"
 import {
     formatCurrency,
     formatDateBr,
+    getCategoriaFieldStyle,
     responsavelTipoColor,
     tipoTransacaoColor,
     tipoTransacaoLabel,
@@ -253,6 +254,8 @@ export const TransacoesTable = ({
                                                             {rows.map((row, index) => {
                                                                 const responsavelTipo = row.responsavel_tipo
                                                                     ?? getResponsavelTipo(row.responsavel_id)
+                                                                const categoriaCor = row.categoria_cor
+                                                                    ?? categoriasLookup.find((c) => c.id === row.categoria_id)?.cor
                                                                 return (
                                                                     <tr key={row.id ?? index}>
                                                                         <td>{formatDateBr(row.data)}</td>
@@ -268,6 +271,11 @@ export const TransacoesTable = ({
                                                                                 className="form-select form-select-sm"
                                                                                 value={row.categoria_id ?? ''}
                                                                                 onChange={(e) => handleInlineCategoriaChange(row, e.target.value)}
+                                                                                style={
+                                                                                    row.categoria_id
+                                                                                        ? (getCategoriaFieldStyle(categoriaCor) ?? undefined)
+                                                                                        : undefined
+                                                                                }
                                                                             >
                                                                                 <option value="">—</option>
                                                                                 {categoriasLookup.map((c) => (
