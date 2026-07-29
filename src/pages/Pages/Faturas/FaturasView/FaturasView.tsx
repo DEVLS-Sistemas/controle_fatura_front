@@ -1,5 +1,6 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import ReactApexChart from 'react-apexcharts'
 import { setActiveMenu } from 'helpers/system_helpers'
 import { useNavegacao } from 'helpers/functions_helpers'
 import {
@@ -11,10 +12,11 @@ import {
     formatCurrency, formatDateBr, faturaStatusColor,
     tipoTransacaoColor, tipoTransacaoLabel,
     FATURA_FILE_ACCEPT, isValidFaturaFile,
+    getCategoriaFieldStyle,
 } from 'helpers/fatura_helpers'
 import { SelectOptions } from 'interfaces/SystemInterfaces/SelectInterface'
 import { FaturasView } from 'interfaces/Faturas/FaturasInterface'
-import { TransacoesList } from 'interfaces/Transacoes/TransacoesInterface'
+import { CategoriaLookup, TransacoesList } from 'interfaces/Transacoes/TransacoesInterface'
 import { FaturasService } from 'services/Faturas/FaturasService'
 import { TransacoesService } from 'services/Transacoes/TransacoesService'
 
@@ -46,6 +48,7 @@ const FaturasViewPage = () => {
     const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null)
     const [processarAuto, setProcessarAuto] = useState(true)
     const [categoriasOptions, setCategoriasOptions] = useState<SelectOptions[]>([])
+    const [categoriasLookup, setCategoriasLookup] = useState<CategoriaLookup[]>([])
     const [responsaveisOptions, setResponsaveisOptions] = useState<SelectOptions[]>([])
     const [savingIds, setSavingIds] = useState<Record<number, boolean>>({})
     const [valorDrafts, setValorDrafts] = useState<Record<number, string>>({})
@@ -112,6 +115,7 @@ const FaturasViewPage = () => {
         try {
             const lookups = await transacoesService.getLookupsTransacoes()
             if (lookups?.categorias) {
+                setCategoriasLookup(lookups.categorias)
                 setCategoriasOptions(
                     lookups.categorias.map((c) => ({
                         value: c.id!,
@@ -238,8 +242,9 @@ const FaturasViewPage = () => {
                     if (item.id !== tx.id) return item
                     const next = { ...item, ...patch }
                     if (patch.categoria_id !== undefined) {
-                        const categoria = categoriasOptions.find((o) => Number(o.value) === patch.categoria_id)
-                        next.categoria_nome = categoria?.label
+                        const categoria = categoriasLookup.find((o) => o.id === patch.categoria_id)
+                        next.categoria_nome = categoria?.nome
+                        next.categoria_cor = categoria?.cor
                     }
                     if (patch.responsavel_id !== undefined) {
                         const responsavel = responsaveisOptions.find((o) => Number(o.value) === patch.responsavel_id)
@@ -326,6 +331,43 @@ const FaturasViewPage = () => {
             if (pdfBlobUrl) URL.revokeObjectURL(pdfBlobUrl)
         }
     }, [pdfBlobUrl])
+
+    const totalTransacoes = transacoes.length || fatura?.total_transacoes || 0
+    const transacoesComCategoria = useMemo(
+        () => transacoes.filter((tx) => tx.categoria_id != null).length,
+        [transacoes]
+    )
+    const categoriasResumo = useMemo(() => {
+        const map = new Map<number, { id: number; nome: string; cor?: string; count: number; total: number }>()
+        transacoes.forEach((tx) => {
+            if (tx.categoria_id == null) return
+            const fromLookup = categoriasLookup.find((c) => c.id === tx.categoria_id)
+            const current = map.get(tx.categoria_id)
+            const valor = Number(tx.valor ?? 0)
+            if (current) {
+                current.count += 1
+                current.total += valor
+                return
+            }
+            map.set(tx.categoria_id, {
+                id: tx.categoria_id,
+                nome: tx.categoria_nome ?? fromLookup?.nome ?? `#${tx.categoria_id}`,
+                cor: tx.categoria_cor ?? fromLookup?.cor,
+                count: 1,
+                total: valor,
+            })
+        })
+        return Array.from(map.values()).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+    }, [transacoes, categoriasLookup])
+
+    const categoriasChart = useMemo(() => {
+        const withTotal = categoriasResumo.filter((c) => c.total > 0)
+        return {
+            labels: withTotal.map((c) => c.nome),
+            series: withTotal.map((c) => Number(c.total.toFixed(2))),
+            colors: withTotal.map((c) => c.cor || '#6b7280'),
+        }
+    }, [categoriasResumo])
 
     if (loading) {
         return (
@@ -450,6 +492,102 @@ const FaturasViewPage = () => {
                                     </button>
                                 </Col>
                             </Row>
+
+                            <Row className="mt-4">
+                                <Col md={12}>
+                                    <div className="d-flex flex-wrap align-items-center gap-3 mb-3">
+                                        <div className="bg-light rounded px-3 py-2">
+                                            <small className="text-muted text-uppercase d-block">Categorias preenchidas</small>
+                                            <span className="fs-5 fw-semibold">
+                                                {transacoesComCategoria}/{totalTransacoes}
+                                            </span>
+                                            <small className="text-muted ms-2">
+                                                {totalTransacoes === 0
+                                                    ? 'sem transações'
+                                                    : `${Math.round((transacoesComCategoria / totalTransacoes) * 100)}% categorizadas`}
+                                            </small>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <small className="text-muted text-uppercase d-block mb-2">Categorias nesta fatura</small>
+                                        {categoriasResumo.length === 0 ? (
+                                            <span className="text-muted">Nenhuma categoria vinculada ainda.</span>
+                                        ) : (
+                                            <div className="d-flex flex-wrap gap-2">
+                                                {categoriasResumo.map((cat) => (
+                                                    <span
+                                                        key={cat.id}
+                                                        className="d-inline-flex align-items-center gap-2 border rounded px-2 py-1"
+                                                        style={{
+                                                            backgroundColor: cat.cor ? `${cat.cor}22` : '#f8f9fa',
+                                                            borderColor: cat.cor || '#dee2e6',
+                                                            borderLeftWidth: 4,
+                                                            borderLeftStyle: 'solid',
+                                                            borderLeftColor: cat.cor || '#adb5bd',
+                                                        }}
+                                                        title={`${cat.count} transação(ões) · ${formatCurrency(cat.total)}`}
+                                                    >
+                                                        {cat.cor && (
+                                                            <span
+                                                                className="rounded-circle border"
+                                                                style={{
+                                                                    width: 12,
+                                                                    height: 12,
+                                                                    backgroundColor: cat.cor,
+                                                                    flexShrink: 0,
+                                                                }}
+                                                            />
+                                                        )}
+                                                        <span className="fw-medium">{cat.nome}</span>
+                                                        <span className="text-muted small">{cat.count}x</span>
+                                                        <span className="text-muted small">{formatCurrency(cat.total)}</span>
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                </Col>
+                            </Row>
+
+                            {categoriasChart.series.length > 0 && (
+                                <Row className="mt-4">
+                                    <Col md={12} lg={7} xl={6}>
+                                        <h6 className="mb-3">Distribuição por categoria</h6>
+                                        <ReactApexChart
+                                            type="pie"
+                                            height={320}
+                                            series={categoriasChart.series}
+                                            options={{
+                                                labels: categoriasChart.labels,
+                                                colors: categoriasChart.colors,
+                                                legend: {
+                                                    position: 'bottom',
+                                                    fontSize: '13px',
+                                                },
+                                                dataLabels: {
+                                                    enabled: true,
+                                                    formatter: (val: number) => `${Math.round(val)}%`,
+                                                },
+                                                tooltip: {
+                                                    y: {
+                                                        formatter: (val: number) => formatCurrency(val),
+                                                    },
+                                                },
+                                                chart: {
+                                                    toolbar: { show: false },
+                                                },
+                                                responsive: [{
+                                                    breakpoint: 576,
+                                                    options: {
+                                                        chart: { height: 280 },
+                                                        legend: { position: 'bottom' },
+                                                    },
+                                                }],
+                                            }}
+                                        />
+                                    </Col>
+                                </Row>
+                            )}
                         </CardBody>
                     </Card>
 
@@ -532,6 +670,14 @@ const FaturasViewPage = () => {
                                                             value={tx.categoria_id ?? ''}
                                                             disabled={!!savingIds[tx.id!]}
                                                             onChange={(e) => handleUpdateSelect(tx, 'categoria_id', e.target.value)}
+                                                            style={
+                                                                tx.categoria_id
+                                                                    ? (getCategoriaFieldStyle(
+                                                                        tx.categoria_cor
+                                                                        ?? categoriasLookup.find((c) => c.id === tx.categoria_id)?.cor
+                                                                    ) ?? undefined)
+                                                                    : undefined
+                                                            }
                                                         >
                                                             <option value="">Sem categoria</option>
                                                             {categoriasOptions.map((opt) => (

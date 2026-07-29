@@ -18,6 +18,7 @@ export interface FaturasList {
     status?: string
     arquivo_pdf?: string
     total_transacoes?: number
+    transacoes_com_categoria?: number
     erro_mensagem?: string
 }
 

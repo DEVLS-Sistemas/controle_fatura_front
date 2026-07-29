@@ -36,6 +36,33 @@ export const faturaStatusColor: Record<string, string> = {
   erro: 'danger',
 }
 
+const hexToRgba = (hex: string, alpha: number): string => {
+  const raw = hex.replace('#', '').trim()
+  const full = raw.length === 3
+    ? raw.split('').map((c) => c + c).join('')
+    : raw
+  if (full.length !== 6) return hex
+  const r = parseInt(full.slice(0, 2), 16)
+  const g = parseInt(full.slice(2, 4), 16)
+  const b = parseInt(full.slice(4, 6), 16)
+  if ([r, g, b].some((n) => Number.isNaN(n))) return hex
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`
+}
+
+/** Estilo de fundo com a cor cadastrada da categoria (texto permanece legível) */
+export const getCategoriaFieldStyle = (
+  cor?: string | null
+): { backgroundColor: string; borderColor: string; borderLeftWidth: number; borderLeftStyle: 'solid'; color: string } | null => {
+  if (!cor) return null
+  return {
+    backgroundColor: hexToRgba(cor, 0.28),
+    borderColor: cor,
+    borderLeftWidth: 4,
+    borderLeftStyle: 'solid',
+    color: '#212529',
+  }
+}
+
 export const mesesOptions = Array.from({ length: 12 }, (_, i) => ({
   value: i + 1,
   label: String(i + 1).padStart(2, '0'),

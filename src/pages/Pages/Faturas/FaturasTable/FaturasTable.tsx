@@ -147,6 +147,7 @@ export const FaturasTable = ({ data, getData, setPerPage, perPage, filters }: Fa
                                                                 <th scope="col">Valor Total</th>
                                                                 <th scope="col">Status</th>
                                                                 <th scope="col">Transações</th>
+                                                                <th scope="col">Categorias</th>
                                                                 <th scope="col" style={{ width: "220px" }}>Ações</th>
                                                             </tr>
                                                         </thead>
@@ -162,6 +163,11 @@ export const FaturasTable = ({ data, getData, setPerPage, perPage, filters }: Fa
                                                                         </span>
                                                                     </td>
                                                                     <td>{row.total_transacoes ?? '-'}</td>
+                                                                    <td>
+                                                                        {row.total_transacoes != null
+                                                                            ? `${row.transacoes_com_categoria ?? 0}/${row.total_transacoes}`
+                                                                            : '-'}
+                                                                    </td>
                                                                     <td>
                                                                         <div className="d-flex justify-content-center align-items-center gap-1">
                                                                             <Link
