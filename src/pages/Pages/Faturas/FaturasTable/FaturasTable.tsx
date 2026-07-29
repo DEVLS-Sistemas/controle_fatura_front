@@ -76,17 +76,17 @@ export const FaturasTable = ({ data, getData, setPerPage, perPage, filters }: Fa
         }
     }
 
-    const handleThisRoute = async (url: string) => {
+    const handleThisRoute = async (url: string | null) => {
+        if (!url) return
         try {
             const new_url = new URL(url)
             await getData({
                 page: Number(new_url.searchParams.get('page')),
-                palavra_chave: new_url.searchParams.get('palavra_chave'),
-                cartao_id: new_url.searchParams.get('cartao_id'),
-                mes: new_url.searchParams.get('mes'),
-                ano: new_url.searchParams.get('ano'),
-                status: new_url.searchParams.get('status'),
-                ...filters,
+                palavra_chave: new_url.searchParams.get('palavra_chave') ?? filters.palavra_chave,
+                cartao_id: new_url.searchParams.get('cartao_id') ?? filters.cartao_id,
+                mes: new_url.searchParams.get('mes') ?? filters.mes,
+                ano: new_url.searchParams.get('ano') ?? filters.ano,
+                status: new_url.searchParams.get('status') ?? filters.status,
             })
         } catch (error) {
             console.error(error)
@@ -147,7 +147,7 @@ export const FaturasTable = ({ data, getData, setPerPage, perPage, filters }: Fa
                                                                 <th scope="col">Valor Total</th>
                                                                 <th scope="col">Status</th>
                                                                 <th scope="col">Transações</th>
-                                                                <th scope="col" style={{ width: "150px" }}>Ações</th>
+                                                                <th scope="col" style={{ width: "220px" }}>Ações</th>
                                                             </tr>
                                                         </thead>
                                                         <tbody>
@@ -163,35 +163,46 @@ export const FaturasTable = ({ data, getData, setPerPage, perPage, filters }: Fa
                                                                     </td>
                                                                     <td>{row.total_transacoes ?? '-'}</td>
                                                                     <td>
-                                                                        <ButtonGroup>
-                                                                            <UncontrolledDropdown direction="down">
-                                                                                <DropdownToggle tag="button" className="btn">
-                                                                                    <i className="ri-more-2-fill"></i>
-                                                                                </DropdownToggle>
-                                                                                <DropdownMenu style={{ zIndex: '999' }}>
-                                                                                    <Link to={`/faturas/view/${rowId(row)}`} state={{ source: row }}>
-                                                                                        <DropdownItem>Visualizar</DropdownItem>
-                                                                                    </Link>
-                                                                                    <Link to={`/faturas/edit/${rowId(row)}`} state={{ source: row }}>
-                                                                                        <DropdownItem>Editar</DropdownItem>
-                                                                                    </Link>
-                                                                                    <DropdownItem onClick={() => navigate(`/faturas/view/${rowId(row)}`)}>
-                                                                                        Upload PDF
-                                                                                    </DropdownItem>
-                                                                                    <DropdownItem onClick={() => rowId(row) && handleReprocessar(rowId(row)!)}>
-                                                                                        Reprocessar
-                                                                                    </DropdownItem>
-                                                                                    <DropdownItem
-                                                                                        onClick={() => {
-                                                                                            setSelectedId(rowId(row)!)
-                                                                                            toggleModal()
-                                                                                        }}
-                                                                                    >
-                                                                                        Excluir
-                                                                                    </DropdownItem>
-                                                                                </DropdownMenu>
-                                                                            </UncontrolledDropdown>
-                                                                        </ButtonGroup>
+                                                                        <div className="d-flex justify-content-center align-items-center gap-1">
+                                                                            <Link
+                                                                                to={`/faturas/view/${rowId(row)}`}
+                                                                                state={{ source: row }}
+                                                                                className="btn btn-sm btn-soft-primary"
+                                                                                title="Ver transações"
+                                                                            >
+                                                                                <i className="ri-list-check-2 me-1"></i>
+                                                                                Transações
+                                                                            </Link>
+                                                                            <ButtonGroup>
+                                                                                <UncontrolledDropdown direction="down">
+                                                                                    <DropdownToggle tag="button" className="btn btn-sm">
+                                                                                        <i className="ri-more-2-fill"></i>
+                                                                                    </DropdownToggle>
+                                                                                    <DropdownMenu style={{ zIndex: '999' }}>
+                                                                                        <Link to={`/faturas/view/${rowId(row)}`} state={{ source: row }}>
+                                                                                            <DropdownItem>Ver Transações</DropdownItem>
+                                                                                        </Link>
+                                                                                        <Link to={`/faturas/edit/${rowId(row)}`} state={{ source: row }}>
+                                                                                            <DropdownItem>Editar</DropdownItem>
+                                                                                        </Link>
+                                                                                        <DropdownItem onClick={() => navigate(`/faturas/view/${rowId(row)}`)}>
+                                                                                            Upload PDF
+                                                                                        </DropdownItem>
+                                                                                        <DropdownItem onClick={() => rowId(row) && handleReprocessar(rowId(row)!)}>
+                                                                                            Reprocessar
+                                                                                        </DropdownItem>
+                                                                                        <DropdownItem
+                                                                                            onClick={() => {
+                                                                                                setSelectedId(rowId(row)!)
+                                                                                                toggleModal()
+                                                                                            }}
+                                                                                        >
+                                                                                            Excluir
+                                                                                        </DropdownItem>
+                                                                                    </DropdownMenu>
+                                                                                </UncontrolledDropdown>
+                                                                            </ButtonGroup>
+                                                                        </div>
                                                                     </td>
                                                                 </tr>
                                                             ))}

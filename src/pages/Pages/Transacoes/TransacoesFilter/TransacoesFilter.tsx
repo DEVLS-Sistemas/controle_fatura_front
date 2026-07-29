@@ -40,7 +40,7 @@ const TransacoesFilter = ({
 
     const anoAtual = new Date().getFullYear()
     const optAnos: SelectOptions[] = [{ value: '', label: 'Todos' }]
-    for (let a = anoAtual; a >= anoAtual - 5; a--) {
+    for (let a = anoAtual; a >= anoAtual - 10; a--) {
         optAnos.push({ value: a, label: String(a) })
     }
 
@@ -98,6 +98,7 @@ const TransacoesFilter = ({
                             <i className="ri-add-circle-line align-middle me-1"></i> Adicionar Transação
                         </Link>
                         <Button
+                            type="button"
                             color="secondary"
                             outline
                             onClick={handleExportCsv}

@@ -55,15 +55,15 @@ export const ResponsaveisTable = ({ data, getData, setPerPage, perPage, filters 
         }
     }
 
-    const handleThisRoute = async (url: string) => {
+    const handleThisRoute = async (url: string | null) => {
+        if (!url) return
         try {
             const new_url = new URL(url)
             await getData({
                 page: Number(new_url.searchParams.get('page')),
-                palavra_chave: new_url.searchParams.get('palavra_chave'),
-                nome: new_url.searchParams.get('nome'),
-                tipo: new_url.searchParams.get('tipo'),
-                ...filters,
+                palavra_chave: new_url.searchParams.get('palavra_chave') ?? filters.palavra_chave,
+                nome: new_url.searchParams.get('nome') ?? filters.nome,
+                tipo: new_url.searchParams.get('tipo') ?? filters.tipo,
             })
         } catch (error) {
             console.error(error)

@@ -51,17 +51,28 @@ const FaturasForm = () => {
         }
     }
 
+    const extractFaturaId = (result: unknown): number | string | null => {
+        const body = result as Record<string, any> | null | undefined
+        return body?.fatura?.data?.id ?? body?.data?.id ?? body?.id ?? null
+    }
+
     const onSubmit: SubmitHandler<FaturasModel> = async (data) => {
         try {
             if (isEdit) {
-                await faturasService.editFaturas({ ...data, fatura_id: record.fatura_id })
+                await faturasService.editFaturas({ ...data, fatura_id: record.fatura_id, id: record.fatura_id })
                 toast.success('Fatura atualizada com sucesso')
+                navigate(`/faturas/view/${record.fatura_id}`)
             } else {
                 const payload = { ...data, arquivo_pdf: arquivoFile }
-                await faturasService.createFaturas(payload)
+                const result = await faturasService.createFaturas(payload)
                 toast.success('Fatura cadastrada com sucesso')
+                const newId = extractFaturaId(result)
+                if (newId) {
+                    navigate(`/faturas/view/${newId}`)
+                } else {
+                    navigate('/faturas')
+                }
             }
-            navigate('/faturas')
         } catch (error: any) {
             toast.error(error?.message || 'Erro ao salvar fatura')
             throw error

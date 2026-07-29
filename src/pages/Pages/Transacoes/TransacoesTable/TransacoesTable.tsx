@@ -47,6 +47,11 @@ const formatParcelas = (atual?: number, total?: number) => {
     return `${atual ?? 1}/${total}`
 }
 
+const formatPeriodoFatura = (mes?: number, ano?: number) => {
+    if (!mes || !ano) return '-'
+    return `${String(mes).padStart(2, '0')}/${ano}`
+}
+
 export const TransacoesTable = ({
     data,
     getData,
@@ -239,6 +244,7 @@ export const TransacoesTable = ({
                                                                 <th scope="col">Categoria</th>
                                                                 <th scope="col">Responsável</th>
                                                                 <th scope="col">Cartão</th>
+                                                                <th scope="col">Fatura</th>
                                                                 <th scope="col">Parcelas</th>
                                                                 <th scope="col" style={{ width: "120px" }}>Ações</th>
                                                             </tr>
@@ -296,6 +302,15 @@ export const TransacoesTable = ({
                                                                             </div>
                                                                         </td>
                                                                         <td>{row.cartao_nome ?? '-'}</td>
+                                                                        <td>
+                                                                            {row.fatura_id ? (
+                                                                                <Link to={`/faturas/view/${row.fatura_id}`}>
+                                                                                    {formatPeriodoFatura(row.fatura_mes, row.fatura_ano)}
+                                                                                </Link>
+                                                                            ) : (
+                                                                                formatPeriodoFatura(row.fatura_mes, row.fatura_ano)
+                                                                            )}
+                                                                        </td>
                                                                         <td>{formatParcelas(row.parcela_atual, row.parcelas_total)}</td>
                                                                         <td>
                                                                             <ButtonGroup>
