@@ -1,0 +1,115 @@
+export interface TransacoesSearch {
+    id?: string | null
+    transacao_id?: string | null
+    data_inicio?: string | null
+    data_fim?: string | null
+    cartao_id?: string | number | null
+    categoria_id?: string | number | null
+    responsavel_id?: string | number | null
+    fatura_id?: string | number | null
+    tipo?: string | null
+    mes?: string | number | null
+    ano?: string | number | null
+    palavra_chave?: string | null | unknown
+}
+
+export interface TransacoesList {
+    id?: number
+    fatura_id?: number
+    data?: string
+    estabelecimento?: string
+    valor?: number
+    parcelas_total?: number
+    parcela_atual?: number
+    tipo?: string
+    categoria_id?: number | null
+    categoria_nome?: string
+    categoria_cor?: string
+    responsavel_id?: number | null
+    responsavel_nome?: string
+    responsavel_tipo?: string
+    cartao_id?: number
+    cartao_nome?: string
+    fatura_mes?: number
+    fatura_ano?: number
+    observacoes?: string
+}
+
+export interface TransacoesView extends TransacoesList {}
+
+export interface TransacoesModel {
+    id?: number | null
+    transacao_id?: number | null
+    fatura_id: number | string | null
+    data?: string | null
+    estabelecimento: string | null
+    valor: number | string | null
+    parcelas_total?: number | string | null
+    parcela_atual?: number | string | null
+    valor_parcela?: number | string | null
+    tipo?: string | null
+    categoria_id?: number | string | null
+    responsavel_id?: number | string | null
+    observacoes?: string | null
+}
+
+export interface CategoriaLookup {
+    id?: number
+    nome?: string
+    cor?: string
+}
+
+export interface ResponsavelLookup {
+    id?: number
+    nome?: string
+    tipo?: string
+}
+
+export interface CartaoLookup {
+    id?: number
+    nome?: string
+}
+
+export interface FaturaLookup {
+    id?: number
+    mes?: number
+    ano?: number
+    cartao_nome?: string
+}
+
+export interface TipoLookup {
+    value?: string
+    label?: string
+}
+
+export interface LookupsTransacoes {
+    tipos?: TipoLookup[]
+    categorias?: CategoriaLookup[]
+    responsaveis?: ResponsavelLookup[]
+    faturas?: FaturaLookup[]
+    cartoes?: CartaoLookup[]
+}
+
+export interface TransacoesInterface {
+    getViewTransacoes(params: { id: number | string }): Promise<TransacoesView | undefined>
+    listTransacoesPaginate(params: TransacoesSearch): Promise<any>
+    AsyncListTransacoes(params: TransacoesSearch): Promise<TransacoesModel[] | undefined>
+    createTransacoes(params: TransacoesModel): Promise<any>
+    editTransacoes(params: TransacoesModel): Promise<any>
+    deleteTransacoes(id: number): Promise<any>
+    getLookupsTransacoes(): Promise<LookupsTransacoes | undefined>
+    exportCsv(params: TransacoesSearch): Promise<Blob>
+}
+
+export const TransacoesDefaultValues: TransacoesModel = {
+    id: null,
+    transacao_id: null,
+    fatura_id: null,
+    data: null,
+    estabelecimento: null,
+    valor: null,
+    tipo: 'purchase',
+    categoria_id: null,
+    responsavel_id: null,
+    observacoes: null,
+}

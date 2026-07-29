@@ -26,11 +26,6 @@ const Navdata = () => {
         if (iscurrentState !== "Dashboard") {
             setIsDashboard(false);
         }
-
-        if (iscurrentState === "Usuarios") {
-            history("/usuarios");
-            document.body.classList.add("twocolumn-panel");
-        }
     }, [history, iscurrentState, isDashboard]);
 
     const menuItems: any = [
@@ -40,47 +35,68 @@ const Navdata = () => {
         },
         {
             id: "dashboard",
-            label: "Dashboards",
+            label: "Dashboard",
             icon: "ri-dashboard-2-line",
-            link: "/#",
-            stateVariables: isDashboard,
+            link: "/dashboard",
             click: function (e: any) {
                 e.preventDefault();
-                setIsDashboard(!isDashboard);
                 setIscurrentState("Dashboard");
                 updateIconSidebar(e);
+                history("/dashboard");
             },
-            subItems: [
-                {
-                    id: "dashboard-home",
-                    label: "Principal",
-                    link: "/dashboard",
-                    parentId: "dashboard",
-                },
-                {
-                    id: "nft",
-                    label: "NFT",
-                    link: "/dashboard-nft",
-                    parentId: "dashboard",
-                },
-                {
-                    id: "job",
-                    label: "Job",
-                    link: "/dashboard-job",
-                    parentId: "dashboard",
-                    badgeColor: "success",
-                    badgeName: "New",
-                },
-            ],
         },
         {
-            id: "usuarios",
-            label: "Usuários",
-            icon: "ri-user-line",
-            link: "/usuarios",
+            id: "cartoes",
+            label: "Cartões",
+            icon: "ri-bank-card-line",
+            link: "/cartoes",
             click: function (e: any) {
                 e.preventDefault();
-                setIscurrentState("Usuarios");
+                setIscurrentState("Cartoes");
+                updateIconSidebar(e);
+            },
+        },
+        {
+            id: "faturas",
+            label: "Faturas",
+            icon: "ri-file-list-3-line",
+            link: "/faturas",
+            click: function (e: any) {
+                e.preventDefault();
+                setIscurrentState("Faturas");
+                updateIconSidebar(e);
+            },
+        },
+        {
+            id: "transacoes",
+            label: "Transações",
+            icon: "ri-exchange-dollar-line",
+            link: "/transacoes",
+            click: function (e: any) {
+                e.preventDefault();
+                setIscurrentState("Transacoes");
+                updateIconSidebar(e);
+            },
+        },
+        {
+            id: "categorias",
+            label: "Categorias",
+            icon: "ri-price-tag-3-line",
+            link: "/categorias",
+            click: function (e: any) {
+                e.preventDefault();
+                setIscurrentState("Categorias");
+                updateIconSidebar(e);
+            },
+        },
+        {
+            id: "responsaveis",
+            label: "Responsáveis",
+            icon: "ri-user-shared-line",
+            link: "/responsaveis",
+            click: function (e: any) {
+                e.preventDefault();
+                setIscurrentState("Responsaveis");
                 updateIconSidebar(e);
             },
         },

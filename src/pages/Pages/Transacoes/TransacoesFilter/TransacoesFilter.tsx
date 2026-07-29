@@ -1,0 +1,259 @@
+import UiContent from "Components/Common/UiContent"
+import React, { useState } from "react"
+import { Link } from "react-router-dom"
+import { useForm } from "react-hook-form"
+import { toast } from "react-toastify"
+import {
+    Breadcrumb, BreadcrumbItem, Button, Card, CardHeader, Col, Collapse, Label, Row
+} from "reactstrap"
+import { InputTextControlled } from "Components/ComponentController/Inputs/Text/InputTextControlled"
+import { InputDate } from "Components/ComponentController/Inputs/Date/InputDate"
+import { SelectListControlled } from "Components/ComponentController/Selects/Select/SelectListControlled"
+import { SelectOptions } from "interfaces/SystemInterfaces/SelectInterface"
+import { mesesOptions } from "helpers/fatura_helpers"
+import { TransacoesSearch } from "interfaces/Transacoes/TransacoesInterface"
+import { TransacoesService } from "services/Transacoes/TransacoesService"
+
+export interface TransacoesFilterProps {
+    getRemoteTransacoesList: (data: any) => void
+    cartoesOptions: SelectOptions[]
+    categoriasOptions: SelectOptions[]
+    responsaveisOptions: SelectOptions[]
+    tiposOptions: SelectOptions[]
+    filtersRef: TransacoesSearch
+}
+
+const TransacoesFilter = ({
+    getRemoteTransacoesList,
+    cartoesOptions,
+    categoriasOptions,
+    responsaveisOptions,
+    tiposOptions,
+    filtersRef,
+}: TransacoesFilterProps) => {
+    const { handleSubmit, control, register, getValues } = useForm<TransacoesSearch>({
+        defaultValues: filtersRef,
+    })
+    const [showFilter, setShowFilter] = useState<boolean>(false)
+    const [exporting, setExporting] = useState(false)
+    const transacoesService = new TransacoesService()
+
+    const anoAtual = new Date().getFullYear()
+    const optAnos: SelectOptions[] = [{ value: '', label: 'Todos' }]
+    for (let a = anoAtual; a >= anoAtual - 5; a--) {
+        optAnos.push({ value: a, label: String(a) })
+    }
+
+    const optMeses: SelectOptions[] = [{ value: '', label: 'Todos' }, ...mesesOptions]
+
+    const handleExportCsv = async () => {
+        setExporting(true)
+        try {
+            const filters = getValues()
+            Object.keys(filters).reduce(
+                (acc, k) => (!filters[k as keyof TransacoesSearch] && filters[k as keyof TransacoesSearch] !== 0 && delete acc[k], acc),
+                filters as Record<string, unknown>
+            )
+            const blob = await transacoesService.exportCsv(filters)
+            const url = URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = url
+            a.download = `transacoes_${Date.now()}.csv`
+            a.click()
+            URL.revokeObjectURL(url)
+            toast.success('Exportação concluída')
+        } catch (error) {
+            console.error('Erro ao exportar:', error)
+            toast.error('Erro ao exportar transações')
+        } finally {
+            setExporting(false)
+        }
+    }
+
+    return (
+        <React.Fragment>
+            <UiContent />
+
+            <Row>
+                <Col xs={12}>
+                    <div className="page-title-box d-sm-flex align-items-center justify-content-between">
+                        <div className="d-flex align-items-center">
+                            <Link to="/dashboard" className="me-2">
+                                <i className="bx bx-arrow-back bx-sm"></i>
+                            </Link>
+                            <h4 className="mb-0">Transações</h4>
+                        </div>
+                        <Breadcrumb pageTitle="" listClassName="mb-sm-0 pt-1 py-2">
+                            <BreadcrumbItem><Link to="/dashboard"><i className="ri-home-5-fill"></i></Link></BreadcrumbItem>
+                            <BreadcrumbItem active>Transações</BreadcrumbItem>
+                        </Breadcrumb>
+                    </div>
+                </Col>
+            </Row>
+
+            <Row>
+                <Col xs={12}>
+                    <div className="d-flex flex-row justify-content-end align-items-center mb-4 gap-2">
+                        <Link to="/transacoes/add" className="btn btn-primary">
+                            <i className="ri-add-circle-line align-middle me-1"></i> Adicionar Transação
+                        </Link>
+                        <Button
+                            color="secondary"
+                            outline
+                            onClick={handleExportCsv}
+                            disabled={exporting}
+                        >
+                            <i className="ri-file-download-line align-middle me-1"></i>
+                            {exporting ? 'Exportando...' : 'Exportar CSV/Excel'}
+                        </Button>
+                    </div>
+                </Col>
+                <Col xl={12}>
+                    <Card>
+                        <CardHeader>
+                            <div className="gap-2 flex-wrap">
+                                <Row>
+                                    <Col md={4}>
+                                        <Button onClick={() => setShowFilter(!showFilter)} color="primary" className="mb-1">
+                                            Filtros
+                                        </Button>
+                                    </Col>
+                                    {!showFilter && (
+                                        <Col md={8}>
+                                            <form onSubmit={handleSubmit(getRemoteTransacoesList)}>
+                                                <div className="input-group">
+                                                    <input
+                                                        {...register("palavra_chave")}
+                                                        type="text"
+                                                        className="form-control"
+                                                        placeholder="Buscar..."
+                                                    />
+                                                    <button className="btn btn-success" type="submit">
+                                                        <i className="ri-search-line align-middle me-1"></i> Buscar
+                                                    </button>
+                                                </div>
+                                            </form>
+                                        </Col>
+                                    )}
+                                </Row>
+                            </div>
+
+                            <Row>
+                                <Col>
+                                    <Collapse isOpen={showFilter} className="multi-collapse mt-3">
+                                        <form
+                                            className="px-0 my-0 m-2"
+                                            id="form-search"
+                                            onSubmit={handleSubmit(getRemoteTransacoesList)}
+                                        >
+                                            <Row>
+                                                <Col md={3}>
+                                                    <div className="mb-3">
+                                                        <Label htmlFor="data_inicio" className="form-label">Data início</Label>
+                                                        <InputDate<TransacoesSearch>
+                                                            field="data_inicio"
+                                                            register={register}
+                                                        />
+                                                    </div>
+                                                </Col>
+                                                <Col md={3}>
+                                                    <div className="mb-3">
+                                                        <Label htmlFor="data_fim" className="form-label">Data fim</Label>
+                                                        <InputDate<TransacoesSearch>
+                                                            field="data_fim"
+                                                            register={register}
+                                                        />
+                                                    </div>
+                                                </Col>
+                                                <Col md={3}>
+                                                    <div className="mb-3">
+                                                        <Label htmlFor="cartao_id" className="form-label">Cartão</Label>
+                                                        <SelectListControlled<TransacoesSearch>
+                                                            options={cartoesOptions}
+                                                            field="cartao_id"
+                                                            control={control}
+                                                        />
+                                                    </div>
+                                                </Col>
+                                                <Col md={3}>
+                                                    <div className="mb-3">
+                                                        <Label htmlFor="tipo" className="form-label">Tipo</Label>
+                                                        <SelectListControlled<TransacoesSearch>
+                                                            options={tiposOptions}
+                                                            field="tipo"
+                                                            control={control}
+                                                        />
+                                                    </div>
+                                                </Col>
+                                            </Row>
+                                            <Row>
+                                                <Col md={3}>
+                                                    <div className="mb-3">
+                                                        <Label htmlFor="categoria_id" className="form-label">Categoria</Label>
+                                                        <SelectListControlled<TransacoesSearch>
+                                                            options={categoriasOptions}
+                                                            field="categoria_id"
+                                                            control={control}
+                                                        />
+                                                    </div>
+                                                </Col>
+                                                <Col md={3}>
+                                                    <div className="mb-3">
+                                                        <Label htmlFor="responsavel_id" className="form-label">Responsável</Label>
+                                                        <SelectListControlled<TransacoesSearch>
+                                                            options={responsaveisOptions}
+                                                            field="responsavel_id"
+                                                            control={control}
+                                                        />
+                                                    </div>
+                                                </Col>
+                                                <Col md={2}>
+                                                    <div className="mb-3">
+                                                        <Label htmlFor="mes" className="form-label">Mês</Label>
+                                                        <SelectListControlled<TransacoesSearch>
+                                                            options={optMeses}
+                                                            field="mes"
+                                                            control={control}
+                                                        />
+                                                    </div>
+                                                </Col>
+                                                <Col md={2}>
+                                                    <div className="mb-3">
+                                                        <Label htmlFor="ano" className="form-label">Ano</Label>
+                                                        <SelectListControlled<TransacoesSearch>
+                                                            options={optAnos}
+                                                            field="ano"
+                                                            control={control}
+                                                        />
+                                                    </div>
+                                                </Col>
+                                            </Row>
+                                            <Row className="mt-3">
+                                                <div className="d-flex flex-row justify-content-end align-items-center">
+                                                    <Col md={6}>
+                                                        <InputTextControlled<TransacoesSearch>
+                                                            field="palavra_chave"
+                                                            control={control}
+                                                            placeholder="Buscar..."
+                                                        />
+                                                    </Col>
+                                                    <Col md={2} className="me-3">
+                                                        <button className="btn btn-success form-control ms-3" type="submit">
+                                                            Buscar
+                                                        </button>
+                                                    </Col>
+                                                </div>
+                                            </Row>
+                                        </form>
+                                    </Collapse>
+                                </Col>
+                            </Row>
+                        </CardHeader>
+                    </Card>
+                </Col>
+            </Row>
+        </React.Fragment>
+    )
+}
+
+export default TransacoesFilter

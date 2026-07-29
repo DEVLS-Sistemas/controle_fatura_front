@@ -1,42 +1,25 @@
-import PropTypes from "prop-types";
 import React, { useEffect } from "react";
 import { Navigate } from "react-router-dom";
-
-import { logoutUser } from "../../slices/thunks";
-
-//redux
-import { useSelector, useDispatch } from "react-redux";
-
 import withRouter from "../../Components/Common/withRouter";
-import { createSelector } from "reselect";
+import { AuthService } from "services/Auth";
 
-const Logout = (props : any) => {
-  const dispatch : any = useDispatch();
-
-
-  const logoutData = createSelector(
-    // (state) => state.Dashboard.productOverviewChart,
-    (state) => state.Login.isUserLogout,
-    (isUserLogout) => isUserLogout
-    );
-    
-  // Inside your component
-  const isUserLogout = useSelector(logoutData);
+const Logout = () => {
+  const [done, setDone] = React.useState(false);
 
   useEffect(() => {
-    dispatch(logoutUser());
-  }, [dispatch]);
+    const run = async () => {
+      const authService = new AuthService();
+      await authService.logout();
+      setDone(true);
+    };
+    run();
+  }, []);
 
-  if (isUserLogout) {
+  if (done) {
     return <Navigate to="/login" />;
   }
 
   return <></>;
 };
-
-Logout.propTypes = {
-  history: PropTypes.object,
-};
-
 
 export default withRouter(Logout);

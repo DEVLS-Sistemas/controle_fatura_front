@@ -1,8 +1,28 @@
 import axios, { AxiosResponse } from 'axios';
+
+const API_BASE_URL =
+  process.env.REACT_APP_API_URL || 'http://127.0.0.1:5000/api/v1/';
+
 export const ApiConfig = axios.create({
-  baseURL: 'http://10.0.0.164:5000/api/v1/',
+  baseURL: API_BASE_URL,
 });
 
+ApiConfig.interceptors.request.use((config) => {
+  try {
+    const raw = sessionStorage.getItem('authUser');
+    if (raw) {
+      const auth = JSON.parse(raw);
+      const token = auth?.token;
+      if (token) {
+        config.headers = config.headers || {};
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+    }
+  } catch {
+    // ignore parse errors
+  }
+  return config;
+});
 
 type HttpRequest = {
   url: string
@@ -19,7 +39,6 @@ type HttpResponse<T = any> = {
   errors?: Array<T>
 }
 
-
 export interface HttpClient<R = any> {
   request: (data: HttpRequest) => Promise<HttpResponse<R>>
   get: (data: HttpRequest) => Promise<HttpResponse<R>>
@@ -28,9 +47,7 @@ export interface HttpClient<R = any> {
   delete: (data: HttpRequest) => Promise<HttpResponse<R>>
 }
 
-
 type HttpMethod = 'post' | 'get' | 'put' | 'delete'
-
 
 export enum HttpStatusCode {
   ok = 200,
@@ -44,54 +61,54 @@ export enum HttpStatusCode {
   serverError = 500
 }
 
-
 export class AxiosHttpClient implements HttpClient {
   async get<T = any>({ url, method = 'get', body, headers }: HttpRequest): Promise<HttpResponse<T>> {
     return await this.request({ url, method, params: body, headers })
-
   }
 
   async post<T = any>({ url, method = 'post', body, headers }: HttpRequest): Promise<HttpResponse<T>> {
     return await this.request({ url, method, body, headers })
-
   }
 
   async put<T = any>({ url, method = 'put', body, headers }: HttpRequest): Promise<HttpResponse<T>> {
     return await this.request({ url, method, body, headers })
-
   }
 
   async delete<T = any>({ url, method = 'delete', body, headers }: HttpRequest): Promise<HttpResponse<T>> {
     return await this.request({ url, method, body, headers })
-
   }
 
   async request(data: HttpRequest): Promise<HttpResponse> {
     let axiosResponse: AxiosResponse
 
     try {
-      // console.log(data.url)
-
       axiosResponse = await ApiConfig.request({
         url: data.url,
         method: data.method,
         data: data.body,
         headers: data.headers,
-        // params: data?.params
         params: data && data.params
       })
     } catch (error: any) {
-      axiosResponse =  error && error.response
+      axiosResponse = error && error.response
       if (error && error.response && error.response.data) {
-        axiosResponse.data.data = error.response.data.errors;
+        if (axiosResponse?.data) {
+          axiosResponse.data.data = error.response.data.errors;
+        }
       }
-      // axiosResponse.data.data = error?.response?.data?.errors
+      if (!axiosResponse) {
+        return {
+          statusCode: HttpStatusCode.serverError,
+          body: undefined,
+          message: error?.message || 'Erro de conexão com a API'
+        }
+      }
     }
 
     return {
       statusCode: axiosResponse.status,
       body: axiosResponse.data,
-      message: axiosResponse.data.message
+      message: axiosResponse.data?.message
     }
   }
 }

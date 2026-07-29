@@ -1,0 +1,156 @@
+import { AxiosHttpClient, HttpStatusCode } from "../../libs/api/ApiConfig"
+import { AccessDeniedError } from "../../libs/api/exceptions/AccessDeniedError"
+import { UnexpectedError } from "../../libs/api/exceptions/UnexpectedError"
+import { ValidationError } from "../../libs/api/exceptions/ValidationError"
+import { PaginateInterface } from "interfaces/SystemInterfaces/PaginateInterface"
+import {
+    FaturasInterface,
+    FaturasList,
+    FaturasModel,
+    FaturasSearch,
+    FaturasView,
+    LookupsFaturas,
+} from "interfaces/Faturas/FaturasInterface"
+
+export class FaturasService implements FaturasInterface {
+    private readonly url: string
+    private readonly httpClient: AxiosHttpClient
+
+    constructor() {
+        this.url = 'faturas'
+        this.httpClient = new AxiosHttpClient()
+    }
+
+    async getViewFaturas(params: any): Promise<FaturasView | undefined> {
+        const response = await this.httpClient.get<FaturasView>({
+            url: `${this.url}/listar/${params.id}`
+        })
+        switch (response.statusCode) {
+            case HttpStatusCode.ok: return response.body
+            case HttpStatusCode.unauthorized: throw new AccessDeniedError()
+            default: throw new UnexpectedError()
+        }
+    }
+
+    async listFaturasPaginate(params: FaturasSearch): Promise<PaginateInterface<FaturasList> | undefined> {
+        try {
+            const response = await this.httpClient.get<PaginateInterface<FaturasList>>({
+                url: this.url + '/listar',
+                body: params
+            })
+            if (!response || !response.statusCode) throw new UnexpectedError()
+            switch (response.statusCode) {
+                case HttpStatusCode.ok: return response.body
+                case HttpStatusCode.unauthorized: throw new AccessDeniedError()
+                default: throw new UnexpectedError()
+            }
+        } catch (error) {
+            console.error('Erro ao buscar faturas:', error)
+            throw error
+        }
+    }
+
+    async AsyncListFaturas(params: FaturasSearch): Promise<FaturasModel[] | undefined> {
+        const response = await this.httpClient.get<any>({
+            url: this.url + '/faturas-list',
+            body: params
+        })
+        switch (response.statusCode) {
+            case HttpStatusCode.ok: return response.body
+            case HttpStatusCode.unauthorized: throw new AccessDeniedError()
+            default: throw new UnexpectedError()
+        }
+    }
+
+    async getLookupsFaturas(): Promise<LookupsFaturas | undefined> {
+        const response = await this.httpClient.get<LookupsFaturas>({
+            url: this.url + '/lookups'
+        })
+        switch (response.statusCode) {
+            case HttpStatusCode.ok: return response.body
+            case HttpStatusCode.unauthorized: throw new AccessDeniedError()
+            default: throw new UnexpectedError()
+        }
+    }
+
+    async createFaturas(params: FaturasModel) {
+        const form = new FormData()
+        Object.entries(params).forEach(([k, v]) => {
+            if (v === null || v === undefined) return
+            if (k === 'arquivo_pdf' && v instanceof File) form.append('arquivo_pdf', v)
+            else form.append(k, String(v))
+        })
+        const response = await this.httpClient.post({
+            url: this.url + '/cadastrar',
+            body: form,
+            headers: { 'Content-Type': 'multipart/form-data' }
+        })
+        switch (response.statusCode) {
+            case HttpStatusCode.ok: return response.body
+            case HttpStatusCode.noContent: return
+            case HttpStatusCode.unauthorized: throw new AccessDeniedError()
+            case HttpStatusCode.invalidForm: throw new ValidationError(response.body)
+            default: throw new UnexpectedError(response.message)
+        }
+    }
+
+    async editFaturas(params: FaturasModel) {
+        const response = await this.httpClient.put({
+            url: this.url + '/editar', body: params
+        })
+        switch (response.statusCode) {
+            case HttpStatusCode.ok: return response.body
+            case HttpStatusCode.noContent: return
+            case HttpStatusCode.unauthorized: throw new AccessDeniedError()
+            case HttpStatusCode.invalidForm: throw new ValidationError(response.body)
+            default: throw new UnexpectedError(response.message)
+        }
+    }
+
+    async deleteFaturas(id: number) {
+        const response = await this.httpClient.delete({
+            url: this.url + '/excluir/' + id
+        })
+        switch (response.statusCode) {
+            case HttpStatusCode.ok: return response
+            case HttpStatusCode.noContent: return
+            case HttpStatusCode.unauthorized: throw new AccessDeniedError()
+            case HttpStatusCode.invalidForm: throw new ValidationError(response.body)
+            default: throw new UnexpectedError(response.message)
+        }
+    }
+
+    async uploadPdf(params: { id: number; arquivo_pdf: File; processar_automatico?: boolean }) {
+        const form = new FormData()
+        form.append('id', String(params.id))
+        form.append('arquivo_pdf', params.arquivo_pdf)
+        if (params.processar_automatico !== undefined) {
+            form.append('processar_automatico', String(params.processar_automatico))
+        }
+        const response = await this.httpClient.post({
+            url: this.url + '/upload-pdf',
+            body: form,
+            headers: { 'Content-Type': 'multipart/form-data' },
+        })
+        switch (response.statusCode) {
+            case HttpStatusCode.ok: return response.body
+            case HttpStatusCode.noContent: return
+            case HttpStatusCode.unauthorized: throw new AccessDeniedError()
+            case HttpStatusCode.invalidForm: throw new ValidationError(response.body)
+            default: throw new UnexpectedError(response.message)
+        }
+    }
+
+    async processarPdf(id: number) {
+        const response = await this.httpClient.post({
+            url: `${this.url}/processar/${id}`
+        })
+        switch (response.statusCode) {
+            case HttpStatusCode.ok: return response.body
+            case HttpStatusCode.noContent: return
+            case HttpStatusCode.unauthorized: throw new AccessDeniedError()
+            case HttpStatusCode.invalidForm: throw new ValidationError(response.body)
+            default: throw new UnexpectedError(response.message)
+        }
+    }
+}
