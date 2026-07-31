@@ -50,6 +50,7 @@ const TransacoesForm = () => {
     const [estabelecimentosOptions, setEstabelecimentosOptions] = useState<SelectOptions[]>([])
     const [estabelecimentosLookup, setEstabelecimentosLookup] = useState<EstabelecimentoLookup[]>([])
     const [responsaveisLookup, setResponsaveisLookup] = useState<ResponsavelLookup[]>([])
+    const [defaultResponsavelId, setDefaultResponsavelId] = useState<number | null>(null)
     const [responsavelModalOpen, setResponsavelModalOpen] = useState(false)
     const skipEstabelecimentoEffect = useRef(true)
     const skipCategoriaEffect = useRef(true)
@@ -67,7 +68,13 @@ const TransacoesForm = () => {
     const responsavelId = watch('responsavel_id')
 
     const responsavelAtual = responsaveisLookup.find((r) => Number(r.id) === Number(responsavelId))
-    const responsavelLabel = responsavelAtual?.nome ?? (responsavelId ? `#${responsavelId}` : '—')
+    const isMeuResponsavel =
+        responsavelId == null
+        || (defaultResponsavelId != null && Number(responsavelId) === Number(defaultResponsavelId))
+        || (responsavelAtual?.nome ?? '').trim().toLowerCase() === 'eu'
+    const responsavelLabel = isMeuResponsavel
+        ? null
+        : (responsavelAtual?.nome ?? (responsavelId ? `#${responsavelId}` : null))
 
     const optTipos: SelectOptions[] = Object.entries(tipoTransacaoLabel).map(([value, label]) => ({
         value,
@@ -116,6 +123,9 @@ const TransacoesForm = () => {
             }
             if (lookups?.responsaveis) {
                 setResponsaveisLookup(lookups.responsaveis)
+            }
+            if (lookups?.default_responsavel_id != null) {
+                setDefaultResponsavelId(lookups.default_responsavel_id)
             }
             if (!isEdit && lookups?.default_responsavel_id && !record.responsavel_id) {
                 setValue('responsavel_id', lookups.default_responsavel_id)
@@ -283,25 +293,28 @@ const TransacoesForm = () => {
                                                     <InputTextControlled<TransacoesModel>
                                                         field="valor"
                                                         control={control}
-                                                        rules={required}
+                                                        required={required}
                                                     />
                                                 </div>
                                             </Col>
                                             <Col md={3}>
                                                 <div className="mb-3">
-                                                    <Label className="form-label">Responsável</Label>
-                                                    <div className="d-flex align-items-center gap-2">
-                                                        <span className="form-control bg-light">
-                                                            {responsavelLabel}
-                                                        </span>
+                                                    <Label className="form-label text-muted">Responsável</Label>
+                                                    <div>
                                                         <Button
                                                             type="button"
-                                                            color="soft-primary"
+                                                            color="light"
+                                                            className="border w-100 text-start"
                                                             onClick={() => setResponsavelModalOpen(true)}
-                                                            title="Alterar responsável"
+                                                            title="Definir responsável"
                                                         >
-                                                            <i className="ri-user-line"></i>
+                                                            <i className="ri-user-line me-2"></i>
+                                                            {responsavelLabel ?? 'Eu'}
+                                                            <i className="ri-arrow-down-s-line float-end mt-1"></i>
                                                         </Button>
+                                                        {!responsavelLabel && (
+                                                            <small className="text-muted">Padrão — clique para trocar ou cadastrar outro</small>
+                                                        )}
                                                     </div>
                                                 </div>
                                             </Col>

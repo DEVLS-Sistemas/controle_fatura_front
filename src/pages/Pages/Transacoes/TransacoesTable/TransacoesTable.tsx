@@ -2,7 +2,7 @@ import UiContent from "Components/Common/UiContent"
 import React, { useEffect, useState } from "react"
 import { Link } from "react-router-dom"
 import {
-    Badge, Button, ButtonGroup, Card, CardBody, Col, DropdownItem,
+    Button, ButtonGroup, Card, CardBody, Col, DropdownItem,
     DropdownMenu, DropdownToggle, Label, Row, UncontrolledDropdown,
     UncontrolledTooltip,
 } from "reactstrap"
@@ -13,7 +13,6 @@ import { useNavegacao } from "helpers/functions_helpers"
 import {
     formatCurrency,
     formatDateBr,
-    responsavelTipoColor,
 } from "helpers/fatura_helpers"
 import {
     ResponsavelLookup,
@@ -32,13 +31,9 @@ export interface TransacoesTableProps {
     perPage: number
     filters: TransacoesSearch
     responsaveisLookup: ResponsavelLookup[]
+    defaultResponsavelId?: number | null
     onResponsaveisChange?: (list: ResponsavelLookup[]) => void
     onRowsChange?: (data: PaginateInterface<TransacoesList>) => void
-}
-
-const responsavelTipoLabel: Record<string, string> = {
-    pessoal: 'Pessoal',
-    empresa: 'Empresa',
 }
 
 const formatParcelas = (atual?: number, total?: number) => {
@@ -64,6 +59,7 @@ export const TransacoesTable = ({
     perPage,
     filters,
     responsaveisLookup,
+    defaultResponsavelId = null,
     onResponsaveisChange,
     onRowsChange,
 }: TransacoesTableProps) => {
@@ -174,6 +170,14 @@ export const TransacoesTable = ({
 
     const rows = localRows.length ? localRows : (data?.data ?? [])
 
+    const isMeuResponsavel = (responsavelId?: number | null, responsavelNome?: string | null) => {
+        if (responsavelId == null) return true
+        if (defaultResponsavelId != null) return Number(responsavelId) === Number(defaultResponsavelId)
+        const nome = responsavelNome
+            ?? responsaveisLookup.find((r) => Number(r.id) === Number(responsavelId))?.nome
+        return (nome ?? '').trim().toLowerCase() === 'eu'
+    }
+
     return (
         <React.Fragment>
             <UiContent />
@@ -224,8 +228,8 @@ export const TransacoesTable = ({
                                                                 <th scope="col">Valor</th>
                                                                 <th scope="col">Categoria</th>
                                                                 <th scope="col">Subcategoria</th>
-                                                                <th scope="col">Responsável</th>
                                                                 <th scope="col" className="text-start">Observação</th>
+                                                                <th scope="col" style={{ width: "100px" }} title="Responsável">Resp.</th>
                                                                 <th scope="col">Fatura / Cartão</th>
                                                                 <th scope="col">Parcelas</th>
                                                                 <th scope="col" style={{ width: "120px" }}>Ações</th>
@@ -236,8 +240,10 @@ export const TransacoesTable = ({
                                                                 const observacaoId = `obs-${row.id ?? index}`
                                                                 const estabelecimentoNome =
                                                                     row.estabelecimento_nome ?? row.estabelecimento ?? '-'
-                                                                const responsavelTipo = row.responsavel_tipo
-                                                                    ?? responsaveisLookup.find((r) => r.id === row.responsavel_id)?.tipo
+                                                                const showResponsavelNome = !isMeuResponsavel(
+                                                                    row.responsavel_id,
+                                                                    row.responsavel_nome
+                                                                )
                                                                 return (
                                                                     <tr key={row.id ?? index}>
                                                                         <td>{formatDateBr(row.data)}</td>
@@ -261,29 +267,6 @@ export const TransacoesTable = ({
                                                                             ) : '-'}
                                                                         </td>
                                                                         <td>{row.subcategoria_nome ?? '-'}</td>
-                                                                        <td>
-                                                                            <div className="d-flex align-items-center gap-1 justify-content-center">
-                                                                                <span>{row.responsavel_nome ?? '-'}</span>
-                                                                                {responsavelTipo && (
-                                                                                    <Badge
-                                                                                        color={responsavelTipoColor[responsavelTipo] ?? 'secondary'}
-                                                                                        className="text-nowrap"
-                                                                                    >
-                                                                                        {responsavelTipoLabel[responsavelTipo] ?? responsavelTipo}
-                                                                                    </Badge>
-                                                                                )}
-                                                                                <Button
-                                                                                    type="button"
-                                                                                    color="soft-primary"
-                                                                                    size="sm"
-                                                                                    className="btn-icon"
-                                                                                    title="Alterar responsável"
-                                                                                    onClick={() => openResponsavelModal(row)}
-                                                                                >
-                                                                                    <i className="ri-user-line"></i>
-                                                                                </Button>
-                                                                            </div>
-                                                                        </td>
                                                                         <td className="text-start">
                                                                             {row.observacoes ? (
                                                                                 <>
@@ -295,6 +278,23 @@ export const TransacoesTable = ({
                                                                                     )}
                                                                                 </>
                                                                             ) : '-'}
+                                                                        </td>
+                                                                        <td>
+                                                                            <Button
+                                                                                type="button"
+                                                                                color="light"
+                                                                                size="sm"
+                                                                                className="border"
+                                                                                title={showResponsavelNome ? `Responsável: ${row.responsavel_nome}` : 'Definir responsável'}
+                                                                                onClick={() => openResponsavelModal(row)}
+                                                                            >
+                                                                                <i className="ri-user-line me-1"></i>
+                                                                                {showResponsavelNome ? (
+                                                                                    <span className="small">{row.responsavel_nome}</span>
+                                                                                ) : (
+                                                                                    <span className="small text-muted">Eu</span>
+                                                                                )}
+                                                                            </Button>
                                                                         </td>
                                                                         <td>
                                                                             <div>{row.cartao_nome ?? '-'}</div>

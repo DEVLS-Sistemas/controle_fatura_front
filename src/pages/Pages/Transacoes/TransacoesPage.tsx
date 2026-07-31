@@ -72,6 +72,7 @@ const TransacoesPage = () => {
     const [responsaveisOptions, setResponsaveisOptions] = useState<SelectOptions[]>([{ value: '', label: 'Todos' }])
     const [tiposOptions, setTiposOptions] = useState<SelectOptions[]>(defaultTiposOptions)
     const [responsaveisLookup, setResponsaveisLookup] = useState<ResponsavelLookup[]>([])
+    const [defaultResponsavelId, setDefaultResponsavelId] = useState<number | null>(null)
 
     const syncContext = (data: TransacoesSearch & PaginateSearch) => {
         transacoesContext.palavra_chave = data.palavra_chave
@@ -109,6 +110,7 @@ const TransacoesPage = () => {
                 setCategoriasOptions(buildSelectOptions(result.categorias))
                 setResponsaveisOptions(buildSelectOptions(result.responsaveis))
                 setResponsaveisLookup(result.responsaveis ?? [])
+                setDefaultResponsavelId(result.default_responsavel_id ?? null)
                 if (result.estabelecimentos?.length) {
                     setEstabelecimentosOptions(buildSelectOptions(result.estabelecimentos))
                 } else {
@@ -163,6 +165,7 @@ const TransacoesPage = () => {
                                 setPage={setPage}
                                 page={page}
                                 responsaveisLookup={responsaveisLookup}
+                                defaultResponsavelId={defaultResponsavelId}
                                 onResponsaveisChange={setResponsaveisLookup}
                                 onRowsChange={setTransacoesList}
                             />

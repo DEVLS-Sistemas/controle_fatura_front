@@ -16,9 +16,11 @@ import {
 } from 'helpers/fatura_helpers'
 import { SelectOptions } from 'interfaces/SystemInterfaces/SelectInterface'
 import { FaturasView } from 'interfaces/Faturas/FaturasInterface'
-import { CategoriaLookup, TransacoesList } from 'interfaces/Transacoes/TransacoesInterface'
+import { CategoriaLookup, ResponsavelLookup, TransacoesList } from 'interfaces/Transacoes/TransacoesInterface'
 import { FaturasService } from 'services/Faturas/FaturasService'
 import { TransacoesService } from 'services/Transacoes/TransacoesService'
+import { SubcategoriasService } from 'services/Subcategorias/SubcategoriasService'
+import ResponsavelModal from 'pages/Pages/Transacoes/ResponsavelModal/ResponsavelModal'
 
 const statusLabel: Record<string, string> = {
     pendente: 'Pendente',
@@ -40,6 +42,8 @@ const FaturasViewPage = () => {
     const { voltarParaRotaAnterior } = useNavegacao()
     const faturasService = useRef(new FaturasService()).current
     const transacoesService = useRef(new TransacoesService()).current
+    const subcategoriasService = useRef(new SubcategoriasService()).current
+    const loadedSubcategoriasRef = useRef<Set<number>>(new Set())
     const fileInputRef = useRef<HTMLInputElement>(null)
 
     const [fatura, setFatura] = useState<FaturasView | null>(null)
@@ -49,10 +53,24 @@ const FaturasViewPage = () => {
     const [processarAuto, setProcessarAuto] = useState(true)
     const [categoriasOptions, setCategoriasOptions] = useState<SelectOptions[]>([])
     const [categoriasLookup, setCategoriasLookup] = useState<CategoriaLookup[]>([])
+    const [subcategoriasByCategoria, setSubcategoriasByCategoria] = useState<Record<number, SelectOptions[]>>({})
     const [responsaveisOptions, setResponsaveisOptions] = useState<SelectOptions[]>([])
+    const [responsaveisLookup, setResponsaveisLookup] = useState<ResponsavelLookup[]>([])
+    const [defaultResponsavelId, setDefaultResponsavelId] = useState<number | null>(null)
+    const [responsavelModalOpen, setResponsavelModalOpen] = useState(false)
+    const [rowForResponsavel, setRowForResponsavel] = useState<TransacoesList | null>(null)
     const [savingIds, setSavingIds] = useState<Record<number, boolean>>({})
     const [valorDrafts, setValorDrafts] = useState<Record<number, string>>({})
+    const [observacaoDrafts, setObservacaoDrafts] = useState<Record<number, string>>({})
     const [exporting, setExporting] = useState(false)
+
+    const isMeuResponsavel = (responsavelId?: number | null) => {
+        if (responsavelId == null) return true
+        if (defaultResponsavelId != null) return Number(responsavelId) === Number(defaultResponsavelId)
+        const nome = responsaveisLookup.find((r) => Number(r.id) === Number(responsavelId))?.nome
+            ?? responsaveisOptions.find((o) => Number(o.value) === Number(responsavelId))?.label
+        return (nome ?? '').trim().toLowerCase() === 'eu'
+    }
 
     const formatPeriodo = (mes?: number, ano?: number) => {
         if (!mes || !ano) return '-'
@@ -90,6 +108,23 @@ const FaturasViewPage = () => {
         }
     }, [])
 
+    const loadSubcategoriasForCategoria = useCallback(async (categoriaId: number) => {
+        if (!categoriaId || loadedSubcategoriasRef.current.has(categoriaId)) return
+        loadedSubcategoriasRef.current.add(categoriaId)
+        try {
+            const list = await subcategoriasService.AsyncListSubcategorias({ categoria_id: categoriaId })
+            const options = (list ?? []).map((s) => ({
+                value: s.id!,
+                label: s.nome ?? `#${s.id}`,
+            }))
+            setSubcategoriasByCategoria((prev) => ({ ...prev, [categoriaId]: options }))
+        } catch (error) {
+            console.error('Erro ao carregar subcategorias:', error)
+            loadedSubcategoriasRef.current.delete(categoriaId)
+            setSubcategoriasByCategoria((prev) => ({ ...prev, [categoriaId]: [] }))
+        }
+    }, [subcategoriasService])
+
     const loadTransacoes = useCallback(async (faturaId: string) => {
         try {
             const response = await transacoesService.listTransacoesPaginate({
@@ -100,16 +135,26 @@ const FaturasViewPage = () => {
             const rows = response?.data ?? []
             setTransacoes(rows)
             const drafts: Record<number, string> = {}
+            const obsDrafts: Record<number, string> = {}
+            const categoriaIds = new Set<number>()
             rows.forEach((tx) => {
                 if (tx.id != null && tx.valor != null) {
                     drafts[tx.id] = Number(tx.valor).toFixed(2)
                 }
+                if (tx.id != null) {
+                    obsDrafts[tx.id] = tx.observacoes ?? ''
+                }
+                if (tx.categoria_id != null) {
+                    categoriaIds.add(tx.categoria_id)
+                }
             })
             setValorDrafts(drafts)
+            setObservacaoDrafts(obsDrafts)
+            await Promise.all(Array.from(categoriaIds).map((catId) => loadSubcategoriasForCategoria(catId)))
         } catch (error) {
             console.error('Erro ao carregar transações:', error)
         }
-    }, [transacoesService])
+    }, [transacoesService, loadSubcategoriasForCategoria])
 
     const loadLookups = useCallback(async () => {
         try {
@@ -124,12 +169,16 @@ const FaturasViewPage = () => {
                 )
             }
             if (lookups?.responsaveis) {
+                setResponsaveisLookup(lookups.responsaveis)
                 setResponsaveisOptions(
                     lookups.responsaveis.map((r) => ({
                         value: r.id!,
                         label: r.nome ?? `#${r.id}`,
                     }))
                 )
+            }
+            if (lookups?.default_responsavel_id != null) {
+                setDefaultResponsavelId(lookups.default_responsavel_id)
             }
         } catch (error) {
             console.error('Erro ao carregar lookups:', error)
@@ -218,24 +267,31 @@ const FaturasViewPage = () => {
 
     const saveTransacao = async (
         tx: TransacoesList,
-        patch: Partial<Pick<TransacoesList, 'categoria_id' | 'responsavel_id' | 'valor'>>
+        patch: Partial<Pick<TransacoesList, 'categoria_id' | 'subcategoria_id' | 'responsavel_id' | 'valor' | 'observacoes'>>
     ) => {
         if (!tx.id) return
         setSavingIds((prev) => ({ ...prev, [tx.id!]: true }))
         try {
             const valor = patch.valor !== undefined ? patch.valor : tx.valor
+            const categoriaId = patch.categoria_id !== undefined ? patch.categoria_id : (tx.categoria_id ?? null)
+            const subcategoriaId = patch.subcategoria_id !== undefined
+                ? patch.subcategoria_id
+                : (categoriaId ? (tx.subcategoria_id ?? null) : null)
+
             await transacoesService.editTransacoes({
                 id: tx.id,
                 transacao_id: tx.id,
                 fatura_id: tx.fatura_id ?? Number(id),
-                estabelecimento: tx.estabelecimento ?? null,
+                estabelecimento_id: tx.estabelecimento_id ?? null,
+                estabelecimento: tx.estabelecimento_id ? undefined : (tx.estabelecimento ?? null),
                 valor: valor ?? null,
                 valor_parcela: valor ?? null,
                 data: tx.data ?? null,
                 tipo: tx.tipo ?? null,
-                categoria_id: patch.categoria_id !== undefined ? patch.categoria_id : (tx.categoria_id ?? null),
+                categoria_id: categoriaId,
+                subcategoria_id: subcategoriaId,
                 responsavel_id: patch.responsavel_id !== undefined ? patch.responsavel_id : (tx.responsavel_id ?? null),
-                observacoes: tx.observacoes ?? null,
+                observacoes: patch.observacoes !== undefined ? patch.observacoes : (tx.observacoes ?? null),
             })
             setTransacoes((prev) =>
                 prev.map((item) => {
@@ -245,10 +301,22 @@ const FaturasViewPage = () => {
                         const categoria = categoriasLookup.find((o) => o.id === patch.categoria_id)
                         next.categoria_nome = categoria?.nome
                         next.categoria_cor = categoria?.cor
+                        if (patch.subcategoria_id === undefined && patch.categoria_id !== tx.categoria_id) {
+                            next.subcategoria_id = null
+                            next.subcategoria_nome = undefined
+                        }
+                    }
+                    if (patch.subcategoria_id !== undefined) {
+                        const opts = categoriaId ? (subcategoriasByCategoria[categoriaId] ?? []) : []
+                        next.subcategoria_nome = opts.find((o) => Number(o.value) === patch.subcategoria_id)?.label
                     }
                     if (patch.responsavel_id !== undefined) {
-                        const responsavel = responsaveisOptions.find((o) => Number(o.value) === patch.responsavel_id)
-                        next.responsavel_nome = responsavel?.label
+                        const responsavel =
+                            responsaveisLookup.find((r) => Number(r.id) === Number(patch.responsavel_id))
+                            ?? null
+                        const fromOptions = responsaveisOptions.find((o) => Number(o.value) === patch.responsavel_id)
+                        next.responsavel_nome = responsavel?.nome ?? fromOptions?.label
+                        next.responsavel_tipo = responsavel?.tipo ?? next.responsavel_tipo
                     }
                     return next
                 })
@@ -257,6 +325,12 @@ const FaturasViewPage = () => {
                 setValorDrafts((prev) => ({
                     ...prev,
                     [tx.id!]: Number(patch.valor).toFixed(2),
+                }))
+            }
+            if (patch.observacoes !== undefined && tx.id) {
+                setObservacaoDrafts((prev) => ({
+                    ...prev,
+                    [tx.id!]: patch.observacoes ?? '',
                 }))
             }
         } catch (error) {
@@ -273,10 +347,24 @@ const FaturasViewPage = () => {
 
     const handleUpdateSelect = async (
         tx: TransacoesList,
-        field: 'categoria_id' | 'responsavel_id',
+        field: 'categoria_id' | 'subcategoria_id' | 'responsavel_id',
         value: string
     ) => {
         const parsed = value === '' ? null : Number(value)
+
+        if (field === 'categoria_id') {
+            if (parsed) await loadSubcategoriasForCategoria(parsed)
+            setTransacoes((prev) =>
+                prev.map((item) =>
+                    item.id === tx.id
+                        ? { ...item, categoria_id: parsed, subcategoria_id: null, subcategoria_nome: undefined }
+                        : item
+                )
+            )
+            await saveTransacao(tx, { categoria_id: parsed, subcategoria_id: null })
+            return
+        }
+
         setTransacoes((prev) =>
             prev.map((item) =>
                 item.id === tx.id ? { ...item, [field]: parsed } : item
@@ -303,6 +391,32 @@ const FaturasViewPage = () => {
             return
         }
         await saveTransacao(tx, { valor: normalized })
+    }
+
+    const handleObservacaoBlur = async (tx: TransacoesList) => {
+        if (!tx.id) return
+        const next = observacaoDrafts[tx.id] ?? ''
+        const current = tx.observacoes ?? ''
+        if (next === current) return
+        await saveTransacao(tx, { observacoes: next || null })
+    }
+
+    const openResponsavelModal = (tx: TransacoesList) => {
+        setRowForResponsavel(tx)
+        setResponsavelModalOpen(true)
+    }
+
+    const handleConfirmResponsavel = async (responsavel: ResponsavelLookup) => {
+        if (!rowForResponsavel?.id) return
+        setResponsaveisLookup((prev) => {
+            if (prev.some((r) => Number(r.id) === Number(responsavel.id))) return prev
+            return [...prev, responsavel]
+        })
+        setResponsaveisOptions((prev) => {
+            if (prev.some((o) => Number(o.value) === Number(responsavel.id))) return prev
+            return [...prev, { value: responsavel.id!, label: responsavel.nome ?? `#${responsavel.id}` }]
+        })
+        await saveTransacao(rowForResponsavel, { responsavel_id: responsavel.id ?? null })
     }
 
     useEffect(() => {
@@ -597,7 +711,7 @@ const FaturasViewPage = () => {
                                 <div>
                                     <h5 className="card-title mb-1">Transações</h5>
                                     <small className="text-muted">
-                                        Ajuste valor, categoria e responsável diretamente em cada linha.
+                                        Ajuste valor, categoria, subcategoria e observação em cada linha. Use a coluna Resp. para definir outro responsável (padrão: Eu).
                                     </small>
                                 </div>
                                 <Button
@@ -624,18 +738,29 @@ const FaturasViewPage = () => {
                                             <tr>
                                                 <th>Data</th>
                                                 <th>Estabelecimento</th>
-                                                <th style={{ minWidth: 130 }}>Valor</th>
+                                                <th style={{ minWidth: 150, maxWidth: 50 }}>Valor</th>
                                                 <th>Tipo</th>
-                                                <th style={{ minWidth: 180 }}>Categoria</th>
-                                                <th style={{ minWidth: 180 }}>Responsável</th>
+                                                <th style={{ minWidth: 160 }}>Categoria</th>
+                                                <th style={{ minWidth: 160 }}>Subcategoria</th>
+                                                <th style={{ minWidth: 250 }}>Observação</th>
+                                                <th style={{ width: 90 }} title="Responsável">Resp.</th>
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {transacoes.map((tx, idx) => (
+                                            {transacoes.map((tx, idx) => {
+                                                const subOptions = tx.categoria_id
+                                                    ? (subcategoriasByCategoria[tx.categoria_id] ?? [])
+                                                    : []
+                                                const showResponsavelNome = !isMeuResponsavel(tx.responsavel_id)
+                                                const responsavelNome =
+                                                    tx.responsavel_nome
+                                                    ?? responsaveisLookup.find((r) => Number(r.id) === Number(tx.responsavel_id))?.nome
+                                                    ?? responsaveisOptions.find((o) => Number(o.value) === Number(tx.responsavel_id))?.label
+                                                return (
                                                 <tr key={tx.id ?? idx}>
                                                     <td>{formatDateBr(tx.data)}</td>
-                                                    <td>{tx.estabelecimento ?? '-'}</td>
-                                                    <td>
+                                                    <td>{tx.estabelecimento_nome ?? tx.estabelecimento ?? '-'}</td>
+                                                    <td  className="text-end">
                                                         <Input
                                                             type="number"
                                                             bsSize="sm"
@@ -689,24 +814,77 @@ const FaturasViewPage = () => {
                                                         <Input
                                                             type="select"
                                                             bsSize="sm"
-                                                            value={tx.responsavel_id ?? ''}
-                                                            disabled={!!savingIds[tx.id!]}
-                                                            onChange={(e) => handleUpdateSelect(tx, 'responsavel_id', e.target.value)}
+                                                            value={tx.subcategoria_id ?? ''}
+                                                            disabled={!tx.categoria_id || !!savingIds[tx.id!]}
+                                                            onChange={(e) => handleUpdateSelect(tx, 'subcategoria_id', e.target.value)}
                                                         >
-                                                            <option value="">Sem responsável</option>
-                                                            {responsaveisOptions.map((opt) => (
+                                                            <option value="">Sem subcategoria</option>
+                                                            {subOptions.map((opt) => (
                                                                 <option key={opt.value} value={opt.value}>{opt.label}</option>
                                                             ))}
                                                         </Input>
                                                     </td>
+                                                    <td>
+                                                        <Input
+                                                            type="text"
+                                                            bsSize="sm"
+                                                            placeholder="Observação..."
+                                                            value={tx.id != null ? (observacaoDrafts[tx.id] ?? '') : ''}
+                                                            disabled={!!savingIds[tx.id!]}
+                                                            onChange={(e) => {
+                                                                if (!tx.id) return
+                                                                setObservacaoDrafts((prev) => ({
+                                                                    ...prev,
+                                                                    [tx.id!]: e.target.value,
+                                                                }))
+                                                            }}
+                                                            onBlur={() => handleObservacaoBlur(tx)}
+                                                            onKeyDown={(e) => {
+                                                                if (e.key === 'Enter') {
+                                                                    e.currentTarget.blur()
+                                                                }
+                                                            }}
+                                                        />
+                                                    </td>
+                                                    <td className="text-center">
+                                                        <Button
+                                                            type="button"
+                                                            color="light"
+                                                            size="sm"
+                                                            className="border"
+                                                            title={showResponsavelNome ? `Responsável: ${responsavelNome}` : 'Definir responsável'}
+                                                            disabled={!!savingIds[tx.id!]}
+                                                            onClick={() => openResponsavelModal(tx)}
+                                                        >
+                                                            <i className="ri-user-line me-1"></i>
+                                                            {showResponsavelNome ? (
+                                                                <span className="small">{responsavelNome}</span>
+                                                            ) : (
+                                                                <span className="small text-muted">Eu</span>
+                                                            )}
+                                                        </Button>
+                                                    </td>
                                                 </tr>
-                                            ))}
+                                                )
+                                            })}
                                         </tbody>
                                     </Table>
                                 </div>
                             )}
                         </CardBody>
                     </Card>
+
+                    <ResponsavelModal
+                        isOpen={responsavelModalOpen}
+                        toggle={() => {
+                            setResponsavelModalOpen(false)
+                            setRowForResponsavel(null)
+                        }}
+                        responsaveis={responsaveisLookup}
+                        currentResponsavelId={rowForResponsavel?.responsavel_id}
+                        onResponsaveisChange={setResponsaveisLookup}
+                        onConfirm={handleConfirmResponsavel}
+                    />
 
                     <Card className="mb-4">
                         <CardBody>
