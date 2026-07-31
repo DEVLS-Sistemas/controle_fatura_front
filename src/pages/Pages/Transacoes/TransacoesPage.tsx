@@ -4,12 +4,12 @@ import { SubmitHandler } from 'react-hook-form'
 import { PaginateInterface, PaginateSearch } from 'interfaces/SystemInterfaces/PaginateInterface'
 import { SelectOptions } from 'interfaces/SystemInterfaces/SelectInterface'
 import {
-    CategoriaLookup,
     ResponsavelLookup,
     TransacoesList,
     TransacoesSearch,
 } from 'interfaces/Transacoes/TransacoesInterface'
 import { TransacoesService } from 'services/Transacoes/TransacoesService'
+import { EstabelecimentosService } from 'services/Estabelecimentos/EstabelecimentosService'
 import { tipoTransacaoLabel } from 'helpers/fatura_helpers'
 import TransacoesFilter from './TransacoesFilter/TransacoesFilter'
 import TransacoesTable from './TransacoesTable/TransacoesTable'
@@ -47,6 +47,8 @@ const TransacoesPage = () => {
         data_fim: null,
         cartao_id: null,
         categoria_id: null,
+        subcategoria_id: null,
+        estabelecimento_id: null,
         responsavel_id: null,
         fatura_id: null,
         tipo: null,
@@ -60,14 +62,15 @@ const TransacoesPage = () => {
 
     const [transacoesList, setTransacoesList] = useState<PaginateInterface<TransacoesList>>()
     const transacoesService = new TransacoesService()
+    const estabelecimentosService = new EstabelecimentosService()
     const [perPage, setPerPage] = useState<number>(5)
     const [page, setPage] = useState(1)
 
     const [cartoesOptions, setCartoesOptions] = useState<SelectOptions[]>([{ value: '', label: 'Todos' }])
     const [categoriasOptions, setCategoriasOptions] = useState<SelectOptions[]>([{ value: '', label: 'Todos' }])
+    const [estabelecimentosOptions, setEstabelecimentosOptions] = useState<SelectOptions[]>([{ value: '', label: 'Todos' }])
     const [responsaveisOptions, setResponsaveisOptions] = useState<SelectOptions[]>([{ value: '', label: 'Todos' }])
     const [tiposOptions, setTiposOptions] = useState<SelectOptions[]>(defaultTiposOptions)
-    const [categoriasLookup, setCategoriasLookup] = useState<CategoriaLookup[]>([])
     const [responsaveisLookup, setResponsaveisLookup] = useState<ResponsavelLookup[]>([])
 
     const syncContext = (data: TransacoesSearch & PaginateSearch) => {
@@ -76,6 +79,8 @@ const TransacoesPage = () => {
         transacoesContext.data_fim = data.data_fim
         transacoesContext.cartao_id = data.cartao_id
         transacoesContext.categoria_id = data.categoria_id
+        transacoesContext.subcategoria_id = data.subcategoria_id
+        transacoesContext.estabelecimento_id = data.estabelecimento_id
         transacoesContext.responsavel_id = data.responsavel_id
         transacoesContext.fatura_id = data.fatura_id
         transacoesContext.tipo = data.tipo
@@ -103,8 +108,13 @@ const TransacoesPage = () => {
                 setCartoesOptions(buildSelectOptions(result.cartoes))
                 setCategoriasOptions(buildSelectOptions(result.categorias))
                 setResponsaveisOptions(buildSelectOptions(result.responsaveis))
-                setCategoriasLookup(result.categorias ?? [])
                 setResponsaveisLookup(result.responsaveis ?? [])
+                if (result.estabelecimentos?.length) {
+                    setEstabelecimentosOptions(buildSelectOptions(result.estabelecimentos))
+                } else {
+                    const list = await estabelecimentosService.AsyncListEstabelecimentos({})
+                    setEstabelecimentosOptions(buildSelectOptions(list))
+                }
                 if (result.tipos?.length) {
                     setTiposOptions([
                         { value: '', label: 'Todos' },
@@ -138,6 +148,7 @@ const TransacoesPage = () => {
                             getRemoteTransacoesList={getRemoteTransacoesList}
                             cartoesOptions={cartoesOptions}
                             categoriasOptions={categoriasOptions}
+                            estabelecimentosOptions={estabelecimentosOptions}
                             responsaveisOptions={responsaveisOptions}
                             tiposOptions={tiposOptions}
                             filtersRef={transacoesContext}
@@ -151,8 +162,8 @@ const TransacoesPage = () => {
                                 perPage={perPage}
                                 setPage={setPage}
                                 page={page}
-                                categoriasLookup={categoriasLookup}
                                 responsaveisLookup={responsaveisLookup}
+                                onResponsaveisChange={setResponsaveisLookup}
                                 onRowsChange={setTransacoesList}
                             />
                         ) : (

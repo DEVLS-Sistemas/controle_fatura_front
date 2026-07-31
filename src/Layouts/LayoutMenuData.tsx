@@ -90,6 +90,28 @@ const Navdata = () => {
             },
         },
         {
+            id: "subcategorias",
+            label: "Subcategorias",
+            icon: "ri-node-tree",
+            link: "/subcategorias",
+            click: function (e: any) {
+                e.preventDefault();
+                setIscurrentState("Subcategorias");
+                updateIconSidebar(e);
+            },
+        },
+        {
+            id: "estabelecimentos",
+            label: "Estabelecimentos",
+            icon: "ri-store-2-line",
+            link: "/estabelecimentos",
+            click: function (e: any) {
+                e.preventDefault();
+                setIscurrentState("Estabelecimentos");
+                updateIconSidebar(e);
+            },
+        },
+        {
             id: "responsaveis",
             label: "Responsáveis",
             icon: "ri-user-shared-line",
@@ -97,6 +119,17 @@ const Navdata = () => {
             click: function (e: any) {
                 e.preventDefault();
                 setIscurrentState("Responsaveis");
+                updateIconSidebar(e);
+            },
+        },
+        {
+            id: "relatorios",
+            label: "Relatórios",
+            icon: "ri-bar-chart-grouped-line",
+            link: "/relatorios",
+            click: function (e: any) {
+                e.preventDefault();
+                setIscurrentState("Relatorios");
                 updateIconSidebar(e);
             },
         },

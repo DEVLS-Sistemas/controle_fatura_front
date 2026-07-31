@@ -2,8 +2,9 @@ import UiContent from "Components/Common/UiContent"
 import React, { useEffect, useState } from "react"
 import { Link } from "react-router-dom"
 import {
-    Badge, ButtonGroup, Card, CardBody, Col, DropdownItem,
-    DropdownMenu, DropdownToggle, Label, Row, UncontrolledDropdown
+    Badge, Button, ButtonGroup, Card, CardBody, Col, DropdownItem,
+    DropdownMenu, DropdownToggle, Label, Row, UncontrolledDropdown,
+    UncontrolledTooltip,
 } from "reactstrap"
 import { toast } from "react-toastify"
 import { PaginateInterface, PaginateSearch, PerPageProps } from "interfaces/SystemInterfaces/PaginateInterface"
@@ -12,18 +13,15 @@ import { useNavegacao } from "helpers/functions_helpers"
 import {
     formatCurrency,
     formatDateBr,
-    getCategoriaFieldStyle,
     responsavelTipoColor,
-    tipoTransacaoColor,
-    tipoTransacaoLabel,
 } from "helpers/fatura_helpers"
 import {
-    CategoriaLookup,
     ResponsavelLookup,
     TransacoesList,
     TransacoesSearch,
 } from "interfaces/Transacoes/TransacoesInterface"
 import { TransacoesService } from "services/Transacoes/TransacoesService"
+import ResponsavelModal from "../ResponsavelModal/ResponsavelModal"
 
 export interface TransacoesTableProps {
     data: PaginateInterface<TransacoesList> | undefined
@@ -33,8 +31,8 @@ export interface TransacoesTableProps {
     page: number
     perPage: number
     filters: TransacoesSearch
-    categoriasLookup: CategoriaLookup[]
     responsaveisLookup: ResponsavelLookup[]
+    onResponsaveisChange?: (list: ResponsavelLookup[]) => void
     onRowsChange?: (data: PaginateInterface<TransacoesList>) => void
 }
 
@@ -53,14 +51,20 @@ const formatPeriodoFatura = (mes?: number, ano?: number) => {
     return `${String(mes).padStart(2, '0')}/${ano}`
 }
 
+const truncate = (text?: string, max = 40) => {
+    if (!text) return '-'
+    if (text.length <= max) return text
+    return `${text.slice(0, max)}…`
+}
+
 export const TransacoesTable = ({
     data,
     getData,
     setPerPage,
     perPage,
     filters,
-    categoriasLookup,
     responsaveisLookup,
+    onResponsaveisChange,
     onRowsChange,
 }: TransacoesTableProps) => {
     const [optPerPage] = useState<PerPageProps[]>([
@@ -74,6 +78,8 @@ export const TransacoesTable = ({
     const [modalIsOpen, setModalIsOpen] = useState(false)
     const [selectedId, setSelectedId] = useState<number | null>(null)
     const [localRows, setLocalRows] = useState<TransacoesList[]>([])
+    const [responsavelModalOpen, setResponsavelModalOpen] = useState(false)
+    const [rowForResponsavel, setRowForResponsavel] = useState<TransacoesList | null>(null)
     const { voltarParaRotaAnterior } = useNavegacao()
 
     const toggleModal = () => setModalIsOpen(!modalIsOpen)
@@ -94,62 +100,35 @@ export const TransacoesTable = ({
         })
     }
 
-    const getResponsavelTipo = (responsavelId: number | null | undefined): string | undefined => {
-        if (!responsavelId) return undefined
-        return responsaveisLookup.find((r) => r.id === responsavelId)?.tipo
+    const openResponsavelModal = (row: TransacoesList) => {
+        setRowForResponsavel(row)
+        setResponsavelModalOpen(true)
     }
 
-    const handleInlineCategoriaChange = async (row: TransacoesList, value: string) => {
-        if (!row.id) return
-        const categoriaId = value ? Number(value) : null
-        const categoria = categoriasLookup.find((c) => c.id === categoriaId)
-        const previous = { categoria_id: row.categoria_id, categoria_nome: row.categoria_nome, categoria_cor: row.categoria_cor }
-
-        updateLocalRow(row.id, {
-            categoria_id: categoriaId,
-            categoria_nome: categoria?.nome,
-            categoria_cor: categoria?.cor,
-        })
-
-        try {
-            await transacoesService.editTransacoes({
-                id: row.id,
-                categoria_id: categoriaId,
-            } as Parameters<typeof transacoesService.editTransacoes>[0])
-            toast.success('Atualizado')
-        } catch (error) {
-            console.error('Erro ao atualizar categoria:', error)
-            updateLocalRow(row.id, previous)
-            toast.error('Erro ao atualizar categoria')
-        }
-    }
-
-    const handleInlineResponsavelChange = async (row: TransacoesList, value: string) => {
-        if (!row.id) return
-        const responsavelId = value ? Number(value) : null
-        const responsavel = responsaveisLookup.find((r) => r.id === responsavelId)
+    const handleConfirmResponsavel = async (responsavel: ResponsavelLookup) => {
+        if (!rowForResponsavel?.id) return
         const previous = {
-            responsavel_id: row.responsavel_id,
-            responsavel_nome: row.responsavel_nome,
-            responsavel_tipo: row.responsavel_tipo,
+            responsavel_id: rowForResponsavel.responsavel_id,
+            responsavel_nome: rowForResponsavel.responsavel_nome,
+            responsavel_tipo: rowForResponsavel.responsavel_tipo,
         }
 
-        updateLocalRow(row.id, {
-            responsavel_id: responsavelId,
-            responsavel_nome: responsavel?.nome,
-            responsavel_tipo: responsavel?.tipo,
+        updateLocalRow(rowForResponsavel.id, {
+            responsavel_id: responsavel.id ?? null,
+            responsavel_nome: responsavel.nome,
+            responsavel_tipo: responsavel.tipo,
         })
 
         try {
             await transacoesService.editTransacoes({
-                id: row.id,
-                responsavel_id: responsavelId,
+                id: rowForResponsavel.id,
+                responsavel_id: responsavel.id,
             } as Parameters<typeof transacoesService.editTransacoes>[0])
-            toast.success('Atualizado')
+            toast.success('Responsável atualizado')
         } catch (error) {
             console.error('Erro ao atualizar responsável:', error)
-            updateLocalRow(row.id, previous)
-            toast.error('Erro ao atualizar responsável')
+            updateLocalRow(rowForResponsavel.id, previous)
+            throw error
         }
     }
 
@@ -176,6 +155,8 @@ export const TransacoesTable = ({
                 data_fim: new_url.searchParams.get('data_fim') ?? filters.data_fim,
                 cartao_id: new_url.searchParams.get('cartao_id') ?? filters.cartao_id,
                 categoria_id: new_url.searchParams.get('categoria_id') ?? filters.categoria_id,
+                subcategoria_id: new_url.searchParams.get('subcategoria_id') ?? filters.subcategoria_id,
+                estabelecimento_id: new_url.searchParams.get('estabelecimento_id') ?? filters.estabelecimento_id,
                 responsavel_id: new_url.searchParams.get('responsavel_id') ?? filters.responsavel_id,
                 fatura_id: new_url.searchParams.get('fatura_id') ?? filters.fatura_id,
                 tipo: new_url.searchParams.get('tipo') ?? filters.tipo,
@@ -241,64 +222,48 @@ export const TransacoesTable = ({
                                                                 <th scope="col">Data</th>
                                                                 <th scope="col" className="text-start">Estabelecimento</th>
                                                                 <th scope="col">Valor</th>
-                                                                <th scope="col">Tipo</th>
                                                                 <th scope="col">Categoria</th>
+                                                                <th scope="col">Subcategoria</th>
                                                                 <th scope="col">Responsável</th>
-                                                                <th scope="col">Cartão</th>
-                                                                <th scope="col">Fatura</th>
+                                                                <th scope="col" className="text-start">Observação</th>
+                                                                <th scope="col">Fatura / Cartão</th>
                                                                 <th scope="col">Parcelas</th>
                                                                 <th scope="col" style={{ width: "120px" }}>Ações</th>
                                                             </tr>
                                                         </thead>
                                                         <tbody>
                                                             {rows.map((row, index) => {
+                                                                const observacaoId = `obs-${row.id ?? index}`
+                                                                const estabelecimentoNome =
+                                                                    row.estabelecimento_nome ?? row.estabelecimento ?? '-'
                                                                 const responsavelTipo = row.responsavel_tipo
-                                                                    ?? getResponsavelTipo(row.responsavel_id)
-                                                                const categoriaCor = row.categoria_cor
-                                                                    ?? categoriasLookup.find((c) => c.id === row.categoria_id)?.cor
+                                                                    ?? responsaveisLookup.find((r) => r.id === row.responsavel_id)?.tipo
                                                                 return (
                                                                     <tr key={row.id ?? index}>
                                                                         <td>{formatDateBr(row.data)}</td>
-                                                                        <td className="text-start">{row.estabelecimento ?? '-'}</td>
+                                                                        <td className="text-start">{estabelecimentoNome}</td>
                                                                         <td>{formatCurrency(row.valor)}</td>
                                                                         <td>
-                                                                            <span className={`badge bg-${tipoTransacaoColor[row.tipo ?? ''] ?? 'secondary'}`}>
-                                                                                {tipoTransacaoLabel[row.tipo ?? ''] ?? row.tipo ?? '-'}
-                                                                            </span>
+                                                                            {row.categoria_nome ? (
+                                                                                <span className="d-inline-flex align-items-center gap-1">
+                                                                                    {row.categoria_cor && (
+                                                                                        <span
+                                                                                            className="d-inline-block rounded-circle"
+                                                                                            style={{
+                                                                                                width: 10,
+                                                                                                height: 10,
+                                                                                                backgroundColor: row.categoria_cor,
+                                                                                            }}
+                                                                                        />
+                                                                                    )}
+                                                                                    {row.categoria_nome}
+                                                                                </span>
+                                                                            ) : '-'}
                                                                         </td>
-                                                                        <td>
-                                                                            <select
-                                                                                className="form-select form-select-sm"
-                                                                                value={row.categoria_id ?? ''}
-                                                                                onChange={(e) => handleInlineCategoriaChange(row, e.target.value)}
-                                                                                style={
-                                                                                    row.categoria_id
-                                                                                        ? (getCategoriaFieldStyle(categoriaCor) ?? undefined)
-                                                                                        : undefined
-                                                                                }
-                                                                            >
-                                                                                <option value="">—</option>
-                                                                                {categoriasLookup.map((c) => (
-                                                                                    <option key={c.id} value={c.id}>
-                                                                                        {c.nome}
-                                                                                    </option>
-                                                                                ))}
-                                                                            </select>
-                                                                        </td>
+                                                                        <td>{row.subcategoria_nome ?? '-'}</td>
                                                                         <td>
                                                                             <div className="d-flex align-items-center gap-1 justify-content-center">
-                                                                                <select
-                                                                                    className="form-select form-select-sm"
-                                                                                    value={row.responsavel_id ?? ''}
-                                                                                    onChange={(e) => handleInlineResponsavelChange(row, e.target.value)}
-                                                                                >
-                                                                                    <option value="">—</option>
-                                                                                    {responsaveisLookup.map((r) => (
-                                                                                        <option key={r.id} value={r.id}>
-                                                                                            {r.nome}
-                                                                                        </option>
-                                                                                    ))}
-                                                                                </select>
+                                                                                <span>{row.responsavel_nome ?? '-'}</span>
                                                                                 {responsavelTipo && (
                                                                                     <Badge
                                                                                         color={responsavelTipoColor[responsavelTipo] ?? 'secondary'}
@@ -307,17 +272,41 @@ export const TransacoesTable = ({
                                                                                         {responsavelTipoLabel[responsavelTipo] ?? responsavelTipo}
                                                                                     </Badge>
                                                                                 )}
+                                                                                <Button
+                                                                                    type="button"
+                                                                                    color="soft-primary"
+                                                                                    size="sm"
+                                                                                    className="btn-icon"
+                                                                                    title="Alterar responsável"
+                                                                                    onClick={() => openResponsavelModal(row)}
+                                                                                >
+                                                                                    <i className="ri-user-line"></i>
+                                                                                </Button>
                                                                             </div>
                                                                         </td>
-                                                                        <td>{row.cartao_nome ?? '-'}</td>
+                                                                        <td className="text-start">
+                                                                            {row.observacoes ? (
+                                                                                <>
+                                                                                    <span id={observacaoId}>{truncate(row.observacoes)}</span>
+                                                                                    {row.observacoes.length > 40 && (
+                                                                                        <UncontrolledTooltip placement="top" target={observacaoId}>
+                                                                                            {row.observacoes}
+                                                                                        </UncontrolledTooltip>
+                                                                                    )}
+                                                                                </>
+                                                                            ) : '-'}
+                                                                        </td>
                                                                         <td>
-                                                                            {row.fatura_id ? (
-                                                                                <Link to={`/faturas/view/${row.fatura_id}`}>
-                                                                                    {formatPeriodoFatura(row.fatura_mes, row.fatura_ano)}
-                                                                                </Link>
-                                                                            ) : (
-                                                                                formatPeriodoFatura(row.fatura_mes, row.fatura_ano)
-                                                                            )}
+                                                                            <div>{row.cartao_nome ?? '-'}</div>
+                                                                            <small className="text-muted">
+                                                                                {row.fatura_id ? (
+                                                                                    <Link to={`/faturas/view/${row.fatura_id}`}>
+                                                                                        {formatPeriodoFatura(row.fatura_mes, row.fatura_ano)}
+                                                                                    </Link>
+                                                                                ) : (
+                                                                                    formatPeriodoFatura(row.fatura_mes, row.fatura_ano)
+                                                                                )}
+                                                                            </small>
                                                                         </td>
                                                                         <td>{formatParcelas(row.parcela_atual, row.parcelas_total)}</td>
                                                                         <td>
@@ -395,6 +384,17 @@ export const TransacoesTable = ({
                 delete={true}
                 body="Deseja realmente excluir esta transação?"
                 onConfirmDelete={() => selectedId && handleRemoteDelete(selectedId)}
+            />
+            <ResponsavelModal
+                isOpen={responsavelModalOpen}
+                toggle={() => {
+                    setResponsavelModalOpen(false)
+                    setRowForResponsavel(null)
+                }}
+                responsaveis={responsaveisLookup}
+                currentResponsavelId={rowForResponsavel?.responsavel_id}
+                onResponsaveisChange={onResponsaveisChange}
+                onConfirm={handleConfirmResponsavel}
             />
             <Row>
                 <Col md={12}>

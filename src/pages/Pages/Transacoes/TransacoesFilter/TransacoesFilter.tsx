@@ -1,7 +1,7 @@
 import UiContent from "Components/Common/UiContent"
-import React, { useState } from "react"
+import React, { useEffect, useState } from "react"
 import { Link } from "react-router-dom"
-import { useForm } from "react-hook-form"
+import { useForm, useWatch } from "react-hook-form"
 import { toast } from "react-toastify"
 import {
     Breadcrumb, BreadcrumbItem, Button, Card, CardHeader, Col, Collapse, Label, Row
@@ -13,11 +13,13 @@ import { SelectOptions } from "interfaces/SystemInterfaces/SelectInterface"
 import { mesesOptions } from "helpers/fatura_helpers"
 import { TransacoesSearch } from "interfaces/Transacoes/TransacoesInterface"
 import { TransacoesService } from "services/Transacoes/TransacoesService"
+import { SubcategoriasService } from "services/Subcategorias/SubcategoriasService"
 
 export interface TransacoesFilterProps {
     getRemoteTransacoesList: (data: any) => void
     cartoesOptions: SelectOptions[]
     categoriasOptions: SelectOptions[]
+    estabelecimentosOptions: SelectOptions[]
     responsaveisOptions: SelectOptions[]
     tiposOptions: SelectOptions[]
     filtersRef: TransacoesSearch
@@ -27,16 +29,21 @@ const TransacoesFilter = ({
     getRemoteTransacoesList,
     cartoesOptions,
     categoriasOptions,
+    estabelecimentosOptions,
     responsaveisOptions,
     tiposOptions,
     filtersRef,
 }: TransacoesFilterProps) => {
-    const { handleSubmit, control, register, getValues } = useForm<TransacoesSearch>({
+    const { handleSubmit, control, register, getValues, setValue } = useForm<TransacoesSearch>({
         defaultValues: filtersRef,
     })
     const [showFilter, setShowFilter] = useState<boolean>(false)
     const [exporting, setExporting] = useState(false)
+    const [subcategoriasOptions, setSubcategoriasOptions] = useState<SelectOptions[]>([{ value: '', label: 'Todos' }])
     const transacoesService = new TransacoesService()
+    const subcategoriasService = new SubcategoriasService()
+
+    const categoriaId = useWatch({ control, name: 'categoria_id' })
 
     const anoAtual = new Date().getFullYear()
     const optAnos: SelectOptions[] = [{ value: '', label: 'Todos' }]
@@ -45,6 +52,30 @@ const TransacoesFilter = ({
     }
 
     const optMeses: SelectOptions[] = [{ value: '', label: 'Todos' }, ...mesesOptions]
+
+    useEffect(() => {
+        const load = async () => {
+            if (!categoriaId) {
+                setSubcategoriasOptions([{ value: '', label: 'Todos' }])
+                setValue('subcategoria_id', null)
+                return
+            }
+            try {
+                const list = await subcategoriasService.AsyncListSubcategorias({ categoria_id: categoriaId })
+                setSubcategoriasOptions([
+                    { value: '', label: 'Todos' },
+                    ...(list ?? []).map((s) => ({
+                        value: s.id!,
+                        label: s.nome ?? `#${s.id}`,
+                    })),
+                ])
+            } catch (error) {
+                console.error('Erro ao carregar subcategorias do filtro:', error)
+                setSubcategoriasOptions([{ value: '', label: 'Todos' }])
+            }
+        }
+        load()
+    }, [categoriaId])
 
     const handleExportCsv = async () => {
         setExporting(true)
@@ -190,11 +221,32 @@ const TransacoesFilter = ({
                                             <Row>
                                                 <Col md={3}>
                                                     <div className="mb-3">
+                                                        <Label htmlFor="estabelecimento_id" className="form-label">Estabelecimento</Label>
+                                                        <SelectListControlled<TransacoesSearch>
+                                                            options={estabelecimentosOptions}
+                                                            field="estabelecimento_id"
+                                                            control={control}
+                                                        />
+                                                    </div>
+                                                </Col>
+                                                <Col md={3}>
+                                                    <div className="mb-3">
                                                         <Label htmlFor="categoria_id" className="form-label">Categoria</Label>
                                                         <SelectListControlled<TransacoesSearch>
                                                             options={categoriasOptions}
                                                             field="categoria_id"
                                                             control={control}
+                                                        />
+                                                    </div>
+                                                </Col>
+                                                <Col md={3}>
+                                                    <div className="mb-3">
+                                                        <Label htmlFor="subcategoria_id" className="form-label">Subcategoria</Label>
+                                                        <SelectListControlled<TransacoesSearch>
+                                                            options={subcategoriasOptions}
+                                                            field="subcategoria_id"
+                                                            control={control}
+                                                            disabled={!categoriaId}
                                                         />
                                                     </div>
                                                 </Col>
@@ -208,6 +260,8 @@ const TransacoesFilter = ({
                                                         />
                                                     </div>
                                                 </Col>
+                                            </Row>
+                                            <Row>
                                                 <Col md={2}>
                                                     <div className="mb-3">
                                                         <Label htmlFor="mes" className="form-label">Mês</Label>

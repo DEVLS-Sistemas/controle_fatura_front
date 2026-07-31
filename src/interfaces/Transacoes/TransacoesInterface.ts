@@ -5,6 +5,8 @@ export interface TransacoesSearch {
     data_fim?: string | null
     cartao_id?: string | number | null
     categoria_id?: string | number | null
+    subcategoria_id?: string | number | null
+    estabelecimento_id?: string | number | null
     responsavel_id?: string | number | null
     fatura_id?: string | number | null
     tipo?: string | null
@@ -18,6 +20,8 @@ export interface TransacoesList {
     fatura_id?: number
     data?: string
     estabelecimento?: string
+    estabelecimento_id?: number | null
+    estabelecimento_nome?: string
     valor?: number
     parcelas_total?: number
     parcela_atual?: number
@@ -25,6 +29,8 @@ export interface TransacoesList {
     categoria_id?: number | null
     categoria_nome?: string
     categoria_cor?: string
+    subcategoria_id?: number | null
+    subcategoria_nome?: string
     responsavel_id?: number | null
     responsavel_nome?: string
     responsavel_tipo?: string
@@ -42,13 +48,16 @@ export interface TransacoesModel {
     transacao_id?: number | null
     fatura_id: number | string | null
     data?: string | null
-    estabelecimento: string | null
+    estabelecimento_id?: number | string | null
+    /** @deprecated use estabelecimento_id — ainda aceito no create (find-or-create) */
+    estabelecimento?: string | null
     valor: number | string | null
     parcelas_total?: number | string | null
     parcela_atual?: number | string | null
     valor_parcela?: number | string | null
     tipo?: string | null
     categoria_id?: number | string | null
+    subcategoria_id?: number | string | null
     responsavel_id?: number | string | null
     observacoes?: string | null
 }
@@ -57,6 +66,19 @@ export interface CategoriaLookup {
     id?: number
     nome?: string
     cor?: string
+}
+
+export interface SubcategoriaLookup {
+    id?: number
+    nome?: string
+    categoria_id?: number | null
+}
+
+export interface EstabelecimentoLookup {
+    id?: number
+    nome?: string
+    categoria_padrao_id?: number | null
+    subcategoria_padrao_id?: number | null
 }
 
 export interface ResponsavelLookup {
@@ -85,9 +107,12 @@ export interface TipoLookup {
 export interface LookupsTransacoes {
     tipos?: TipoLookup[]
     categorias?: CategoriaLookup[]
+    subcategorias?: SubcategoriaLookup[]
+    estabelecimentos?: EstabelecimentoLookup[]
     responsaveis?: ResponsavelLookup[]
     faturas?: FaturaLookup[]
     cartoes?: CartaoLookup[]
+    default_responsavel_id?: number | null
 }
 
 export interface TransacoesInterface {
@@ -106,10 +131,12 @@ export const TransacoesDefaultValues: TransacoesModel = {
     transacao_id: null,
     fatura_id: null,
     data: null,
+    estabelecimento_id: null,
     estabelecimento: null,
     valor: null,
     tipo: 'purchase',
     categoria_id: null,
+    subcategoria_id: null,
     responsavel_id: null,
     observacoes: null,
 }

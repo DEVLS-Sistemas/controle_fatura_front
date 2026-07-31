@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { setActiveMenu } from 'helpers/system_helpers'
 import { useNavegacao } from 'helpers/functions_helpers'
-import { Breadcrumb, BreadcrumbItem, Card, CardBody, Col, Container, Label, Row } from 'reactstrap'
+import { Breadcrumb, BreadcrumbItem, Button, Card, CardBody, Col, Container, Label, Row } from 'reactstrap'
 import { SubmitHandler, useForm } from 'react-hook-form'
 import { toast } from 'react-toastify'
 import { required } from 'Components/ComponentController/ValidatorForm/ValidatorForm'
@@ -11,9 +11,22 @@ import { InputDate } from 'Components/ComponentController/Inputs/Date/InputDate'
 import { SelectListControlled } from 'Components/ComponentController/Selects/Select/SelectListControlled'
 import { SelectOptions } from 'interfaces/SystemInterfaces/SelectInterface'
 import { tipoTransacaoLabel } from 'helpers/fatura_helpers'
-import { TransacoesDefaultValues, TransacoesModel } from 'interfaces/Transacoes/TransacoesInterface'
+import {
+    EstabelecimentoLookup,
+    ResponsavelLookup,
+    TransacoesDefaultValues,
+    TransacoesModel,
+} from 'interfaces/Transacoes/TransacoesInterface'
 import { TransacoesService } from 'services/Transacoes/TransacoesService'
+import { EstabelecimentosService } from 'services/Estabelecimentos/EstabelecimentosService'
+import { SubcategoriasService } from 'services/Subcategorias/SubcategoriasService'
+import ResponsavelModal from '../ResponsavelModal/ResponsavelModal'
 
+/**
+ * UX: ao trocar o estabelecimento, a UI sempre reaplica
+ * categoria_padrao_id e subcategoria_padrao_id do estabelecimento selecionado.
+ * Editar categoria/subcategoria na compra NÃO atualiza o estabelecimento.
+ */
 const TransacoesForm = () => {
     const { state } = useLocation()
     const [record] = useState<TransacoesModel>(
@@ -23,24 +36,62 @@ const TransacoesForm = () => {
                 ...state.source,
                 transacao_id: state.source.transacao_id ?? state.source.id,
                 fatura_id: state.source.fatura_id ?? null,
+                estabelecimento_id: state.source.estabelecimento_id ?? null,
+                subcategoria_id: state.source.subcategoria_id ?? null,
             }
             : TransacoesDefaultValues
     )
-    const { register, handleSubmit, control } = useForm<TransacoesModel>({
+    const { register, handleSubmit, control, setValue, watch } = useForm<TransacoesModel>({
         defaultValues: record,
     })
     const [faturasOptions, setFaturasOptions] = useState<SelectOptions[]>([])
     const [categoriasOptions, setCategoriasOptions] = useState<SelectOptions[]>([])
-    const [responsaveisOptions, setResponsaveisOptions] = useState<SelectOptions[]>([])
+    const [subcategoriasOptions, setSubcategoriasOptions] = useState<SelectOptions[]>([])
+    const [estabelecimentosOptions, setEstabelecimentosOptions] = useState<SelectOptions[]>([])
+    const [estabelecimentosLookup, setEstabelecimentosLookup] = useState<EstabelecimentoLookup[]>([])
+    const [responsaveisLookup, setResponsaveisLookup] = useState<ResponsavelLookup[]>([])
+    const [responsavelModalOpen, setResponsavelModalOpen] = useState(false)
+    const skipEstabelecimentoEffect = useRef(true)
+    const skipCategoriaEffect = useRef(true)
+    const applyingEstabelecimentoDefaults = useRef(false)
+
     const { voltarParaRotaAnterior } = useNavegacao()
     const navigate = useNavigate()
     const transacoesService = new TransacoesService()
+    const estabelecimentosService = new EstabelecimentosService()
+    const subcategoriasService = new SubcategoriasService()
     const isEdit = Boolean(record.transacao_id ?? record.id)
+
+    const estabelecimentoId = watch('estabelecimento_id')
+    const categoriaId = watch('categoria_id')
+    const responsavelId = watch('responsavel_id')
+
+    const responsavelAtual = responsaveisLookup.find((r) => Number(r.id) === Number(responsavelId))
+    const responsavelLabel = responsavelAtual?.nome ?? (responsavelId ? `#${responsavelId}` : '—')
 
     const optTipos: SelectOptions[] = Object.entries(tipoTransacaoLabel).map(([value, label]) => ({
         value,
         label,
     }))
+
+    const loadSubcategorias = async (catId: string | number | null | undefined) => {
+        if (!catId) {
+            setSubcategoriasOptions([])
+            return
+        }
+        try {
+            const list = await subcategoriasService.AsyncListSubcategorias({ categoria_id: catId })
+            setSubcategoriasOptions(
+                (list ?? []).map((s) => ({
+                    value: s.id!,
+                    label: s.nome ?? `#${s.id}`,
+                }))
+            )
+        } catch (error) {
+            console.error('Erro ao carregar subcategorias:', error)
+            setSubcategoriasOptions([])
+        }
+    }
 
     const getLookups = async (): Promise<void> => {
         try {
@@ -64,12 +115,26 @@ const TransacoesForm = () => {
                 )
             }
             if (lookups?.responsaveis) {
-                setResponsaveisOptions(
-                    lookups.responsaveis.map((r) => ({
-                        value: r.id!,
-                        label: r.nome ?? `#${r.id}`,
-                    }))
-                )
+                setResponsaveisLookup(lookups.responsaveis)
+            }
+            if (!isEdit && lookups?.default_responsavel_id && !record.responsavel_id) {
+                setValue('responsavel_id', lookups.default_responsavel_id)
+            }
+
+            const estabelecimentos =
+                lookups?.estabelecimentos
+                ?? (await estabelecimentosService.AsyncListEstabelecimentos({}))
+                ?? []
+            setEstabelecimentosLookup(estabelecimentos)
+            setEstabelecimentosOptions(
+                estabelecimentos.map((e) => ({
+                    value: e.id!,
+                    label: e.nome ?? `#${e.id}`,
+                }))
+            )
+
+            if (record.categoria_id) {
+                await loadSubcategorias(record.categoria_id)
             }
         } catch (error) {
             console.error('Erro ao carregar lookups:', error)
@@ -78,10 +143,15 @@ const TransacoesForm = () => {
 
     const onSubmit: SubmitHandler<TransacoesModel> = async (data) => {
         try {
-            const payload = {
+            const payload: TransacoesModel = {
                 ...data,
                 transacao_id: record.transacao_id ?? record.id,
                 id: record.id ?? record.transacao_id,
+                subcategoria_id: data.categoria_id ? data.subcategoria_id : null,
+            }
+            // remove texto legado se há estabelecimento_id
+            if (payload.estabelecimento_id) {
+                delete (payload as any).estabelecimento
             }
             if (isEdit) {
                 await transacoesService.editTransacoes(payload)
@@ -104,6 +174,35 @@ const TransacoesForm = () => {
     useEffect(() => {
         setActiveMenu('/transacoes')
     }, [])
+
+    // Reaplica padrões ao trocar estabelecimento
+    useEffect(() => {
+        if (skipEstabelecimentoEffect.current) {
+            skipEstabelecimentoEffect.current = false
+            return
+        }
+        if (!estabelecimentoId) return
+        const est = estabelecimentosLookup.find((e) => Number(e.id) === Number(estabelecimentoId))
+        if (!est) return
+        applyingEstabelecimentoDefaults.current = true
+        setValue('categoria_id', est.categoria_padrao_id ?? null)
+        setValue('subcategoria_id', est.subcategoria_padrao_id ?? null)
+        loadSubcategorias(est.categoria_padrao_id)
+    }, [estabelecimentoId])
+
+    useEffect(() => {
+        if (skipCategoriaEffect.current) {
+            skipCategoriaEffect.current = false
+            if (categoriaId) loadSubcategorias(categoriaId)
+            return
+        }
+        loadSubcategorias(categoriaId)
+        if (applyingEstabelecimentoDefaults.current) {
+            applyingEstabelecimentoDefaults.current = false
+            return
+        }
+        setValue('subcategoria_id', null)
+    }, [categoriaId])
 
     return (
         <React.Fragment>
@@ -169,11 +268,12 @@ const TransacoesForm = () => {
                                         <Row>
                                             <Col md={6}>
                                                 <div className="mb-3">
-                                                    <Label htmlFor="estabelecimento" className="form-label">Estabelecimento</Label>
-                                                    <InputTextControlled<TransacoesModel>
-                                                        field="estabelecimento"
+                                                    <Label htmlFor="estabelecimento_id" className="form-label">Estabelecimento</Label>
+                                                    <SelectListControlled<TransacoesModel>
+                                                        options={estabelecimentosOptions}
+                                                        field="estabelecimento_id"
                                                         control={control}
-                                                        rules={required}
+                                                        required={required}
                                                     />
                                                 </div>
                                             </Col>
@@ -189,6 +289,26 @@ const TransacoesForm = () => {
                                             </Col>
                                             <Col md={3}>
                                                 <div className="mb-3">
+                                                    <Label className="form-label">Responsável</Label>
+                                                    <div className="d-flex align-items-center gap-2">
+                                                        <span className="form-control bg-light">
+                                                            {responsavelLabel}
+                                                        </span>
+                                                        <Button
+                                                            type="button"
+                                                            color="soft-primary"
+                                                            onClick={() => setResponsavelModalOpen(true)}
+                                                            title="Alterar responsável"
+                                                        >
+                                                            <i className="ri-user-line"></i>
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            </Col>
+                                        </Row>
+                                        <Row>
+                                            <Col md={4}>
+                                                <div className="mb-3">
                                                     <Label htmlFor="categoria_id" className="form-label">Categoria</Label>
                                                     <SelectListControlled<TransacoesModel>
                                                         options={categoriasOptions}
@@ -197,15 +317,14 @@ const TransacoesForm = () => {
                                                     />
                                                 </div>
                                             </Col>
-                                        </Row>
-                                        <Row>
                                             <Col md={4}>
                                                 <div className="mb-3">
-                                                    <Label htmlFor="responsavel_id" className="form-label">Responsável</Label>
+                                                    <Label htmlFor="subcategoria_id" className="form-label">Subcategoria</Label>
                                                     <SelectListControlled<TransacoesModel>
-                                                        options={responsaveisOptions}
-                                                        field="responsavel_id"
+                                                        options={subcategoriasOptions}
+                                                        field="subcategoria_id"
                                                         control={control}
+                                                        disabled={!categoriaId}
                                                     />
                                                 </div>
                                             </Col>
@@ -227,12 +346,16 @@ const TransacoesForm = () => {
                                                     />
                                                 </div>
                                             </Col>
-                                            <Col md={4}>
+                                        </Row>
+                                        <Row>
+                                            <Col md={12}>
                                                 <div className="mb-3">
-                                                    <Label htmlFor="observacoes" className="form-label">Observações</Label>
-                                                    <InputTextControlled<TransacoesModel>
-                                                        field="observacoes"
-                                                        control={control}
+                                                    <Label htmlFor="observacoes" className="form-label">Observação</Label>
+                                                    <textarea
+                                                        {...register('observacoes')}
+                                                        className="form-control"
+                                                        rows={3}
+                                                        placeholder="Texto livre opcional"
                                                     />
                                                 </div>
                                             </Col>
@@ -253,6 +376,18 @@ const TransacoesForm = () => {
                     </Row>
                 </Container>
             </div>
+
+            <ResponsavelModal
+                isOpen={responsavelModalOpen}
+                toggle={() => setResponsavelModalOpen(false)}
+                responsaveis={responsaveisLookup}
+                currentResponsavelId={responsavelId}
+                onResponsaveisChange={setResponsaveisLookup}
+                onConfirm={(responsavel) => {
+                    setValue('responsavel_id', responsavel.id ?? null)
+                    toast.success(`Responsável: ${responsavel.nome}`)
+                }}
+            />
         </React.Fragment>
     )
 }

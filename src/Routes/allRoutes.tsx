@@ -34,6 +34,14 @@ import FaturasView from "pages/Pages/Faturas/FaturasView/FaturasView";
 import TransacoesPage from "pages/Pages/Transacoes/TransacoesPage";
 import TransacoesForm from "pages/Pages/Transacoes/TransacoesForm/TransacoesForm";
 
+import EstabelecimentosPage from "pages/Pages/Estabelecimentos/EstabelecimentosPage";
+import EstabelecimentosForm from "pages/Pages/Estabelecimentos/EstabelecimentosForm/EstabelecimentosForm";
+
+import SubcategoriasPage from "pages/Pages/Subcategorias/SubcategoriasPage";
+import SubcategoriasForm from "pages/Pages/Subcategorias/SubcategoriasForm/SubcategoriasForm";
+
+import RelatoriosPage from "pages/Pages/Relatorios/RelatoriosPage";
+
 const authProtectedRoutes = [
   { path: "/dashboard", component: <DashboardsHome /> },
   { path: "/dashboard-nft", component: <DashboardNFT /> },
@@ -66,6 +74,16 @@ const authProtectedRoutes = [
   { path: "/transacoes", component: <TransacoesPage /> },
   { path: "/transacoes/add", component: <TransacoesForm /> },
   { path: "/transacoes/edit/:id", component: <TransacoesForm /> },
+
+  { path: "/estabelecimentos", component: <EstabelecimentosPage /> },
+  { path: "/estabelecimentos/add", component: <EstabelecimentosForm /> },
+  { path: "/estabelecimentos/edit/:id", component: <EstabelecimentosForm /> },
+
+  { path: "/subcategorias", component: <SubcategoriasPage /> },
+  { path: "/subcategorias/add", component: <SubcategoriasForm /> },
+  { path: "/subcategorias/edit/:id", component: <SubcategoriasForm /> },
+
+  { path: "/relatorios", component: <RelatoriosPage /> },
 
   { path: "/profile", component: <SimplePage /> },
   { path: "/pages-profile-settings", component: <Settings /> },
