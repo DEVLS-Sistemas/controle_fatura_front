@@ -22,6 +22,7 @@ interface InputTextControlledProps<T extends FieldValues> {
     control: Control<T>,
     defaultValue?: any
     uppercase?: boolean
+    textValor?: boolean
 }
 
 
@@ -67,6 +68,7 @@ export const InputTextControlled = <T extends Partial<Record<keyof T, any>>>(pro
                     readOnly={props.readOnly}
                     onKeyUp={props.onKeyUp}
                     uppercase={props.uppercase}
+                    textValor={props.textValor}
                 />
             )}
 

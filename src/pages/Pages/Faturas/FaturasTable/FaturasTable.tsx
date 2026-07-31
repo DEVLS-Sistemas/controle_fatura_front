@@ -9,7 +9,7 @@ import { toast } from "react-toastify"
 import { PaginateInterface, PaginateSearch, PerPageProps } from "interfaces/SystemInterfaces/PaginateInterface"
 import CustomModal from "Components/ComponentController/Modal/CustomModal"
 import { useNavegacao } from "helpers/functions_helpers"
-import { formatCurrency, faturaStatusColor } from "helpers/fatura_helpers"
+import { formatCurrency, faturaStatusColor, VALOR_TEXT_CLASS } from "helpers/fatura_helpers"
 import { FaturasList, FaturasSearch } from "interfaces/Faturas/FaturasInterface"
 import { FaturasService } from "services/Faturas/FaturasService"
 
@@ -144,7 +144,7 @@ export const FaturasTable = ({ data, getData, setPerPage, perPage, filters }: Fa
                                                             <tr>
                                                                 <th scope="col" className="text-start">Cartão</th>
                                                                 <th scope="col">Período</th>
-                                                                <th scope="col">Valor Total</th>
+                                                                <th scope="col" className={VALOR_TEXT_CLASS}>Valor Total</th>
                                                                 <th scope="col">Status</th>
                                                                 <th scope="col">Transações</th>
                                                                 <th scope="col">Categorias</th>
@@ -156,7 +156,7 @@ export const FaturasTable = ({ data, getData, setPerPage, perPage, filters }: Fa
                                                                 <tr key={rowId(row) ?? index}>
                                                                     <td className="text-start">{row.cartao_nome ?? '-'}</td>
                                                                     <td>{formatPeriodo(row.mes, row.ano)}</td>
-                                                                    <td>{formatCurrency(row.valor_total)}</td>
+                                                                    <td className={VALOR_TEXT_CLASS}>{formatCurrency(row.valor_total)}</td>
                                                                     <td>
                                                                         <span className={`badge bg-${faturaStatusColor[row.status ?? ''] ?? 'secondary'}`}>
                                                                             {statusLabel[row.status ?? ''] ?? row.status}

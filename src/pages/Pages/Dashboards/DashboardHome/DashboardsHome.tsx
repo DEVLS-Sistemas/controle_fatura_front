@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { Card, CardBody, Col, Container, Label, Row, Spinner } from 'reactstrap'
 import ReactApexChart from 'react-apexcharts'
 import { DashboardService, DashboardResumo } from 'services/Dashboard'
-import { formatCurrency, tipoTransacaoLabel } from 'helpers/fatura_helpers'
+import { formatCurrency, tipoTransacaoLabel, VALOR_TEXT_CLASS } from 'helpers/fatura_helpers'
 import { toast } from 'react-toastify'
 import { Link } from 'react-router-dom'
 
@@ -105,7 +105,7 @@ const DashboardsHome = () => {
                         <div className="d-flex align-items-center">
                           <div className="flex-grow-1">
                             <p className="text-uppercase fw-medium text-muted mb-0">{card.title}</p>
-                            <h4 className="fs-22 fw-semibold ff-secondary mb-0">
+                            <h4 className={`fs-22 fw-semibold ff-secondary mb-0 ${card.isCount ? '' : VALOR_TEXT_CLASS}`}>
                               {card.isCount ? (card.value ?? 0) : formatCurrency(card.value)}
                             </h4>
                           </div>
@@ -189,7 +189,7 @@ const DashboardsHome = () => {
                             <tr>
                               <th>Nome</th>
                               <th>Tipo</th>
-                              <th className="text-end">Total</th>
+                              <th className={VALOR_TEXT_CLASS}>Total</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -204,7 +204,7 @@ const DashboardsHome = () => {
                                       {item.tipo || '-'}
                                     </span>
                                   </td>
-                                  <td className="text-end">{formatCurrency(item.total)}</td>
+                                  <td className={VALOR_TEXT_CLASS}>{formatCurrency(item.total)}</td>
                                 </tr>
                               ))
                             )}
@@ -228,7 +228,7 @@ const DashboardsHome = () => {
                             {(resumo?.por_cartao || []).map((item, idx) => (
                               <li key={idx} className="d-flex justify-content-between py-1 border-bottom">
                                 <span>{item.nome}</span>
-                                <strong>{formatCurrency(item.total)}</strong>
+                                <strong className={VALOR_TEXT_CLASS}>{formatCurrency(item.total)}</strong>
                               </li>
                             ))}
                             {(resumo?.por_cartao || []).length === 0 && (
@@ -242,7 +242,7 @@ const DashboardsHome = () => {
                             {(resumo?.por_tipo || []).map((item, idx) => (
                               <li key={idx} className="d-flex justify-content-between py-1 border-bottom">
                                 <span>{tipoTransacaoLabel[item.tipo] || item.tipo}</span>
-                                <strong>{formatCurrency(item.total)}</strong>
+                                <strong className={VALOR_TEXT_CLASS}>{formatCurrency(item.total)}</strong>
                               </li>
                             ))}
                             {(resumo?.por_tipo || []).length === 0 && (

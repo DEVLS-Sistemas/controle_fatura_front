@@ -12,7 +12,7 @@ import {
     formatCurrency, formatDateBr, faturaStatusColor,
     tipoTransacaoColor, tipoTransacaoLabel,
     FATURA_FILE_ACCEPT, isValidFaturaFile,
-    getCategoriaFieldStyle,
+    getCategoriaFieldStyle, VALOR_TEXT_CLASS,
 } from 'helpers/fatura_helpers'
 import { SelectOptions } from 'interfaces/SystemInterfaces/SelectInterface'
 import { FaturasView } from 'interfaces/Faturas/FaturasInterface'
@@ -553,7 +553,7 @@ const FaturasViewPage = () => {
                                     </div>
                                     <div className="d-inline-flex flex-column bg-light rounded px-3 py-2">
                                         <small className="text-muted text-uppercase">Total da fatura</small>
-                                        <span className="fs-3 fw-semibold text-primary">
+                                        <span className={`fs-3 fw-semibold text-primary ${VALOR_TEXT_CLASS}`}>
                                             {formatCurrency(fatura.valor_total)}
                                         </span>
                                     </div>
@@ -654,7 +654,7 @@ const FaturasViewPage = () => {
                                                         )}
                                                         <span className="fw-medium">{cat.nome}</span>
                                                         <span className="text-muted small">{cat.count}x</span>
-                                                        <span className="text-muted small">{formatCurrency(cat.total)}</span>
+                                                        <span className={`text-muted small ${VALOR_TEXT_CLASS}`}>{formatCurrency(cat.total)}</span>
                                                     </span>
                                                 ))}
                                             </div>
@@ -738,7 +738,7 @@ const FaturasViewPage = () => {
                                             <tr>
                                                 <th>Data</th>
                                                 <th>Estabelecimento</th>
-                                                <th style={{ minWidth: 150, maxWidth: 50 }}>Valor</th>
+                                                <th className={VALOR_TEXT_CLASS} style={{ minWidth: 150, maxWidth: 50 }}>Valor</th>
                                                 <th>Tipo</th>
                                                 <th style={{ minWidth: 160 }}>Categoria</th>
                                                 <th style={{ minWidth: 160 }}>Subcategoria</th>
@@ -760,10 +760,11 @@ const FaturasViewPage = () => {
                                                 <tr key={tx.id ?? idx}>
                                                     <td>{formatDateBr(tx.data)}</td>
                                                     <td>{tx.estabelecimento_nome ?? tx.estabelecimento ?? '-'}</td>
-                                                    <td  className="text-end">
+                                                    <td className={VALOR_TEXT_CLASS}>
                                                         <Input
                                                             type="number"
                                                             bsSize="sm"
+                                                            className={VALOR_TEXT_CLASS}
                                                             step="0.01"
                                                             min="0"
                                                             value={tx.id != null ? (valorDrafts[tx.id] ?? '') : ''}

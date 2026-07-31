@@ -1,4 +1,5 @@
 import { FieldValues, Path } from "react-hook-form"
+import { VALOR_TEXT_CLASS } from "helpers/fatura_helpers"
 import { ValidatorForm } from "../../ValidatorForm/ValidatorForm"
 
 interface InputTextProps<T extends FieldValues> {
@@ -20,6 +21,7 @@ interface InputTextProps<T extends FieldValues> {
     onKeyUp?: any,
     defaultValue?: any
     uppercase?: boolean
+    textValor?: boolean
 }
 
 export const InputText = <T extends Record<keyof T, any>>(
@@ -37,6 +39,7 @@ export const InputText = <T extends Record<keyof T, any>>(
         onBlur,
         onKeyUp,
         uppercase,
+        textValor,
     }: InputTextProps<T>) => {
     return (
         <>
@@ -48,7 +51,7 @@ export const InputText = <T extends Record<keyof T, any>>(
                 required={!!required}
                 id={`text-input-${field}`}
                 type={`${type ? type : 'text'}`}
-                className={`form-control ${errors ? 'is-invalid' : ''}`}
+                className={`form-control ${textValor ? VALOR_TEXT_CLASS : ''} ${errors ? 'is-invalid' : ''}`.trim()}
                 value={value}
                 onChange={onChange}
                 onKeyUp={onKeyUp}

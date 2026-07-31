@@ -1,3 +1,6 @@
+/** Classe CSS para alinhar valores monetários à direita */
+export const VALOR_TEXT_CLASS = 'text-valor'
+
 export const formatCurrency = (value?: number | string | null): string => {
   const amount = Number(value || 0)
   return amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })

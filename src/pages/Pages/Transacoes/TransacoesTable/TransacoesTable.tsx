@@ -13,6 +13,7 @@ import { useNavegacao } from "helpers/functions_helpers"
 import {
     formatCurrency,
     formatDateBr,
+    VALOR_TEXT_CLASS,
 } from "helpers/fatura_helpers"
 import {
     ResponsavelLookup,
@@ -225,7 +226,7 @@ export const TransacoesTable = ({
                                                             <tr>
                                                                 <th scope="col">Data</th>
                                                                 <th scope="col" className="text-start">Estabelecimento</th>
-                                                                <th scope="col">Valor</th>
+                                                                <th scope="col" className={VALOR_TEXT_CLASS}>Valor</th>
                                                                 <th scope="col">Categoria</th>
                                                                 <th scope="col">Subcategoria</th>
                                                                 <th scope="col" className="text-start">Observação</th>
@@ -248,7 +249,7 @@ export const TransacoesTable = ({
                                                                     <tr key={row.id ?? index}>
                                                                         <td>{formatDateBr(row.data)}</td>
                                                                         <td className="text-start">{estabelecimentoNome}</td>
-                                                                        <td>{formatCurrency(row.valor)}</td>
+                                                                        <td className={VALOR_TEXT_CLASS}>{formatCurrency(row.valor)}</td>
                                                                         <td>
                                                                             {row.categoria_nome ? (
                                                                                 <span className="d-inline-flex align-items-center gap-1">

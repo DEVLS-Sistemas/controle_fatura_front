@@ -294,6 +294,7 @@ const TransacoesForm = () => {
                                                         field="valor"
                                                         control={control}
                                                         required={required}
+                                                        textValor
                                                     />
                                                 </div>
                                             </Col>
