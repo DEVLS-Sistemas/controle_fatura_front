@@ -74,7 +74,7 @@ const ProjecaoFaturasFilter = ({
 
       <Row>
         <Col xl={12}>
-          <Card>
+          <Card className="position-relative" style={{ zIndex: 10 }}>
             <CardHeader>
               <form id="form-search-projecao" onSubmit={handleSubmit(getRemoteProjecaoFaturas)}>
                 <Row className="align-items-end g-3">
