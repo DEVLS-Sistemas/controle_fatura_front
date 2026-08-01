@@ -38,6 +38,19 @@ const RelatoriosPage = () => {
                         <Col md={4}>
                             <Card className="card-animate">
                                 <CardBody>
+                                    <h5 className="card-title">Projeção de Faturas</h5>
+                                    <p className="text-muted mb-3">
+                                        Previsão de valores por cartão e responsável nos próximos meses.
+                                    </p>
+                                    <Link to="/projecao-faturas" className="btn btn-soft-primary btn-sm">
+                                        Abrir projeção
+                                    </Link>
+                                </CardBody>
+                            </Card>
+                        </Col>
+                        <Col md={4}>
+                            <Card className="card-animate">
+                                <CardBody>
                                     <h5 className="card-title">Por fatura</h5>
                                     <p className="text-muted mb-0">
                                         O que cada responsável deve por fatura. Em breve.
@@ -48,17 +61,7 @@ const RelatoriosPage = () => {
                         <Col md={4}>
                             <Card className="card-animate">
                                 <CardBody>
-                                    <h5 className="card-title">Por compra</h5>
-                                    <p className="text-muted mb-0">
-                                        Detalhamento por compra/transação. Em breve.
-                                    </p>
-                                </CardBody>
-                            </Card>
-                        </Col>
-                        <Col md={4}>
-                            <Card className="card-animate">
-                                <CardBody>
-                                    <h5 className="card-title">Geral</h5>
+                                    <h5 className="card-title">Por responsável</h5>
                                     <p className="text-muted mb-0">
                                         Visão consolidada por responsável. Em breve.
                                     </p>

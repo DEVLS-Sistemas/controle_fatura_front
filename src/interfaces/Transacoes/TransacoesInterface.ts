@@ -46,7 +46,8 @@ export interface TransacoesView extends TransacoesList {}
 export interface TransacoesModel {
     id?: number | null
     transacao_id?: number | null
-    fatura_id: number | string | null
+    cartao_id: number | string | null
+    fatura_id?: number | string | null
     data?: string | null
     estabelecimento_id?: number | string | null
     /** @deprecated use estabelecimento_id — ainda aceito no create (find-or-create) */
@@ -129,6 +130,7 @@ export interface TransacoesInterface {
 export const TransacoesDefaultValues: TransacoesModel = {
     id: null,
     transacao_id: null,
+    cartao_id: null,
     fatura_id: null,
     data: null,
     estabelecimento_id: null,

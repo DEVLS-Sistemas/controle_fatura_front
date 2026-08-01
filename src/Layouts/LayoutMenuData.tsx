@@ -46,6 +46,17 @@ const Navdata = () => {
             },
         },
         {
+            id: "projecao-faturas",
+            label: "Projeção",
+            icon: "ri-line-chart-line",
+            link: "/projecao-faturas",
+            click: function (e: any) {
+                e.preventDefault();
+                setIscurrentState("ProjecaoFaturas");
+                updateIconSidebar(e);
+            },
+        },
+        {
             id: "cartoes",
             label: "Cartões",
             icon: "ri-bank-card-line",

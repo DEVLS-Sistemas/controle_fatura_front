@@ -281,6 +281,7 @@ const FaturasViewPage = () => {
             await transacoesService.editTransacoes({
                 id: tx.id,
                 transacao_id: tx.id,
+                cartao_id: tx.cartao_id ?? null,
                 fatura_id: tx.fatura_id ?? Number(id),
                 estabelecimento_id: tx.estabelecimento_id ?? null,
                 estabelecimento: tx.estabelecimento_id ? undefined : (tx.estabelecimento ?? null),

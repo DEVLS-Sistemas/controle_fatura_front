@@ -35,6 +35,7 @@ const TransacoesForm = () => {
                 ...TransacoesDefaultValues,
                 ...state.source,
                 transacao_id: state.source.transacao_id ?? state.source.id,
+                cartao_id: state.source.cartao_id ?? null,
                 fatura_id: state.source.fatura_id ?? null,
                 estabelecimento_id: state.source.estabelecimento_id ?? null,
                 subcategoria_id: state.source.subcategoria_id ?? null,
@@ -44,7 +45,7 @@ const TransacoesForm = () => {
     const { register, handleSubmit, control, setValue, watch } = useForm<TransacoesModel>({
         defaultValues: record,
     })
-    const [faturasOptions, setFaturasOptions] = useState<SelectOptions[]>([])
+    const [cartoesOptions, setCartoesOptions] = useState<SelectOptions[]>([])
     const [categoriasOptions, setCategoriasOptions] = useState<SelectOptions[]>([])
     const [subcategoriasOptions, setSubcategoriasOptions] = useState<SelectOptions[]>([])
     const [estabelecimentosOptions, setEstabelecimentosOptions] = useState<SelectOptions[]>([])
@@ -103,13 +104,11 @@ const TransacoesForm = () => {
     const getLookups = async (): Promise<void> => {
         try {
             const lookups = await transacoesService.getLookupsTransacoes()
-            if (lookups?.faturas) {
-                setFaturasOptions(
-                    lookups.faturas.map((f) => ({
-                        value: f.id!,
-                        label: f.cartao_nome
-                            ? `${f.cartao_nome} — ${String(f.mes).padStart(2, '0')}/${f.ano}`
-                            : `Fatura ${f.id}`,
+            if (lookups?.cartoes) {
+                setCartoesOptions(
+                    lookups.cartoes.map((c) => ({
+                        value: c.id!,
+                        label: c.nome ?? `Cartão ${c.id}`,
                     }))
                 )
             }
@@ -245,10 +244,10 @@ const TransacoesForm = () => {
                                         <Row>
                                             <Col md={6}>
                                                 <div className="mb-3">
-                                                    <Label htmlFor="fatura_id" className="form-label">Fatura</Label>
+                                                    <Label htmlFor="cartao_id" className="form-label">Cartão</Label>
                                                     <SelectListControlled<TransacoesModel>
-                                                        options={faturasOptions}
-                                                        field="fatura_id"
+                                                        options={cartoesOptions}
+                                                        field="cartao_id"
                                                         control={control}
                                                         required={required}
                                                     />
