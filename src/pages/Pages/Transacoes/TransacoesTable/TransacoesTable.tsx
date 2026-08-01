@@ -3,12 +3,11 @@ import React, { useEffect, useState } from "react"
 import { Link } from "react-router-dom"
 import {
     Button, ButtonGroup, Card, CardBody, Col, DropdownItem,
-    DropdownMenu, DropdownToggle, Label, Row, UncontrolledDropdown,
-    UncontrolledTooltip,
+    DropdownMenu, DropdownToggle, Label, Modal, ModalBody, ModalHeader,
+    Row, UncontrolledDropdown, UncontrolledTooltip,
 } from "reactstrap"
 import { toast } from "react-toastify"
 import { PaginateInterface, PaginateSearch, PerPageProps } from "interfaces/SystemInterfaces/PaginateInterface"
-import CustomModal from "Components/ComponentController/Modal/CustomModal"
 import { useNavegacao } from "helpers/functions_helpers"
 import {
     formatCurrency,
@@ -73,13 +72,24 @@ export const TransacoesTable = ({
     ])
     const transacoesService = new TransacoesService()
     const [modalIsOpen, setModalIsOpen] = useState(false)
-    const [selectedId, setSelectedId] = useState<number | null>(null)
+    const [rowForDelete, setRowForDelete] = useState<TransacoesList | null>(null)
+    const [deleting, setDeleting] = useState(false)
     const [localRows, setLocalRows] = useState<TransacoesList[]>([])
     const [responsavelModalOpen, setResponsavelModalOpen] = useState(false)
     const [rowForResponsavel, setRowForResponsavel] = useState<TransacoesList | null>(null)
     const { voltarParaRotaAnterior } = useNavegacao()
 
-    const toggleModal = () => setModalIsOpen(!modalIsOpen)
+    const toggleModal = () => {
+        setModalIsOpen((open) => {
+            if (open) setRowForDelete(null)
+            return !open
+        })
+    }
+
+    const openDeleteModal = (row: TransacoesList) => {
+        setRowForDelete(row)
+        setModalIsOpen(true)
+    }
 
     useEffect(() => {
         if (data?.data) {
@@ -129,15 +139,24 @@ export const TransacoesTable = ({
         }
     }
 
-    const handleRemoteDelete = async (id: number) => {
+    const handleRemoteDelete = async (excluirGrupo = false) => {
+        if (!rowForDelete?.id || deleting) return
+        setDeleting(true)
         try {
-            await transacoesService.deleteTransacoes(id)
-            toast.success('Transação excluída com sucesso')
+            await transacoesService.deleteTransacoes(rowForDelete.id, { excluir_grupo: excluirGrupo })
+            toast.success(
+                excluirGrupo
+                    ? 'Todas as parcelas da compra foram excluídas'
+                    : 'Transação excluída com sucesso'
+            )
             if (data) await handleThisRoute(data.first_page_url)
-            toggleModal()
+            setModalIsOpen(false)
+            setRowForDelete(null)
         } catch (error) {
             console.error('Erro ao excluir:', error)
             toast.error('Erro ao excluir transação')
+        } finally {
+            setDeleting(false)
         }
     }
 
@@ -320,12 +339,7 @@ export const TransacoesTable = ({
                                                                                         <Link to={`/transacoes/edit/${row.id}`} state={{ source: row }}>
                                                                                             <DropdownItem>Editar</DropdownItem>
                                                                                         </Link>
-                                                                                        <DropdownItem
-                                                                                            onClick={() => {
-                                                                                                setSelectedId(row.id!)
-                                                                                                toggleModal()
-                                                                                            }}
-                                                                                        >
+                                                                                        <DropdownItem onClick={() => openDeleteModal(row)}>
                                                                                             Excluir
                                                                                         </DropdownItem>
                                                                                     </DropdownMenu>
@@ -378,14 +392,61 @@ export const TransacoesTable = ({
                     </Card>
                 </Col>
             </Row>
-            <CustomModal
-                isOpen={modalIsOpen}
-                toggle={toggleModal}
-                title="Confirmação de Exclusão"
-                delete={true}
-                body="Deseja realmente excluir esta transação?"
-                onConfirmDelete={() => selectedId && handleRemoteDelete(selectedId)}
-            />
+            <Modal isOpen={modalIsOpen} toggle={toggleModal} centered>
+                <ModalHeader toggle={toggleModal}>Confirmação de Exclusão</ModalHeader>
+                <ModalBody className="text-center py-4">
+                    <i className="ri-delete-bin-line display-5 text-danger"></i>
+                    {rowForDelete?.compra_grupo_id ? (
+                        <>
+                            <p className="mt-3 mb-1">
+                                Esta compra possui múltiplas parcelas
+                                {rowForDelete.parcelas_total
+                                    ? ` (${rowForDelete.parcela_atual ?? '?'}/${rowForDelete.parcelas_total})`
+                                    : ''}
+                                .
+                            </p>
+                            <p className="text-muted small mb-4">
+                                Excluir só esta parcela ou todas as parcelas da compra?
+                            </p>
+                            <div className="d-flex flex-column flex-sm-row gap-2 justify-content-center">
+                                <Button color="light" onClick={toggleModal} disabled={deleting}>
+                                    Cancelar
+                                </Button>
+                                <Button
+                                    color="warning"
+                                    onClick={() => handleRemoteDelete(false)}
+                                    disabled={deleting}
+                                >
+                                    Só esta parcela
+                                </Button>
+                                <Button
+                                    color="danger"
+                                    onClick={() => handleRemoteDelete(true)}
+                                    disabled={deleting}
+                                >
+                                    Todas as parcelas
+                                </Button>
+                            </div>
+                        </>
+                    ) : (
+                        <>
+                            <p className="mt-3 mb-4">Deseja realmente excluir esta transação?</p>
+                            <div className="d-flex gap-2 justify-content-center">
+                                <Button color="light" onClick={toggleModal} disabled={deleting}>
+                                    Cancelar
+                                </Button>
+                                <Button
+                                    color="danger"
+                                    onClick={() => handleRemoteDelete(false)}
+                                    disabled={deleting}
+                                >
+                                    Excluir
+                                </Button>
+                            </div>
+                        </>
+                    )}
+                </ModalBody>
+            </Modal>
             <ResponsavelModal
                 isOpen={responsavelModalOpen}
                 toggle={() => {

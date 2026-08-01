@@ -99,9 +99,10 @@ export class TransacoesService implements TransacoesInterface {
         }
     }
 
-    async deleteTransacoes(id: number) {
+    async deleteTransacoes(id: number, options?: { excluir_grupo?: boolean }) {
+        const qs = options?.excluir_grupo ? '?excluir_grupo=1' : ''
         const response = await this.httpClient.delete({
-            url: this.url + '/excluir/' + id
+            url: this.url + '/excluir/' + id + qs
         })
         switch (response.statusCode) {
             case HttpStatusCode.ok: return response

@@ -68,6 +68,26 @@ const RelatoriosPage = () => {
                                 </CardBody>
                             </Card>
                         </Col>
+                        <Col md={4}>
+                            <Card className="card-animate">
+                                <CardBody>
+                                    <h5 className="card-title">Por compra</h5>
+                                    <p className="text-muted mb-0">
+                                        Detalhamento por compra/grupo de parcelas. Em breve.
+                                    </p>
+                                </CardBody>
+                            </Card>
+                        </Col>
+                        <Col md={4}>
+                            <Card className="card-animate">
+                                <CardBody>
+                                    <h5 className="card-title">Geral</h5>
+                                    <p className="text-muted mb-0">
+                                        Relatório geral de gastos. Em breve.
+                                    </p>
+                                </CardBody>
+                            </Card>
+                        </Col>
                     </Row>
                 </Container>
             </div>

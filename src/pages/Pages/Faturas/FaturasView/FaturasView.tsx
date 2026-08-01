@@ -214,7 +214,7 @@ const FaturasViewPage = () => {
         if (!id) return
         try {
             await faturasService.processarPdf(Number(id))
-            toast.success('Reprocessamento iniciado')
+            toast.success('Reprocessamento concluído')
             await loadFatura({ silent: true })
         } catch (error) {
             toast.error('Erro ao reprocessar fatura')
@@ -399,7 +399,7 @@ const FaturasViewPage = () => {
         const next = observacaoDrafts[tx.id] ?? ''
         const current = tx.observacoes ?? ''
         if (next === current) return
-        await saveTransacao(tx, { observacoes: next || null })
+        await saveTransacao(tx, { observacoes: next || undefined })
     }
 
     const openResponsavelModal = (tx: TransacoesList) => {
@@ -427,19 +427,8 @@ const FaturasViewPage = () => {
 
     useEffect(() => {
         loadFatura()
-    }, [loadFatura])
-
-    useEffect(() => {
-        const status = fatura?.status
-        const shouldPoll = status === 'pendente' || status === 'processando'
-        if (!shouldPoll || !id) return
-
-        const timer = setInterval(() => {
-            loadFatura({ silent: true })
-        }, 2500)
-
-        return () => clearInterval(timer)
-    }, [fatura?.status, id, loadFatura])
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- carga única ao abrir a tela / trocar id
+    }, [id])
 
     useEffect(() => {
         return () => {
@@ -562,9 +551,8 @@ const FaturasViewPage = () => {
                                         <div className="alert alert-danger mt-3 mb-0">{fatura.erro_mensagem}</div>
                                     )}
                                     {isProcessing && (
-                                        <div className="alert alert-info mt-3 mb-0 d-flex align-items-center gap-2">
-                                            <Spinner size="sm" />
-                                            Processando fatura… as transações aparecerão automaticamente.
+                                        <div className="alert alert-info mt-3 mb-0">
+                                            Fatura pendente/processando. Use <strong>Reprocessar</strong> para atualizar as transações.
                                         </div>
                                     )}
                                 </Col>
@@ -715,21 +703,38 @@ const FaturasViewPage = () => {
                                         Ajuste valor, categoria, subcategoria e observação em cada linha. Use a coluna Resp. para definir outro responsável (padrão: Eu).
                                     </small>
                                 </div>
-                                <Button
-                                    type="button"
-                                    color="secondary"
-                                    outline
-                                    onClick={handleExportCsv}
-                                    disabled={exporting || transacoes.length === 0}
-                                >
-                                    <i className="ri-file-download-line align-middle me-1"></i>
-                                    {exporting ? 'Exportando...' : 'Exportar CSV/Excel'}
-                                </Button>
+                                <div className="d-flex flex-wrap gap-2">
+                                    <Link
+                                        to="/transacoes/add"
+                                        state={{
+                                            source: {
+                                                fatura_id: Number(id),
+                                                cartao_id: fatura.cartao_id,
+                                                tipo: 'purchase',
+                                            },
+                                            returnTo: `/faturas/view/${id}`,
+                                        }}
+                                        className="btn btn-primary"
+                                    >
+                                        <i className="ri-add-circle-line align-middle me-1"></i>
+                                        Nova compra
+                                    </Link>
+                                    <Button
+                                        type="button"
+                                        color="secondary"
+                                        outline
+                                        onClick={handleExportCsv}
+                                        disabled={exporting || transacoes.length === 0}
+                                    >
+                                        <i className="ri-file-download-line align-middle me-1"></i>
+                                        {exporting ? 'Exportando...' : 'Exportar CSV/Excel'}
+                                    </Button>
+                                </div>
                             </div>
                             {transacoes.length === 0 ? (
                                 <div className="text-center text-muted py-5">
                                     {isProcessing
-                                        ? 'Aguardando processamento das transações…'
+                                        ? 'Nenhuma transação ainda. Clique em Reprocessar para processar a fatura.'
                                         : 'Nenhuma transação encontrada.'}
                                 </div>
                             ) : (

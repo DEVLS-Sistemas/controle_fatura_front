@@ -23,8 +23,10 @@ export interface TransacoesList {
     estabelecimento_id?: number | null
     estabelecimento_nome?: string
     valor?: number
+    valor_compra?: number | string | null
     parcelas_total?: number
     parcela_atual?: number
+    compra_grupo_id?: string | number | null
     tipo?: string
     categoria_id?: number | null
     categoria_nome?: string
@@ -43,6 +45,11 @@ export interface TransacoesList {
 
 export interface TransacoesView extends TransacoesList {}
 
+export interface ParcelaValor {
+    parcela: number
+    valor: string
+}
+
 export interface TransacoesModel {
     id?: number | null
     transacao_id?: number | null
@@ -52,10 +59,19 @@ export interface TransacoesModel {
     estabelecimento_id?: number | string | null
     /** @deprecated use estabelecimento_id — ainda aceito no create (find-or-create) */
     estabelecimento?: string | null
-    valor: number | string | null
+    /** Valor da linha (edit / listagem). No create use valor_compra. */
+    valor?: number | string | null
+    /** Total da venda — enviado no create (formato BR: "150,90") */
+    valor_compra?: number | string | null
     parcelas_total?: number | string | null
+    /** Somente leitura / edit — não enviar no create */
     parcela_atual?: number | string | null
     valor_parcela?: number | string | null
+    /** Valores por parcela quando parcelas_total > 1 */
+    parcelas?: ParcelaValor[]
+    compra_grupo_id?: string | number | null
+    /** No edit, propaga campos compartilhados para o grupo */
+    propagar_grupo?: boolean
     tipo?: string | null
     categoria_id?: number | string | null
     subcategoria_id?: number | string | null
@@ -121,7 +137,7 @@ export interface TransacoesInterface {
     AsyncListTransacoes(params: TransacoesSearch): Promise<TransacoesModel[] | undefined>
     createTransacoes(params: TransacoesModel): Promise<any>
     editTransacoes(params: TransacoesModel): Promise<any>
-    deleteTransacoes(id: number): Promise<any>
+    deleteTransacoes(id: number, options?: { excluir_grupo?: boolean }): Promise<any>
     getLookupsTransacoes(): Promise<LookupsTransacoes | undefined>
     exportCsv(params: TransacoesSearch): Promise<Blob>
 }
@@ -135,6 +151,12 @@ export const TransacoesDefaultValues: TransacoesModel = {
     estabelecimento_id: null,
     estabelecimento: null,
     valor: null,
+    valor_compra: null,
+    parcelas_total: 1,
+    parcela_atual: null,
+    parcelas: undefined,
+    compra_grupo_id: null,
+    propagar_grupo: false,
     tipo: 'purchase',
     categoria_id: null,
     subcategoria_id: null,

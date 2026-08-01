@@ -1,7 +1,15 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { setActiveMenu } from 'helpers/system_helpers'
-import { useNavegacao } from 'helpers/functions_helpers'
+import { mask, removeMask, useNavegacao } from 'helpers/functions_helpers'
+import {
+    centavosToBr,
+    parcelasOptions,
+    splitValorEmParcelas,
+    toCentavos,
+    tipoTransacaoLabel,
+    VALOR_TEXT_CLASS,
+} from 'helpers/fatura_helpers'
 import { Breadcrumb, BreadcrumbItem, Button, Card, CardBody, Col, Container, Label, Row } from 'reactstrap'
 import { SubmitHandler, useForm } from 'react-hook-form'
 import { toast } from 'react-toastify'
@@ -11,7 +19,6 @@ import { InputDate } from 'Components/ComponentController/Inputs/Date/InputDate'
 import { SelectListControlled } from 'Components/ComponentController/Selects/Select/SelectListControlled'
 import { AsyncSelectListControlled } from 'Components/ComponentController/Selects/AsyncSelect/AsyncSelectListControlled'
 import { SelectOptions } from 'interfaces/SystemInterfaces/SelectInterface'
-import { tipoTransacaoLabel } from 'helpers/fatura_helpers'
 import {
     EstabelecimentoLookup,
     ResponsavelLookup,
@@ -27,9 +34,19 @@ import ResponsavelModal from '../ResponsavelModal/ResponsavelModal'
  * UX: ao trocar o estabelecimento, a UI sempre reaplica
  * categoria_padrao_id e subcategoria_padrao_id do estabelecimento selecionado.
  * Editar categoria/subcategoria na compra NÃO atualiza o estabelecimento.
+ *
+ * Create: valor_compra + select 1..36; sem parcela_atual.
+ * Parcelado: N inputs editáveis; total deve bater com valor_compra.
  */
 const TransacoesForm = () => {
     const { state } = useLocation()
+    const returnTo: string | undefined = state?.returnTo
+
+    const toPrecoDigits = (value: string | number | null | undefined): string | null => {
+        if (value == null || value === '') return null
+        return String(toCentavos(value))
+    }
+
     const [record] = useState<TransacoesModel>(
         state?.source
             ? {
@@ -40,18 +57,26 @@ const TransacoesForm = () => {
                 fatura_id: state.source.fatura_id ?? null,
                 estabelecimento_id: state.source.estabelecimento_id ?? null,
                 subcategoria_id: state.source.subcategoria_id ?? null,
+                valor: toPrecoDigits(state.source.valor ?? state.source.valor_compra),
+                valor_compra: toPrecoDigits(state.source.valor_compra ?? state.source.valor),
+                parcelas_total: state.source.parcelas_total ?? 1,
+                compra_grupo_id: state.source.compra_grupo_id ?? null,
             }
             : TransacoesDefaultValues
     )
+
     const { register, handleSubmit, control, setValue, watch } = useForm<TransacoesModel>({
         defaultValues: record,
     })
+
     const [cartoesOptions, setCartoesOptions] = useState<SelectOptions[]>([])
     const [categoriasOptions, setCategoriasOptions] = useState<SelectOptions[]>([])
     const [subcategoriasOptions, setSubcategoriasOptions] = useState<SelectOptions[]>([])
     const [responsaveisLookup, setResponsaveisLookup] = useState<ResponsavelLookup[]>([])
     const [defaultResponsavelId, setDefaultResponsavelId] = useState<number | null>(null)
     const [responsavelModalOpen, setResponsavelModalOpen] = useState(false)
+    const [parcelasValores, setParcelasValores] = useState<string[]>([])
+
     const skipEstabelecimentoEffect = useRef(true)
     const skipCategoriaEffect = useRef(true)
     const applyingEstabelecimentoDefaults = useRef(false)
@@ -63,10 +88,19 @@ const TransacoesForm = () => {
     const estabelecimentosService = new EstabelecimentosService()
     const subcategoriasService = new SubcategoriasService()
     const isEdit = Boolean(record.transacao_id ?? record.id)
+    const fromFatura = Boolean(record.fatura_id)
 
     const estabelecimentoId = watch('estabelecimento_id')
     const categoriaId = watch('categoria_id')
     const responsavelId = watch('responsavel_id')
+    const valorCompraWatch = watch('valor_compra')
+    const parcelasTotalWatch = watch('parcelas_total')
+    const propagarGrupo = watch('propagar_grupo')
+
+    const nParcelas = Math.max(1, Math.min(36, Number(parcelasTotalWatch) || 1))
+    const totalParcelasCentavos = parcelasValores.reduce((acc, v) => acc + toCentavos(v), 0)
+    const valorCompraCentavos = toCentavos(valorCompraWatch)
+    const totaisBatem = nParcelas <= 1 || totalParcelasCentavos === valorCompraCentavos
 
     const responsavelAtual = responsaveisLookup.find((r) => Number(r.id) === Number(responsavelId))
     const isMeuResponsavel =
@@ -82,6 +116,11 @@ const TransacoesForm = () => {
         label,
     }))
 
+    const optParcelas: SelectOptions[] = parcelasOptions.map((p) => ({
+        value: p.value,
+        label: p.label,
+    }))
+
     const estabelecimentoDefault: SelectOptions | undefined =
         record.estabelecimento_id
             ? {
@@ -92,6 +131,10 @@ const TransacoesForm = () => {
                     ?? `#${record.estabelecimento_id}`,
             }
             : undefined
+
+    const toBrPayload = (value: string | number | null | undefined): string => {
+        return centavosToBr(toCentavos(value))
+    }
 
     const loadSubcategorias = async (catId: string | number | null | undefined) => {
         if (!catId) {
@@ -169,26 +212,89 @@ const TransacoesForm = () => {
         }
     }
 
+    const redistributeParcelas = (valor: string | number | null | undefined, n: number) => {
+        if (n <= 1) {
+            setParcelasValores([])
+            return
+        }
+        setParcelasValores(splitValorEmParcelas(toCentavos(valor), n))
+    }
+
+    const handleParcelaChange = (index: number, raw: string) => {
+        const digits = removeMask(raw)
+        setParcelasValores((prev) => prev.map((v, i) => (i === index ? digits : v)))
+    }
+
     const onSubmit: SubmitHandler<TransacoesModel> = async (data) => {
         try {
-            const payload: TransacoesModel = {
-                ...data,
-                transacao_id: record.transacao_id ?? record.id,
-                id: record.id ?? record.transacao_id,
-                subcategoria_id: data.categoria_id ? data.subcategoria_id : null,
-            }
-            // remove texto legado se há estabelecimento_id
-            if (payload.estabelecimento_id) {
-                delete (payload as any).estabelecimento
-            }
             if (isEdit) {
+                const payload: TransacoesModel = {
+                    id: record.id ?? record.transacao_id,
+                    transacao_id: record.transacao_id ?? record.id,
+                    cartao_id: data.cartao_id,
+                    fatura_id: data.fatura_id,
+                    data: data.data,
+                    estabelecimento_id: data.estabelecimento_id,
+                    valor: toCentavos(data.valor ?? data.valor_compra) / 100,
+                    tipo: data.tipo,
+                    categoria_id: data.categoria_id,
+                    subcategoria_id: data.categoria_id ? data.subcategoria_id : null,
+                    responsavel_id: data.responsavel_id,
+                    observacoes: data.observacoes,
+                    propagar_grupo: Boolean(data.propagar_grupo && record.compra_grupo_id),
+                }
+                if (payload.estabelecimento_id) {
+                    delete (payload as any).estabelecimento
+                }
                 await transacoesService.editTransacoes(payload)
                 toast.success('Transação atualizada com sucesso')
             } else {
+                if (nParcelas > 1 && !totaisBatem) {
+                    toast.error('O total das parcelas deve ser igual ao valor da compra.')
+                    return
+                }
+
+                const payload: TransacoesModel = {
+                    cartao_id: data.cartao_id,
+                    data: data.data,
+                    estabelecimento_id: data.estabelecimento_id,
+                    valor_compra: toBrPayload(data.valor_compra),
+                    tipo: data.tipo || 'purchase',
+                    parcelas_total: nParcelas,
+                    categoria_id: data.categoria_id || undefined,
+                    subcategoria_id: data.categoria_id ? (data.subcategoria_id || undefined) : undefined,
+                    responsavel_id: data.responsavel_id || undefined,
+                    observacoes: data.observacoes || undefined,
+                }
+
+                if (fromFatura && data.fatura_id) {
+                    payload.fatura_id = data.fatura_id
+                }
+
+                if (nParcelas > 1) {
+                    payload.parcelas = parcelasValores.map((valor, idx) => ({
+                        parcela: idx + 1,
+                        valor: toBrPayload(valor),
+                    }))
+                }
+
+                if (payload.estabelecimento_id) {
+                    delete (payload as any).estabelecimento
+                }
+
+                // Não enviar parcela_atual no create
+                delete (payload as any).parcela_atual
+                delete (payload as any).valor
+
                 await transacoesService.createTransacoes(payload)
-                toast.success('Transação cadastrada com sucesso')
+                toast.success(
+                    nParcelas > 1
+                        ? `Compra parcelada cadastrada (${nParcelas} parcelas)`
+                        : 'Transação cadastrada com sucesso'
+                )
             }
-            navigate('/transacoes')
+
+            navigate(returnTo || '/transacoes')
         } catch (error: any) {
             toast.error('Erro ao salvar transação')
             throw error
@@ -202,6 +308,12 @@ const TransacoesForm = () => {
     useEffect(() => {
         setActiveMenu('/transacoes')
     }, [])
+
+    // Redistribui parcelas ao mudar valor_compra ou N (create)
+    useEffect(() => {
+        if (isEdit) return
+        redistributeParcelas(valorCompraWatch, nParcelas)
+    }, [valorCompraWatch, nParcelas, isEdit])
 
     // Reaplica padrões ao trocar estabelecimento
     useEffect(() => {
@@ -265,9 +377,9 @@ const TransacoesForm = () => {
                         <Col xs={12}>
                             <div className="page-title-box d-sm-flex align-items-center justify-content-between">
                                 <div className="d-sm-flex align-items-center justify-content-between">
-                                    <Link to="/transacoes"><i className="bx bx-arrow-back bx-sm"></i></Link>
+                                    <Link to={returnTo || '/transacoes'}><i className="bx bx-arrow-back bx-sm"></i></Link>
                                     <h4 className="mb-sm-0 ms-3">
-                                        {isEdit ? 'Editar' : 'Adicionar'} Transação
+                                        {isEdit ? 'Editar' : 'Adicionar'} {fromFatura && !isEdit ? 'Compra' : 'Transação'}
                                     </h4>
                                 </div>
                                 <Breadcrumb pageTitle="" listClassName="mb-sm-0 pt-1 py-2">
@@ -294,12 +406,16 @@ const TransacoesForm = () => {
                                                         field="cartao_id"
                                                         control={control}
                                                         required={required}
+                                                        disabled={fromFatura && !isEdit}
                                                     />
+                                                    {fromFatura && !isEdit && (
+                                                        <small className="text-muted">Vinculado à fatura selecionada</small>
+                                                    )}
                                                 </div>
                                             </Col>
                                             <Col md={3}>
                                                 <div className="mb-3">
-                                                    <Label htmlFor="data" className="form-label">Data</Label>
+                                                    <Label htmlFor="data" className="form-label">Data da compra</Label>
                                                     <InputDate<TransacoesModel>
                                                         field="data"
                                                         register={register}
@@ -334,13 +450,26 @@ const TransacoesForm = () => {
                                             </Col>
                                             <Col md={3}>
                                                 <div className="mb-3">
-                                                    <Label htmlFor="valor" className="form-label">Valor</Label>
-                                                    <InputTextControlled<TransacoesModel>
-                                                        field="valor"
-                                                        control={control}
-                                                        required={required}
-                                                        textValor
-                                                    />
+                                                    <Label htmlFor="valor_compra" className="form-label">
+                                                        {isEdit ? 'Valor' : 'Valor da compra'}
+                                                    </Label>
+                                                    {isEdit ? (
+                                                        <InputTextControlled<TransacoesModel>
+                                                            field="valor"
+                                                            control={control}
+                                                            required={required}
+                                                            textValor
+                                                            mask="preco"
+                                                        />
+                                                    ) : (
+                                                        <InputTextControlled<TransacoesModel>
+                                                            field="valor_compra"
+                                                            control={control}
+                                                            required={required}
+                                                            textValor
+                                                            mask="preco"
+                                                        />
+                                                    )}
                                                 </div>
                                             </Col>
                                             <Col md={3}>
@@ -387,25 +516,67 @@ const TransacoesForm = () => {
                                                     />
                                                 </div>
                                             </Col>
-                                            <Col md={2}>
+                                            <Col md={4}>
                                                 <div className="mb-3">
-                                                    <Label htmlFor="parcela_atual" className="form-label">Parcela atual</Label>
-                                                    <InputTextControlled<TransacoesModel>
-                                                        field="parcela_atual"
-                                                        control={control}
-                                                    />
-                                                </div>
-                                            </Col>
-                                            <Col md={2}>
-                                                <div className="mb-3">
-                                                    <Label htmlFor="parcelas_total" className="form-label">Total parcelas</Label>
-                                                    <InputTextControlled<TransacoesModel>
-                                                        field="parcelas_total"
-                                                        control={control}
-                                                    />
+                                                    <Label htmlFor="parcelas_total" className="form-label">Parcelas</Label>
+                                                    {isEdit ? (
+                                                        <div className="form-control-plaintext">
+                                                            {record.parcelas_total && Number(record.parcelas_total) > 1
+                                                                ? `${record.parcela_atual ?? 1}/${record.parcelas_total}`
+                                                                : 'À vista'}
+                                                        </div>
+                                                    ) : (
+                                                        <SelectListControlled<TransacoesModel>
+                                                            options={optParcelas}
+                                                            field="parcelas_total"
+                                                            control={control}
+                                                            required={required}
+                                                        />
+                                                    )}
                                                 </div>
                                             </Col>
                                         </Row>
+
+                                        {!isEdit && nParcelas > 1 && (
+                                            <Row>
+                                                <Col md={12}>
+                                                    <div className="mb-3 border rounded p-3 bg-light">
+                                                        <div className="d-flex justify-content-between align-items-center mb-2">
+                                                            <Label className="form-label mb-0">Valores das parcelas</Label>
+                                                            <span className={`small ${totaisBatem ? 'text-success' : 'text-danger'}`}>
+                                                                Total das parcelas: {centavosToBr(totalParcelasCentavos)}
+                                                                {!totaisBatem && (
+                                                                    <> · esperado {centavosToBr(valorCompraCentavos)}</>
+                                                                )}
+                                                            </span>
+                                                        </div>
+                                                        <Row>
+                                                            {parcelasValores.map((valor, idx) => (
+                                                                <Col md={3} sm={6} key={`parcela-${idx}`}>
+                                                                    <div className="mb-2">
+                                                                        <Label className="form-label small">
+                                                                            Parcela {idx + 1}/{nParcelas}
+                                                                        </Label>
+                                                                        <input
+                                                                            type="text"
+                                                                            className={`form-control ${VALOR_TEXT_CLASS}`}
+                                                                            value={mask('preco', valor) ?? ''}
+                                                                            onChange={(e) => handleParcelaChange(idx, e.target.value)}
+                                                                        />
+                                                                    </div>
+                                                                </Col>
+                                                            ))}
+                                                        </Row>
+                                                        {!totaisBatem && (
+                                                            <div className="alert alert-warning mb-0 mt-2 py-2">
+                                                                Ajuste as parcelas até o total coincidir com o valor da compra.
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </Col>
+                                            </Row>
+                                        )}
+
                                         <Row>
                                             <Col md={12}>
                                                 <div className="mb-3">
@@ -419,12 +590,44 @@ const TransacoesForm = () => {
                                                 </div>
                                             </Col>
                                         </Row>
+
+                                        {isEdit && record.compra_grupo_id && (
+                                            <Row>
+                                                <Col md={12}>
+                                                    <div className="form-check mb-3">
+                                                        <input
+                                                            type="checkbox"
+                                                            className="form-check-input"
+                                                            id="propagar_grupo"
+                                                            checked={Boolean(propagarGrupo)}
+                                                            onChange={(e) => setValue('propagar_grupo', e.target.checked)}
+                                                        />
+                                                        <Label className="form-check-label" htmlFor="propagar_grupo">
+                                                            Aplicar estabelecimento, categoria, responsável e observação a todas as parcelas da compra
+                                                        </Label>
+                                                    </div>
+                                                </Col>
+                                            </Row>
+                                        )}
+
                                         <hr />
                                         <Row className="mt-3">
                                             <Col md={12}>
                                                 <div className="hstack gap-2 justify-content-end">
-                                                    <button type="submit" className="btn btn-primary">Salvar</button>
-                                                    <button type="button" className="btn btn-soft-success" onClick={voltarParaRotaAnterior}>Voltar</button>
+                                                    <button
+                                                        type="submit"
+                                                        className="btn btn-primary"
+                                                        disabled={!isEdit && nParcelas > 1 && !totaisBatem}
+                                                    >
+                                                        Salvar
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        className="btn btn-soft-success"
+                                                        onClick={returnTo ? () => navigate(returnTo) : voltarParaRotaAnterior}
+                                                    >
+                                                        Voltar
+                                                    </button>
                                                 </div>
                                             </Col>
                                         </Row>

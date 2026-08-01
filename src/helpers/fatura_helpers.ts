@@ -93,3 +93,56 @@ export const isValidFaturaFile = (file: File): boolean => {
     'text/plain',
   ].includes(mime)
 }
+
+/** Converte valor monetário (BR "1.234,56", "1234.56", dígitos-centavos ou number) para centavos. */
+export const toCentavos = (value: string | number | null | undefined): number => {
+  if (value == null || value === '') return 0
+  if (typeof value === 'number') return Math.round(value * 100)
+
+  const str = String(value).trim()
+  if (!str) return 0
+
+  if (str.includes(',')) {
+    const n = parseFloat(str.replace(/\./g, '').replace(',', '.'))
+    return Math.round((Number.isNaN(n) ? 0 : n) * 100)
+  }
+
+  if (str.includes('.')) {
+    const n = parseFloat(str)
+    return Math.round((Number.isNaN(n) ? 0 : n) * 100)
+  }
+
+  // Dígitos puros: tratados como centavos (padrão da máscara `preco`)
+  const digits = str.replace(/\D/g, '')
+  return parseInt(digits || '0', 10)
+}
+
+/** Formata centavos para string BR sem símbolo (ex.: "1.234,56"). */
+export const centavosToBr = (centavos: number): string => {
+  return (centavos / 100).toLocaleString('pt-BR', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
+}
+
+/**
+ * Divide o total em N parcelas iguais; centavos restantes na última.
+ * Retorna strings de dígitos (centavos), compatíveis com a máscara `preco`.
+ */
+export const splitValorEmParcelas = (valorCentavos: number, n: number): string[] => {
+  const totalParcelas = Math.max(1, Math.min(36, Math.floor(n) || 1))
+  if (totalParcelas === 1) return [String(valorCentavos)]
+
+  const base = Math.floor(valorCentavos / totalParcelas)
+  const resto = valorCentavos - base * totalParcelas
+
+  return Array.from({ length: totalParcelas }, (_, i) => {
+    const cents = i === totalParcelas - 1 ? base + resto : base
+    return String(cents)
+  })
+}
+
+export const parcelasOptions = Array.from({ length: 36 }, (_, i) => ({
+  value: i + 1,
+  label: String(i + 1),
+}))
