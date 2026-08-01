@@ -38,6 +38,10 @@ export interface ProjecaoPorResponsavel {
   total: number
 }
 
+export interface ProjecaoPorCartaoResponsavel extends ProjecaoPorCartao {
+  por_responsavel: ProjecaoPorResponsavel[]
+}
+
 export interface ProjecaoTotalColuna {
   mes: number
   ano: number
@@ -51,6 +55,7 @@ export interface ProjecaoFaturasView {
   colunas: ProjecaoColuna[]
   por_cartao: ProjecaoPorCartao[]
   por_responsavel: ProjecaoPorResponsavel[]
+  por_cartao_responsavel?: ProjecaoPorCartaoResponsavel[]
   totais_por_coluna: ProjecaoTotalColuna[]
 }
 
