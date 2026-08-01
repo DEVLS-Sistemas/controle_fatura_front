@@ -12,6 +12,8 @@ export interface FaturasList {
     id?: number
     cartao_id?: number
     cartao_nome?: string
+    cartao_cor_fundo?: string | null
+    cartao_cor_texto?: string | null
     mes?: number
     ano?: number
     valor_total?: number
@@ -47,6 +49,8 @@ export interface CartaoLookup {
     nome?: string
     bandeira?: string
     ultimos_digitos?: string
+    cor_fundo?: string | null
+    cor_texto?: string | null
 }
 
 export interface LookupsFaturas {

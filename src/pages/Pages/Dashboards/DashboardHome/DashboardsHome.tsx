@@ -3,6 +3,7 @@ import { Card, CardBody, Col, Container, Label, Row, Spinner } from 'reactstrap'
 import ReactApexChart from 'react-apexcharts'
 import { DashboardService, DashboardResumo } from 'services/Dashboard'
 import { formatCurrency, tipoTransacaoLabel, VALOR_TEXT_CLASS } from 'helpers/fatura_helpers'
+import { CartaoChip } from 'helpers/cartao_helpers'
 import { toast } from 'react-toastify'
 import { Link } from 'react-router-dom'
 
@@ -227,7 +228,16 @@ const DashboardsHome = () => {
                           <ul className="list-unstyled mb-0">
                             {(resumo?.por_cartao || []).map((item, idx) => (
                               <li key={idx} className="d-flex justify-content-between py-1 border-bottom">
-                                <span>{item.nome}</span>
+                                <span className="d-flex align-items-center gap-2">
+                                  {item.cor_fundo && (
+                                    <CartaoChip
+                                      cor_fundo={item.cor_fundo}
+                                      cor_texto={item.cor_texto}
+                                      label={item.nome ? String(item.nome).slice(0, 1) : '•'}
+                                    />
+                                  )}
+                                  {item.nome}
+                                </span>
                                 <strong className={VALOR_TEXT_CLASS}>{formatCurrency(item.total)}</strong>
                               </li>
                             ))}

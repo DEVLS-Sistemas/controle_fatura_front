@@ -2,6 +2,7 @@ import React from 'react'
 import { Card, CardBody, Col, Row, UncontrolledTooltip } from 'reactstrap'
 import { CurrencyValue } from 'Components/Common/CurrencyValue'
 import { formatCurrency, VALOR_TEXT_CLASS } from 'helpers/fatura_helpers'
+import { CartaoChip } from 'helpers/cartao_helpers'
 import {
   ProjecaoColuna,
   ProjecaoValor,
@@ -60,6 +61,8 @@ type LinhaTabela = {
   id: number | string
   label: string
   sublabel?: string
+  cor_fundo?: string | null
+  cor_texto?: string | null
   valores: ProjecaoValor[]
   total: number
 }
@@ -68,6 +71,8 @@ type LinhaCruzamento = {
   cartaoId: number
   cartaoLabel: string
   cartaoSublabel?: string
+  cartaoCorFundo?: string | null
+  cartaoCorTexto?: string | null
   responsavelId: number
   responsavelLabel: string
   responsavelSublabel?: string
@@ -235,7 +240,16 @@ const ProjecaoMatriz = ({
               {linhas.map((linha) => (
                 <tr key={linha.id}>
                   <td className="text-start" style={stickyColStyle}>
-                    <span className="fw-medium">{linha.label}</span>
+                    <span className="d-flex align-items-center gap-2 fw-medium">
+                      {linha.cor_fundo && (
+                        <CartaoChip
+                          cor_fundo={linha.cor_fundo}
+                          cor_texto={linha.cor_texto}
+                          label={String(linha.label).slice(0, 1)}
+                        />
+                      )}
+                      <span>{linha.label}</span>
+                    </span>
                     {linha.sublabel && (
                       <span className="d-block text-muted fs-12">{linha.sublabel}</span>
                     )}
@@ -307,7 +321,16 @@ const ProjecaoMatrizCruzamento = ({
                 <tr key={`${linha.cartaoId}-${linha.responsavelId}`}>
                   {linha.isFirstOfCartao && (
                     <td className="text-start align-middle" style={stickyColStyle} rowSpan={linha.cartaoRowSpan}>
-                      <span className="fw-medium">{linha.cartaoLabel}</span>
+                      <span className="d-flex align-items-center gap-2 fw-medium">
+                        {linha.cartaoCorFundo && (
+                          <CartaoChip
+                            cor_fundo={linha.cartaoCorFundo}
+                            cor_texto={linha.cartaoCorTexto}
+                            label={String(linha.cartaoLabel).slice(0, 1)}
+                          />
+                        )}
+                        <span>{linha.cartaoLabel}</span>
+                      </span>
                       {linha.cartaoSublabel && (
                         <span className="d-block text-muted fs-12">{linha.cartaoSublabel}</span>
                       )}
@@ -361,6 +384,8 @@ export const ProjecaoFaturasTable = ({ data }: ProjecaoFaturasTableProps) => {
     sublabel: [c.bandeira, c.ultimos_digitos ? `•••• ${c.ultimos_digitos}` : null]
       .filter(Boolean)
       .join(' · '),
+    cor_fundo: c.cor_fundo,
+    cor_texto: c.cor_texto,
     valores: c.valores || [],
     total: c.total,
   }))
@@ -385,6 +410,8 @@ export const ProjecaoFaturasTable = ({ data }: ProjecaoFaturasTableProps) => {
         cartaoId: cartao.cartao_id,
         cartaoLabel: cartao.nome,
         cartaoSublabel: cartaoSublabel || undefined,
+        cartaoCorFundo: cartao.cor_fundo,
+        cartaoCorTexto: cartao.cor_texto,
         responsavelId: resp.responsavel_id,
         responsavelLabel: resp.nome,
         responsavelSublabel: resp.tipo

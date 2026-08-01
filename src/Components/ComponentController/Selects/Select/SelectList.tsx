@@ -1,5 +1,6 @@
-import { SelectProps } from 'interfaces/SystemInterfaces/SelectInterface';
-import Select from 'react-select'
+import { SelectOptions, SelectProps } from 'interfaces/SystemInterfaces/SelectInterface';
+import Select, { FormatOptionLabelMeta } from 'react-select'
+import { CartaoChip } from 'helpers/cartao_helpers'
 
 const customStyles = {
     multiValue: (styles: any) => {
@@ -24,7 +25,37 @@ const customStyles = {
     }),
 }
 
+const formatOptionLabel = (
+    option: SelectOptions,
+    _meta: FormatOptionLabelMeta<SelectOptions>
+) => (
+    <div className="d-flex align-items-center gap-2">
+        {option.cor_fundo ? (
+            <CartaoChip
+                cor_fundo={option.cor_fundo}
+                cor_texto={option.cor_texto}
+                label={option.label ? String(option.label).slice(0, 1) : '•'}
+                className="fs-12"
+            />
+        ) : option.cor ? (
+            <span
+                className="d-inline-block rounded-circle border flex-shrink-0"
+                style={{
+                    width: 12,
+                    height: 12,
+                    backgroundColor: option.cor,
+                }}
+            />
+        ) : null}
+        <span>{option.label}</span>
+    </div>
+)
+
 export function SelectList(props: SelectProps) {
+    const hasColorOptions = props.options.some(
+        (option) => !!option.cor_fundo || !!option.cor
+    )
+
     if (!props.isMulti) {
         const value = props.options.filter(option => option.value === props.value)
         return (
@@ -43,6 +74,7 @@ export function SelectList(props: SelectProps) {
                     menuPlacement={props.menuPlacement ?? 'auto'}
                     isClearable
                     closeMenuOnSelect={true}
+                    formatOptionLabel={hasColorOptions ? formatOptionLabel : undefined}
                     className={`${props.errors ? 'select is-invalid' : ''}`}
                 />
                 {props.errors && <div className="d-block invalid-feedback text-danger ps-3">{props.errors.message}</div>}
@@ -74,6 +106,7 @@ export function SelectList(props: SelectProps) {
                 styles={customStyles}
                 closeMenuOnSelect={props.closeMenuOnSelect ?? false}
                 menuPlacement={props.menuPlacement ?? 'auto'}
+                formatOptionLabel={hasColorOptions ? formatOptionLabel : undefined}
             />
             {props.errors && <div className="d-block invalid-feedback text-danger ps-3">{props.errors.message}</div>}
         </>

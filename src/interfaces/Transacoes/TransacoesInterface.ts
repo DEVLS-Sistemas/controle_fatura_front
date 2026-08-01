@@ -38,6 +38,8 @@ export interface TransacoesList {
     responsavel_tipo?: string
     cartao_id?: number
     cartao_nome?: string
+    cartao_cor_fundo?: string | null
+    cartao_cor_texto?: string | null
     fatura_mes?: number
     fatura_ano?: number
     observacoes?: string
@@ -107,6 +109,8 @@ export interface ResponsavelLookup {
 export interface CartaoLookup {
     id?: number
     nome?: string
+    cor_fundo?: string | null
+    cor_texto?: string | null
 }
 
 export interface FaturaLookup {

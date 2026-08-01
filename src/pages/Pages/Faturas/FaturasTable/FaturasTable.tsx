@@ -10,6 +10,7 @@ import { PaginateInterface, PaginateSearch, PerPageProps } from "interfaces/Syst
 import CustomModal from "Components/ComponentController/Modal/CustomModal"
 import { useNavegacao } from "helpers/functions_helpers"
 import { formatCurrency, faturaStatusColor, VALOR_TEXT_CLASS } from "helpers/fatura_helpers"
+import { CartaoChip } from "helpers/cartao_helpers"
 import { FaturasList, FaturasSearch } from "interfaces/Faturas/FaturasInterface"
 import { FaturasService } from "services/Faturas/FaturasService"
 
@@ -154,7 +155,20 @@ export const FaturasTable = ({ data, getData, setPerPage, perPage, filters }: Fa
                                                         <tbody>
                                                             {data.data.map((row, index) => (
                                                                 <tr key={rowId(row) ?? index}>
-                                                                    <td className="text-start">{row.cartao_nome ?? '-'}</td>
+                                                                    <td className="text-start">
+                                                                        <div className="d-flex align-items-center gap-2">
+                                                                            {row.cartao_cor_fundo && (
+                                                                                <CartaoChip
+                                                                                    cor_fundo={row.cartao_cor_fundo}
+                                                                                    cor_texto={row.cartao_cor_texto}
+                                                                                    label={row.cartao_nome
+                                                                                        ? String(row.cartao_nome).slice(0, 1)
+                                                                                        : '•'}
+                                                                                />
+                                                                            )}
+                                                                            <span>{row.cartao_nome ?? '-'}</span>
+                                                                        </div>
+                                                                    </td>
                                                                     <td>{formatPeriodo(row.mes, row.ano)}</td>
                                                                     <td className={VALOR_TEXT_CLASS}>{formatCurrency(row.valor_total)}</td>
                                                                     <td>

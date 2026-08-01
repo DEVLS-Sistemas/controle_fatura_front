@@ -14,6 +14,7 @@ import {
     FATURA_FILE_ACCEPT, isValidFaturaFile,
     getCategoriaFieldStyle, VALOR_TEXT_CLASS,
 } from 'helpers/fatura_helpers'
+import { CartaoChip } from 'helpers/cartao_helpers'
 import { SelectOptions } from 'interfaces/SystemInterfaces/SelectInterface'
 import { FaturasView } from 'interfaces/Faturas/FaturasInterface'
 import { CategoriaLookup, ResponsavelLookup, TransacoesList } from 'interfaces/Transacoes/TransacoesInterface'
@@ -21,6 +22,7 @@ import { FaturasService } from 'services/Faturas/FaturasService'
 import { TransacoesService } from 'services/Transacoes/TransacoesService'
 import { SubcategoriasService } from 'services/Subcategorias/SubcategoriasService'
 import ResponsavelModal from 'pages/Pages/Transacoes/ResponsavelModal/ResponsavelModal'
+import { getApiBaseUrl } from 'libs/api/ApiConfig'
 
 const statusLabel: Record<string, string> = {
     pendente: 'Pendente',
@@ -83,7 +85,7 @@ const FaturasViewPage = () => {
         try {
             const raw = sessionStorage.getItem('authUser')
             const token = raw ? JSON.parse(raw).token : null
-            const base = process.env.REACT_APP_API_URL || 'http://127.0.0.1:5000/api/v1/'
+            const base = getApiBaseUrl()
             const res = await fetch(`${base}faturas/pdf/${faturaId}`, {
                 headers: token ? { Authorization: `Bearer ${token}` } : {},
             })
@@ -522,11 +524,22 @@ const FaturasViewPage = () => {
                         <CardBody>
                             <Row className="align-items-center">
                                 <Col md={8}>
-                                    <h5 className="mb-2">
-                                        {fatura.cartao_nome}
-                                        {fatura.cartao_ultimos_digitos && (
-                                            <small className="text-muted ms-2">•••• {fatura.cartao_ultimos_digitos}</small>
+                                    <h5 className="mb-2 d-flex align-items-center gap-2">
+                                        {fatura.cartao_cor_fundo && (
+                                            <CartaoChip
+                                                cor_fundo={fatura.cartao_cor_fundo}
+                                                cor_texto={fatura.cartao_cor_texto}
+                                                label={fatura.cartao_nome
+                                                    ? String(fatura.cartao_nome).slice(0, 1)
+                                                    : '•'}
+                                            />
                                         )}
+                                        <span>
+                                            {fatura.cartao_nome}
+                                            {fatura.cartao_ultimos_digitos && (
+                                                <small className="text-muted ms-2">•••• {fatura.cartao_ultimos_digitos}</small>
+                                            )}
+                                        </span>
                                     </h5>
                                     <div className="d-flex flex-wrap gap-3 text-muted mb-3">
                                         <span><strong>Período:</strong> {formatPeriodo(fatura.mes, fatura.ano)}</span>

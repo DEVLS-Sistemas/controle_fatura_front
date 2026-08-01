@@ -25,13 +25,25 @@ const defaultTiposOptions: SelectOptions[] = [
 ]
 
 const buildSelectOptions = (
-    items: { id?: number; nome?: string }[] | undefined,
+    items: {
+        id?: number
+        nome?: string
+        cor?: string | null
+        cor_fundo?: string | null
+        cor_texto?: string | null
+    }[] | undefined,
     allLabel = 'Todos'
 ): SelectOptions[] => {
     const opts: SelectOptions[] = [{ value: '', label: allLabel }]
     items?.forEach((item) => {
         if (item.id != null) {
-            opts.push({ value: item.id, label: item.nome ?? `#${item.id}` })
+            opts.push({
+                value: item.id,
+                label: item.nome ?? `#${item.id}`,
+                cor: item.cor ?? null,
+                cor_fundo: item.cor_fundo ?? null,
+                cor_texto: item.cor_texto ?? null,
+            })
         }
     })
     return opts

@@ -4,6 +4,11 @@ export type SelectOptions = {
     value: string | number | undefined | null;
     label: string | undefined;
     disabled?: boolean | undefined;
+    /** Cor única (ex.: categorias) */
+    cor?: string | null;
+    /** Par de cores do cartão */
+    cor_fundo?: string | null;
+    cor_texto?: string | null;
 };
 
 export type SelectProps = {

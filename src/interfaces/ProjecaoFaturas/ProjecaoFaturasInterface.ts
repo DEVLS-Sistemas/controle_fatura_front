@@ -26,6 +26,8 @@ export interface ProjecaoPorCartao {
   nome: string
   bandeira?: string
   ultimos_digitos?: string
+  cor_fundo?: string | null
+  cor_texto?: string | null
   valores: ProjecaoValor[]
   total: number
 }

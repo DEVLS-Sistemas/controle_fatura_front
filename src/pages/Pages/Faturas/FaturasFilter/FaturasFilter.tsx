@@ -40,6 +40,8 @@ const FaturasFilter = ({ getRemoteFaturasList }: FaturasFilterProps) => {
                         opts.push({
                             value: c.id!,
                             label: c.nome ?? `Cartão ${c.id}`,
+                            cor_fundo: c.cor_fundo ?? null,
+                            cor_texto: c.cor_texto ?? null,
                         })
                     })
                     setCartoesOptions(opts)

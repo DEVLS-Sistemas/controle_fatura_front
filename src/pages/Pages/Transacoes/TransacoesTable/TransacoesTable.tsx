@@ -14,6 +14,7 @@ import {
     formatDateBr,
     VALOR_TEXT_CLASS,
 } from "helpers/fatura_helpers"
+import { CartaoChip } from "helpers/cartao_helpers"
 import {
     ResponsavelLookup,
     TransacoesList,
@@ -317,7 +318,18 @@ export const TransacoesTable = ({
                                                                             </Button>
                                                                         </td>
                                                                         <td>
-                                                                            <div>{row.cartao_nome ?? '-'}</div>
+                                                                            <div className="d-flex align-items-center gap-2">
+                                                                                {row.cartao_cor_fundo && (
+                                                                                    <CartaoChip
+                                                                                        cor_fundo={row.cartao_cor_fundo}
+                                                                                        cor_texto={row.cartao_cor_texto}
+                                                                                        label={row.cartao_nome
+                                                                                            ? String(row.cartao_nome).slice(0, 1)
+                                                                                            : '•'}
+                                                                                    />
+                                                                                )}
+                                                                                <span>{row.cartao_nome ?? '-'}</span>
+                                                                            </div>
                                                                             <small className="text-muted">
                                                                                 {row.fatura_id ? (
                                                                                     <Link to={`/faturas/view/${row.fatura_id}`}>

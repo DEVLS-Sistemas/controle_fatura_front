@@ -11,6 +11,7 @@ import CustomModal from "Components/ComponentController/Modal/CustomModal"
 import { useNavegacao } from "helpers/functions_helpers"
 import { CartoesList, CartoesSearch } from "interfaces/Cartoes/CartoesInterface"
 import { CartoesService } from "services/Cartoes/CartoesService"
+import { CartaoChip } from "helpers/cartao_helpers"
 
 export interface CartoesTableProps {
     data: PaginateInterface<CartoesList> | undefined
@@ -118,6 +119,7 @@ export const CartoesTable = ({ data, getData, setPerPage, setPage, perPage, filt
                                                                 <th scope="col">Bandeira</th>
                                                                 <th scope="col">Banco</th>
                                                                 <th scope="col">Final</th>
+                                                                <th scope="col">Ciclo</th>
                                                                 <th scope="col">Ativo</th>
                                                                 <th scope="col" style={{ width: "150px" }}>Ações</th>
                                                             </tr>
@@ -125,10 +127,28 @@ export const CartoesTable = ({ data, getData, setPerPage, setPage, perPage, filt
                                                         <tbody>
                                                             {data.data.map((row, index) => (
                                                                 <tr key={row.id ?? index}>
-                                                                    <td className="text-start">{row.nome}</td>
+                                                                    <td className="text-start">
+                                                                        <div className="d-flex align-items-center gap-2">
+                                                                            {row.cor_fundo && (
+                                                                                <CartaoChip
+                                                                                    cor_fundo={row.cor_fundo}
+                                                                                    cor_texto={row.cor_texto}
+                                                                                    label={row.nome ? String(row.nome).slice(0, 1) : '•'}
+                                                                                />
+                                                                            )}
+                                                                            <span>{row.nome}</span>
+                                                                        </div>
+                                                                    </td>
                                                                     <td>{row.bandeira}</td>
                                                                     <td>{row.banco}</td>
                                                                     <td>{row.ultimos_digitos}</td>
+                                                                    <td>
+                                                                        <span className="text-muted small">
+                                                                            Fecha dia {row.dia_limite_fatura ?? '-'}
+                                                                            {' · '}
+                                                                            Vence dia {row.dia_vencimento_fatura ?? '-'}
+                                                                        </span>
+                                                                    </td>
                                                                     <td>
                                                                         <span className={`badge bg-${row.ativo ? 'success' : 'danger'}`}>
                                                                             {row.ativo ? 'Ativo' : 'Inativo'}

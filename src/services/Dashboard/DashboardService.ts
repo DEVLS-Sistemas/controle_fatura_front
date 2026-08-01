@@ -15,7 +15,7 @@ export interface DashboardResumo {
   por_mes: Array<{ mes: number; total: number }>
   por_categoria: Array<{ categoria_id?: number; nome: string; cor?: string; total: number; quantidade: number }>
   por_responsavel: Array<{ responsavel_id?: number; nome: string; tipo?: string; total: number; quantidade: number }>
-  por_cartao: Array<{ cartao_id?: number; nome: string; total: number; quantidade: number }>
+  por_cartao: Array<{ cartao_id?: number; nome: string; cor_fundo?: string | null; cor_texto?: string | null; total: number; quantidade: number }>
   por_tipo: Array<{ tipo: string; total: number; quantidade: number }>
 }
 

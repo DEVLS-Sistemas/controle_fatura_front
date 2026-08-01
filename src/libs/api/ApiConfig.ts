@@ -1,10 +1,34 @@
 import axios, { AxiosResponse } from 'axios';
 
-const API_BASE_URL =
-  process.env.REACT_APP_API_URL || 'http://127.0.0.1:5000/api/v1/';
+/** Resolve API base URL so LAN access uses the host IP, not 127.0.0.1. */
+export function getApiBaseUrl(): string {
+  const fromEnv = process.env.REACT_APP_API_URL;
+  const isLoopback =
+    !fromEnv ||
+    fromEnv.includes('127.0.0.1') ||
+    fromEnv.includes('localhost');
+
+  if (fromEnv && !isLoopback) {
+    return fromEnv;
+  }
+
+  const host =
+    typeof window !== 'undefined' ? window.location.hostname : '127.0.0.1';
+
+  if (fromEnv) {
+    try {
+      const u = new URL(fromEnv);
+      return `${u.protocol}//${host}${u.port ? `:${u.port}` : ''}${u.pathname}`;
+    } catch {
+      // fall through
+    }
+  }
+
+  return `http://${host}:5000/api/v1/`;
+}
 
 export const ApiConfig = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: getApiBaseUrl(),
 });
 
 ApiConfig.interceptors.request.use((config) => {
