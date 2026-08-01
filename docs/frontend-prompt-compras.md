@@ -40,6 +40,7 @@ CRUD padrão em todos: `lookups`, `listar`, `listar/{id}`, `cadastrar`, `editar`
 - Categoria da compra é `transacoes.categoria_id` (não herda mais globalmente do estabelecimento)
 - Novo: `subcategoria_id`
 - `responsavel_id` obrigatório; lookups de transação incluem `default_responsavel_id`
+- Lookups de transação **não** incluem `estabelecimentos` — usar `GET /estabelecimentos/estabelecimentos-list?palavra_chave=`
 
 ---
 
@@ -72,29 +73,66 @@ Campos:
 
 ## 3) Tela / formulário de Compra (Transação)
 
-Campos (além dos já existentes: valor, data, fatura/cartão, parcelas, tipo):
+### Fluxo fatura → transações (obrigatório)
+
+A tela de detalhe da fatura já abre a listagem de transações daquela fatura:
+
+```http
+GET /api/v1/faturas/listar/{id}
+GET /api/v1/transacoes/listar?fatura_id={id}&perPage=200&page=1
+```
+
+Nessa tela **também** deve ser possível **adicionar e editar categoria e subcategoria** da transação (não só na tela global de compras).  
+Usar os mesmos endpoints:
+
+```http
+PUT /api/v1/transacoes/editar
+POST /api/v1/transacoes/cadastrar
+GET /api/v1/transacoes/lookups
+GET /api/v1/subcategorias/subcategorias-list?categoria_id={id}
+```
+
+A listagem já devolve, por linha: `categoria_id`, `categoria_nome`, `categoria_cor`, `subcategoria_id`, `subcategoria_nome`.
+
+Campos do formulário de compra:
 
 | Campo | UI |
 |-------|-----|
+| Valor da compra | input obrigatório (`valor_compra`) — total da venda |
+| Parcelas | **select 1..36** (default 1). Não usar mais inputs de `parcela_atual` no create |
+| Valores das parcelas | se N > 1: projetar N inputs “Parcela k/N” com split igual; usuário pode ajustar |
+| Total das parcelas | soma dos inputs; deve bater com `valor_compra` (bloquear submit se diferir) |
+| Data | data da compra — define a fatura da 1ª parcela; demais avançam mês a mês |
+| Cartão / Fatura | cartão no form global; `fatura_id` opcional na tela da fatura |
 | Estabelecimento | select/async obrigatório (`/estabelecimentos/estabelecimentos-list`) |
 | Categoria | select opcional; ao escolher estabelecimento, **pré-selecionar** `categoria_padrao_id` |
 | Subcategoria | select opcional; filtrar por categoria; pré-selecionar `subcategoria_padrao_id` se compatível |
 | Observação | textarea opcional |
 | Responsável | ver UX abaixo |
 
-Regras UX:
-- Ao trocar estabelecimento, reaplicar pré-seleção dos padrões **somente se** o usuário ainda não alterou categoria/subcategoria manualmente (ou sempre reaplica — escolha uma e documente; preferência: reaplicar ao trocar estabelecimento).
+### UX do parcelamento (obrigatório)
+
+1. Usuário informa `valor_compra` e escolhe N no select (1–36).
+2. Front gera N campos com valores iguais (`valor_compra / N`; centavos na última).
+3. Usuário pode ajustar cada parcela.
+4. Exibir **Total das parcelas** em tempo real; validar igualdade com `valor_compra` antes do POST.
+5. **Não** enviar `parcela_atual` no create — o backend sempre materializa 1..N.
+6. Resposta traz `compra_grupo_id` + array `transacoes` (uma por parcela/fatura).
+
+Regras UX gerais:
+- Ao trocar estabelecimento, reaplicar pré-seleção dos padrões (preferência: reaplicar ao trocar estabelecimento).
 - Editar categoria/subcategoria na compra **não** chama update do estabelecimento.
 - Subcategoria desabilitada sem categoria.
-- Create payload sugerido:
+- Create payload à vista:
 
 ```json
 {
-  "fatura_id": 1,
+  "cartao_id": 1,
   "estabelecimento_id": 10,
-  "valor": 150.9,
+  "valor_compra": "150,90",
   "data": "2026-07-15",
   "tipo": "purchase",
+  "parcelas_total": 1,
   "categoria_id": 2,
   "subcategoria_id": 5,
   "responsavel_id": 1,
@@ -102,7 +140,40 @@ Regras UX:
 }
 ```
 
-Omitir `categoria_id`/`subcategoria_id`/`responsavel_id` no create faz o backend aplicar defaults.
+- Create payload parcelado (10x):
+
+```json
+{
+  "cartao_id": 1,
+  "estabelecimento_id": 10,
+  "valor_compra": "1000,00",
+  "data": "2026-03-15",
+  "tipo": "purchase",
+  "parcelas_total": 10,
+  "parcelas": [
+    { "parcela": 1, "valor": "100,00" },
+    { "parcela": 2, "valor": "100,00" },
+    { "parcela": 3, "valor": "100,00" },
+    { "parcela": 4, "valor": "100,00" },
+    { "parcela": 5, "valor": "100,00" },
+    { "parcela": 6, "valor": "100,00" },
+    { "parcela": 7, "valor": "100,00" },
+    { "parcela": 8, "valor": "100,00" },
+    { "parcela": 9, "valor": "100,00" },
+    { "parcela": 10, "valor": "100,00" }
+  ],
+  "categoria_id": 2,
+  "responsavel_id": 1
+}
+```
+
+- No formulário global: selecionar **cartão** (`cartao_id`). Não enviar `fatura_id`.
+- Backend cria/vincula fatura do cartão no mês da `data` (parcela 1) e nos meses seguintes.
+- Na tela de detalhe da fatura: pode enviar `fatura_id` (já conhecido).
+- `valor_compra` / valores de parcela em formato BR (`125,50`).
+- Omitir `categoria_id`/`subcategoria_id`/`responsavel_id` no create aplica defaults.
+- Listagem: mostrar `k/N`; se a linha tiver `compra_grupo_id`, na exclusão oferecer “Excluir só esta parcela” vs “Excluir todas as parcelas da compra” (`DELETE .../excluir/{id}?excluir_grupo=1`).
+- Edit de campos compartilhados (categoria, responsável, estabelecimento, observação) pode enviar `propagar_grupo: true` para atualizar o grupo.
 
 ---
 
@@ -145,8 +216,12 @@ O backend já tem `responsavel_id` obrigatório e embrião no dashboard (`por_re
 - [ ] Tela Estabelecimentos com padrão de categoria/subcategoria
 - [ ] Tela Subcategorias com multi categorias
 - [ ] Compra pré-seleciona padrões do estabelecimento
+- [ ] Na tela de fatura → transações: add/edit de categoria **e** subcategoria
 - [ ] Editar categoria na compra não altera o estabelecimento
 - [ ] Subcategoria exige categoria
 - [ ] Listagem: responsável só como texto + modal
 - [ ] Default responsável = Eu
 - [ ] Removidas referências a `/estabelecimento-categorias`
+- [ ] Select de parcelas 1..36 + campos editáveis por parcela + validação do total
+- [ ] Create parcelado materializa N transações (sem input de parcela_atual)
+- [ ] Excluir grupo de compra quando houver `compra_grupo_id`
