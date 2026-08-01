@@ -1,5 +1,5 @@
 import UiContent from "Components/Common/UiContent"
-import React, { useEffect, useState } from "react"
+import React, { useEffect, useMemo, useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import {
     ButtonGroup, Card, CardBody, Col, DropdownItem,
@@ -9,19 +9,28 @@ import { toast } from "react-toastify"
 import { PaginateInterface, PaginateSearch, PerPageProps } from "interfaces/SystemInterfaces/PaginateInterface"
 import CustomModal from "Components/ComponentController/Modal/CustomModal"
 import { useNavegacao } from "helpers/functions_helpers"
-import { formatCurrency, faturaStatusColor, VALOR_TEXT_CLASS } from "helpers/fatura_helpers"
+import { formatCurrency, formatDateBr, faturaStatusColor, VALOR_TEXT_CLASS } from "helpers/fatura_helpers"
 import { CartaoChip } from "helpers/cartao_helpers"
-import { FaturasList, FaturasSearch } from "interfaces/Faturas/FaturasInterface"
+import { FaturaResumo, FaturasCartaoGroup, FaturasSearch } from "interfaces/Faturas/FaturasInterface"
 import { FaturasService } from "services/Faturas/FaturasService"
+import { getApiBaseUrl } from "libs/api/ApiConfig"
 
 export interface FaturasTableProps {
-    data: PaginateInterface<FaturasList> | undefined
+    data: PaginateInterface<FaturasCartaoGroup> | undefined
     getData: (data: PaginateSearch & FaturasSearch) => void
     setPerPage: (perPage: number) => void
     setPage: (page: number) => void
     page: number
     perPage: number
     filters: any
+}
+
+type FaturaRow = FaturaResumo & {
+    cartao_id?: number
+    cartao_nome?: string
+    cartao_cor_fundo?: string | null
+    cartao_cor_texto?: string | null
+    cartao_ultimos_digitos?: string
 }
 
 const statusLabel: Record<string, string> = {
@@ -31,9 +40,28 @@ const statusLabel: Record<string, string> = {
     erro: 'Erro',
 }
 
-const formatPeriodo = (mes?: number, ano?: number) => {
-    if (!mes || !ano) return '-'
-    return `${String(mes).padStart(2, '0')}/${ano}`
+const formatCompetencia = (fatura: FaturaResumo) => {
+    if (fatura.competencia) return fatura.competencia
+    if (!fatura.mes || !fatura.ano) return '-'
+    return `${String(fatura.mes).padStart(2, '0')}/${fatura.ano}`
+}
+
+const formatPeriodoCiclo = (fatura: FaturaResumo) => {
+    if (!fatura.periodo_inicio && !fatura.periodo_fim) return '-'
+    return `${formatDateBr(fatura.periodo_inicio)} – ${formatDateBr(fatura.periodo_fim)}`
+}
+
+const flattenFaturas = (grupos: FaturasCartaoGroup[]): FaturaRow[] => {
+    return grupos.flatMap((grupo) =>
+        (grupo.faturas ?? []).map((fatura) => ({
+            ...fatura,
+            cartao_id: grupo.cartao_id,
+            cartao_nome: grupo.nome,
+            cartao_cor_fundo: grupo.cor_fundo,
+            cartao_cor_texto: grupo.cor_texto,
+            cartao_ultimos_digitos: grupo.ultimos_digitos,
+        }))
+    )
 }
 
 export const FaturasTable = ({ data, getData, setPerPage, perPage, filters }: FaturasTableProps) => {
@@ -52,7 +80,8 @@ export const FaturasTable = ({ data, getData, setPerPage, perPage, filters }: Fa
 
     const toggleModal = () => setModalIsOpen(!modalIsOpen)
 
-    const rowId = (row: FaturasList) => row.id
+    const rows = useMemo(() => flattenFaturas(data?.data ?? []), [data?.data])
+    const temFiltroPeriodo = Boolean(filters?.mes || filters?.ano)
 
     const handleRemoteDelete = async (id: number) => {
         try {
@@ -74,6 +103,27 @@ export const FaturasTable = ({ data, getData, setPerPage, perPage, filters }: Fa
         } catch (error) {
             console.error('Erro ao reprocessar:', error)
             toast.error('Erro ao reprocessar fatura')
+        }
+    }
+
+    const handleVerPdf = async (id: number) => {
+        try {
+            const raw = sessionStorage.getItem('authUser')
+            const token = raw ? JSON.parse(raw).token : null
+            const base = getApiBaseUrl()
+            const res = await fetch(`${base}faturas/pdf/${id}`, {
+                headers: token ? { Authorization: `Bearer ${token}` } : {},
+            })
+            if (!res.ok) {
+                toast.error('PDF não disponível')
+                return
+            }
+            const blob = await res.blob()
+            const url = URL.createObjectURL(blob)
+            window.open(url, '_blank')
+        } catch (error) {
+            console.error('Erro ao abrir PDF:', error)
+            toast.error('Erro ao abrir PDF')
         }
     }
 
@@ -108,7 +158,9 @@ export const FaturasTable = ({ data, getData, setPerPage, perPage, filters }: Fa
                             <div className="live-preview mt-1">
                                 {data && data.total === 0 ? (
                                     <div className="bg-primary text-white border-0 alert alert-primary fade show text-center">
-                                        INFORME OS FILTROS DESEJADOS E CLIQUE EM BUSCAR!
+                                        {temFiltroPeriodo
+                                            ? 'Nenhuma fatura neste período para os filtros informados.'
+                                            : 'Nenhuma fatura encontrada. Cadastre uma compra ou importe um PDF.'}
                                     </div>
                                 ) : !data ? (
                                     <div className="bg-danger text-white border-0 alert alert-danger fade show text-center">
@@ -118,7 +170,7 @@ export const FaturasTable = ({ data, getData, setPerPage, perPage, filters }: Fa
                                     <>
                                         <Row className="d-flex align-items-center g-3 text-center text-sm-start">
                                             <Col lg={12}>
-                                                <Col lg={2}>
+                                                <Col lg={3}>
                                                     <div className="d-flex flex-row align-items-center">
                                                         <Label className="form-label me-3">Mostrar</Label>
                                                         <select
@@ -131,7 +183,7 @@ export const FaturasTable = ({ data, getData, setPerPage, perPage, filters }: Fa
                                                                 <option key={item.value} value={item.value}>{item.label}</option>
                                                             ))}
                                                         </select>
-                                                        <Label className="form-label ms-3">resultados</Label>
+                                                        <Label className="form-label ms-3">cartões</Label>
                                                     </div>
                                                 </Col>
                                             </Col>
@@ -144,88 +196,135 @@ export const FaturasTable = ({ data, getData, setPerPage, perPage, filters }: Fa
                                                         <thead className="table-light">
                                                             <tr>
                                                                 <th scope="col" className="text-start">Cartão</th>
+                                                                <th scope="col">Competência</th>
                                                                 <th scope="col">Período</th>
-                                                                <th scope="col" className={VALOR_TEXT_CLASS}>Valor Total</th>
+                                                                <th scope="col">Vencimento</th>
+                                                                <th scope="col" className={VALOR_TEXT_CLASS}>Valor</th>
                                                                 <th scope="col">Status</th>
-                                                                <th scope="col">Transações</th>
-                                                                <th scope="col">Categorias</th>
+                                                                <th scope="col">Lançamentos</th>
                                                                 <th scope="col" style={{ width: "220px" }}>Ações</th>
                                                             </tr>
                                                         </thead>
                                                         <tbody>
-                                                            {data.data.map((row, index) => (
-                                                                <tr key={rowId(row) ?? index}>
-                                                                    <td className="text-start">
-                                                                        <div className="d-flex align-items-center gap-2">
-                                                                            {row.cartao_cor_fundo && (
-                                                                                <CartaoChip
-                                                                                    cor_fundo={row.cartao_cor_fundo}
-                                                                                    cor_texto={row.cartao_cor_texto}
-                                                                                    label={row.cartao_nome
-                                                                                        ? String(row.cartao_nome).slice(0, 1)
-                                                                                        : '•'}
-                                                                                />
-                                                                            )}
-                                                                            <span>{row.cartao_nome ?? '-'}</span>
-                                                                        </div>
-                                                                    </td>
-                                                                    <td>{formatPeriodo(row.mes, row.ano)}</td>
-                                                                    <td className={VALOR_TEXT_CLASS}>{formatCurrency(row.valor_total)}</td>
-                                                                    <td>
-                                                                        <span className={`badge bg-${faturaStatusColor[row.status ?? ''] ?? 'secondary'}`}>
-                                                                            {statusLabel[row.status ?? ''] ?? row.status}
-                                                                        </span>
-                                                                    </td>
-                                                                    <td>{row.total_transacoes ?? '-'}</td>
-                                                                    <td>
-                                                                        {row.total_transacoes != null
-                                                                            ? `${row.transacoes_com_categoria ?? 0}/${row.total_transacoes}`
-                                                                            : '-'}
-                                                                    </td>
-                                                                    <td>
-                                                                        <div className="d-flex justify-content-center align-items-center gap-1">
-                                                                            <Link
-                                                                                to={`/faturas/view/${rowId(row)}`}
-                                                                                state={{ source: row }}
-                                                                                className="btn btn-sm btn-soft-primary"
-                                                                                title="Ver transações"
-                                                                            >
-                                                                                <i className="ri-list-check-2 me-1"></i>
-                                                                                Transações
-                                                                            </Link>
-                                                                            <ButtonGroup>
-                                                                                <UncontrolledDropdown direction="down">
-                                                                                    <DropdownToggle tag="button" className="btn btn-sm">
-                                                                                        <i className="ri-more-2-fill"></i>
-                                                                                    </DropdownToggle>
-                                                                                    <DropdownMenu style={{ zIndex: '999' }}>
-                                                                                        <Link to={`/faturas/view/${rowId(row)}`} state={{ source: row }}>
-                                                                                            <DropdownItem>Ver Transações</DropdownItem>
-                                                                                        </Link>
-                                                                                        <Link to={`/faturas/edit/${rowId(row)}`} state={{ source: row }}>
-                                                                                            <DropdownItem>Editar</DropdownItem>
-                                                                                        </Link>
-                                                                                        <DropdownItem onClick={() => navigate(`/faturas/view/${rowId(row)}`)}>
-                                                                                            Upload PDF
-                                                                                        </DropdownItem>
-                                                                                        <DropdownItem onClick={() => rowId(row) && handleReprocessar(rowId(row)!)}>
-                                                                                            Reprocessar
-                                                                                        </DropdownItem>
-                                                                                        <DropdownItem
-                                                                                            onClick={() => {
-                                                                                                setSelectedId(rowId(row)!)
-                                                                                                toggleModal()
-                                                                                            }}
-                                                                                        >
-                                                                                            Excluir
-                                                                                        </DropdownItem>
-                                                                                    </DropdownMenu>
-                                                                                </UncontrolledDropdown>
-                                                                            </ButtonGroup>
-                                                                        </div>
+                                                            {rows.length === 0 ? (
+                                                                <tr>
+                                                                    <td colSpan={8} className="text-muted py-4">
+                                                                        Nenhuma fatura neste período
                                                                     </td>
                                                                 </tr>
-                                                            ))}
+                                                            ) : (
+                                                                rows.map((row, index) => (
+                                                                    <tr key={row.id ?? index}>
+                                                                        <td className="text-start">
+                                                                            <div className="d-flex align-items-center gap-2">
+                                                                                {row.cartao_cor_fundo && (
+                                                                                    <CartaoChip
+                                                                                        cor_fundo={row.cartao_cor_fundo}
+                                                                                        cor_texto={row.cartao_cor_texto}
+                                                                                        label={row.cartao_nome
+                                                                                            ? String(row.cartao_nome).slice(0, 1)
+                                                                                            : '•'}
+                                                                                    />
+                                                                                )}
+                                                                                <span>
+                                                                                    {row.cartao_nome ?? '-'}
+                                                                                    {row.cartao_ultimos_digitos && (
+                                                                                        <small className="text-muted ms-1">
+                                                                                            •••• {row.cartao_ultimos_digitos}
+                                                                                        </small>
+                                                                                    )}
+                                                                                </span>
+                                                                            </div>
+                                                                        </td>
+                                                                        <td>
+                                                                            <Link
+                                                                                to={`/faturas/view/${row.id}`}
+                                                                                className="fw-medium"
+                                                                            >
+                                                                                {formatCompetencia(row)}
+                                                                            </Link>
+                                                                        </td>
+                                                                        <td className="text-muted small">
+                                                                            {formatPeriodoCiclo(row)}
+                                                                        </td>
+                                                                        <td>{formatDateBr(row.data_vencimento)}</td>
+                                                                        <td className={VALOR_TEXT_CLASS}>
+                                                                            {formatCurrency(row.valor_total)}
+                                                                        </td>
+                                                                        <td>
+                                                                            <span className={`badge bg-${faturaStatusColor[row.status ?? ''] ?? 'secondary'}`}>
+                                                                                {statusLabel[row.status ?? ''] ?? row.status}
+                                                                            </span>
+                                                                        </td>
+                                                                        <td>
+                                                                            <span className="text-muted">
+                                                                                {row.total_transacoes ?? 0}
+                                                                            </span>
+                                                                            {row.tem_pdf && (
+                                                                                <i
+                                                                                    className="ri-file-pdf-2-line text-danger ms-2"
+                                                                                    title="Possui arquivo"
+                                                                                />
+                                                                            )}
+                                                                        </td>
+                                                                        <td>
+                                                                            <div className="d-flex justify-content-center align-items-center gap-1">
+                                                                                <Link
+                                                                                    to={`/faturas/view/${row.id}`}
+                                                                                    className="btn btn-sm btn-soft-primary"
+                                                                                    title="Ver detalhe"
+                                                                                >
+                                                                                    <i className="ri-eye-line me-1"></i>
+                                                                                    Detalhe
+                                                                                </Link>
+                                                                                <ButtonGroup>
+                                                                                    <UncontrolledDropdown direction="down">
+                                                                                        <DropdownToggle tag="button" className="btn btn-sm">
+                                                                                            <i className="ri-more-2-fill"></i>
+                                                                                        </DropdownToggle>
+                                                                                        <DropdownMenu style={{ zIndex: '999' }}>
+                                                                                            <Link to={`/faturas/view/${row.id}`}>
+                                                                                                <DropdownItem>Ver detalhe</DropdownItem>
+                                                                                            </Link>
+                                                                                            <Link
+                                                                                                to={`/faturas/edit/${row.id}`}
+                                                                                                state={{
+                                                                                                    source: {
+                                                                                                        ...row,
+                                                                                                        fatura_id: row.id,
+                                                                                                        cartao_id: row.cartao_id,
+                                                                                                    },
+                                                                                                }}
+                                                                                            >
+                                                                                                <DropdownItem>Editar</DropdownItem>
+                                                                                            </Link>
+                                                                                            <DropdownItem onClick={() => navigate(`/faturas/view/${row.id}`)}>
+                                                                                                Upload PDF
+                                                                                            </DropdownItem>
+                                                                                            {row.tem_pdf && row.id && (
+                                                                                                <DropdownItem onClick={() => handleVerPdf(row.id!)}>
+                                                                                                    Ver PDF
+                                                                                                </DropdownItem>
+                                                                                            )}
+                                                                                            <DropdownItem onClick={() => row.id && handleReprocessar(row.id)}>
+                                                                                                Reprocessar
+                                                                                            </DropdownItem>
+                                                                                            <DropdownItem
+                                                                                                onClick={() => {
+                                                                                                    setSelectedId(row.id!)
+                                                                                                    toggleModal()
+                                                                                                }}
+                                                                                            >
+                                                                                                Excluir
+                                                                                            </DropdownItem>
+                                                                                        </DropdownMenu>
+                                                                                    </UncontrolledDropdown>
+                                                                                </ButtonGroup>
+                                                                            </div>
+                                                                        </td>
+                                                                    </tr>
+                                                                ))
+                                                            )}
                                                         </tbody>
                                                     </table>
                                                 </div>
@@ -236,7 +335,10 @@ export const FaturasTable = ({ data, getData, setPerPage, perPage, filters }: Fa
                                             <Col sm="12">
                                                 <div className="text-muted">
                                                     Exibindo <span className="fw-semibold ms-1">{data.per_page}</span> de
-                                                    <span className="fw-semibold"> {data.total}</span> Resultados
+                                                    <span className="fw-semibold"> {data.total}</span> cartões
+                                                    {rows.length > 0 && (
+                                                        <> · <span className="fw-semibold">{rows.length}</span> fatura(s) nesta página</>
+                                                    )}
                                                 </div>
                                             </Col>
                                             <Col sm="12" className="d-none d-sm-flex justify-content-end gap-2 flex-wrap">

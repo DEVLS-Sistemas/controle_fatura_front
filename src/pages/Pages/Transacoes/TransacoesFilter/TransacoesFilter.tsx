@@ -12,6 +12,7 @@ import { SelectListControlled } from "Components/ComponentController/Selects/Sel
 import { AsyncSelectListControlled } from "Components/ComponentController/Selects/AsyncSelect/AsyncSelectListControlled"
 import { SelectOptions } from "interfaces/SystemInterfaces/SelectInterface"
 import { mesesOptions } from "helpers/fatura_helpers"
+import { AnosSelect } from "helpers/functions_helpers"
 import { TransacoesSearch } from "interfaces/Transacoes/TransacoesInterface"
 import { TransacoesService } from "services/Transacoes/TransacoesService"
 import { SubcategoriasService } from "services/Subcategorias/SubcategoriasService"
@@ -63,11 +64,7 @@ const TransacoesFilter = ({
 
     const categoriaId = useWatch({ control, name: 'categoria_id' })
 
-    const anoAtual = new Date().getFullYear()
-    const optAnos: SelectOptions[] = [{ value: '', label: 'Todos' }]
-    for (let a = anoAtual; a >= anoAtual - 10; a--) {
-        optAnos.push({ value: a, label: String(a) })
-    }
+    const optAnos = AnosSelect({ includeTodos: true })
 
     const optMeses: SelectOptions[] = [{ value: '', label: 'Todos' }, ...mesesOptions]
 

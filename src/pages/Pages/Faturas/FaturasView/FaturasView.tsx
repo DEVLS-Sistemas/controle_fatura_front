@@ -556,12 +556,12 @@ const FaturasViewPage = () => {
                                     <Link to="/faturas" className="me-2">
                                         <i className="bx bx-arrow-back bx-sm"></i>
                                     </Link>
-                                    <h4 className="mb-0">Transações da Fatura</h4>
+                                    <h4 className="mb-0">Detalhe da Fatura</h4>
                                 </div>
                                 <Breadcrumb pageTitle="" listClassName="mb-sm-0 pt-1 py-2">
                                     <BreadcrumbItem><Link to="/dashboard"><i className="ri-home-5-fill"></i></Link></BreadcrumbItem>
                                     <BreadcrumbItem><Link to="/faturas">Faturas</Link></BreadcrumbItem>
-                                    <BreadcrumbItem active>Transações</BreadcrumbItem>
+                                    <BreadcrumbItem active>Detalhe</BreadcrumbItem>
                                 </Breadcrumb>
                             </div>
                         </Col>
@@ -589,14 +589,28 @@ const FaturasViewPage = () => {
                                         </span>
                                     </h5>
                                     <div className="d-flex flex-wrap gap-3 text-muted mb-3">
-                                        <span><strong>Período:</strong> {formatPeriodo(fatura.mes, fatura.ano)}</span>
+                                        <span>
+                                            <strong>Competência:</strong>{' '}
+                                            {fatura.competencia ?? formatPeriodo(fatura.mes, fatura.ano)}
+                                        </span>
+                                        {(fatura.periodo_inicio || fatura.periodo_fim) && (
+                                            <span>
+                                                <strong>Ciclo:</strong>{' '}
+                                                {formatDateBr(fatura.periodo_inicio)} – {formatDateBr(fatura.periodo_fim)}
+                                            </span>
+                                        )}
+                                        {fatura.data_vencimento && (
+                                            <span>
+                                                <strong>Vencimento:</strong> {formatDateBr(fatura.data_vencimento)}
+                                            </span>
+                                        )}
                                         <span>
                                             <strong>Status:</strong>{' '}
                                             <Badge color={faturaStatusColor[fatura.status ?? ''] ?? 'secondary'}>
                                                 {statusLabel[fatura.status ?? ''] ?? fatura.status}
                                             </Badge>
                                         </span>
-                                        <span><strong>Transações:</strong> {fatura.total_transacoes ?? transacoes.length}</span>
+                                        <span><strong>Lançamentos:</strong> {fatura.total_transacoes ?? transacoes.length}</span>
                                         {fatura.processado_em && (
                                             <span><strong>Processado em:</strong> {formatDateBr(fatura.processado_em)}</span>
                                         )}

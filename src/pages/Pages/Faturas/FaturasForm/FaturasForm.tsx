@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { setActiveMenu } from 'helpers/system_helpers'
-import { useNavegacao } from 'helpers/functions_helpers'
+import { AnosSelect, useNavegacao } from 'helpers/functions_helpers'
 import { Breadcrumb, BreadcrumbItem, Card, CardBody, Col, Container, Input, Label, Row } from 'reactstrap'
 import { SubmitHandler, useForm } from 'react-hook-form'
 import { toast } from 'react-toastify'
@@ -102,11 +102,7 @@ const FaturasForm = () => {
         setActiveMenu('/faturas')
     }, [])
 
-    const anoAtual = new Date().getFullYear()
-    const optAnos: SelectOptions[] = []
-    for (let a = anoAtual; a >= anoAtual - 10; a--) {
-        optAnos.push({ value: a, label: String(a) })
-    }
+    const optAnos = AnosSelect()
 
     return (
         <React.Fragment>

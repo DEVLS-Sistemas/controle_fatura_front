@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from "react"
 import { Container, Spinner } from 'reactstrap'
 import { SubmitHandler } from 'react-hook-form'
 import { PaginateInterface, PaginateSearch } from 'interfaces/SystemInterfaces/PaginateInterface'
-import { FaturasList, FaturasSearch } from 'interfaces/Faturas/FaturasInterface'
+import { FaturasCartaoGroup, FaturasSearch } from 'interfaces/Faturas/FaturasInterface'
 import { FaturasService } from 'services/Faturas/FaturasService'
 import FaturasFilter from './FaturasFilter/FaturasFilter'
 import FaturasTable from './FaturasTable/FaturasTable'
@@ -16,7 +16,7 @@ export const FaturasFilterContext = createContext<FaturasFilterContextType>({} a
 const FaturasPage = () => {
     const [display, setDisplay] = useState<boolean>(false)
     const faturasContext = useContext(FaturasFilterContext)
-    const [faturasList, setFaturasList] = useState<PaginateInterface<FaturasList>>()
+    const [faturasList, setFaturasList] = useState<PaginateInterface<FaturasCartaoGroup>>()
     const faturasService = new FaturasService()
 
     const FaturasFilterContextValue: FaturasFilterContextType = {

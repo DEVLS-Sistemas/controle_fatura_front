@@ -9,6 +9,7 @@ import { InputTextControlled } from "Components/ComponentController/Inputs/Text/
 import { SelectListControlled } from "Components/ComponentController/Selects/Select/SelectListControlled"
 import { SelectOptions } from "interfaces/SystemInterfaces/SelectInterface"
 import { mesesOptions } from "helpers/fatura_helpers"
+import { AnosSelect } from "helpers/functions_helpers"
 import { FaturasSearch } from "interfaces/Faturas/FaturasInterface"
 import { FaturasService } from "services/Faturas/FaturasService"
 
@@ -53,11 +54,7 @@ const FaturasFilter = ({ getRemoteFaturasList }: FaturasFilterProps) => {
         loadLookups()
     }, [])
 
-    const anoAtual = new Date().getFullYear()
-    const optAnos: SelectOptions[] = [{ value: '', label: 'Todos' }]
-    for (let a = anoAtual; a >= anoAtual - 5; a--) {
-        optAnos.push({ value: a, label: String(a) })
-    }
+    const optAnos = AnosSelect({ includeTodos: true })
 
     const optMeses: SelectOptions[] = [{ value: '', label: 'Todos' }, ...mesesOptions]
 

@@ -6,6 +6,7 @@ import { Breadcrumb, BreadcrumbItem, Card, CardHeader, Col, Label, Row } from 'r
 import { SelectListControlled } from 'Components/ComponentController/Selects/Select/SelectListControlled'
 import { SelectOptions } from 'interfaces/SystemInterfaces/SelectInterface'
 import { mesesOptions } from 'helpers/fatura_helpers'
+import { AnosSelect } from 'helpers/functions_helpers'
 import {
   ProjecaoFaturasDefaultValues,
   ProjecaoFaturasSearch,
@@ -34,11 +35,7 @@ const ProjecaoFaturasFilter = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mesWatch, anoWatch])
 
-  const anoAtual = new Date().getFullYear()
-  const optAnos: SelectOptions[] = []
-  for (let a = anoAtual + 1; a >= anoAtual - 5; a--) {
-    optAnos.push({ value: a, label: String(a) })
-  }
+  const optAnos = AnosSelect()
 
   const optMeses: SelectOptions[] = mesesOptions.map((m) => ({
     value: m.value,

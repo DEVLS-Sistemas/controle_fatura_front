@@ -4,8 +4,8 @@ import { UnexpectedError } from "../../libs/api/exceptions/UnexpectedError"
 import { ValidationError } from "../../libs/api/exceptions/ValidationError"
 import { PaginateInterface } from "interfaces/SystemInterfaces/PaginateInterface"
 import {
+    FaturasCartaoGroup,
     FaturasInterface,
-    FaturasList,
     FaturasModel,
     FaturasSearch,
     FaturasView,
@@ -32,9 +32,9 @@ export class FaturasService implements FaturasInterface {
         }
     }
 
-    async listFaturasPaginate(params: FaturasSearch): Promise<PaginateInterface<FaturasList> | undefined> {
+    async listFaturasPaginate(params: FaturasSearch): Promise<PaginateInterface<FaturasCartaoGroup> | undefined> {
         try {
-            const response = await this.httpClient.get<PaginateInterface<FaturasList>>({
+            const response = await this.httpClient.get<PaginateInterface<FaturasCartaoGroup>>({
                 url: this.url + '/listar',
                 body: params
             })

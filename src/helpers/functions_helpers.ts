@@ -394,14 +394,32 @@ export const validarDiaMes = (dia: number, mes: number, ano: number): boolean =>
     return dia >= 1 && dia <= diasPorMes[mes];
 };
 
-export const AnosSelect = (): SelectOptions[] => {
-    const currentYear = new Date().getFullYear(); // Obtém o ano atual
-    const optMesesAno: SelectOptions[] = Array.from({ length: 10 }, (_, i) => ({
-        value: currentYear + i,
-        label: (currentYear + i).toString(),
-    }));
+const ANO_MINIMO_SELECT = 2015
 
-    return optMesesAno;
+type AnosSelectParams = {
+    /** Quantos anos além do atual incluir no topo da lista (padrão: 1) */
+    anosFuturos?: number
+    /** Se true, inclui a opção "Todos" no início */
+    includeTodos?: boolean
+}
+
+/** Opções de ano para selects: do ano máximo até 2015 (decrescente). */
+export const AnosSelect = ({
+    anosFuturos = 1,
+    includeTodos = false,
+}: AnosSelectParams = {}): SelectOptions[] => {
+    const anoMaximo = new Date().getFullYear() + anosFuturos
+    const options: SelectOptions[] = []
+
+    if (includeTodos) {
+        options.push({ value: '', label: 'Todos' })
+    }
+
+    for (let ano = anoMaximo; ano >= ANO_MINIMO_SELECT; ano--) {
+        options.push({ value: ano, label: String(ano) })
+    }
+
+    return options
 };
 
 export const ajustaMoedaBanco = (valor: string): number => {

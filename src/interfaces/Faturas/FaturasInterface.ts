@@ -8,27 +8,54 @@ export interface FaturasSearch {
     palavra_chave?: string | null | unknown
 }
 
-export interface FaturasList {
+/** Resumo de uma fatura (sem array de transações) */
+export interface FaturaResumo {
     id?: number
+    mes?: number
+    ano?: number
+    competencia?: string
+    periodo_inicio?: string
+    periodo_fim?: string
+    data_vencimento?: string
+    valor_total?: number | string
+    arquivo_pdf?: string | null
+    tem_pdf?: boolean
+    status?: string
+    erro_mensagem?: string | null
+    processado_em?: string | null
+    total_transacoes?: number
+    transacoes_com_categoria?: number
+    created_at?: string
+    updated_at?: string
+}
+
+/** Grupo de faturas por cartão — item de `GET /faturas/listar` */
+export interface FaturasCartaoGroup {
+    cartao_id?: number
+    nome?: string
+    bandeira?: string
+    banco?: string
+    ultimos_digitos?: string
+    dia_limite_fatura?: number | null
+    dia_vencimento_fatura?: number | null
+    cor_fundo?: string | null
+    cor_texto?: string | null
+    ativo?: boolean
+    total_faturas?: number
+    valor_total?: number | string
+    faturas?: FaturaResumo[]
+}
+
+/** @deprecated Use FaturasCartaoGroup — mantido só para compatibilidade de imports */
+export type FaturasList = FaturasCartaoGroup
+
+export interface FaturasView extends FaturaResumo {
     cartao_id?: number
     cartao_nome?: string
     cartao_cor_fundo?: string | null
     cartao_cor_texto?: string | null
-    mes?: number
-    ano?: number
-    valor_total?: number
-    status?: string
-    arquivo_pdf?: string
-    total_transacoes?: number
-    transacoes_com_categoria?: number
-    erro_mensagem?: string
-}
-
-export interface FaturasView extends FaturasList {
     cartao_bandeira?: string
     cartao_ultimos_digitos?: string
-    processado_em?: string
-    tem_pdf?: boolean
     pdf_url?: string
 }
 
