@@ -27,6 +27,30 @@ export const tipoTransacaoColor: Record<string, string> = {
   advance: 'warning',
 }
 
+/** Fallback quando lookups.origens_compra ainda não carregou */
+export const origemCompraLabel: Record<string, string> = {
+  COMPRAS_ONLINE: 'Compras online',
+  COMPRAS_PRESENCIAL: 'Compras presencial',
+  PAGAMENTO_SERVICOS: 'Pagamento de serviços',
+  PAGAMENTO_FATURA: 'Pagamento fatura',
+}
+
+export const origemCompraColor: Record<string, string> = {
+  COMPRAS_ONLINE: 'info',
+  COMPRAS_PRESENCIAL: 'primary',
+  PAGAMENTO_SERVICOS: 'warning',
+  PAGAMENTO_FATURA: 'secondary',
+}
+
+export const resolveOrigemCompraLabel = (
+  value?: string | null,
+  lookupLabel?: string | null
+): string => {
+  if (lookupLabel) return lookupLabel
+  if (!value) return '-'
+  return origemCompraLabel[value] ?? value
+}
+
 export const responsavelTipoColor: Record<string, string> = {
   pessoal: 'primary',
   empresa: 'secondary',

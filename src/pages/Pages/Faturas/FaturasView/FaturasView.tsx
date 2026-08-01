@@ -11,6 +11,7 @@ import { toast } from 'react-toastify'
 import {
     formatCurrency, formatDateBr, faturaStatusColor,
     tipoTransacaoColor, tipoTransacaoLabel,
+    origemCompraLabel,
     FATURA_FILE_ACCEPT, isValidFaturaFile,
     getCategoriaFieldStyle, VALOR_TEXT_CLASS,
 } from 'helpers/fatura_helpers'
@@ -38,6 +39,11 @@ const getArquivoExtensao = (path?: string | null) => {
     return parts.length > 1 ? parts[parts.length - 1].toLowerCase() : ''
 }
 
+const formatParcelas = (atual?: number, total?: number) => {
+    if (!total || total <= 1) return 'À vista'
+    return `${atual ?? 1}/${total}`
+}
+
 const FaturasViewPage = () => {
     const { id } = useParams<{ id: string }>()
     const navigate = useNavigate()
@@ -58,6 +64,9 @@ const FaturasViewPage = () => {
     const [subcategoriasByCategoria, setSubcategoriasByCategoria] = useState<Record<number, SelectOptions[]>>({})
     const [responsaveisOptions, setResponsaveisOptions] = useState<SelectOptions[]>([])
     const [responsaveisLookup, setResponsaveisLookup] = useState<ResponsavelLookup[]>([])
+    const [origensCompraOptions, setOrigensCompraOptions] = useState<SelectOptions[]>(
+        () => Object.entries(origemCompraLabel).map(([value, label]) => ({ value, label }))
+    )
     const [defaultResponsavelId, setDefaultResponsavelId] = useState<number | null>(null)
     const [responsavelModalOpen, setResponsavelModalOpen] = useState(false)
     const [rowForResponsavel, setRowForResponsavel] = useState<TransacoesList | null>(null)
@@ -182,6 +191,14 @@ const FaturasViewPage = () => {
             if (lookups?.default_responsavel_id != null) {
                 setDefaultResponsavelId(lookups.default_responsavel_id)
             }
+            if (lookups?.origens_compra?.length) {
+                setOrigensCompraOptions(
+                    lookups.origens_compra.map((o) => ({
+                        value: o.value ?? '',
+                        label: o.label ?? o.value ?? '',
+                    }))
+                )
+            }
         } catch (error) {
             console.error('Erro ao carregar lookups:', error)
         }
@@ -269,7 +286,7 @@ const FaturasViewPage = () => {
 
     const saveTransacao = async (
         tx: TransacoesList,
-        patch: Partial<Pick<TransacoesList, 'categoria_id' | 'subcategoria_id' | 'responsavel_id' | 'valor' | 'observacoes'>>
+        patch: Partial<Pick<TransacoesList, 'categoria_id' | 'subcategoria_id' | 'responsavel_id' | 'valor' | 'observacoes' | 'origem_compra'>>
     ) => {
         if (!tx.id) return
         setSavingIds((prev) => ({ ...prev, [tx.id!]: true }))
@@ -279,6 +296,9 @@ const FaturasViewPage = () => {
             const subcategoriaId = patch.subcategoria_id !== undefined
                 ? patch.subcategoria_id
                 : (categoriaId ? (tx.subcategoria_id ?? null) : null)
+            const origemCompra = patch.origem_compra !== undefined
+                ? patch.origem_compra
+                : (tx.origem_compra ?? null)
 
             await transacoesService.editTransacoes({
                 id: tx.id,
@@ -291,6 +311,7 @@ const FaturasViewPage = () => {
                 valor_parcela: valor ?? null,
                 data: tx.data ?? null,
                 tipo: tx.tipo ?? null,
+                origem_compra: origemCompra,
                 categoria_id: categoriaId,
                 subcategoria_id: subcategoriaId,
                 responsavel_id: patch.responsavel_id !== undefined ? patch.responsavel_id : (tx.responsavel_id ?? null),
@@ -312,6 +333,12 @@ const FaturasViewPage = () => {
                     if (patch.subcategoria_id !== undefined) {
                         const opts = categoriaId ? (subcategoriasByCategoria[categoriaId] ?? []) : []
                         next.subcategoria_nome = opts.find((o) => Number(o.value) === patch.subcategoria_id)?.label
+                    }
+                    if (patch.origem_compra !== undefined) {
+                        next.origem_compra_label =
+                            origensCompraOptions.find((o) => o.value === patch.origem_compra)?.label
+                            ?? origemCompraLabel[patch.origem_compra ?? '']
+                            ?? null
                     }
                     if (patch.responsavel_id !== undefined) {
                         const responsavel =
@@ -374,6 +401,26 @@ const FaturasViewPage = () => {
             )
         )
         await saveTransacao(tx, { [field]: parsed })
+    }
+
+    const handleUpdateOrigem = async (tx: TransacoesList, value: string) => {
+        const origem = value === '' ? null : value
+        if ((tx.origem_compra ?? null) === origem) return
+        setTransacoes((prev) =>
+            prev.map((item) =>
+                item.id === tx.id
+                    ? {
+                        ...item,
+                        origem_compra: origem,
+                        origem_compra_label:
+                            origensCompraOptions.find((o) => o.value === origem)?.label
+                            ?? origemCompraLabel[origem ?? '']
+                            ?? null,
+                    }
+                    : item
+            )
+        )
+        await saveTransacao(tx, { origem_compra: origem })
     }
 
     const handleValorBlur = async (tx: TransacoesList) => {
@@ -713,7 +760,7 @@ const FaturasViewPage = () => {
                                 <div>
                                     <h5 className="card-title mb-1">Transações</h5>
                                     <small className="text-muted">
-                                        Ajuste valor, categoria, subcategoria e observação em cada linha. Use a coluna Resp. para definir outro responsável (padrão: Eu).
+                                        Ajuste valor, origem, categoria, subcategoria e observação em cada linha. Use a coluna Resp. para definir outro responsável (padrão: Eu).
                                     </small>
                                 </div>
                                 <div className="d-flex flex-wrap gap-2">
@@ -724,6 +771,11 @@ const FaturasViewPage = () => {
                                                 fatura_id: Number(id),
                                                 cartao_id: fatura.cartao_id,
                                                 tipo: 'purchase',
+                                                // Data no ciclo desta fatura → 1ª parcela cai aqui
+                                                // (backend usa a data da compra, não o fatura_id, para ancorar o parcelamento)
+                                                data: fatura.mes && fatura.ano
+                                                    ? `${fatura.ano}-${String(fatura.mes).padStart(2, '0')}-01`
+                                                    : undefined,
                                             },
                                             returnTo: `/faturas/view/${id}`,
                                         }}
@@ -758,7 +810,9 @@ const FaturasViewPage = () => {
                                                 <th>Data</th>
                                                 <th>Estabelecimento</th>
                                                 <th className={VALOR_TEXT_CLASS} style={{ minWidth: 150, maxWidth: 50 }}>Valor</th>
+                                                <th style={{ width: 90 }}>Parcelas</th>
                                                 <th>Tipo</th>
+                                                <th>Origem</th>
                                                 <th style={{ minWidth: 160 }}>Categoria</th>
                                                 <th style={{ minWidth: 160 }}>Subcategoria</th>
                                                 <th style={{ minWidth: 250 }}>Observação</th>
@@ -803,10 +857,29 @@ const FaturasViewPage = () => {
                                                             }}
                                                         />
                                                     </td>
+                                                    <td className="text-center text-nowrap">
+                                                        {formatParcelas(tx.parcela_atual, tx.parcelas_total)}
+                                                    </td>
                                                     <td>
                                                         <Badge color={tipoTransacaoColor[tx.tipo ?? ''] ?? 'secondary'}>
                                                             {tipoTransacaoLabel[tx.tipo ?? ''] ?? tx.tipo}
                                                         </Badge>
+                                                    </td>
+                                                    <td style={{ minWidth: 170 }}>
+                                                        <Input
+                                                            type="select"
+                                                            bsSize="sm"
+                                                            value={tx.origem_compra ?? ''}
+                                                            disabled={!!savingIds[tx.id!]}
+                                                            onChange={(e) => handleUpdateOrigem(tx, e.target.value)}
+                                                        >
+                                                            <option value="">Selecionar...</option>
+                                                            {origensCompraOptions.map((opt) => (
+                                                                <option key={String(opt.value)} value={opt.value ?? ''}>
+                                                                    {opt.label}
+                                                                </option>
+                                                            ))}
+                                                        </Input>
                                                     </td>
                                                     <td>
                                                         <Input

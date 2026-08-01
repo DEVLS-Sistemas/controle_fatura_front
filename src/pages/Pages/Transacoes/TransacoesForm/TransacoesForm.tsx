@@ -4,6 +4,7 @@ import { setActiveMenu } from 'helpers/system_helpers'
 import { mask, removeMask, useNavegacao } from 'helpers/functions_helpers'
 import {
     centavosToBr,
+    origemCompraLabel,
     parcelasOptions,
     splitValorEmParcelas,
     toCentavos,
@@ -57,6 +58,7 @@ const TransacoesForm = () => {
                 fatura_id: state.source.fatura_id ?? null,
                 estabelecimento_id: state.source.estabelecimento_id ?? null,
                 subcategoria_id: state.source.subcategoria_id ?? null,
+                origem_compra: state.source.origem_compra ?? null,
                 valor: toPrecoDigits(state.source.valor ?? state.source.valor_compra),
                 valor_compra: toPrecoDigits(state.source.valor_compra ?? state.source.valor),
                 parcelas_total: state.source.parcelas_total ?? 1,
@@ -72,6 +74,10 @@ const TransacoesForm = () => {
     const [cartoesOptions, setCartoesOptions] = useState<SelectOptions[]>([])
     const [categoriasOptions, setCategoriasOptions] = useState<SelectOptions[]>([])
     const [subcategoriasOptions, setSubcategoriasOptions] = useState<SelectOptions[]>([])
+    const defaultOrigensCompraOptions: SelectOptions[] = Object.entries(origemCompraLabel).map(
+        ([value, label]) => ({ value, label })
+    )
+    const [origensCompraOptions, setOrigensCompraOptions] = useState<SelectOptions[]>(defaultOrigensCompraOptions)
     const [responsaveisLookup, setResponsaveisLookup] = useState<ResponsavelLookup[]>([])
     const [defaultResponsavelId, setDefaultResponsavelId] = useState<number | null>(null)
     const [responsavelModalOpen, setResponsavelModalOpen] = useState(false)
@@ -196,6 +202,14 @@ const TransacoesForm = () => {
                     }))
                 )
             }
+            if (lookups?.origens_compra?.length) {
+                setOrigensCompraOptions(
+                    lookups.origens_compra.map((o) => ({
+                        value: o.value ?? '',
+                        label: o.label ?? o.value ?? '',
+                    }))
+                )
+            }
             if (lookups?.responsaveis) {
                 setResponsaveisLookup(lookups.responsaveis)
             }
@@ -239,6 +253,7 @@ const TransacoesForm = () => {
                     estabelecimento_id: data.estabelecimento_id,
                     valor: toCentavos(data.valor ?? data.valor_compra) / 100,
                     tipo: data.tipo,
+                    origem_compra: data.origem_compra,
                     categoria_id: data.categoria_id,
                     subcategoria_id: data.categoria_id ? data.subcategoria_id : null,
                     responsavel_id: data.responsavel_id,
@@ -262,6 +277,7 @@ const TransacoesForm = () => {
                     estabelecimento_id: data.estabelecimento_id,
                     valor_compra: toBrPayload(data.valor_compra),
                     tipo: data.tipo || 'purchase',
+                    origem_compra: data.origem_compra,
                     parcelas_total: nParcelas,
                     categoria_id: data.categoria_id || undefined,
                     subcategoria_id: data.categoria_id ? (data.subcategoria_id || undefined) : undefined,
@@ -422,6 +438,11 @@ const TransacoesForm = () => {
                                                         field="data"
                                                         register={register}
                                                     />
+                                                    {fromFatura && !isEdit && (
+                                                        <small className="text-muted">
+                                                            A 1ª parcela entra na fatura do ciclo desta data (não necessariamente a fatura de origem se a data for alterada).
+                                                        </small>
+                                                    )}
                                                 </div>
                                             </Col>
                                             <Col md={3}>
@@ -437,7 +458,7 @@ const TransacoesForm = () => {
                                             </Col>
                                         </Row>
                                         <Row>
-                                            <Col md={6}>
+                                            <Col md={5}>
                                                 <div className="mb-3">
                                                     <Label htmlFor="estabelecimento_id" className="form-label">Estabelecimento</Label>
                                                     <AsyncSelectListControlled<TransacoesModel>
@@ -451,6 +472,17 @@ const TransacoesForm = () => {
                                                 </div>
                                             </Col>
                                             <Col md={3}>
+                                                <div className="mb-3">
+                                                    <Label htmlFor="origem_compra" className="form-label">Origem da compra</Label>
+                                                    <SelectListControlled<TransacoesModel>
+                                                        options={origensCompraOptions}
+                                                        field="origem_compra"
+                                                        control={control}
+                                                        required={required}
+                                                    />
+                                                </div>
+                                            </Col>
+                                            <Col md={2}>
                                                 <div className="mb-3">
                                                     <Label htmlFor="valor_compra" className="form-label">
                                                         {isEdit ? 'Valor' : 'Valor da compra'}
@@ -474,7 +506,7 @@ const TransacoesForm = () => {
                                                     )}
                                                 </div>
                                             </Col>
-                                            <Col md={3}>
+                                            <Col md={2}>
                                                 <div className="mb-3">
                                                     <Label className="form-label text-muted">Responsável</Label>
                                                     <div>
@@ -605,7 +637,7 @@ const TransacoesForm = () => {
                                                             onChange={(e) => setValue('propagar_grupo', e.target.checked)}
                                                         />
                                                         <Label className="form-check-label" htmlFor="propagar_grupo">
-                                                            Aplicar estabelecimento, categoria, responsável e observação a todas as parcelas da compra
+                                                            Aplicar estabelecimento, origem, categoria, responsável e observação a todas as parcelas da compra
                                                         </Label>
                                                     </div>
                                                 </Col>

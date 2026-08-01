@@ -23,6 +23,7 @@ export interface TransacoesFilterProps {
     categoriasOptions: SelectOptions[]
     responsaveisOptions: SelectOptions[]
     tiposOptions: SelectOptions[]
+    origensCompraOptions: SelectOptions[]
     filtersRef: TransacoesSearch
 }
 
@@ -32,6 +33,7 @@ const TransacoesFilter = ({
     categoriasOptions,
     responsaveisOptions,
     tiposOptions,
+    origensCompraOptions,
     filtersRef,
 }: TransacoesFilterProps) => {
     const { handleSubmit, control, register, getValues, setValue } = useForm<TransacoesSearch>({
@@ -237,6 +239,16 @@ const TransacoesFilter = ({
                                             <Row>
                                                 <Col md={3}>
                                                     <div className="mb-3">
+                                                        <Label htmlFor="origem_compra" className="form-label">Origem da compra</Label>
+                                                        <SelectListControlled<TransacoesSearch>
+                                                            options={origensCompraOptions}
+                                                            field="origem_compra"
+                                                            control={control}
+                                                        />
+                                                    </div>
+                                                </Col>
+                                                <Col md={3}>
+                                                    <div className="mb-3">
                                                         <Label htmlFor="estabelecimento_id" className="form-label">Estabelecimento</Label>
                                                         <AsyncSelectListControlled<TransacoesSearch>
                                                             callback={searchEstabelecimentos}
@@ -246,7 +258,7 @@ const TransacoesFilter = ({
                                                         />
                                                     </div>
                                                 </Col>
-                                                <Col md={3}>
+                                                <Col md={2}>
                                                     <div className="mb-3">
                                                         <Label htmlFor="categoria_id" className="form-label">Categoria</Label>
                                                         <SelectListControlled<TransacoesSearch>
@@ -256,7 +268,7 @@ const TransacoesFilter = ({
                                                         />
                                                     </div>
                                                 </Col>
-                                                <Col md={3}>
+                                                <Col md={2}>
                                                     <div className="mb-3">
                                                         <Label htmlFor="subcategoria_id" className="form-label">Subcategoria</Label>
                                                         <SelectListControlled<TransacoesSearch>
@@ -267,7 +279,7 @@ const TransacoesFilter = ({
                                                         />
                                                     </div>
                                                 </Col>
-                                                <Col md={3}>
+                                                <Col md={2}>
                                                     <div className="mb-3">
                                                         <Label htmlFor="responsavel_id" className="form-label">Responsável</Label>
                                                         <SelectListControlled<TransacoesSearch>

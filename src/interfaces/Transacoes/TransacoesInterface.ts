@@ -10,6 +10,7 @@ export interface TransacoesSearch {
     responsavel_id?: string | number | null
     fatura_id?: string | number | null
     tipo?: string | null
+    origem_compra?: string | null
     mes?: string | number | null
     ano?: string | number | null
     palavra_chave?: string | null | unknown
@@ -28,6 +29,8 @@ export interface TransacoesList {
     parcela_atual?: number
     compra_grupo_id?: string | number | null
     tipo?: string
+    origem_compra?: string | null
+    origem_compra_label?: string | null
     categoria_id?: number | null
     categoria_nome?: string
     categoria_cor?: string
@@ -75,6 +78,8 @@ export interface TransacoesModel {
     /** No edit, propaga campos compartilhados para o grupo */
     propagar_grupo?: boolean
     tipo?: string | null
+    /** Canal/origem da compra — obrigatório no create */
+    origem_compra?: string | null
     categoria_id?: number | string | null
     subcategoria_id?: number | string | null
     responsavel_id?: number | string | null
@@ -125,8 +130,14 @@ export interface TipoLookup {
     label?: string
 }
 
+export interface OrigemCompraLookup {
+    value?: string
+    label?: string
+}
+
 export interface LookupsTransacoes {
     tipos?: TipoLookup[]
+    origens_compra?: OrigemCompraLookup[]
     categorias?: CategoriaLookup[]
     subcategorias?: SubcategoriaLookup[]
     responsaveis?: ResponsavelLookup[]
@@ -162,6 +173,7 @@ export const TransacoesDefaultValues: TransacoesModel = {
     compra_grupo_id: null,
     propagar_grupo: false,
     tipo: 'purchase',
+    origem_compra: null,
     categoria_id: null,
     subcategoria_id: null,
     responsavel_id: null,

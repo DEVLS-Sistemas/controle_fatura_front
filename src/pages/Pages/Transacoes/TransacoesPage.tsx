@@ -9,7 +9,7 @@ import {
     TransacoesSearch,
 } from 'interfaces/Transacoes/TransacoesInterface'
 import { TransacoesService } from 'services/Transacoes/TransacoesService'
-import { tipoTransacaoLabel } from 'helpers/fatura_helpers'
+import { origemCompraLabel, tipoTransacaoLabel } from 'helpers/fatura_helpers'
 import TransacoesFilter from './TransacoesFilter/TransacoesFilter'
 import TransacoesTable from './TransacoesTable/TransacoesTable'
 
@@ -22,6 +22,11 @@ export const TransacoesFilterContext = createContext<TransacoesFilterContextType
 const defaultTiposOptions: SelectOptions[] = [
     { value: '', label: 'Todos' },
     ...Object.entries(tipoTransacaoLabel).map(([value, label]) => ({ value, label })),
+]
+
+const defaultOrigensCompraOptions: SelectOptions[] = [
+    { value: '', label: 'Todos' },
+    ...Object.entries(origemCompraLabel).map(([value, label]) => ({ value, label })),
 ]
 
 const buildSelectOptions = (
@@ -63,6 +68,7 @@ const TransacoesPage = () => {
         responsavel_id: null,
         fatura_id: null,
         tipo: null,
+        origem_compra: null,
         mes: null,
         ano: null,
         palavra_chave: null,
@@ -80,6 +86,7 @@ const TransacoesPage = () => {
     const [categoriasOptions, setCategoriasOptions] = useState<SelectOptions[]>([{ value: '', label: 'Todos' }])
     const [responsaveisOptions, setResponsaveisOptions] = useState<SelectOptions[]>([{ value: '', label: 'Todos' }])
     const [tiposOptions, setTiposOptions] = useState<SelectOptions[]>(defaultTiposOptions)
+    const [origensCompraOptions, setOrigensCompraOptions] = useState<SelectOptions[]>(defaultOrigensCompraOptions)
     const [responsaveisLookup, setResponsaveisLookup] = useState<ResponsavelLookup[]>([])
     const [defaultResponsavelId, setDefaultResponsavelId] = useState<number | null>(null)
 
@@ -94,6 +101,7 @@ const TransacoesPage = () => {
         transacoesContext.responsavel_id = data.responsavel_id
         transacoesContext.fatura_id = data.fatura_id
         transacoesContext.tipo = data.tipo
+        transacoesContext.origem_compra = data.origem_compra
         transacoesContext.mes = data.mes
         transacoesContext.ano = data.ano
         transacoesContext.page = data.page
@@ -129,6 +137,15 @@ const TransacoesPage = () => {
                         })),
                     ])
                 }
+                if (result.origens_compra?.length) {
+                    setOrigensCompraOptions([
+                        { value: '', label: 'Todos' },
+                        ...result.origens_compra.map((o) => ({
+                            value: o.value ?? '',
+                            label: o.label ?? o.value ?? '',
+                        })),
+                    ])
+                }
             }
         } catch (error) {
             console.error('Erro ao carregar lookups de transações:', error)
@@ -155,6 +172,7 @@ const TransacoesPage = () => {
                             categoriasOptions={categoriasOptions}
                             responsaveisOptions={responsaveisOptions}
                             tiposOptions={tiposOptions}
+                            origensCompraOptions={origensCompraOptions}
                             filtersRef={transacoesContext}
                         />
                         {display ? (
@@ -170,6 +188,7 @@ const TransacoesPage = () => {
                                 defaultResponsavelId={defaultResponsavelId}
                                 onResponsaveisChange={setResponsaveisLookup}
                                 onRowsChange={setTransacoesList}
+                                origensCompraOptions={origensCompraOptions}
                             />
                         ) : (
                             <div className="text-center">

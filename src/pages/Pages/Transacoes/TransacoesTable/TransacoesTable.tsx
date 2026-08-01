@@ -2,7 +2,7 @@ import UiContent from "Components/Common/UiContent"
 import React, { useEffect, useState } from "react"
 import { Link } from "react-router-dom"
 import {
-    Button, ButtonGroup, Card, CardBody, Col, DropdownItem,
+    Badge, Button, ButtonGroup, Card, CardBody, Col, DropdownItem,
     DropdownMenu, DropdownToggle, Label, Modal, ModalBody, ModalHeader,
     Row, UncontrolledDropdown, UncontrolledTooltip,
 } from "reactstrap"
@@ -12,9 +12,12 @@ import { useNavegacao } from "helpers/functions_helpers"
 import {
     formatCurrency,
     formatDateBr,
+    origemCompraColor,
+    resolveOrigemCompraLabel,
     VALOR_TEXT_CLASS,
 } from "helpers/fatura_helpers"
 import { CartaoChip } from "helpers/cartao_helpers"
+import { SelectOptions } from "interfaces/SystemInterfaces/SelectInterface"
 import {
     ResponsavelLookup,
     TransacoesList,
@@ -35,6 +38,7 @@ export interface TransacoesTableProps {
     defaultResponsavelId?: number | null
     onResponsaveisChange?: (list: ResponsavelLookup[]) => void
     onRowsChange?: (data: PaginateInterface<TransacoesList>) => void
+    origensCompraOptions?: SelectOptions[]
 }
 
 const formatParcelas = (atual?: number, total?: number) => {
@@ -63,6 +67,7 @@ export const TransacoesTable = ({
     defaultResponsavelId = null,
     onResponsaveisChange,
     onRowsChange,
+    origensCompraOptions = [],
 }: TransacoesTableProps) => {
     const [optPerPage] = useState<PerPageProps[]>([
         { value: 5, label: "5" },
@@ -177,6 +182,7 @@ export const TransacoesTable = ({
                 responsavel_id: new_url.searchParams.get('responsavel_id') ?? filters.responsavel_id,
                 fatura_id: new_url.searchParams.get('fatura_id') ?? filters.fatura_id,
                 tipo: new_url.searchParams.get('tipo') ?? filters.tipo,
+                origem_compra: new_url.searchParams.get('origem_compra') ?? filters.origem_compra,
                 mes: new_url.searchParams.get('mes') ?? filters.mes,
                 ano: new_url.searchParams.get('ano') ?? filters.ano,
             })
@@ -197,6 +203,11 @@ export const TransacoesTable = ({
         const nome = responsavelNome
             ?? responsaveisLookup.find((r) => Number(r.id) === Number(responsavelId))?.nome
         return (nome ?? '').trim().toLowerCase() === 'eu'
+    }
+
+    const origemLabel = (value?: string | null, apiLabel?: string | null) => {
+        const fromLookup = origensCompraOptions.find((o) => o.value && o.value === value)?.label
+        return resolveOrigemCompraLabel(value, apiLabel ?? fromLookup)
     }
 
     return (
@@ -247,6 +258,7 @@ export const TransacoesTable = ({
                                                                 <th scope="col">Data</th>
                                                                 <th scope="col" className="text-start">Estabelecimento</th>
                                                                 <th scope="col" className={VALOR_TEXT_CLASS}>Valor</th>
+                                                                <th scope="col">Origem</th>
                                                                 <th scope="col">Categoria</th>
                                                                 <th scope="col">Subcategoria</th>
                                                                 <th scope="col" className="text-start">Observação</th>
@@ -270,6 +282,16 @@ export const TransacoesTable = ({
                                                                         <td>{formatDateBr(row.data)}</td>
                                                                         <td className="text-start">{estabelecimentoNome}</td>
                                                                         <td className={VALOR_TEXT_CLASS}>{formatCurrency(row.valor)}</td>
+                                                                        <td>
+                                                                            {row.origem_compra ? (
+                                                                                <Badge
+                                                                                    color={origemCompraColor[row.origem_compra] ?? 'secondary'}
+                                                                                    className="fw-normal"
+                                                                                >
+                                                                                    {origemLabel(row.origem_compra, row.origem_compra_label)}
+                                                                                </Badge>
+                                                                            ) : '-'}
+                                                                        </td>
                                                                         <td>
                                                                             {row.categoria_nome ? (
                                                                                 <span className="d-inline-flex align-items-center gap-1">
