@@ -9,6 +9,7 @@ import { required } from 'Components/ComponentController/ValidatorForm/Validator
 import { InputTextControlled } from 'Components/ComponentController/Inputs/Text/InputTextControlled'
 import { InputDate } from 'Components/ComponentController/Inputs/Date/InputDate'
 import { SelectListControlled } from 'Components/ComponentController/Selects/Select/SelectListControlled'
+import { AsyncSelectListControlled } from 'Components/ComponentController/Selects/AsyncSelect/AsyncSelectListControlled'
 import { SelectOptions } from 'interfaces/SystemInterfaces/SelectInterface'
 import { tipoTransacaoLabel } from 'helpers/fatura_helpers'
 import {
@@ -48,14 +49,13 @@ const TransacoesForm = () => {
     const [cartoesOptions, setCartoesOptions] = useState<SelectOptions[]>([])
     const [categoriasOptions, setCategoriasOptions] = useState<SelectOptions[]>([])
     const [subcategoriasOptions, setSubcategoriasOptions] = useState<SelectOptions[]>([])
-    const [estabelecimentosOptions, setEstabelecimentosOptions] = useState<SelectOptions[]>([])
-    const [estabelecimentosLookup, setEstabelecimentosLookup] = useState<EstabelecimentoLookup[]>([])
     const [responsaveisLookup, setResponsaveisLookup] = useState<ResponsavelLookup[]>([])
     const [defaultResponsavelId, setDefaultResponsavelId] = useState<number | null>(null)
     const [responsavelModalOpen, setResponsavelModalOpen] = useState(false)
     const skipEstabelecimentoEffect = useRef(true)
     const skipCategoriaEffect = useRef(true)
     const applyingEstabelecimentoDefaults = useRef(false)
+    const estabelecimentosCache = useRef<Map<number, EstabelecimentoLookup>>(new Map())
 
     const { voltarParaRotaAnterior } = useNavegacao()
     const navigate = useNavigate()
@@ -82,6 +82,17 @@ const TransacoesForm = () => {
         label,
     }))
 
+    const estabelecimentoDefault: SelectOptions | undefined =
+        record.estabelecimento_id
+            ? {
+                value: record.estabelecimento_id,
+                label:
+                    state?.source?.estabelecimento_nome
+                    ?? state?.source?.estabelecimento
+                    ?? `#${record.estabelecimento_id}`,
+            }
+            : undefined
+
     const loadSubcategorias = async (catId: string | number | null | undefined) => {
         if (!catId) {
             setSubcategoriasOptions([])
@@ -98,6 +109,26 @@ const TransacoesForm = () => {
         } catch (error) {
             console.error('Erro ao carregar subcategorias:', error)
             setSubcategoriasOptions([])
+        }
+    }
+
+    const searchEstabelecimentos = async (inputValue: string): Promise<SelectOptions[]> => {
+        try {
+            const list = await estabelecimentosService.AsyncListEstabelecimentos({
+                palavra_chave: inputValue,
+            })
+            ;(list ?? []).forEach((e) => {
+                if (e.id != null) {
+                    estabelecimentosCache.current.set(Number(e.id), e)
+                }
+            })
+            return (list ?? []).map((e) => ({
+                value: e.id!,
+                label: e.nome ?? `#${e.id}`,
+            }))
+        } catch (error) {
+            console.error('Erro ao buscar estabelecimentos:', error)
+            return []
         }
     }
 
@@ -129,18 +160,6 @@ const TransacoesForm = () => {
             if (!isEdit && lookups?.default_responsavel_id && !record.responsavel_id) {
                 setValue('responsavel_id', lookups.default_responsavel_id)
             }
-
-            const estabelecimentos =
-                lookups?.estabelecimentos
-                ?? (await estabelecimentosService.AsyncListEstabelecimentos({}))
-                ?? []
-            setEstabelecimentosLookup(estabelecimentos)
-            setEstabelecimentosOptions(
-                estabelecimentos.map((e) => ({
-                    value: e.id!,
-                    label: e.nome ?? `#${e.id}`,
-                }))
-            )
 
             if (record.categoria_id) {
                 await loadSubcategorias(record.categoria_id)
@@ -191,12 +210,37 @@ const TransacoesForm = () => {
             return
         }
         if (!estabelecimentoId) return
-        const est = estabelecimentosLookup.find((e) => Number(e.id) === Number(estabelecimentoId))
-        if (!est) return
-        applyingEstabelecimentoDefaults.current = true
-        setValue('categoria_id', est.categoria_padrao_id ?? null)
-        setValue('subcategoria_id', est.subcategoria_padrao_id ?? null)
-        loadSubcategorias(est.categoria_padrao_id)
+
+        const applyDefaults = async () => {
+            let est = estabelecimentosCache.current.get(Number(estabelecimentoId))
+            if (!est) {
+                try {
+                    const view = await estabelecimentosService.getViewEstabelecimentos({
+                        id: estabelecimentoId,
+                    })
+                    if (view?.id != null) {
+                        est = {
+                            id: view.id,
+                            nome: view.nome,
+                            categoria_padrao_id: view.categoria_padrao_id ?? null,
+                            subcategoria_padrao_id: view.subcategoria_padrao_id ?? null,
+                        }
+                        estabelecimentosCache.current.set(Number(view.id), est)
+                    }
+                } catch (error) {
+                    console.error('Erro ao carregar estabelecimento:', error)
+                    return
+                }
+            }
+            if (!est) return
+
+            applyingEstabelecimentoDefaults.current = true
+            setValue('categoria_id', est.categoria_padrao_id ?? null)
+            setValue('subcategoria_id', est.subcategoria_padrao_id ?? null)
+            loadSubcategorias(est.categoria_padrao_id)
+        }
+
+        applyDefaults()
     }, [estabelecimentoId])
 
     useEffect(() => {
@@ -278,11 +322,13 @@ const TransacoesForm = () => {
                                             <Col md={6}>
                                                 <div className="mb-3">
                                                     <Label htmlFor="estabelecimento_id" className="form-label">Estabelecimento</Label>
-                                                    <SelectListControlled<TransacoesModel>
-                                                        options={estabelecimentosOptions}
+                                                    <AsyncSelectListControlled<TransacoesModel>
+                                                        callback={searchEstabelecimentos}
                                                         field="estabelecimento_id"
                                                         control={control}
                                                         required={required}
+                                                        defaultValue={estabelecimentoDefault}
+                                                        placeholder="Digite para buscar..."
                                                     />
                                                 </div>
                                             </Col>

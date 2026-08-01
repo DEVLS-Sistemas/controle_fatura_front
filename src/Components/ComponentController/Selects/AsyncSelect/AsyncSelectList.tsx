@@ -79,6 +79,7 @@ export const AsyncSelectList = (props: AsyncSelectListInterface) => {
         if (inputValue.length > 2) {
             return props.callback(inputValue)
         }
+        return Promise.resolve([])
     }
 
     useEffect(() => {

@@ -9,7 +9,6 @@ import {
     TransacoesSearch,
 } from 'interfaces/Transacoes/TransacoesInterface'
 import { TransacoesService } from 'services/Transacoes/TransacoesService'
-import { EstabelecimentosService } from 'services/Estabelecimentos/EstabelecimentosService'
 import { tipoTransacaoLabel } from 'helpers/fatura_helpers'
 import TransacoesFilter from './TransacoesFilter/TransacoesFilter'
 import TransacoesTable from './TransacoesTable/TransacoesTable'
@@ -62,13 +61,11 @@ const TransacoesPage = () => {
 
     const [transacoesList, setTransacoesList] = useState<PaginateInterface<TransacoesList>>()
     const transacoesService = new TransacoesService()
-    const estabelecimentosService = new EstabelecimentosService()
     const [perPage, setPerPage] = useState<number>(5)
     const [page, setPage] = useState(1)
 
     const [cartoesOptions, setCartoesOptions] = useState<SelectOptions[]>([{ value: '', label: 'Todos' }])
     const [categoriasOptions, setCategoriasOptions] = useState<SelectOptions[]>([{ value: '', label: 'Todos' }])
-    const [estabelecimentosOptions, setEstabelecimentosOptions] = useState<SelectOptions[]>([{ value: '', label: 'Todos' }])
     const [responsaveisOptions, setResponsaveisOptions] = useState<SelectOptions[]>([{ value: '', label: 'Todos' }])
     const [tiposOptions, setTiposOptions] = useState<SelectOptions[]>(defaultTiposOptions)
     const [responsaveisLookup, setResponsaveisLookup] = useState<ResponsavelLookup[]>([])
@@ -111,12 +108,6 @@ const TransacoesPage = () => {
                 setResponsaveisOptions(buildSelectOptions(result.responsaveis))
                 setResponsaveisLookup(result.responsaveis ?? [])
                 setDefaultResponsavelId(result.default_responsavel_id ?? null)
-                if (result.estabelecimentos?.length) {
-                    setEstabelecimentosOptions(buildSelectOptions(result.estabelecimentos))
-                } else {
-                    const list = await estabelecimentosService.AsyncListEstabelecimentos({})
-                    setEstabelecimentosOptions(buildSelectOptions(list))
-                }
                 if (result.tipos?.length) {
                     setTiposOptions([
                         { value: '', label: 'Todos' },
@@ -150,7 +141,6 @@ const TransacoesPage = () => {
                             getRemoteTransacoesList={getRemoteTransacoesList}
                             cartoesOptions={cartoesOptions}
                             categoriasOptions={categoriasOptions}
-                            estabelecimentosOptions={estabelecimentosOptions}
                             responsaveisOptions={responsaveisOptions}
                             tiposOptions={tiposOptions}
                             filtersRef={transacoesContext}

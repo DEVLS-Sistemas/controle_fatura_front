@@ -1,7 +1,6 @@
 import { ValidatorForm } from 'Components/ComponentController/ValidatorForm/ValidatorForm'
 import { SelectOptions } from 'interfaces/SystemInterfaces/SelectInterface'
-import { useEffect } from 'react'
-import { Path, Controller, FieldValues, Control, Validate, PathValue } from 'react-hook-form'
+import { Path, Controller, FieldValues, Control } from 'react-hook-form'
 import { AsyncSelectList } from './AsyncSelectList'
 
 
@@ -12,7 +11,7 @@ export interface AsyncSelectListInterface {
     className: string;
     style: string;
     errors: any;
-    required?: boolean;
+    required?: boolean | ValidatorForm;
     disabled?: boolean;
     defaultValue?: SelectOptions;
     isLoading?: boolean;
@@ -27,7 +26,7 @@ export type AsyncSelectListProps<T extends FieldValues> = {
     placeholder?: string;
     className?: string;
     style?: string;
-    required?: boolean;
+    required?: boolean | ValidatorForm;
     disabled?: boolean;
     defaultValue?: SelectOptions;
     isLoading?: boolean;

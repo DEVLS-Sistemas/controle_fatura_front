@@ -109,7 +109,6 @@ export interface LookupsTransacoes {
     tipos?: TipoLookup[]
     categorias?: CategoriaLookup[]
     subcategorias?: SubcategoriaLookup[]
-    estabelecimentos?: EstabelecimentoLookup[]
     responsaveis?: ResponsavelLookup[]
     faturas?: FaturaLookup[]
     cartoes?: CartaoLookup[]

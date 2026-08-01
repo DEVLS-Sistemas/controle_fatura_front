@@ -9,17 +9,18 @@ import {
 import { InputTextControlled } from "Components/ComponentController/Inputs/Text/InputTextControlled"
 import { InputDate } from "Components/ComponentController/Inputs/Date/InputDate"
 import { SelectListControlled } from "Components/ComponentController/Selects/Select/SelectListControlled"
+import { AsyncSelectListControlled } from "Components/ComponentController/Selects/AsyncSelect/AsyncSelectListControlled"
 import { SelectOptions } from "interfaces/SystemInterfaces/SelectInterface"
 import { mesesOptions } from "helpers/fatura_helpers"
 import { TransacoesSearch } from "interfaces/Transacoes/TransacoesInterface"
 import { TransacoesService } from "services/Transacoes/TransacoesService"
 import { SubcategoriasService } from "services/Subcategorias/SubcategoriasService"
+import { EstabelecimentosService } from "services/Estabelecimentos/EstabelecimentosService"
 
 export interface TransacoesFilterProps {
     getRemoteTransacoesList: (data: any) => void
     cartoesOptions: SelectOptions[]
     categoriasOptions: SelectOptions[]
-    estabelecimentosOptions: SelectOptions[]
     responsaveisOptions: SelectOptions[]
     tiposOptions: SelectOptions[]
     filtersRef: TransacoesSearch
@@ -29,7 +30,6 @@ const TransacoesFilter = ({
     getRemoteTransacoesList,
     cartoesOptions,
     categoriasOptions,
-    estabelecimentosOptions,
     responsaveisOptions,
     tiposOptions,
     filtersRef,
@@ -42,6 +42,22 @@ const TransacoesFilter = ({
     const [subcategoriasOptions, setSubcategoriasOptions] = useState<SelectOptions[]>([{ value: '', label: 'Todos' }])
     const transacoesService = new TransacoesService()
     const subcategoriasService = new SubcategoriasService()
+    const estabelecimentosService = new EstabelecimentosService()
+
+    const searchEstabelecimentos = async (inputValue: string): Promise<SelectOptions[]> => {
+        try {
+            const list = await estabelecimentosService.AsyncListEstabelecimentos({
+                palavra_chave: inputValue,
+            })
+            return (list ?? []).map((e) => ({
+                value: e.id!,
+                label: e.nome ?? `#${e.id}`,
+            }))
+        } catch (error) {
+            console.error('Erro ao buscar estabelecimentos:', error)
+            return []
+        }
+    }
 
     const categoriaId = useWatch({ control, name: 'categoria_id' })
 
@@ -222,10 +238,11 @@ const TransacoesFilter = ({
                                                 <Col md={3}>
                                                     <div className="mb-3">
                                                         <Label htmlFor="estabelecimento_id" className="form-label">Estabelecimento</Label>
-                                                        <SelectListControlled<TransacoesSearch>
-                                                            options={estabelecimentosOptions}
+                                                        <AsyncSelectListControlled<TransacoesSearch>
+                                                            callback={searchEstabelecimentos}
                                                             field="estabelecimento_id"
                                                             control={control}
+                                                            placeholder="Digite para buscar..."
                                                         />
                                                     </div>
                                                 </Col>
