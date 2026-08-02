@@ -12,6 +12,7 @@ import { useNavegacao } from "helpers/functions_helpers"
 import { CartoesList, CartoesSearch } from "interfaces/Cartoes/CartoesInterface"
 import { CartoesService } from "services/Cartoes/CartoesService"
 import { CartaoChip } from "helpers/cartao_helpers"
+import { formatCurrency, VALOR_TEXT_CLASS } from "helpers/fatura_helpers"
 
 export interface CartoesTableProps {
     data: PaginateInterface<CartoesList> | undefined
@@ -119,6 +120,7 @@ export const CartoesTable = ({ data, getData, setPerPage, setPage, perPage, filt
                                                                 <th scope="col">Bandeira</th>
                                                                 <th scope="col">Banco</th>
                                                                 <th scope="col">Final</th>
+                                                                <th scope="col" className="text-end">Limite</th>
                                                                 <th scope="col">Ciclo</th>
                                                                 <th scope="col">Ativo</th>
                                                                 <th scope="col" style={{ width: "150px" }}>Ações</th>
@@ -142,6 +144,11 @@ export const CartoesTable = ({ data, getData, setPerPage, setPage, perPage, filt
                                                                     <td>{row.bandeira}</td>
                                                                     <td>{row.banco}</td>
                                                                     <td>{row.ultimos_digitos}</td>
+                                                                    <td className={`text-end ${VALOR_TEXT_CLASS}`}>
+                                                                        {row.limite_credito != null && Number(row.limite_credito) > 0
+                                                                            ? formatCurrency(row.limite_credito)
+                                                                            : <span className="text-muted">-</span>}
+                                                                    </td>
                                                                     <td>
                                                                         <span className="text-muted small">
                                                                             Fecha dia {row.dia_limite_fatura ?? '-'}

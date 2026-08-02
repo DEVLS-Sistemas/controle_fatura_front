@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'react-toastify'
 import { setActiveMenu } from 'helpers/system_helpers'
 import { useNavegacao } from 'helpers/functions_helpers'
+import { centavosToBr, toCentavos } from 'helpers/fatura_helpers'
 import { CartaoChip } from 'helpers/cartao_helpers'
 import { Breadcrumb, BreadcrumbItem, Card, CardBody, Col, Container, Label, Row } from 'reactstrap'
 import { SubmitHandler, useForm } from 'react-hook-form'
@@ -21,11 +22,18 @@ import {
 } from 'interfaces/Cartoes/CartoesInterface'
 import { CartoesService } from 'services/Cartoes/CartoesService'
 
+const toPrecoDigits = (value: string | number | null | undefined): string | null => {
+    if (value == null || value === '') return null
+    const cents = toCentavos(value)
+    return cents > 0 ? String(cents) : null
+}
+
 const buildRecordFromSource = (source: any): CartoesModel => ({
     ...CartoesDefaultValues,
     ...source,
     id: source.id ?? null,
     cartao_id: source.cartao_id ?? source.id ?? null,
+    limite_credito: toPrecoDigits(source.limite_credito),
     dia_limite_fatura: source.dia_limite_fatura ?? null,
     dia_vencimento_fatura: source.dia_vencimento_fatura ?? null,
     cor_fundo: source.cor_fundo ?? source.cor ?? null,
@@ -161,8 +169,10 @@ const CartoesForm = () => {
 
     const onSubmit: SubmitHandler<CartoesModel> = async (data) => {
         try {
+            const limiteCents = toCentavos(data.limite_credito)
             const payload: CartoesModel = {
                 ...data,
+                limite_credito: limiteCents > 0 ? centavosToBr(limiteCents) : null,
                 dia_limite_fatura: data.dia_limite_fatura != null
                     ? Number(data.dia_limite_fatura)
                     : null,
@@ -278,7 +288,27 @@ const CartoesForm = () => {
                                                     />
                                                 </div>
                                             </Col>
+                                        </Row>
+
+                                        <Row>
                                             <Col md={6}>
+                                                <div className="mb-3">
+                                                    <Label htmlFor="limite_credito" className="form-label">
+                                                        Limite do cartão (R$)
+                                                    </Label>
+                                                    <InputTextControlled<CartoesModel>
+                                                        field="limite_credito"
+                                                        control={control}
+                                                        textValor
+                                                        mask="preco"
+                                                        placeholder="Ex.: 8.000,00"
+                                                    />
+                                                    <small className="text-muted">
+                                                        Opcional. Usado para calcular o % utilizado na projeção de faturas
+                                                    </small>
+                                                </div>
+                                            </Col>
+                                            <Col md={3}>
                                                 <div className="mb-3">
                                                     <Label htmlFor="dia_limite_fatura" className="form-label">
                                                         Dia limite da fatura
@@ -294,7 +324,7 @@ const CartoesForm = () => {
                                                     </small>
                                                 </div>
                                             </Col>
-                                            <Col md={6}>
+                                            <Col md={3}>
                                                 <div className="mb-3">
                                                     <Label htmlFor="dia_vencimento_fatura" className="form-label">
                                                         Dia de vencimento
@@ -310,6 +340,9 @@ const CartoesForm = () => {
                                                     </small>
                                                 </div>
                                             </Col>
+                                        </Row>
+
+                                        <Row>
 
                                             <Col md={12}>
                                                 <div className="mb-3">

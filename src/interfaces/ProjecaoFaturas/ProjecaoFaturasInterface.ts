@@ -19,6 +19,10 @@ export interface ProjecaoValor {
   projetado: number
   total: number
   fonte: ProjecaoFonte
+  /** % do limite utilizado — só em células por cartão; null se sem limite */
+  percentual_utilizado?: number | null
+  /** limite_credito - total — só em células por cartão; null se sem limite */
+  disponivel?: number | null
 }
 
 export interface ProjecaoPorCartao {
@@ -26,8 +30,11 @@ export interface ProjecaoPorCartao {
   nome: string
   bandeira?: string
   ultimos_digitos?: string
+  limite_credito?: number | null
   cor_fundo?: string | null
   cor_texto?: string | null
+  dia_limite_fatura?: number | null
+  dia_vencimento_fatura?: number | null
   valores: ProjecaoValor[]
   total: number
 }

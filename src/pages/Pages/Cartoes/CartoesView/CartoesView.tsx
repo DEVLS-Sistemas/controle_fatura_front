@@ -4,6 +4,7 @@ import { toast } from 'react-toastify'
 import { setActiveMenu } from 'helpers/system_helpers'
 import { useNavegacao } from 'helpers/functions_helpers'
 import { CartaoChip } from 'helpers/cartao_helpers'
+import { formatCurrency, VALOR_TEXT_CLASS } from 'helpers/fatura_helpers'
 import { Breadcrumb, BreadcrumbItem, Card, CardBody, Col, Container, Label, Row } from 'reactstrap'
 import { CartoesView } from 'interfaces/Cartoes/CartoesInterface'
 import { CartoesService } from 'services/Cartoes/CartoesService'
@@ -93,6 +94,17 @@ const CartoesViewPage = () => {
                                         <Col md={6} className="mb-3">
                                             <Label className="form-label fw-semibold">Últimos Dígitos</Label>
                                             <p className="text-muted mb-0">{record.ultimos_digitos || '-'}</p>
+                                        </Col>
+                                        <Col md={6} className="mb-3">
+                                            <Label className="form-label fw-semibold">Limite de crédito</Label>
+                                            <p className={`text-muted mb-0 ${VALOR_TEXT_CLASS}`}>
+                                                {record.limite_credito != null && Number(record.limite_credito) > 0
+                                                    ? formatCurrency(record.limite_credito)
+                                                    : '-'}
+                                            </p>
+                                            <small className="text-muted">
+                                                Usado para calcular o % utilizado na projeção
+                                            </small>
                                         </Col>
                                         <Col md={6} className="mb-3">
                                             <Label className="form-label fw-semibold">Dia limite da fatura</Label>

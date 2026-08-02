@@ -1,5 +1,5 @@
 import React from 'react'
-import { Card, CardBody, Col, Row, UncontrolledTooltip } from 'reactstrap'
+import { Card, CardBody, Col, Progress, Row, UncontrolledTooltip } from 'reactstrap'
 import { CurrencyValue } from 'Components/Common/CurrencyValue'
 import { formatCurrency, VALOR_TEXT_CLASS } from 'helpers/fatura_helpers'
 import { CartaoChip } from 'helpers/cartao_helpers'
@@ -14,8 +14,8 @@ const stickyColStyle: React.CSSProperties = {
   left: 0,
   zIndex: 2,
   backgroundColor: 'var(--vz-secondary-bg, #fff)',
-  minWidth: 160,
-  maxWidth: 220,
+  minWidth: 200,
+  maxWidth: 260,
 }
 
 const stickyHeadStyle: React.CSSProperties = {
@@ -33,7 +33,7 @@ const stickyFootStyle: React.CSSProperties = {
 
 const stickySecondColStyle: React.CSSProperties = {
   position: 'sticky',
-  left: 160,
+  left: 200,
   zIndex: 2,
   backgroundColor: 'var(--vz-secondary-bg, #fff)',
   minWidth: 140,
@@ -53,6 +53,21 @@ const labelMesAno = (col: ProjecaoColuna) => ({
   ano: String(col.ano),
 })
 
+/** Cor do % de uso do limite: verde &lt;50%, âmbar 50–80%, vermelho &gt;80% */
+const percentualTone = (pct: number): 'success' | 'warning' | 'danger' => {
+  if (pct > 80) return 'danger'
+  if (pct >= 50) return 'warning'
+  return 'success'
+}
+
+const formatPercentual = (pct: number | null | undefined): string => {
+  if (pct == null || Number.isNaN(Number(pct))) return ''
+  return `${Math.round(Number(pct))}%`
+}
+
+const hasLimite = (limite: number | null | undefined): boolean =>
+  limite != null && !Number.isNaN(Number(limite)) && Number(limite) > 0
+
 export interface ProjecaoFaturasTableProps {
   data: ProjecaoFaturasView | undefined
 }
@@ -63,6 +78,7 @@ type LinhaTabela = {
   sublabel?: string
   cor_fundo?: string | null
   cor_texto?: string | null
+  limite_credito?: number | null
   valores: ProjecaoValor[]
   total: number
 }
@@ -73,6 +89,8 @@ type LinhaCruzamento = {
   cartaoSublabel?: string
   cartaoCorFundo?: string | null
   cartaoCorTexto?: string | null
+  limite_credito?: number | null
+  valorReferencia?: ProjecaoValor
   responsavelId: number
   responsavelLabel: string
   responsavelSublabel?: string
@@ -90,14 +108,66 @@ const cellClassName = (valor: ProjecaoValor | undefined, isReferencia: boolean):
   return classes.join(' ')
 }
 
+const LimiteUsoResumo = ({
+  limite,
+  valorReferencia,
+  idPrefix,
+}: {
+  limite?: number | null
+  valorReferencia?: ProjecaoValor
+  idPrefix: string
+}) => {
+  if (!hasLimite(limite)) return null
+
+  const pct = valorReferencia?.percentual_utilizado
+  const pctNum = pct != null ? Number(pct) : 0
+  const tone = percentualTone(pctNum)
+  const barId = `${idPrefix}-limite-bar`
+
+  return (
+    <div className="mt-1" style={{ maxWidth: 180 }}>
+      <span className="d-block text-muted fs-11">
+        Limite {formatCurrency(limite)}
+      </span>
+      <div id={barId} className="d-flex align-items-center gap-1">
+        <Progress
+          value={Math.min(100, Math.max(0, pctNum))}
+          color={tone}
+          className="flex-grow-1 mb-0"
+          style={{ height: 6 }}
+        />
+        <span className={`fs-11 fw-semibold text-${tone}`}>
+          {formatPercentual(pctNum)}
+        </span>
+      </div>
+      {valorReferencia && (
+        <UncontrolledTooltip placement="top" target={barId}>
+          Realizado: {formatCurrency(valorReferencia.realizado)}
+          {' | '}
+          Projetado: {formatCurrency(valorReferencia.projetado)}
+          {' | '}
+          Limite: {formatCurrency(limite)}
+          {' | '}
+          Disponível: {formatCurrency(valorReferencia.disponivel)}
+          {' '}({formatPercentual(pctNum)})
+        </UncontrolledTooltip>
+      )}
+    </div>
+  )
+}
+
 const ProjecaoCelula = ({
   valor,
   coluna,
   cellId,
+  showUsoLimite,
+  limiteCredito,
 }: {
   valor: ProjecaoValor | undefined
   coluna: ProjecaoColuna
   cellId: string
+  showUsoLimite?: boolean
+  limiteCredito?: number | null
 }) => {
   if (!valor || valor.fonte === 'vazio' || Number(valor.total) === 0) {
     return (
@@ -108,19 +178,40 @@ const ProjecaoCelula = ({
   }
 
   const temProjecao = Number(valor.projetado) > 0
+  const pct = valor.percentual_utilizado
+  const showPct = showUsoLimite && hasLimite(limiteCredito) && pct != null
+  const tone = showPct ? percentualTone(Number(pct)) : null
 
   return (
     <td className={cellClassName(valor, coluna.referencia)}>
-      <span id={cellId} className="d-inline-flex align-items-center gap-1">
-        <CurrencyValue value={valor.total} />
-        {temProjecao && (
-          <span className="badge bg-info-subtle text-info" style={{ fontSize: '0.65rem' }}>
-            proj.
+      <span id={cellId} className="d-inline-flex flex-column align-items-end gap-1">
+        <span className="d-inline-flex align-items-center gap-1">
+          <CurrencyValue value={valor.total} />
+          {temProjecao && (
+            <span className="badge bg-info-subtle text-info" style={{ fontSize: '0.65rem' }}>
+              proj.
+            </span>
+          )}
+        </span>
+        {showPct && tone && (
+          <span className={`badge bg-${tone}-subtle text-${tone}`} style={{ fontSize: '0.65rem' }}>
+            {formatPercentual(pct)}
           </span>
         )}
       </span>
       <UncontrolledTooltip placement="top" target={cellId}>
-        Realizado: {formatCurrency(valor.realizado)} | Projetado: {formatCurrency(valor.projetado)}
+        Realizado: {formatCurrency(valor.realizado)}
+        {' | '}
+        Projetado: {formatCurrency(valor.projetado)}
+        {showPct && (
+          <>
+            {' | '}
+            Limite: {formatCurrency(limiteCredito)}
+            {' | '}
+            Disponível: {formatCurrency(valor.disponivel)}
+            {' '}({formatPercentual(pct)})
+          </>
+        )}
       </UncontrolledTooltip>
     </td>
   )
@@ -208,73 +299,92 @@ const ProjecaoMatriz = ({
   linhas,
   totais,
   prefix,
+  showUsoLimite = false,
 }: {
   titulo: string
   colunas: ProjecaoColuna[]
   linhas: LinhaTabela[]
   totais: Array<{ realizado: number; projetado: number; total: number }>
   prefix: string
-}) => (
-  <Card>
-    <CardBody>
-      <h5 className="card-title mb-3">{titulo}</h5>
-      {linhas.length === 0 ? (
-        <div className="bg-primary text-white border-0 alert alert-primary fade show text-center mb-0">
-          Nenhum dado encontrado para o período selecionado.
-        </div>
-      ) : (
-        <div className="table-responsive">
-          <table className="table align-middle table-nowrap table-striped-columns mb-0">
-            <thead className="table-light">
-              <tr>
-                <th scope="col" className="text-start" style={stickyHeadStyle}>
-                  Nome
-                </th>
-                <CabecalhoMeses colunas={colunas} />
-                <th scope="col" className="text-end" style={{ minWidth: 90 }}>
-                  Total
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {linhas.map((linha) => (
-                <tr key={linha.id}>
-                  <td className="text-start" style={stickyColStyle}>
-                    <span className="d-flex align-items-center gap-2 fw-medium">
-                      {linha.cor_fundo && (
-                        <CartaoChip
-                          cor_fundo={linha.cor_fundo}
-                          cor_texto={linha.cor_texto}
-                          label={String(linha.label).slice(0, 1)}
-                        />
-                      )}
-                      <span>{linha.label}</span>
-                    </span>
-                    {linha.sublabel && (
-                      <span className="d-block text-muted fs-12">{linha.sublabel}</span>
-                    )}
-                  </td>
-                  {colunas.map((col, idx) => (
-                    <ProjecaoCelula
-                      key={`${linha.id}-${col.chave}`}
-                      valor={linha.valores[idx]}
-                      coluna={col}
-                      cellId={`${prefix}-${linha.id}-${col.chave}`}
-                    />
-                  ))}
-                  <td className={`text-end fw-semibold ${VALOR_TEXT_CLASS}`}>
-                    <CurrencyValue value={linha.total} />
-                  </td>
+  showUsoLimite?: boolean
+}) => {
+  const idxReferencia = colunas.findIndex((c) => c.referencia)
+
+  return (
+    <Card>
+      <CardBody>
+        <h5 className="card-title mb-3">{titulo}</h5>
+        {linhas.length === 0 ? (
+          <div className="bg-primary text-white border-0 alert alert-primary fade show text-center mb-0">
+            Nenhum dado encontrado para o período selecionado.
+          </div>
+        ) : (
+          <div className="table-responsive">
+            <table className="table align-middle table-nowrap table-striped-columns mb-0">
+              <thead className="table-light">
+                <tr>
+                  <th scope="col" className="text-start" style={stickyHeadStyle}>
+                    Nome
+                  </th>
+                  <CabecalhoMeses colunas={colunas} />
+                  <th scope="col" className="text-end" style={{ minWidth: 90 }}>
+                    Total
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-            <RodapeTotais colunas={colunas} totais={totais} prefix={prefix} />
-          </table>
-        </div>
-      )}
-    </CardBody>
-  </Card>
-)
+              </thead>
+              <tbody>
+                {linhas.map((linha) => {
+                  const valorRef =
+                    idxReferencia >= 0 ? linha.valores[idxReferencia] : undefined
+                  return (
+                    <tr key={linha.id}>
+                      <td className="text-start" style={stickyColStyle}>
+                        <span className="d-flex align-items-center gap-2 fw-medium">
+                          {linha.cor_fundo && (
+                            <CartaoChip
+                              cor_fundo={linha.cor_fundo}
+                              cor_texto={linha.cor_texto}
+                              label={String(linha.label).slice(0, 1)}
+                            />
+                          )}
+                          <span>{linha.label}</span>
+                        </span>
+                        {linha.sublabel && (
+                          <span className="d-block text-muted fs-12">{linha.sublabel}</span>
+                        )}
+                        {showUsoLimite && (
+                          <LimiteUsoResumo
+                            limite={linha.limite_credito}
+                            valorReferencia={valorRef}
+                            idPrefix={`${prefix}-${linha.id}`}
+                          />
+                        )}
+                      </td>
+                      {colunas.map((col, idx) => (
+                        <ProjecaoCelula
+                          key={`${linha.id}-${col.chave}`}
+                          valor={linha.valores[idx]}
+                          coluna={col}
+                          cellId={`${prefix}-${linha.id}-${col.chave}`}
+                          showUsoLimite={showUsoLimite}
+                          limiteCredito={linha.limite_credito}
+                        />
+                      ))}
+                      <td className={`text-end fw-semibold ${VALOR_TEXT_CLASS}`}>
+                        <CurrencyValue value={linha.total} />
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+              <RodapeTotais colunas={colunas} totais={totais} prefix={prefix} />
+            </table>
+          </div>
+        )}
+      </CardBody>
+    </Card>
+  )
+}
 
 const ProjecaoMatrizCruzamento = ({
   titulo,
@@ -334,6 +444,11 @@ const ProjecaoMatrizCruzamento = ({
                       {linha.cartaoSublabel && (
                         <span className="d-block text-muted fs-12">{linha.cartaoSublabel}</span>
                       )}
+                      <LimiteUsoResumo
+                        limite={linha.limite_credito}
+                        valorReferencia={linha.valorReferencia}
+                        idPrefix={`${prefix}-${linha.cartaoId}`}
+                      />
                     </td>
                   )}
                   <td className="text-start" style={stickySecondColStyle}>
@@ -377,6 +492,7 @@ export const ProjecaoFaturasTable = ({ data }: ProjecaoFaturasTableProps) => {
   }
 
   const colunas = data.colunas || []
+  const idxReferencia = colunas.findIndex((c) => c.referencia)
 
   const linhasCartoes: LinhaTabela[] = (data.por_cartao || []).map((c) => ({
     id: c.cartao_id,
@@ -386,6 +502,7 @@ export const ProjecaoFaturasTable = ({ data }: ProjecaoFaturasTableProps) => {
       .join(' · '),
     cor_fundo: c.cor_fundo,
     cor_texto: c.cor_texto,
+    limite_credito: c.limite_credito,
     valores: c.valores || [],
     total: c.total,
   }))
@@ -404,6 +521,8 @@ export const ProjecaoFaturasTable = ({ data }: ProjecaoFaturasTableProps) => {
     const cartaoSublabel = [cartao.bandeira, cartao.ultimos_digitos ? `•••• ${cartao.ultimos_digitos}` : null]
       .filter(Boolean)
       .join(' · ')
+    const valorReferencia =
+      idxReferencia >= 0 ? (cartao.valores || [])[idxReferencia] : undefined
 
     responsaveis.forEach((resp, idx) => {
       linhasCruzamento.push({
@@ -412,6 +531,8 @@ export const ProjecaoFaturasTable = ({ data }: ProjecaoFaturasTableProps) => {
         cartaoSublabel: cartaoSublabel || undefined,
         cartaoCorFundo: cartao.cor_fundo,
         cartaoCorTexto: cartao.cor_texto,
+        limite_credito: cartao.limite_credito,
+        valorReferencia,
         responsavelId: resp.responsavel_id,
         responsavelLabel: resp.nome,
         responsavelSublabel: resp.tipo
@@ -438,6 +559,7 @@ export const ProjecaoFaturasTable = ({ data }: ProjecaoFaturasTableProps) => {
             linhas={linhasCartoes}
             totais={totaisCartoes}
             prefix="proj-cartao"
+            showUsoLimite
           />
         </Col>
       </Row>
@@ -464,10 +586,16 @@ export const ProjecaoFaturasTable = ({ data }: ProjecaoFaturasTableProps) => {
       </Row>
       <Row>
         <Col md={12}>
-          <div className="hstack gap-2 justify-content-end mb-3">
+          <div className="hstack gap-2 justify-content-end mb-3 flex-wrap">
             <span className="text-muted fs-13">
               <span className="badge bg-info-subtle text-info me-1">proj.</span>
-              indica valores com parcela projetada
+              parcela projetada
+            </span>
+            <span className="text-muted fs-13">
+              <span className="badge bg-success-subtle text-success me-1">&lt;50%</span>
+              <span className="badge bg-warning-subtle text-warning me-1">50–80%</span>
+              <span className="badge bg-danger-subtle text-danger me-1">&gt;80%</span>
+              uso do limite
             </span>
           </div>
         </Col>

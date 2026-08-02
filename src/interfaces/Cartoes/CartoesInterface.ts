@@ -14,6 +14,7 @@ export interface CartoesList {
     bandeira?: string
     banco?: string
     ultimos_digitos?: string
+    limite_credito?: number | string | null
     dia_limite_fatura?: number | null
     dia_vencimento_fatura?: number | null
     cor_fundo?: string | null
@@ -30,6 +31,8 @@ export interface CartoesModel {
     bandeira?: string | null
     banco?: string | null
     ultimos_digitos?: string | null
+    /** Dígitos-centavos no form (máscara preco); string BR no payload da API */
+    limite_credito?: number | string | null
     dia_limite_fatura?: number | string | null
     dia_vencimento_fatura?: number | string | null
     cor_fundo?: string | null
@@ -73,6 +76,7 @@ export const CartoesDefaultValues: CartoesModel = {
     bandeira: null,
     banco: null,
     ultimos_digitos: null,
+    limite_credito: null,
     dia_limite_fatura: null,
     dia_vencimento_fatura: null,
     cor_fundo: null,
