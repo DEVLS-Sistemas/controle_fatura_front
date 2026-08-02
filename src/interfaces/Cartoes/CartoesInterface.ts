@@ -78,21 +78,21 @@ export interface TipoNumeroLookup {
     label: string
 }
 
+/** Item de `GET /cartoes/bandeiras-list` (formato select) */
 export interface BandeiraListItem {
-    id?: number
-    bandeira?: string
+    value: number
+    label: string
     limite_credito?: number | string | null
-    ativo?: boolean
-    cartao_id?: number
+    qtd_numeros?: number
 }
 
+/** Item de `GET /cartoes/numeros-list` (formato select) */
 export interface NumeroListItem {
-    id?: number
-    ultimos_digitos?: string
+    value: number
+    label: string
     tipo?: string | null
     apelido?: string | null
     ativo?: boolean
-    cartao_bandeira_id?: number
 }
 
 export interface LookupsCartoes {

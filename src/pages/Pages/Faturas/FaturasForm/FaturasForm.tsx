@@ -74,10 +74,9 @@ const FaturasForm = () => {
         setBandeirasLoading(true)
         setSemBandeiras(false)
         try {
-            const list = await cartoesService.AsyncListBandeiras({ cartao_id: id })
-            const ativas = (list ?? []).filter((b) => b.ativo !== false)
+            const list = (await cartoesService.AsyncListBandeiras({ cartao_id: id })) ?? []
 
-            if (ativas.length === 0) {
+            if (list.length === 0) {
                 setBandeirasOptions([])
                 setShowBandeiraSelect(false)
                 setSemBandeiras(true)
@@ -86,15 +85,15 @@ const FaturasForm = () => {
             }
 
             setBandeirasOptions(
-                ativas.map((b) => ({
-                    value: b.id!,
-                    label: b.bandeira ?? `Bandeira ${b.id}`,
+                list.map((b) => ({
+                    value: b.value,
+                    label: b.label,
                 }))
             )
 
-            if (ativas.length === 1) {
+            if (list.length === 1) {
                 setShowBandeiraSelect(false)
-                setValue('cartao_bandeira_id', ativas[0].id ?? null)
+                setValue('cartao_bandeira_id', list[0].value ?? null)
             } else {
                 setShowBandeiraSelect(true)
                 // Troca de cartão exige nova escolha quando há 2+ bandeiras
