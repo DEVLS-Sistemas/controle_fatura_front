@@ -58,6 +58,8 @@ const FaturasViewPage = () => {
     const [transacoes, setTransacoes] = useState<TransacoesList[]>([])
     const [loading, setLoading] = useState(true)
     const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null)
+    const [showPdfPreview, setShowPdfPreview] = useState(false)
+    const [loadingPdf, setLoadingPdf] = useState(false)
     const [processarAuto, setProcessarAuto] = useState(true)
     const [categoriasOptions, setCategoriasOptions] = useState<SelectOptions[]>([])
     const [categoriasLookup, setCategoriasLookup] = useState<CategoriaLookup[]>([])
@@ -88,9 +90,15 @@ const FaturasViewPage = () => {
         return `${String(mes).padStart(2, '0')}/${ano}`
     }
 
-    const isPdfArquivo = (view: FaturasView) => getArquivoExtensao(view.arquivo_pdf) === 'pdf'
+    const clearPdfBlobUrl = useCallback(() => {
+        setPdfBlobUrl((prev) => {
+            if (prev) URL.revokeObjectURL(prev)
+            return null
+        })
+    }, [])
 
     const loadPdf = useCallback(async (faturaId: string) => {
+        setLoadingPdf(true)
         try {
             const raw = sessionStorage.getItem('authUser')
             const token = raw ? JSON.parse(raw).token : null
@@ -98,15 +106,16 @@ const FaturasViewPage = () => {
             const res = await fetch(`${base}faturas/pdf/${faturaId}`, {
                 headers: token ? { Authorization: `Bearer ${token}` } : {},
             })
-            if (!res.ok) return
+            if (!res.ok) {
+                toast.error('Erro ao carregar PDF')
+                return false
+            }
 
             const contentType = (res.headers.get('content-type') || '').toLowerCase()
             if (!contentType.includes('pdf')) {
-                setPdfBlobUrl((prev) => {
-                    if (prev) URL.revokeObjectURL(prev)
-                    return null
-                })
-                return
+                clearPdfBlobUrl()
+                toast.warning('Pré-visualização disponível apenas para PDF')
+                return false
             }
 
             const blob = await res.blob()
@@ -114,10 +123,15 @@ const FaturasViewPage = () => {
                 if (prev) URL.revokeObjectURL(prev)
                 return URL.createObjectURL(blob)
             })
+            return true
         } catch (error) {
             console.error('Erro ao carregar PDF:', error)
+            toast.error('Erro ao carregar PDF')
+            return false
+        } finally {
+            setLoadingPdf(false)
         }
-    }, [])
+    }, [clearPdfBlobUrl])
 
     const loadSubcategoriasForCategoria = useCallback(async (categoriaId: number) => {
         if (!categoriaId || loadedSubcategoriasRef.current.has(categoriaId)) return
@@ -211,14 +225,8 @@ const FaturasViewPage = () => {
             const view = await faturasService.getViewFaturas({ id })
             if (view) {
                 setFatura(view)
-                if ((view.tem_pdf || view.pdf_url || view.arquivo_pdf) && isPdfArquivo(view)) {
-                    await loadPdf(id)
-                } else {
-                    setPdfBlobUrl((prev) => {
-                        if (prev) URL.revokeObjectURL(prev)
-                        return null
-                    })
-                }
+                setShowPdfPreview(false)
+                clearPdfBlobUrl()
                 await loadTransacoes(id)
             }
         } catch (error) {
@@ -227,7 +235,7 @@ const FaturasViewPage = () => {
         } finally {
             if (!opts?.silent) setLoading(false)
         }
-    }, [id, faturasService, loadPdf, loadTransacoes])
+    }, [id, faturasService, clearPdfBlobUrl, loadTransacoes])
 
     const handleReprocessar = async () => {
         if (!id) return
@@ -995,17 +1003,62 @@ const FaturasViewPage = () => {
 
                     <Card className="mb-4">
                         <CardBody>
-                            <h5 className="card-title mb-3">Visualização do arquivo</h5>
-                            {pdfBlobUrl ? (
-                                <iframe
-                                    src={pdfBlobUrl}
-                                    title="PDF da Fatura"
-                                    style={{ width: '100%', height: '600px', border: '1px solid #dee2e6' }}
-                                />
-                            ) : temArquivo && arquivoExt && arquivoExt !== 'pdf' ? (
+                            <div className="d-flex align-items-center justify-content-between mb-3">
+                                <h5 className="card-title mb-0">Visualização do arquivo</h5>
+                                {temArquivo && (!arquivoExt || arquivoExt === 'pdf') && showPdfPreview && pdfBlobUrl && (
+                                    <Button
+                                        color="light"
+                                        size="sm"
+                                        className="border"
+                                        onClick={() => {
+                                            setShowPdfPreview(false)
+                                            clearPdfBlobUrl()
+                                        }}
+                                    >
+                                        <i className="ri-eye-off-line me-1"></i>
+                                        Ocultar preview
+                                    </Button>
+                                )}
+                            </div>
+                            {temArquivo && arquivoExt && arquivoExt !== 'pdf' ? (
                                 <div className="text-center text-muted py-5">
                                     Arquivo <strong>.{arquivoExt}</strong> anexado. A pré-visualização está disponível apenas para PDF.
                                 </div>
+                            ) : temArquivo && (!arquivoExt || arquivoExt === 'pdf') ? (
+                                showPdfPreview && pdfBlobUrl ? (
+                                    <iframe
+                                        src={pdfBlobUrl}
+                                        title="PDF da Fatura"
+                                        style={{ width: '100%', height: '600px', border: '1px solid #dee2e6' }}
+                                    />
+                                ) : (
+                                    <div className="text-center py-5">
+                                        <p className="text-muted mb-3">
+                                            Há um PDF anexado. Clique no botão para carregar a pré-visualização.
+                                        </p>
+                                        <Button
+                                            color="primary"
+                                            disabled={loadingPdf}
+                                            onClick={async () => {
+                                                if (!id) return
+                                                const ok = await loadPdf(id)
+                                                if (ok) setShowPdfPreview(true)
+                                            }}
+                                        >
+                                            {loadingPdf ? (
+                                                <>
+                                                    <Spinner size="sm" className="me-2" />
+                                                    Carregando...
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <i className="ri-file-pdf-line me-1"></i>
+                                                    Ver preview do PDF
+                                                </>
+                                            )}
+                                        </Button>
+                                    </div>
+                                )
                             ) : (
                                 <div className="text-center text-muted py-5">
                                     Nenhum PDF disponível para visualização.
