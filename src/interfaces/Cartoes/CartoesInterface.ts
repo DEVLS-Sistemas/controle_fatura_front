@@ -8,18 +8,41 @@ export interface CartoesSearch {
     palavra_chave?: string | null | unknown
 }
 
+export type TipoNumeroCartao = 'fisico' | 'virtual' | 'adicional'
+
+export interface CartaoNumero {
+    id?: number | null
+    /** Chave local temporária (antes do save) */
+    _key?: string
+    ultimos_digitos: string
+    tipo?: TipoNumeroCartao | string | null
+    apelido?: string | null
+    ativo?: boolean
+}
+
+export interface CartaoBandeira {
+    id?: number | null
+    /** Chave local temporária (antes do save) */
+    _key?: string
+    bandeira: string
+    /** Dígitos-centavos no form; string BR ou number na API */
+    limite_credito?: number | string | null
+    ativo?: boolean
+    numeros?: CartaoNumero[]
+}
+
 export interface CartoesList {
     id?: number
     nome?: string
-    bandeira?: string
     banco?: string
-    ultimos_digitos?: string
-    limite_credito?: number | string | null
     dia_limite_fatura?: number | null
     dia_vencimento_fatura?: number | null
     cor_fundo?: string | null
     cor_texto?: string | null
     ativo?: boolean
+    qtd_bandeiras?: number
+    qtd_numeros?: number
+    bandeiras?: CartaoBandeira[]
 }
 
 export interface CartoesView extends CartoesList {}
@@ -28,16 +51,15 @@ export interface CartoesModel {
     id?: number | null
     cartao_id?: number | null
     nome: string | null
-    bandeira?: string | null
     banco?: string | null
-    ultimos_digitos?: string | null
-    /** Dígitos-centavos no form (máscara preco); string BR no payload da API */
-    limite_credito?: number | string | null
     dia_limite_fatura?: number | string | null
     dia_vencimento_fatura?: number | string | null
     cor_fundo?: string | null
     cor_texto?: string | null
     ativo?: boolean
+    bandeiras?: CartaoBandeira[]
+    bandeiras_remover?: number[]
+    numeros_remover?: number[]
 }
 
 export interface DiaLookup {
@@ -51,8 +73,31 @@ export interface ParCorLookup {
     label?: string
 }
 
+export interface TipoNumeroLookup {
+    value: string
+    label: string
+}
+
+export interface BandeiraListItem {
+    id?: number
+    bandeira?: string
+    limite_credito?: number | string | null
+    ativo?: boolean
+    cartao_id?: number
+}
+
+export interface NumeroListItem {
+    id?: number
+    ultimos_digitos?: string
+    tipo?: string | null
+    apelido?: string | null
+    ativo?: boolean
+    cartao_bandeira_id?: number
+}
+
 export interface LookupsCartoes {
     bandeiras?: string[]
+    tipos_numero?: TipoNumeroLookup[]
     cores_fundo?: string[]
     cores_texto?: string[]
     pares_cores?: ParCorLookup[]
@@ -63,6 +108,8 @@ export interface CartoesInterface {
     getViewCartoes(params: { id: number | string }): Promise<CartoesView | undefined>
     listCartoesPaginate(params: CartoesSearch): Promise<any>
     AsyncListCartoes(params: CartoesSearch): Promise<CartoesModel[] | undefined>
+    AsyncListBandeiras(params: { cartao_id: number | string }): Promise<BandeiraListItem[] | undefined>
+    AsyncListNumeros(params: { cartao_bandeira_id: number | string }): Promise<NumeroListItem[] | undefined>
     createCartoes(params: CartoesModel): Promise<any>
     editCartoes(params: CartoesModel): Promise<any>
     deleteCartoes(id: number): Promise<any>
@@ -73,16 +120,22 @@ export const CartoesDefaultValues: CartoesModel = {
     id: null,
     cartao_id: null,
     nome: null,
-    bandeira: null,
     banco: null,
-    ultimos_digitos: null,
-    limite_credito: null,
     dia_limite_fatura: null,
     dia_vencimento_fatura: null,
     cor_fundo: null,
     cor_texto: null,
     ativo: true,
+    bandeiras: [],
+    bandeiras_remover: [],
+    numeros_remover: [],
 }
+
+export const TIPOS_NUMERO_PADRAO: TipoNumeroLookup[] = [
+    { value: 'fisico', label: 'Físico' },
+    { value: 'virtual', label: 'Virtual' },
+    { value: 'adicional', label: 'Adicional' },
+]
 
 export const CARTAO_CORES_FUNDO_PADRAO = [
     '#ef4444',

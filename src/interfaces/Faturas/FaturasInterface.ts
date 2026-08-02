@@ -11,6 +11,8 @@ export interface FaturasSearch {
 /** Resumo de uma fatura (sem array de transações) */
 export interface FaturaResumo {
     id?: number
+    cartao_bandeira_id?: number | null
+    bandeira?: string | null
     mes?: number
     ano?: number
     competencia?: string
@@ -33,9 +35,7 @@ export interface FaturaResumo {
 export interface FaturasCartaoGroup {
     cartao_id?: number
     nome?: string
-    bandeira?: string
     banco?: string
-    ultimos_digitos?: string
     dia_limite_fatura?: number | null
     dia_vencimento_fatura?: number | null
     cor_fundo?: string | null
@@ -55,7 +55,7 @@ export interface FaturasView extends FaturaResumo {
     cartao_cor_fundo?: string | null
     cartao_cor_texto?: string | null
     cartao_bandeira?: string
-    cartao_ultimos_digitos?: string
+    cartao_bandeira_id?: number | null
     pdf_url?: string
 }
 
@@ -63,6 +63,7 @@ export interface FaturasModel {
     id?: number | null
     fatura_id?: number | null
     cartao_id: number | string | null
+    cartao_bandeira_id?: number | string | null
     mes: number | string | null
     ano: number | string | null
     valor_total?: number | string | null
@@ -74,10 +75,9 @@ export interface FaturasModel {
 export interface CartaoLookup {
     id?: number
     nome?: string
-    bandeira?: string
-    ultimos_digitos?: string
     cor_fundo?: string | null
     cor_texto?: string | null
+    qtd_bandeiras?: number
 }
 
 export interface LookupsFaturas {
@@ -100,6 +100,7 @@ export const FaturasDefaultValues: FaturasModel = {
     id: null,
     fatura_id: null,
     cartao_id: null,
+    cartao_bandeira_id: null,
     mes: null,
     ano: new Date().getFullYear(),
     valor_total: null,

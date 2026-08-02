@@ -12,28 +12,37 @@ import { SelectOptions } from 'interfaces/SystemInterfaces/SelectInterface'
 import { FATURA_FILE_ACCEPT, isValidFaturaFile, mesesOptions } from 'helpers/fatura_helpers'
 import { FaturasDefaultValues, FaturasModel } from 'interfaces/Faturas/FaturasInterface'
 import { FaturasService } from 'services/Faturas/FaturasService'
+import { CartoesService } from 'services/Cartoes/CartoesService'
 
 const FaturasForm = () => {
     const { state } = useLocation()
-    const [record, setRecord] = useState<FaturasModel>(
+    const [record] = useState<FaturasModel>(
         state?.source
             ? {
+                ...FaturasDefaultValues,
                 ...state.source,
                 fatura_id: state.source.fatura_id ?? state.source.id,
                 cartao_id: state.source.cartao_id ?? null,
+                cartao_bandeira_id: state.source.cartao_bandeira_id ?? null,
             }
             : FaturasDefaultValues
     )
-    const { register, handleSubmit, control, setValue } = useForm<FaturasModel>({
+    const { register, handleSubmit, control, setValue, watch } = useForm<FaturasModel>({
         defaultValues: record
     })
     const [cartoesOptions, setCartoesOptions] = useState<SelectOptions[]>([])
+    const [bandeirasOptions, setBandeirasOptions] = useState<SelectOptions[]>([])
+    const [showBandeiraSelect, setShowBandeiraSelect] = useState(false)
+    const [bandeirasLoading, setBandeirasLoading] = useState(false)
+    const [semBandeiras, setSemBandeiras] = useState(false)
     const [arquivoFile, setArquivoFile] = useState<File | null>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
     const { voltarParaRotaAnterior } = useNavegacao()
     const navigate = useNavigate()
-    const faturasService = new FaturasService()
+    const faturasService = useRef(new FaturasService()).current
+    const cartoesService = useRef(new CartoesService()).current
     const isEdit = Boolean(record.fatura_id)
+    const cartaoId = watch('cartao_id')
 
     const getLookups = async (): Promise<void> => {
         try {
@@ -53,6 +62,55 @@ const FaturasForm = () => {
         }
     }
 
+    const loadBandeiras = async (id: number | string | null | undefined) => {
+        if (!id) {
+            setBandeirasOptions([])
+            setShowBandeiraSelect(false)
+            setSemBandeiras(false)
+            setValue('cartao_bandeira_id', null)
+            return
+        }
+
+        setBandeirasLoading(true)
+        setSemBandeiras(false)
+        try {
+            const list = await cartoesService.AsyncListBandeiras({ cartao_id: id })
+            const ativas = (list ?? []).filter((b) => b.ativo !== false)
+
+            if (ativas.length === 0) {
+                setBandeirasOptions([])
+                setShowBandeiraSelect(false)
+                setSemBandeiras(true)
+                setValue('cartao_bandeira_id', null)
+                return
+            }
+
+            setBandeirasOptions(
+                ativas.map((b) => ({
+                    value: b.id!,
+                    label: b.bandeira ?? `Bandeira ${b.id}`,
+                }))
+            )
+
+            if (ativas.length === 1) {
+                setShowBandeiraSelect(false)
+                setValue('cartao_bandeira_id', ativas[0].id ?? null)
+            } else {
+                setShowBandeiraSelect(true)
+                // Troca de cartão exige nova escolha quando há 2+ bandeiras
+                setValue('cartao_bandeira_id', null)
+            }
+        } catch (error) {
+            console.error('Erro ao carregar bandeiras:', error)
+            setBandeirasOptions([])
+            setShowBandeiraSelect(false)
+            setSemBandeiras(true)
+            setValue('cartao_bandeira_id', null)
+        } finally {
+            setBandeirasLoading(false)
+        }
+    }
+
     const extractFaturaId = (result: unknown): number | string | null => {
         const body = result as Record<string, any> | null | undefined
         return body?.fatura?.data?.id ?? body?.data?.id ?? body?.id ?? null
@@ -60,12 +118,31 @@ const FaturasForm = () => {
 
     const onSubmit: SubmitHandler<FaturasModel> = async (data) => {
         try {
+            if (!isEdit) {
+                if (semBandeiras || !data.cartao_bandeira_id) {
+                    toast.warning(
+                        semBandeiras
+                            ? 'Cadastre uma bandeira/número neste cartão antes de criar a fatura'
+                            : 'Selecione a bandeira da fatura'
+                    )
+                    return
+                }
+            }
+
             if (isEdit) {
-                await faturasService.editFaturas({ ...data, fatura_id: record.fatura_id, id: record.fatura_id })
+                await faturasService.editFaturas({
+                    ...data,
+                    fatura_id: record.fatura_id,
+                    id: record.fatura_id,
+                })
                 toast.success('Fatura atualizada com sucesso')
                 navigate(`/faturas/view/${record.fatura_id}`)
             } else {
-                const payload = { ...data, arquivo_pdf: arquivoFile }
+                const payload = {
+                    ...data,
+                    cartao_bandeira_id: data.cartao_bandeira_id,
+                    arquivo_pdf: arquivoFile,
+                }
                 const result = await faturasService.createFaturas(payload)
                 toast.success('Fatura cadastrada com sucesso')
                 const newId = extractFaturaId(result)
@@ -102,6 +179,13 @@ const FaturasForm = () => {
         setActiveMenu('/faturas')
     }, [])
 
+    useEffect(() => {
+        if (!isEdit) {
+            loadBandeiras(cartaoId)
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [cartaoId, isEdit])
+
     const optAnos = AnosSelect()
 
     return (
@@ -133,7 +217,7 @@ const FaturasForm = () => {
                                 <CardBody>
                                     <form onSubmit={handleSubmit(onSubmit)}>
                                         <Row>
-                                            <Col md={6}>
+                                            <Col md={showBandeiraSelect ? 4 : 6}>
                                                 <div className="mb-3">
                                                     <Label htmlFor="cartao_id" className="form-label">Cartão</Label>
                                                     <SelectListControlled<FaturasModel>
@@ -141,9 +225,26 @@ const FaturasForm = () => {
                                                         field="cartao_id"
                                                         control={control}
                                                         required={required}
+                                                        disabled={isEdit}
                                                     />
                                                 </div>
                                             </Col>
+                                            {!isEdit && showBandeiraSelect && (
+                                                <Col md={2}>
+                                                    <div className="mb-3">
+                                                        <Label htmlFor="cartao_bandeira_id" className="form-label">
+                                                            Bandeira da fatura
+                                                        </Label>
+                                                        <SelectListControlled<FaturasModel>
+                                                            options={bandeirasOptions}
+                                                            field="cartao_bandeira_id"
+                                                            control={control}
+                                                            required={required}
+                                                            isLoading={bandeirasLoading}
+                                                        />
+                                                    </div>
+                                                </Col>
+                                            )}
                                             <Col md={3}>
                                                 <div className="mb-3">
                                                     <Label htmlFor="mes" className="form-label">Mês</Label>
@@ -167,6 +268,14 @@ const FaturasForm = () => {
                                                 </div>
                                             </Col>
                                         </Row>
+                                        {!isEdit && semBandeiras && cartaoId && (
+                                            <div className="alert alert-warning">
+                                                Este cartão ainda não possui bandeira/número cadastrado.{' '}
+                                                <Link to={`/cartoes/edit/${cartaoId}`}>
+                                                    Cadastre uma bandeira/número neste cartão
+                                                </Link>
+                                            </div>
+                                        )}
                                         {!isEdit && (
                                             <Row>
                                                 <Col md={6}>
@@ -208,7 +317,13 @@ const FaturasForm = () => {
                                         <Row className="mt-3">
                                             <Col md={12}>
                                                 <div className="hstack gap-2 justify-content-end">
-                                                    <button type="submit" className="btn btn-primary">Salvar</button>
+                                                    <button
+                                                        type="submit"
+                                                        className="btn btn-primary"
+                                                        disabled={!isEdit && (semBandeiras || bandeirasLoading)}
+                                                    >
+                                                        Salvar
+                                                    </button>
                                                     <button type="button" className="btn btn-soft-success" onClick={voltarParaRotaAnterior}>Voltar</button>
                                                 </div>
                                             </Col>

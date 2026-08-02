@@ -30,7 +30,6 @@ type FaturaRow = FaturaResumo & {
     cartao_nome?: string
     cartao_cor_fundo?: string | null
     cartao_cor_texto?: string | null
-    cartao_ultimos_digitos?: string
 }
 
 const statusLabel: Record<string, string> = {
@@ -59,7 +58,6 @@ const flattenFaturas = (grupos: FaturasCartaoGroup[]): FaturaRow[] => {
             cartao_nome: grupo.nome,
             cartao_cor_fundo: grupo.cor_fundo,
             cartao_cor_texto: grupo.cor_texto,
-            cartao_ultimos_digitos: grupo.ultimos_digitos,
         }))
     )
 }
@@ -196,6 +194,7 @@ export const FaturasTable = ({ data, getData, setPerPage, perPage, filters }: Fa
                                                         <thead className="table-light">
                                                             <tr>
                                                                 <th scope="col" className="text-start">Cartão</th>
+                                                                <th scope="col">Bandeira</th>
                                                                 <th scope="col">Competência</th>
                                                                 <th scope="col">Período</th>
                                                                 <th scope="col">Vencimento</th>
@@ -208,7 +207,7 @@ export const FaturasTable = ({ data, getData, setPerPage, perPage, filters }: Fa
                                                         <tbody>
                                                             {rows.length === 0 ? (
                                                                 <tr>
-                                                                    <td colSpan={8} className="text-muted py-4">
+                                                                    <td colSpan={9} className="text-muted py-4">
                                                                         Nenhuma fatura neste período
                                                                     </td>
                                                                 </tr>
@@ -226,15 +225,17 @@ export const FaturasTable = ({ data, getData, setPerPage, perPage, filters }: Fa
                                                                                             : '•'}
                                                                                     />
                                                                                 )}
-                                                                                <span>
-                                                                                    {row.cartao_nome ?? '-'}
-                                                                                    {row.cartao_ultimos_digitos && (
-                                                                                        <small className="text-muted ms-1">
-                                                                                            •••• {row.cartao_ultimos_digitos}
-                                                                                        </small>
-                                                                                    )}
-                                                                                </span>
+                                                                                <span>{row.cartao_nome ?? '-'}</span>
                                                                             </div>
+                                                                        </td>
+                                                                        <td>
+                                                                            {row.bandeira ? (
+                                                                                <span className="badge bg-light text-dark">
+                                                                                    {row.bandeira}
+                                                                                </span>
+                                                                            ) : (
+                                                                                <span className="text-muted">-</span>
+                                                                            )}
                                                                         </td>
                                                                         <td>
                                                                             <Link
@@ -293,6 +294,7 @@ export const FaturasTable = ({ data, getData, setPerPage, perPage, filters }: Fa
                                                                                                         ...row,
                                                                                                         fatura_id: row.id,
                                                                                                         cartao_id: row.cartao_id,
+                                                                                                        cartao_bandeira_id: row.cartao_bandeira_id,
                                                                                                     },
                                                                                                 }}
                                                                                             >

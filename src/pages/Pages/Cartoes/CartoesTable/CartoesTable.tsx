@@ -8,7 +8,6 @@ import {
 } from "reactstrap"
 import { PaginateInterface, PaginateSearch, PerPageProps } from "interfaces/SystemInterfaces/PaginateInterface"
 import CustomModal from "Components/ComponentController/Modal/CustomModal"
-import { useNavegacao } from "helpers/functions_helpers"
 import { CartoesList, CartoesSearch } from "interfaces/Cartoes/CartoesInterface"
 import { CartoesService } from "services/Cartoes/CartoesService"
 import { CartaoChip } from "helpers/cartao_helpers"
@@ -24,7 +23,22 @@ export interface CartoesTableProps {
     filters: CartoesSearch
 }
 
-export const CartoesTable = ({ data, getData, setPerPage, setPage, perPage, filters }: CartoesTableProps) => {
+const formatLimitesResumo = (row: CartoesList) => {
+    const bandeiras = row.bandeiras ?? []
+    if (bandeiras.length === 0) return null
+
+    return bandeiras
+        .map((b) => {
+            const nome = b.bandeira
+            if (b.limite_credito != null && Number(b.limite_credito) > 0) {
+                return `${nome} ${formatCurrency(b.limite_credito)}`
+            }
+            return nome
+        })
+        .join(' · ')
+}
+
+export const CartoesTable = ({ data, getData, setPerPage, perPage, filters }: CartoesTableProps) => {
     const [optPerPage] = useState<PerPageProps[]>([
         { value: 5, label: "5" },
         { value: 10, label: "10" },
@@ -35,7 +49,6 @@ export const CartoesTable = ({ data, getData, setPerPage, setPage, perPage, filt
     const cartoesService = new CartoesService()
     const [modalIsOpen, setModalIsOpen] = useState(false)
     const [selectedId, setSelectedId] = useState<number | null>(null)
-    const { voltarParaRotaAnterior } = useNavegacao()
 
     const toggleModal = () => setModalIsOpen(!modalIsOpen)
 
@@ -117,77 +130,92 @@ export const CartoesTable = ({ data, getData, setPerPage, setPage, perPage, filt
                                                         <thead className="table-light">
                                                             <tr>
                                                                 <th scope="col" className="text-start">Nome</th>
-                                                                <th scope="col">Bandeira</th>
                                                                 <th scope="col">Banco</th>
-                                                                <th scope="col">Final</th>
-                                                                <th scope="col" className="text-end">Limite</th>
+                                                                <th scope="col">Resumo</th>
+                                                                <th scope="col" className="text-start">Limites</th>
                                                                 <th scope="col">Ciclo</th>
                                                                 <th scope="col">Ativo</th>
                                                                 <th scope="col" style={{ width: "150px" }}>Ações</th>
                                                             </tr>
                                                         </thead>
                                                         <tbody>
-                                                            {data.data.map((row, index) => (
-                                                                <tr key={row.id ?? index}>
-                                                                    <td className="text-start">
-                                                                        <div className="d-flex align-items-center gap-2">
-                                                                            {row.cor_fundo && (
-                                                                                <CartaoChip
-                                                                                    cor_fundo={row.cor_fundo}
-                                                                                    cor_texto={row.cor_texto}
-                                                                                    label={row.nome ? String(row.nome).slice(0, 1) : '•'}
-                                                                                />
-                                                                            )}
-                                                                            <span>{row.nome}</span>
-                                                                        </div>
-                                                                    </td>
-                                                                    <td>{row.bandeira}</td>
-                                                                    <td>{row.banco}</td>
-                                                                    <td>{row.ultimos_digitos}</td>
-                                                                    <td className={`text-end ${VALOR_TEXT_CLASS}`}>
-                                                                        {row.limite_credito != null && Number(row.limite_credito) > 0
-                                                                            ? formatCurrency(row.limite_credito)
-                                                                            : <span className="text-muted">-</span>}
-                                                                    </td>
-                                                                    <td>
-                                                                        <span className="text-muted small">
-                                                                            Fecha dia {row.dia_limite_fatura ?? '-'}
-                                                                            {' · '}
-                                                                            Vence dia {row.dia_vencimento_fatura ?? '-'}
-                                                                        </span>
-                                                                    </td>
-                                                                    <td>
-                                                                        <span className={`badge bg-${row.ativo ? 'success' : 'danger'}`}>
-                                                                            {row.ativo ? 'Ativo' : 'Inativo'}
-                                                                        </span>
-                                                                    </td>
-                                                                    <td>
-                                                                        <ButtonGroup>
-                                                                            <UncontrolledDropdown direction="down">
-                                                                                <DropdownToggle tag="button" className="btn">
-                                                                                    <i className="ri-more-2-fill"></i>
-                                                                                </DropdownToggle>
-                                                                                <DropdownMenu style={{ zIndex: '999' }}>
-                                                                                    <Link to={`/cartoes/view/${row.id}`} state={{ source: row }}>
-                                                                                        <DropdownItem>Visualizar</DropdownItem>
-                                                                                    </Link>
-                                                                                    <Link to={`/cartoes/edit/${row.id}`} state={{ source: row }}>
-                                                                                        <DropdownItem>Editar</DropdownItem>
-                                                                                    </Link>
-                                                                                    <DropdownItem
-                                                                                        onClick={() => {
-                                                                                            setSelectedId(row.id!)
-                                                                                            toggleModal()
-                                                                                        }}
-                                                                                    >
-                                                                                        Excluir
-                                                                                    </DropdownItem>
-                                                                                </DropdownMenu>
-                                                                            </UncontrolledDropdown>
-                                                                        </ButtonGroup>
-                                                                    </td>
-                                                                </tr>
-                                                            ))}
+                                                            {data.data.map((row, index) => {
+                                                                const qtdBandeiras = row.qtd_bandeiras
+                                                                    ?? row.bandeiras?.length
+                                                                    ?? 0
+                                                                const qtdNumeros = row.qtd_numeros
+                                                                    ?? row.bandeiras?.reduce(
+                                                                        (acc, b) => acc + (b.numeros?.length ?? 0),
+                                                                        0
+                                                                    )
+                                                                    ?? 0
+                                                                const limites = formatLimitesResumo(row)
+
+                                                                return (
+                                                                    <tr key={row.id ?? index}>
+                                                                        <td className="text-start">
+                                                                            <div className="d-flex align-items-center gap-2">
+                                                                                {row.cor_fundo && (
+                                                                                    <CartaoChip
+                                                                                        cor_fundo={row.cor_fundo}
+                                                                                        cor_texto={row.cor_texto}
+                                                                                        label={row.nome ? String(row.nome).slice(0, 1) : '•'}
+                                                                                    />
+                                                                                )}
+                                                                                <span>{row.nome}</span>
+                                                                            </div>
+                                                                        </td>
+                                                                        <td>{row.banco || '-'}</td>
+                                                                        <td>
+                                                                            <span className="text-muted small">
+                                                                                {qtdBandeiras} bandeira{qtdBandeiras === 1 ? '' : 's'}
+                                                                                {' · '}
+                                                                                {qtdNumeros} cartão{qtdNumeros === 1 ? '' : 'ões'}
+                                                                            </span>
+                                                                        </td>
+                                                                        <td className={`text-start small ${VALOR_TEXT_CLASS}`}>
+                                                                            {limites || <span className="text-muted">-</span>}
+                                                                        </td>
+                                                                        <td>
+                                                                            <span className="text-muted small">
+                                                                                Fecha dia {row.dia_limite_fatura ?? '-'}
+                                                                                {' · '}
+                                                                                Vence dia {row.dia_vencimento_fatura ?? '-'}
+                                                                            </span>
+                                                                        </td>
+                                                                        <td>
+                                                                            <span className={`badge bg-${row.ativo ? 'success' : 'danger'}`}>
+                                                                                {row.ativo ? 'Ativo' : 'Inativo'}
+                                                                            </span>
+                                                                        </td>
+                                                                        <td>
+                                                                            <ButtonGroup>
+                                                                                <UncontrolledDropdown direction="down">
+                                                                                    <DropdownToggle tag="button" className="btn">
+                                                                                        <i className="ri-more-2-fill"></i>
+                                                                                    </DropdownToggle>
+                                                                                    <DropdownMenu style={{ zIndex: '999' }}>
+                                                                                        <Link to={`/cartoes/view/${row.id}`} state={{ source: row }}>
+                                                                                            <DropdownItem>Visualizar</DropdownItem>
+                                                                                        </Link>
+                                                                                        <Link to={`/cartoes/edit/${row.id}`} state={{ source: row }}>
+                                                                                            <DropdownItem>Editar</DropdownItem>
+                                                                                        </Link>
+                                                                                        <DropdownItem
+                                                                                            onClick={() => {
+                                                                                                setSelectedId(row.id!)
+                                                                                                toggleModal()
+                                                                                            }}
+                                                                                        >
+                                                                                            Excluir
+                                                                                        </DropdownItem>
+                                                                                    </DropdownMenu>
+                                                                                </UncontrolledDropdown>
+                                                                            </ButtonGroup>
+                                                                        </td>
+                                                                    </tr>
+                                                                )
+                                                            })}
                                                         </tbody>
                                                     </table>
                                                 </div>

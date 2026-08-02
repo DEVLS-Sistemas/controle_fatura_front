@@ -3,11 +3,11 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'react-toastify'
 import { setActiveMenu } from 'helpers/system_helpers'
 import { useNavegacao } from 'helpers/functions_helpers'
-import { centavosToBr, toCentavos } from 'helpers/fatura_helpers'
+import { centavosToBr, formatCurrency, toCentavos, VALOR_TEXT_CLASS } from 'helpers/fatura_helpers'
 import { CartaoChip } from 'helpers/cartao_helpers'
-import { Breadcrumb, BreadcrumbItem, Card, CardBody, Col, Container, Label, Row } from 'reactstrap'
+import { Breadcrumb, BreadcrumbItem, Card, CardBody, Col, Container, Input, Label, Row } from 'reactstrap'
 import { SubmitHandler, useForm } from 'react-hook-form'
-import { required, maxLength } from 'Components/ComponentController/ValidatorForm/ValidatorForm'
+import { required } from 'Components/ComponentController/ValidatorForm/ValidatorForm'
 import { InputTextControlled } from 'Components/ComponentController/Inputs/Text/InputTextControlled'
 import { SelectListControlled } from 'Components/ComponentController/Selects/Select/SelectListControlled'
 import { SelectOptions } from 'interfaces/SystemInterfaces/SelectInterface'
@@ -16,9 +16,12 @@ import {
     CARTAO_CORES_FUNDO_PADRAO,
     CARTAO_CORES_TEXTO_PADRAO,
     CARTAO_PARES_CORES_PADRAO,
+    CartaoBandeira,
+    CartaoNumero,
     CartoesDefaultValues,
     CartoesModel,
     ParCorLookup,
+    TIPOS_NUMERO_PADRAO,
 } from 'interfaces/Cartoes/CartoesInterface'
 import { CartoesService } from 'services/Cartoes/CartoesService'
 
@@ -28,16 +31,38 @@ const toPrecoDigits = (value: string | number | null | undefined): string | null
     return cents > 0 ? String(cents) : null
 }
 
+const newLocalKey = () => `tmp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+
+const tipoLabel = (tipo?: string | null, tipos?: SelectOptions[]) => {
+    if (!tipo) return null
+    return tipos?.find((t) => String(t.value) === String(tipo))?.label ?? tipo
+}
+
+const normalizeBandeiras = (bandeiras?: CartaoBandeira[]): CartaoBandeira[] =>
+    (bandeiras ?? []).map((b) => ({
+        ...b,
+        _key: b._key ?? (b.id != null ? `b_${b.id}` : newLocalKey()),
+        limite_credito: toPrecoDigits(b.limite_credito),
+        ativo: b.ativo !== false,
+        numeros: (b.numeros ?? []).map((n) => ({
+            ...n,
+            _key: n._key ?? (n.id != null ? `n_${n.id}` : newLocalKey()),
+            ativo: n.ativo !== false,
+        })),
+    }))
+
 const buildRecordFromSource = (source: any): CartoesModel => ({
     ...CartoesDefaultValues,
     ...source,
     id: source.id ?? null,
     cartao_id: source.cartao_id ?? source.id ?? null,
-    limite_credito: toPrecoDigits(source.limite_credito),
     dia_limite_fatura: source.dia_limite_fatura ?? null,
     dia_vencimento_fatura: source.dia_vencimento_fatura ?? null,
     cor_fundo: source.cor_fundo ?? source.cor ?? null,
     cor_texto: source.cor_texto ?? (source.cor_fundo || source.cor ? '#ffffff' : null),
+    bandeiras: normalizeBandeiras(source.bandeiras),
+    bandeiras_remover: [],
+    numeros_remover: [],
 })
 
 const CORES_UNIFICADAS_PADRAO = Array.from(
@@ -73,6 +98,22 @@ const ColorSwatch = ({
     />
 )
 
+type NovoCartaoForm = {
+    bandeira: string
+    ultimos_digitos: string
+    tipo: string
+    apelido: string
+    limite_credito: string
+}
+
+const novoCartaoDefault: NovoCartaoForm = {
+    bandeira: '',
+    ultimos_digitos: '',
+    tipo: 'fisico',
+    apelido: '',
+    limite_credito: '',
+}
+
 const CartoesForm = () => {
     const { state } = useLocation()
     const { cartao_id: routeCartaoId, id: routeId } = useParams()
@@ -81,6 +122,14 @@ const CartoesForm = () => {
     const [record, setRecord] = useState<CartoesModel>(
         state?.source ? buildRecordFromSource(state.source) : CartoesDefaultValues
     )
+    const [bandeiras, setBandeiras] = useState<CartaoBandeira[]>(
+        state?.source ? normalizeBandeiras(state.source.bandeiras) : []
+    )
+    const [bandeirasRemover, setBandeirasRemover] = useState<number[]>([])
+    const [numerosRemover, setNumerosRemover] = useState<number[]>([])
+    const [novoCartao, setNovoCartao] = useState<NovoCartaoForm>(novoCartaoDefault)
+    const [editingLimiteKey, setEditingLimiteKey] = useState<string | null>(null)
+    const [limiteDraft, setLimiteDraft] = useState('')
 
     const { register, handleSubmit, control, reset, setValue, watch } = useForm<CartoesModel>({
         defaultValues: record
@@ -94,6 +143,9 @@ const CartoesForm = () => {
     const cartoesService = new CartoesService()
 
     const [bandeirasOptions, setBandeirasOptions] = useState<SelectOptions[]>([])
+    const [tiposOptions, setTiposOptions] = useState<SelectOptions[]>(
+        TIPOS_NUMERO_PADRAO.map((t) => ({ value: t.value, label: t.label }))
+    )
     const [diasOptions, setDiasOptions] = useState<SelectOptions[]>(
         buildDiasOptions().map((d) => ({ value: d.value, label: d.label }))
     )
@@ -102,6 +154,9 @@ const CartoesForm = () => {
     const [paresCores, setParesCores] = useState<ParCorLookup[]>(CARTAO_PARES_CORES_PADRAO)
 
     const isEditing = !!(record.cartao_id || record.id || paramId)
+    const bandeiraJaExiste = bandeiras.some(
+        (b) => b.bandeira.toLowerCase() === novoCartao.bandeira.trim().toLowerCase()
+    )
 
     const applyParCor = (par: ParCorLookup) => {
         setValue('cor_fundo', par.cor_fundo, { shouldDirty: true })
@@ -114,6 +169,11 @@ const CartoesForm = () => {
             if (lookups?.bandeiras?.length) {
                 setBandeirasOptions(
                     lookups.bandeiras.map((b) => ({ value: b, label: b }))
+                )
+            }
+            if (lookups?.tipos_numero?.length) {
+                setTiposOptions(
+                    lookups.tipos_numero.map((t) => ({ value: t.value, label: t.label }))
                 )
             }
             if (lookups?.dias?.length) {
@@ -132,7 +192,6 @@ const CartoesForm = () => {
                 ? lookups.pares_cores
                 : CARTAO_PARES_CORES_PADRAO
 
-            // Mesmas opções nos dois lados (união das paletas, sem duplicar)
             const coresUnificadas = Array.from(new Set([...fundo, ...texto]))
             setCoresFundo(coresUnificadas)
             setCoresTexto(coresUnificadas)
@@ -159,6 +218,9 @@ const CartoesForm = () => {
             if (view) {
                 const loaded = buildRecordFromSource(view)
                 setRecord(loaded)
+                setBandeiras(loaded.bandeiras ?? [])
+                setBandeirasRemover([])
+                setNumerosRemover([])
                 reset(loaded)
             }
         } catch (error) {
@@ -167,18 +229,159 @@ const CartoesForm = () => {
         }
     }
 
+    const handleAddCartao = () => {
+        const bandeiraNome = novoCartao.bandeira.trim()
+        const digitos = novoCartao.ultimos_digitos.replace(/\D/g, '')
+
+        if (!bandeiraNome) {
+            toast.warning('Selecione a bandeira')
+            return
+        }
+        if (digitos.length !== 4) {
+            toast.warning('Informe exatamente 4 dígitos do final do cartão')
+            return
+        }
+
+        const existing = bandeiras.find(
+            (b) => b.bandeira.toLowerCase() === bandeiraNome.toLowerCase()
+        )
+
+        if (existing?.numeros?.some((n) => n.ultimos_digitos === digitos)) {
+            toast.warning('Este final já está cadastrado nesta bandeira')
+            return
+        }
+
+        const numero: CartaoNumero = {
+            _key: newLocalKey(),
+            ultimos_digitos: digitos,
+            tipo: novoCartao.tipo || 'fisico',
+            apelido: novoCartao.apelido.trim() || null,
+            ativo: true,
+        }
+
+        if (existing) {
+            setBandeiras((prev) =>
+                prev.map((b) =>
+                    (b._key ?? b.id) === (existing._key ?? existing.id)
+                        ? { ...b, numeros: [...(b.numeros ?? []), numero] }
+                        : b
+                )
+            )
+        } else {
+            const limiteCents = toCentavos(novoCartao.limite_credito)
+            const novaBandeira: CartaoBandeira = {
+                _key: newLocalKey(),
+                bandeira: bandeiraNome,
+                limite_credito: limiteCents > 0 ? String(limiteCents) : null,
+                ativo: true,
+                numeros: [numero],
+            }
+            setBandeiras((prev) => [...prev, novaBandeira])
+        }
+
+        setNovoCartao(novoCartaoDefault)
+    }
+
+    const handleToggleNumero = (bandeiraKey: string | number, numeroKey: string | number) => {
+        setBandeiras((prev) =>
+            prev.map((b) => {
+                if ((b._key ?? b.id) !== bandeiraKey) return b
+                return {
+                    ...b,
+                    numeros: (b.numeros ?? []).map((n) =>
+                        (n._key ?? n.id) === numeroKey ? { ...n, ativo: !n.ativo } : n
+                    ),
+                }
+            })
+        )
+    }
+
+    const handleRemoveNumero = (bandeira: CartaoBandeira, numero: CartaoNumero) => {
+        const bandeiraKey = bandeira._key ?? bandeira.id
+        const numeroKey = numero._key ?? numero.id
+
+        if (numero.id) {
+            setNumerosRemover((prev) => (prev.includes(numero.id!) ? prev : [...prev, numero.id!]))
+        }
+
+        const numerosRestantes = (bandeira.numeros ?? []).filter(
+            (n) => (n._key ?? n.id) !== numeroKey
+        )
+        if (numerosRestantes.length === 0 && bandeira.id) {
+            setBandeirasRemover((prev) =>
+                prev.includes(bandeira.id!) ? prev : [...prev, bandeira.id!]
+            )
+        }
+
+        setBandeiras((prev) =>
+            prev
+                .map((b) => {
+                    if ((b._key ?? b.id) !== bandeiraKey) return b
+                    return { ...b, numeros: numerosRestantes }
+                })
+                .filter((b) => (b.numeros ?? []).length > 0)
+        )
+    }
+
+    const startEditLimite = (bandeira: CartaoBandeira) => {
+        const key = String(bandeira._key ?? bandeira.id)
+        setEditingLimiteKey(key)
+        setLimiteDraft(bandeira.limite_credito != null ? String(bandeira.limite_credito) : '')
+    }
+
+    const saveLimite = (bandeira: CartaoBandeira) => {
+        const key = bandeira._key ?? bandeira.id
+        const cents = toCentavos(limiteDraft)
+        setBandeiras((prev) =>
+            prev.map((b) =>
+                (b._key ?? b.id) === key
+                    ? { ...b, limite_credito: cents > 0 ? String(cents) : null }
+                    : b
+            )
+        )
+        setEditingLimiteKey(null)
+        setLimiteDraft('')
+    }
+
     const onSubmit: SubmitHandler<CartoesModel> = async (data) => {
         try {
-            const limiteCents = toCentavos(data.limite_credito)
+            if (bandeiras.length === 0) {
+                toast.warning('Adicione ao menos um cartão (final + bandeira)')
+                return
+            }
+
+            const bandeirasPayload = bandeiras.map((b) => {
+                const limiteCents = toCentavos(b.limite_credito)
+                return {
+                    ...(b.id ? { id: b.id } : {}),
+                    bandeira: b.bandeira,
+                    limite_credito: limiteCents > 0 ? centavosToBr(limiteCents) : null,
+                    ativo: b.ativo !== false,
+                    numeros: (b.numeros ?? []).map((n) => ({
+                        ...(n.id ? { id: n.id } : {}),
+                        ultimos_digitos: n.ultimos_digitos,
+                        tipo: n.tipo || 'fisico',
+                        apelido: n.apelido || null,
+                        ativo: n.ativo !== false,
+                    })),
+                }
+            })
+
             const payload: CartoesModel = {
-                ...data,
-                limite_credito: limiteCents > 0 ? centavosToBr(limiteCents) : null,
+                nome: data.nome,
+                banco: data.banco,
                 dia_limite_fatura: data.dia_limite_fatura != null
                     ? Number(data.dia_limite_fatura)
                     : null,
                 dia_vencimento_fatura: data.dia_vencimento_fatura != null
                     ? Number(data.dia_vencimento_fatura)
                     : null,
+                cor_fundo: data.cor_fundo,
+                cor_texto: data.cor_texto,
+                ativo: data.ativo,
+                bandeiras: bandeirasPayload as CartaoBandeira[],
+                bandeiras_remover: bandeirasRemover,
+                numeros_remover: numerosRemover,
             }
 
             if (isEditing) {
@@ -208,10 +411,18 @@ const CartoesForm = () => {
     }, [])
 
     useEffect(() => {
-        if (paramId && !state?.source) {
+        if (paramId) {
+            // Sempre carrega o detalhe completo (listagem pode vir sem árvore)
             loadRecord(paramId)
         }
     }, [paramId])
+
+    const formatLimiteDisplay = (limite?: number | string | null) => {
+        if (limite == null || limite === '') return 'Sem limite'
+        const cents = toCentavos(limite)
+        if (cents <= 0) return 'Sem limite'
+        return formatCurrency(cents / 100)
+    }
 
     return (
         <React.Fragment>
@@ -241,6 +452,7 @@ const CartoesForm = () => {
                             <Card>
                                 <CardBody>
                                     <form onSubmit={handleSubmit(onSubmit)}>
+                                        <h6 className="text-muted text-uppercase mb-3">Dados do cartão</h6>
                                         <Row>
                                             <Col md={6}>
                                                 <div className="mb-3">
@@ -254,58 +466,11 @@ const CartoesForm = () => {
                                             </Col>
                                             <Col md={6}>
                                                 <div className="mb-3">
-                                                    <Label htmlFor="bandeira" className="form-label">Bandeira</Label>
-                                                    {bandeirasOptions.length > 0 ? (
-                                                        <SelectListControlled<CartoesModel>
-                                                            field="bandeira"
-                                                            control={control}
-                                                            options={bandeirasOptions}
-                                                        />
-                                                    ) : (
-                                                        <InputTextControlled<CartoesModel>
-                                                            field={"bandeira"}
-                                                            control={control}
-                                                        />
-                                                    )}
-                                                </div>
-                                            </Col>
-                                            <Col md={6}>
-                                                <div className="mb-3">
                                                     <Label htmlFor="banco" className="form-label">Banco</Label>
                                                     <InputTextControlled<CartoesModel>
                                                         field={"banco"}
                                                         control={control}
                                                     />
-                                                </div>
-                                            </Col>
-                                            <Col md={6}>
-                                                <div className="mb-3">
-                                                    <Label htmlFor="ultimos_digitos" className="form-label">Últimos Dígitos</Label>
-                                                    <InputTextControlled<CartoesModel>
-                                                        field={"ultimos_digitos"}
-                                                        control={control}
-                                                        maxLength={maxLength(4)}
-                                                    />
-                                                </div>
-                                            </Col>
-                                        </Row>
-
-                                        <Row>
-                                            <Col md={6}>
-                                                <div className="mb-3">
-                                                    <Label htmlFor="limite_credito" className="form-label">
-                                                        Limite do cartão (R$)
-                                                    </Label>
-                                                    <InputTextControlled<CartoesModel>
-                                                        field="limite_credito"
-                                                        control={control}
-                                                        textValor
-                                                        mask="preco"
-                                                        placeholder="Ex.: 8.000,00"
-                                                    />
-                                                    <small className="text-muted">
-                                                        Opcional. Usado para calcular o % utilizado na projeção de faturas
-                                                    </small>
                                                 </div>
                                             </Col>
                                             <Col md={3}>
@@ -340,10 +505,20 @@ const CartoesForm = () => {
                                                     </small>
                                                 </div>
                                             </Col>
+                                            <Col md={6}>
+                                                <div className="form-check mt-4">
+                                                    <input
+                                                        {...register('ativo')}
+                                                        className="form-check-input"
+                                                        type="checkbox"
+                                                        id="ativo"
+                                                    />
+                                                    <Label className="form-check-label" htmlFor="ativo">Ativo</Label>
+                                                </div>
+                                            </Col>
                                         </Row>
 
                                         <Row>
-
                                             <Col md={12}>
                                                 <div className="mb-3">
                                                     <Label className="form-label">Cores do cartão</Label>
@@ -438,21 +613,274 @@ const CartoesForm = () => {
                                                     </div>
                                                 </div>
                                             </Col>
+                                        </Row>
 
-                                            <Col md={6}>
-                                                <div className="form-check mt-2">
-                                                    <input
-                                                        {...register('ativo')}
-                                                        className="form-check-input"
-                                                        type="checkbox"
-                                                        id="ativo"
+                                        <hr className="my-4" />
+
+                                        <h6 className="text-muted text-uppercase mb-3">Cartões deste grupo</h6>
+                                        <p className="text-muted small mb-3">
+                                            Adicione finais e bandeiras. O limite é único por bandeira — vários cartões
+                                            (físico, virtual, adicional) compartilham o mesmo limite.
+                                        </p>
+
+                                        <Row className="align-items-end g-2 mb-3">
+                                            <Col md={3}>
+                                                <Label className="form-label">Bandeira</Label>
+                                                {bandeirasOptions.length > 0 ? (
+                                                    <Input
+                                                        type="select"
+                                                        value={novoCartao.bandeira}
+                                                        onChange={(e) =>
+                                                            setNovoCartao((prev) => ({
+                                                                ...prev,
+                                                                bandeira: e.target.value,
+                                                            }))
+                                                        }
+                                                    >
+                                                        <option value="">Selecionar...</option>
+                                                        {bandeirasOptions.map((opt) => (
+                                                            <option key={String(opt.value)} value={opt.value}>
+                                                                {opt.label}
+                                                            </option>
+                                                        ))}
+                                                    </Input>
+                                                ) : (
+                                                    <Input
+                                                        type="text"
+                                                        value={novoCartao.bandeira}
+                                                        placeholder="Ex.: Mastercard"
+                                                        onChange={(e) =>
+                                                            setNovoCartao((prev) => ({
+                                                                ...prev,
+                                                                bandeira: e.target.value,
+                                                            }))
+                                                        }
                                                     />
-                                                    <Label className="form-check-label" htmlFor="ativo">Ativo</Label>
-                                                </div>
+                                                )}
+                                            </Col>
+                                            <Col md={2}>
+                                                <Label className="form-label">Final</Label>
+                                                <Input
+                                                    type="text"
+                                                    inputMode="numeric"
+                                                    maxLength={4}
+                                                    placeholder="••••"
+                                                    value={novoCartao.ultimos_digitos}
+                                                    onChange={(e) =>
+                                                        setNovoCartao((prev) => ({
+                                                            ...prev,
+                                                            ultimos_digitos: e.target.value.replace(/\D/g, '').slice(0, 4),
+                                                        }))
+                                                    }
+                                                />
+                                            </Col>
+                                            <Col md={2}>
+                                                <Label className="form-label">Tipo</Label>
+                                                <Input
+                                                    type="select"
+                                                    value={novoCartao.tipo}
+                                                    onChange={(e) =>
+                                                        setNovoCartao((prev) => ({
+                                                            ...prev,
+                                                            tipo: e.target.value,
+                                                        }))
+                                                    }
+                                                >
+                                                    {tiposOptions.map((opt) => (
+                                                        <option key={String(opt.value)} value={opt.value}>
+                                                            {opt.label}
+                                                        </option>
+                                                    ))}
+                                                </Input>
+                                            </Col>
+                                            <Col md={2}>
+                                                <Label className="form-label">Apelido</Label>
+                                                <Input
+                                                    type="text"
+                                                    placeholder="Opcional"
+                                                    value={novoCartao.apelido}
+                                                    onChange={(e) =>
+                                                        setNovoCartao((prev) => ({
+                                                            ...prev,
+                                                            apelido: e.target.value,
+                                                        }))
+                                                    }
+                                                />
+                                            </Col>
+                                            {!bandeiraJaExiste && novoCartao.bandeira && (
+                                                <Col md={2}>
+                                                    <Label className="form-label">Limite da bandeira</Label>
+                                                    <Input
+                                                        type="text"
+                                                        className={VALOR_TEXT_CLASS}
+                                                        placeholder="Ex.: 15.000,00"
+                                                        value={
+                                                            novoCartao.limite_credito
+                                                                ? centavosToBr(toCentavos(novoCartao.limite_credito))
+                                                                : ''
+                                                        }
+                                                        onChange={(e) => {
+                                                            const digits = e.target.value.replace(/\D/g, '')
+                                                            setNovoCartao((prev) => ({
+                                                                ...prev,
+                                                                limite_credito: digits,
+                                                            }))
+                                                        }}
+                                                    />
+                                                </Col>
+                                            )}
+                                            <Col md="auto">
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-soft-primary"
+                                                    onClick={handleAddCartao}
+                                                >
+                                                    <i className="ri-add-circle-line align-middle me-1"></i>
+                                                    Adicionar cartão
+                                                </button>
                                             </Col>
                                         </Row>
+
+                                        {bandeiras.length === 0 ? (
+                                            <div className="text-muted border rounded p-3 text-center mb-3">
+                                                Nenhum cartão adicionado ainda.
+                                            </div>
+                                        ) : (
+                                            <div className="mb-3">
+                                                {bandeiras.map((bandeira) => {
+                                                    const bKey = String(bandeira._key ?? bandeira.id)
+                                                    const isEditingLimite = editingLimiteKey === bKey
+                                                    return (
+                                                        <div
+                                                            key={bKey}
+                                                            className="border rounded mb-3 overflow-hidden"
+                                                        >
+                                                            <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 px-3 py-2 bg-light">
+                                                                <div className="d-flex align-items-center gap-2">
+                                                                    <strong>{bandeira.bandeira}</strong>
+                                                                    <span className="text-muted">·</span>
+                                                                    {isEditingLimite ? (
+                                                                        <div className="d-flex align-items-center gap-2">
+                                                                            <Input
+                                                                                type="text"
+                                                                                bsSize="sm"
+                                                                                className={VALOR_TEXT_CLASS}
+                                                                                style={{ width: 140 }}
+                                                                                value={
+                                                                                    limiteDraft
+                                                                                        ? centavosToBr(toCentavos(limiteDraft))
+                                                                                        : ''
+                                                                                }
+                                                                                onChange={(e) =>
+                                                                                    setLimiteDraft(
+                                                                                        e.target.value.replace(/\D/g, '')
+                                                                                    )
+                                                                                }
+                                                                                onKeyDown={(e) => {
+                                                                                    if (e.key === 'Enter') {
+                                                                                        e.preventDefault()
+                                                                                        saveLimite(bandeira)
+                                                                                    }
+                                                                                }}
+                                                                            />
+                                                                            <button
+                                                                                type="button"
+                                                                                className="btn btn-sm btn-primary"
+                                                                                onClick={() => saveLimite(bandeira)}
+                                                                            >
+                                                                                Ok
+                                                                            </button>
+                                                                            <button
+                                                                                type="button"
+                                                                                className="btn btn-sm btn-light"
+                                                                                onClick={() => {
+                                                                                    setEditingLimiteKey(null)
+                                                                                    setLimiteDraft('')
+                                                                                }}
+                                                                            >
+                                                                                Cancelar
+                                                                            </button>
+                                                                        </div>
+                                                                    ) : (
+                                                                        <span className={`text-muted ${VALOR_TEXT_CLASS}`}>
+                                                                            Limite {formatLimiteDisplay(bandeira.limite_credito)}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                                {!isEditingLimite && (
+                                                                    <button
+                                                                        type="button"
+                                                                        className="btn btn-sm btn-soft-secondary"
+                                                                        onClick={() => startEditLimite(bandeira)}
+                                                                    >
+                                                                        Editar limite
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                            <ul className="list-group list-group-flush">
+                                                                {(bandeira.numeros ?? []).map((numero) => {
+                                                                    const nKey = String(numero._key ?? numero.id)
+                                                                    const labelTipo = tipoLabel(numero.tipo, tiposOptions)
+                                                                    return (
+                                                                        <li
+                                                                            key={nKey}
+                                                                            className="list-group-item d-flex flex-wrap align-items-center justify-content-between gap-2"
+                                                                        >
+                                                                            <div>
+                                                                                <span className="fw-medium me-2">
+                                                                                    •••• {numero.ultimos_digitos}
+                                                                                </span>
+                                                                                {labelTipo && (
+                                                                                    <span className="badge bg-light text-dark me-1">
+                                                                                        {labelTipo}
+                                                                                    </span>
+                                                                                )}
+                                                                                {numero.apelido && (
+                                                                                    <span className="text-muted small">
+                                                                                        · {numero.apelido}
+                                                                                    </span>
+                                                                                )}
+                                                                                {!numero.ativo && (
+                                                                                    <span className="badge bg-danger ms-2">
+                                                                                        Inativo
+                                                                                    </span>
+                                                                                )}
+                                                                            </div>
+                                                                            <div className="d-flex gap-1">
+                                                                                <button
+                                                                                    type="button"
+                                                                                    className={`btn btn-sm ${numero.ativo ? 'btn-soft-warning' : 'btn-soft-success'}`}
+                                                                                    onClick={() =>
+                                                                                        handleToggleNumero(
+                                                                                            bandeira._key ?? bandeira.id!,
+                                                                                            numero._key ?? numero.id!
+                                                                                        )
+                                                                                    }
+                                                                                >
+                                                                                    {numero.ativo ? 'Desativar' : 'Ativar'}
+                                                                                </button>
+                                                                                <button
+                                                                                    type="button"
+                                                                                    className="btn btn-sm btn-soft-danger"
+                                                                                    onClick={() =>
+                                                                                        handleRemoveNumero(bandeira, numero)
+                                                                                    }
+                                                                                >
+                                                                                    Remover
+                                                                                </button>
+                                                                            </div>
+                                                                        </li>
+                                                                    )
+                                                                })}
+                                                            </ul>
+                                                        </div>
+                                                    )
+                                                })}
+                                            </div>
+                                        )}
+
                                         <hr />
-                                        <Row className="mt-5">
+                                        <Row className="mt-4">
                                             <Col md={12}>
                                                 <div className="hstack gap-2 justify-content-end">
                                                     <button type="submit" className="btn btn-primary">Salvar</button>

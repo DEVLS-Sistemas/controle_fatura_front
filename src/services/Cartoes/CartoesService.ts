@@ -4,12 +4,14 @@ import { UnexpectedError } from "../../libs/api/exceptions/UnexpectedError"
 import { ValidationError } from "../../libs/api/exceptions/ValidationError"
 import { PaginateInterface } from "interfaces/SystemInterfaces/PaginateInterface"
 import {
+    BandeiraListItem,
     CartoesInterface,
     CartoesList,
     CartoesModel,
     CartoesSearch,
     CartoesView,
     LookupsCartoes,
+    NumeroListItem,
 } from "interfaces/Cartoes/CartoesInterface"
 
 export class CartoesService implements CartoesInterface {
@@ -55,6 +57,30 @@ export class CartoesService implements CartoesInterface {
         const response = await this.httpClient.get<any>({
             url: this.url + '/cartoes-list',
             body: params
+        })
+        switch (response.statusCode) {
+            case HttpStatusCode.ok: return response.body
+            case HttpStatusCode.unauthorized: throw new AccessDeniedError()
+            default: throw new UnexpectedError()
+        }
+    }
+
+    async AsyncListBandeiras(params: { cartao_id: number | string }): Promise<BandeiraListItem[] | undefined> {
+        const response = await this.httpClient.get<BandeiraListItem[]>({
+            url: this.url + '/bandeiras-list',
+            body: params,
+        })
+        switch (response.statusCode) {
+            case HttpStatusCode.ok: return response.body
+            case HttpStatusCode.unauthorized: throw new AccessDeniedError()
+            default: throw new UnexpectedError()
+        }
+    }
+
+    async AsyncListNumeros(params: { cartao_bandeira_id: number | string }): Promise<NumeroListItem[] | undefined> {
+        const response = await this.httpClient.get<NumeroListItem[]>({
+            url: this.url + '/numeros-list',
+            body: params,
         })
         switch (response.statusCode) {
             case HttpStatusCode.ok: return response.body

@@ -43,6 +43,14 @@ export interface TransacoesList {
     cartao_nome?: string
     cartao_cor_fundo?: string | null
     cartao_cor_texto?: string | null
+    cartao_numero_id?: number | null
+    cartao_numero?: {
+        id?: number
+        ultimos_digitos?: string
+        tipo?: string | null
+        apelido?: string | null
+    } | null
+    ultimos_digitos?: string | null
     fatura_mes?: number
     fatura_ano?: number
     observacoes?: string

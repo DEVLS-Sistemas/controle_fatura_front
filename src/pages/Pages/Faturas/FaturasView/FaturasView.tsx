@@ -44,6 +44,59 @@ const formatParcelas = (atual?: number, total?: number) => {
     return `${atual ?? 1}/${total}`
 }
 
+const getTxUltimosDigitos = (tx: TransacoesList): string | null => {
+    const digitos = tx.ultimos_digitos
+        ?? tx.cartao_numero?.ultimos_digitos
+        ?? null
+    if (!digitos) return null
+    return String(digitos).replace(/\D/g, '').slice(-4) || null
+}
+
+const getTxNumeroLabel = (tx: TransacoesList): string => {
+    const digitos = getTxUltimosDigitos(tx)
+    if (!digitos) return 'Sem cartão identificado'
+    const tipo = tx.cartao_numero?.tipo
+    const apelido = tx.cartao_numero?.apelido
+    const extras = [tipo, apelido].filter(Boolean).join(' · ')
+    return extras ? `•••• ${digitos} · ${extras}` : `•••• ${digitos}`
+}
+
+type TransacaoGrupo = {
+    key: string
+    digitos: string | null
+    label: string
+    items: TransacoesList[]
+    subtotal: number
+}
+
+const groupTransacoesPorFinal = (rows: TransacoesList[]): TransacaoGrupo[] => {
+    const map = new Map<string, TransacaoGrupo>()
+
+    rows.forEach((tx) => {
+        const digitos = getTxUltimosDigitos(tx)
+        const key = digitos ?? '__sem_cartao__'
+        const current = map.get(key)
+        if (current) {
+            current.items.push(tx)
+            current.subtotal += Number(tx.valor ?? 0)
+            return
+        }
+        map.set(key, {
+            key,
+            digitos,
+            label: getTxNumeroLabel(tx),
+            items: [tx],
+            subtotal: Number(tx.valor ?? 0),
+        })
+    })
+
+    return Array.from(map.values()).sort((a, b) => {
+        if (a.digitos == null) return 1
+        if (b.digitos == null) return -1
+        return a.digitos.localeCompare(b.digitos, 'pt-BR')
+    })
+}
+
 const FaturasViewPage = () => {
     const { id } = useParams<{ id: string }>()
     const navigate = useNavigate()
@@ -530,6 +583,11 @@ const FaturasViewPage = () => {
         }
     }, [categoriasResumo])
 
+    const gruposPorFinal = useMemo(
+        () => groupTransacoesPorFinal(transacoes),
+        [transacoes]
+    )
+
     if (loading) {
         return (
             <div className="page-content text-center py-5">
@@ -579,7 +637,7 @@ const FaturasViewPage = () => {
                         <CardBody>
                             <Row className="align-items-center">
                                 <Col md={8}>
-                                    <h5 className="mb-2 d-flex align-items-center gap-2">
+                                    <h5 className="mb-2 d-flex align-items-center gap-2 flex-wrap">
                                         {fatura.cartao_cor_fundo && (
                                             <CartaoChip
                                                 cor_fundo={fatura.cartao_cor_fundo}
@@ -589,12 +647,12 @@ const FaturasViewPage = () => {
                                                     : '•'}
                                             />
                                         )}
-                                        <span>
-                                            {fatura.cartao_nome}
-                                            {fatura.cartao_ultimos_digitos && (
-                                                <small className="text-muted ms-2">•••• {fatura.cartao_ultimos_digitos}</small>
-                                            )}
-                                        </span>
+                                        <span>{fatura.cartao_nome}</span>
+                                        {(fatura.bandeira || fatura.cartao_bandeira) && (
+                                            <span className="badge bg-light text-dark">
+                                                {fatura.bandeira || fatura.cartao_bandeira}
+                                            </span>
+                                        )}
                                     </h5>
                                     <div className="d-flex flex-wrap gap-3 text-muted mb-3">
                                         <span>
@@ -842,146 +900,165 @@ const FaturasViewPage = () => {
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {transacoes.map((tx, idx) => {
-                                                const subOptions = tx.categoria_id
-                                                    ? (subcategoriasByCategoria[tx.categoria_id] ?? [])
-                                                    : []
-                                                const showResponsavelNome = !isMeuResponsavel(tx.responsavel_id)
-                                                const responsavelNome =
-                                                    tx.responsavel_nome
-                                                    ?? responsaveisLookup.find((r) => Number(r.id) === Number(tx.responsavel_id))?.nome
-                                                    ?? responsaveisOptions.find((o) => Number(o.value) === Number(tx.responsavel_id))?.label
-                                                return (
-                                                <tr key={tx.id ?? idx}>
-                                                    <td>{formatDateBr(tx.data)}</td>
-                                                    <td>{tx.estabelecimento_nome ?? tx.estabelecimento ?? '-'}</td>
-                                                    <td className={VALOR_TEXT_CLASS}>
-                                                        <Input
-                                                            type="number"
-                                                            bsSize="sm"
-                                                            className={VALOR_TEXT_CLASS}
-                                                            step="0.01"
-                                                            min="0"
-                                                            value={tx.id != null ? (valorDrafts[tx.id] ?? '') : ''}
-                                                            disabled={!!savingIds[tx.id!]}
-                                                            onChange={(e) => {
-                                                                if (!tx.id) return
-                                                                setValorDrafts((prev) => ({
-                                                                    ...prev,
-                                                                    [tx.id!]: e.target.value,
-                                                                }))
-                                                            }}
-                                                            onBlur={() => handleValorBlur(tx)}
-                                                            onKeyDown={(e) => {
-                                                                if (e.key === 'Enter') {
-                                                                    e.currentTarget.blur()
-                                                                }
-                                                            }}
-                                                        />
-                                                    </td>
-                                                    <td className="text-center text-nowrap">
-                                                        {formatParcelas(tx.parcela_atual, tx.parcelas_total)}
-                                                    </td>
-                                                    <td>
-                                                        <Badge color={tipoTransacaoColor[tx.tipo ?? ''] ?? 'secondary'}>
-                                                            {tipoTransacaoLabel[tx.tipo ?? ''] ?? tx.tipo}
-                                                        </Badge>
-                                                    </td>
-                                                    <td style={{ minWidth: 170 }}>
-                                                        <Input
-                                                            type="select"
-                                                            bsSize="sm"
-                                                            value={tx.origem_compra ?? ''}
-                                                            disabled={!!savingIds[tx.id!]}
-                                                            onChange={(e) => handleUpdateOrigem(tx, e.target.value)}
-                                                        >
-                                                            <option value="">Selecionar...</option>
-                                                            {origensCompraOptions.map((opt) => (
-                                                                <option key={String(opt.value)} value={opt.value ?? ''}>
-                                                                    {opt.label}
-                                                                </option>
-                                                            ))}
-                                                        </Input>
-                                                    </td>
-                                                    <td>
-                                                        <Input
-                                                            type="select"
-                                                            bsSize="sm"
-                                                            value={tx.categoria_id ?? ''}
-                                                            disabled={!!savingIds[tx.id!]}
-                                                            onChange={(e) => handleUpdateSelect(tx, 'categoria_id', e.target.value)}
-                                                            style={
-                                                                tx.categoria_id
-                                                                    ? (getCategoriaFieldStyle(
-                                                                        tx.categoria_cor
-                                                                        ?? categoriasLookup.find((c) => c.id === tx.categoria_id)?.cor
-                                                                    ) ?? undefined)
-                                                                    : undefined
-                                                            }
-                                                        >
-                                                            <option value="">Sem categoria</option>
-                                                            {categoriasOptions.map((opt) => (
-                                                                <option key={opt.value} value={opt.value}>{opt.label}</option>
-                                                            ))}
-                                                        </Input>
-                                                    </td>
-                                                    <td>
-                                                        <Input
-                                                            type="select"
-                                                            bsSize="sm"
-                                                            value={tx.subcategoria_id ?? ''}
-                                                            disabled={!tx.categoria_id || !!savingIds[tx.id!]}
-                                                            onChange={(e) => handleUpdateSelect(tx, 'subcategoria_id', e.target.value)}
-                                                        >
-                                                            <option value="">Sem subcategoria</option>
-                                                            {subOptions.map((opt) => (
-                                                                <option key={opt.value} value={opt.value}>{opt.label}</option>
-                                                            ))}
-                                                        </Input>
-                                                    </td>
-                                                    <td>
-                                                        <Input
-                                                            type="text"
-                                                            bsSize="sm"
-                                                            placeholder="Observação..."
-                                                            value={tx.id != null ? (observacaoDrafts[tx.id] ?? '') : ''}
-                                                            disabled={!!savingIds[tx.id!]}
-                                                            onChange={(e) => {
-                                                                if (!tx.id) return
-                                                                setObservacaoDrafts((prev) => ({
-                                                                    ...prev,
-                                                                    [tx.id!]: e.target.value,
-                                                                }))
-                                                            }}
-                                                            onBlur={() => handleObservacaoBlur(tx)}
-                                                            onKeyDown={(e) => {
-                                                                if (e.key === 'Enter') {
-                                                                    e.currentTarget.blur()
-                                                                }
-                                                            }}
-                                                        />
-                                                    </td>
-                                                    <td className="text-center">
-                                                        <Button
-                                                            type="button"
-                                                            color="light"
-                                                            size="sm"
-                                                            className="border"
-                                                            title={showResponsavelNome ? `Responsável: ${responsavelNome}` : 'Definir responsável'}
-                                                            disabled={!!savingIds[tx.id!]}
-                                                            onClick={() => openResponsavelModal(tx)}
-                                                        >
-                                                            <i className="ri-user-line me-1"></i>
-                                                            {showResponsavelNome ? (
-                                                                <span className="small">{responsavelNome}</span>
-                                                            ) : (
-                                                                <span className="small text-muted">Eu</span>
-                                                            )}
-                                                        </Button>
-                                                    </td>
-                                                </tr>
-                                                )
-                                            })}
+                                            {gruposPorFinal.map((grupo) => (
+                                                <React.Fragment key={grupo.key}>
+                                                    <tr className="table-secondary">
+                                                        <td colSpan={10} className="py-2">
+                                                            <div className="d-flex flex-wrap align-items-center justify-content-between gap-2">
+                                                                <span className="fw-semibold">
+                                                                    {grupo.label}
+                                                                    <span className="text-muted fw-normal ms-2 small">
+                                                                        {grupo.items.length} lançamento{grupo.items.length === 1 ? '' : 's'}
+                                                                    </span>
+                                                                </span>
+                                                                <span className={`fw-semibold ${VALOR_TEXT_CLASS}`}>
+                                                                    {formatCurrency(grupo.subtotal)}
+                                                                </span>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                    {grupo.items.map((tx, idx) => {
+                                                        const subOptions = tx.categoria_id
+                                                            ? (subcategoriasByCategoria[tx.categoria_id] ?? [])
+                                                            : []
+                                                        const showResponsavelNome = !isMeuResponsavel(tx.responsavel_id)
+                                                        const responsavelNome =
+                                                            tx.responsavel_nome
+                                                            ?? responsaveisLookup.find((r) => Number(r.id) === Number(tx.responsavel_id))?.nome
+                                                            ?? responsaveisOptions.find((o) => Number(o.value) === Number(tx.responsavel_id))?.label
+                                                        return (
+                                                        <tr key={tx.id ?? `${grupo.key}_${idx}`}>
+                                                            <td>{formatDateBr(tx.data)}</td>
+                                                            <td>{tx.estabelecimento_nome ?? tx.estabelecimento ?? '-'}</td>
+                                                            <td className={VALOR_TEXT_CLASS}>
+                                                                <Input
+                                                                    type="number"
+                                                                    bsSize="sm"
+                                                                    className={VALOR_TEXT_CLASS}
+                                                                    step="0.01"
+                                                                    min="0"
+                                                                    value={tx.id != null ? (valorDrafts[tx.id] ?? '') : ''}
+                                                                    disabled={!!savingIds[tx.id!]}
+                                                                    onChange={(e) => {
+                                                                        if (!tx.id) return
+                                                                        setValorDrafts((prev) => ({
+                                                                            ...prev,
+                                                                            [tx.id!]: e.target.value,
+                                                                        }))
+                                                                    }}
+                                                                    onBlur={() => handleValorBlur(tx)}
+                                                                    onKeyDown={(e) => {
+                                                                        if (e.key === 'Enter') {
+                                                                            e.currentTarget.blur()
+                                                                        }
+                                                                    }}
+                                                                />
+                                                            </td>
+                                                            <td className="text-center text-nowrap">
+                                                                {formatParcelas(tx.parcela_atual, tx.parcelas_total)}
+                                                            </td>
+                                                            <td>
+                                                                <Badge color={tipoTransacaoColor[tx.tipo ?? ''] ?? 'secondary'}>
+                                                                    {tipoTransacaoLabel[tx.tipo ?? ''] ?? tx.tipo}
+                                                                </Badge>
+                                                            </td>
+                                                            <td style={{ minWidth: 170 }}>
+                                                                <Input
+                                                                    type="select"
+                                                                    bsSize="sm"
+                                                                    value={tx.origem_compra ?? ''}
+                                                                    disabled={!!savingIds[tx.id!]}
+                                                                    onChange={(e) => handleUpdateOrigem(tx, e.target.value)}
+                                                                >
+                                                                    <option value="">Selecionar...</option>
+                                                                    {origensCompraOptions.map((opt) => (
+                                                                        <option key={String(opt.value)} value={opt.value ?? ''}>
+                                                                            {opt.label}
+                                                                        </option>
+                                                                    ))}
+                                                                </Input>
+                                                            </td>
+                                                            <td>
+                                                                <Input
+                                                                    type="select"
+                                                                    bsSize="sm"
+                                                                    value={tx.categoria_id ?? ''}
+                                                                    disabled={!!savingIds[tx.id!]}
+                                                                    onChange={(e) => handleUpdateSelect(tx, 'categoria_id', e.target.value)}
+                                                                    style={
+                                                                        tx.categoria_id
+                                                                            ? (getCategoriaFieldStyle(
+                                                                                tx.categoria_cor
+                                                                                ?? categoriasLookup.find((c) => c.id === tx.categoria_id)?.cor
+                                                                            ) ?? undefined)
+                                                                            : undefined
+                                                                    }
+                                                                >
+                                                                    <option value="">Sem categoria</option>
+                                                                    {categoriasOptions.map((opt) => (
+                                                                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                                                    ))}
+                                                                </Input>
+                                                            </td>
+                                                            <td>
+                                                                <Input
+                                                                    type="select"
+                                                                    bsSize="sm"
+                                                                    value={tx.subcategoria_id ?? ''}
+                                                                    disabled={!tx.categoria_id || !!savingIds[tx.id!]}
+                                                                    onChange={(e) => handleUpdateSelect(tx, 'subcategoria_id', e.target.value)}
+                                                                >
+                                                                    <option value="">Sem subcategoria</option>
+                                                                    {subOptions.map((opt) => (
+                                                                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                                                    ))}
+                                                                </Input>
+                                                            </td>
+                                                            <td>
+                                                                <Input
+                                                                    type="text"
+                                                                    bsSize="sm"
+                                                                    placeholder="Observação..."
+                                                                    value={tx.id != null ? (observacaoDrafts[tx.id] ?? '') : ''}
+                                                                    disabled={!!savingIds[tx.id!]}
+                                                                    onChange={(e) => {
+                                                                        if (!tx.id) return
+                                                                        setObservacaoDrafts((prev) => ({
+                                                                            ...prev,
+                                                                            [tx.id!]: e.target.value,
+                                                                        }))
+                                                                    }}
+                                                                    onBlur={() => handleObservacaoBlur(tx)}
+                                                                    onKeyDown={(e) => {
+                                                                        if (e.key === 'Enter') {
+                                                                            e.currentTarget.blur()
+                                                                        }
+                                                                    }}
+                                                                />
+                                                            </td>
+                                                            <td className="text-center">
+                                                                <Button
+                                                                    type="button"
+                                                                    color="light"
+                                                                    size="sm"
+                                                                    className="border"
+                                                                    title={showResponsavelNome ? `Responsável: ${responsavelNome}` : 'Definir responsável'}
+                                                                    disabled={!!savingIds[tx.id!]}
+                                                                    onClick={() => openResponsavelModal(tx)}
+                                                                >
+                                                                    <i className="ri-user-line me-1"></i>
+                                                                    {showResponsavelNome ? (
+                                                                        <span className="small">{responsavelNome}</span>
+                                                                    ) : (
+                                                                        <span className="small text-muted">Eu</span>
+                                                                    )}
+                                                                </Button>
+                                                            </td>
+                                                        </tr>
+                                                        )
+                                                    })}
+                                                </React.Fragment>
+                                            ))}
                                         </tbody>
                                     </Table>
                                 </div>

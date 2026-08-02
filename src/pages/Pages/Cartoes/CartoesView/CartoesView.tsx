@@ -6,8 +6,11 @@ import { useNavegacao } from 'helpers/functions_helpers'
 import { CartaoChip } from 'helpers/cartao_helpers'
 import { formatCurrency, VALOR_TEXT_CLASS } from 'helpers/fatura_helpers'
 import { Breadcrumb, BreadcrumbItem, Card, CardBody, Col, Container, Label, Row } from 'reactstrap'
-import { CartoesView } from 'interfaces/Cartoes/CartoesInterface'
+import { CartoesView, TIPOS_NUMERO_PADRAO } from 'interfaces/Cartoes/CartoesInterface'
 import { CartoesService } from 'services/Cartoes/CartoesService'
+
+const tipoLabel = (tipo?: string | null) =>
+    TIPOS_NUMERO_PADRAO.find((t) => t.value === tipo)?.label ?? tipo ?? '-'
 
 const CartoesViewPage = () => {
     const { state } = useLocation()
@@ -31,7 +34,8 @@ const CartoesViewPage = () => {
     }, [])
 
     useEffect(() => {
-        if (id && !state?.source) {
+        if (id) {
+            // Sempre carrega detalhe completo (listagem pode vir sem árvore)
             loadRecord(id)
         }
     }, [id])
@@ -45,6 +49,11 @@ const CartoesViewPage = () => {
             </div>
         )
     }
+
+    const qtdBandeiras = record.qtd_bandeiras ?? record.bandeiras?.length ?? 0
+    const qtdNumeros = record.qtd_numeros
+        ?? record.bandeiras?.reduce((acc, b) => acc + (b.numeros?.length ?? 0), 0)
+        ?? 0
 
     return (
         <React.Fragment>
@@ -84,27 +93,8 @@ const CartoesViewPage = () => {
                                             </p>
                                         </Col>
                                         <Col md={6} className="mb-3">
-                                            <Label className="form-label fw-semibold">Bandeira</Label>
-                                            <p className="text-muted mb-0">{record.bandeira || '-'}</p>
-                                        </Col>
-                                        <Col md={6} className="mb-3">
                                             <Label className="form-label fw-semibold">Banco</Label>
                                             <p className="text-muted mb-0">{record.banco || '-'}</p>
-                                        </Col>
-                                        <Col md={6} className="mb-3">
-                                            <Label className="form-label fw-semibold">Últimos Dígitos</Label>
-                                            <p className="text-muted mb-0">{record.ultimos_digitos || '-'}</p>
-                                        </Col>
-                                        <Col md={6} className="mb-3">
-                                            <Label className="form-label fw-semibold">Limite de crédito</Label>
-                                            <p className={`text-muted mb-0 ${VALOR_TEXT_CLASS}`}>
-                                                {record.limite_credito != null && Number(record.limite_credito) > 0
-                                                    ? formatCurrency(record.limite_credito)
-                                                    : '-'}
-                                            </p>
-                                            <small className="text-muted">
-                                                Usado para calcular o % utilizado na projeção
-                                            </small>
                                         </Col>
                                         <Col md={6} className="mb-3">
                                             <Label className="form-label fw-semibold">Dia limite da fatura</Label>
@@ -155,7 +145,62 @@ const CartoesViewPage = () => {
                                                 </span>
                                             </p>
                                         </Col>
+                                        <Col md={12} className="mb-3">
+                                            <Label className="form-label fw-semibold">Resumo</Label>
+                                            <p className="text-muted mb-0">
+                                                {qtdBandeiras} bandeira{qtdBandeiras === 1 ? '' : 's'}
+                                                {' · '}
+                                                {qtdNumeros} cartão{qtdNumeros === 1 ? '' : 'ões'}
+                                            </p>
+                                        </Col>
                                     </Row>
+
+                                    <hr />
+                                    <h6 className="text-muted text-uppercase mb-3">Bandeiras e cartões</h6>
+
+                                    {(record.bandeiras ?? []).length === 0 ? (
+                                        <p className="text-muted">Nenhuma bandeira cadastrada.</p>
+                                    ) : (
+                                        (record.bandeiras ?? []).map((bandeira) => (
+                                            <div key={bandeira.id ?? bandeira.bandeira} className="border rounded mb-3 overflow-hidden">
+                                                <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 px-3 py-2 bg-light">
+                                                    <strong>{bandeira.bandeira}</strong>
+                                                    <span className={`text-muted ${VALOR_TEXT_CLASS}`}>
+                                                        Limite{' '}
+                                                        {bandeira.limite_credito != null && Number(bandeira.limite_credito) > 0
+                                                            ? formatCurrency(bandeira.limite_credito)
+                                                            : 'Sem limite'}
+                                                    </span>
+                                                </div>
+                                                <ul className="list-group list-group-flush">
+                                                    {(bandeira.numeros ?? []).map((numero) => (
+                                                        <li
+                                                            key={numero.id ?? numero.ultimos_digitos}
+                                                            className="list-group-item d-flex flex-wrap align-items-center justify-content-between gap-2"
+                                                        >
+                                                            <div>
+                                                                <span className="fw-medium me-2">
+                                                                    •••• {numero.ultimos_digitos}
+                                                                </span>
+                                                                <span className="badge bg-light text-dark me-1">
+                                                                    {tipoLabel(numero.tipo)}
+                                                                </span>
+                                                                {numero.apelido && (
+                                                                    <span className="text-muted small">
+                                                                        · {numero.apelido}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            <span className={`badge bg-${numero.ativo !== false ? 'success' : 'danger'}`}>
+                                                                {numero.ativo !== false ? 'Ativo' : 'Inativo'}
+                                                            </span>
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        ))
+                                    )}
+
                                     <hr />
                                     <Row className="mt-3">
                                         <Col md={12}>
