@@ -92,7 +92,17 @@ export interface NumeroListItem {
     label: string
     tipo?: string | null
     apelido?: string | null
+    ultimos_digitos?: string | null
+    bandeira?: string | null
+    cartao_bandeira_id?: number | null
     ativo?: boolean
+}
+
+/** Filtros de `GET /cartoes/numeros-list` */
+export interface NumerosListParams {
+    cartao_bandeira_id?: number | string
+    cartao_id?: number | string
+    fatura_id?: number | string
 }
 
 export interface LookupsCartoes {
@@ -109,7 +119,7 @@ export interface CartoesInterface {
     listCartoesPaginate(params: CartoesSearch): Promise<any>
     AsyncListCartoes(params: CartoesSearch): Promise<CartoesModel[] | undefined>
     AsyncListBandeiras(params: { cartao_id: number | string }): Promise<BandeiraListItem[] | undefined>
-    AsyncListNumeros(params: { cartao_bandeira_id: number | string }): Promise<NumeroListItem[] | undefined>
+    AsyncListNumeros(params: NumerosListParams): Promise<NumeroListItem[] | undefined>
     createCartoes(params: CartoesModel): Promise<any>
     editCartoes(params: CartoesModel): Promise<any>
     deleteCartoes(id: number): Promise<any>

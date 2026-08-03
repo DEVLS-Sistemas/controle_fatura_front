@@ -12,6 +12,7 @@ import {
     CartoesView,
     LookupsCartoes,
     NumeroListItem,
+    NumerosListParams,
 } from "interfaces/Cartoes/CartoesInterface"
 
 export class CartoesService implements CartoesInterface {
@@ -77,7 +78,7 @@ export class CartoesService implements CartoesInterface {
         }
     }
 
-    async AsyncListNumeros(params: { cartao_bandeira_id: number | string }): Promise<NumeroListItem[] | undefined> {
+    async AsyncListNumeros(params: NumerosListParams): Promise<NumeroListItem[] | undefined> {
         const response = await this.httpClient.get<NumeroListItem[]>({
             url: this.url + '/numeros-list',
             body: params,

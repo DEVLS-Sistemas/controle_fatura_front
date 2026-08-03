@@ -17,7 +17,7 @@ import {
 } from 'helpers/fatura_helpers'
 import { CartaoChip } from 'helpers/cartao_helpers'
 import { SelectOptions } from 'interfaces/SystemInterfaces/SelectInterface'
-import { FaturasView } from 'interfaces/Faturas/FaturasInterface'
+import { FaturaGrupoPorCartao, FaturasView } from 'interfaces/Faturas/FaturasInterface'
 import { CategoriaLookup, ResponsavelLookup, TransacoesList } from 'interfaces/Transacoes/TransacoesInterface'
 import { FaturasService } from 'services/Faturas/FaturasService'
 import { TransacoesService } from 'services/Transacoes/TransacoesService'
@@ -52,29 +52,52 @@ const getTxUltimosDigitos = (tx: TransacoesList): string | null => {
     return String(digitos).replace(/\D/g, '').slice(-4) || null
 }
 
+const getTxNumeroKey = (tx: TransacoesList): string => {
+    if (tx.cartao_numero_id != null) return `numero_${tx.cartao_numero_id}`
+    if (tx.cartao_numero?.id != null) return `numero_${tx.cartao_numero.id}`
+    const digitos = getTxUltimosDigitos(tx)
+    return digitos ? `digitos_${digitos}` : '__sem_cartao__'
+}
+
 const getTxNumeroLabel = (tx: TransacoesList): string => {
     const digitos = getTxUltimosDigitos(tx)
     if (!digitos) return 'Sem cartão identificado'
     const tipo = tx.cartao_numero?.tipo
     const apelido = tx.cartao_numero?.apelido
-    const extras = [tipo, apelido].filter(Boolean).join(' · ')
+    const extras = [apelido || tipo].filter(Boolean).join(' · ')
     return extras ? `•••• ${digitos} · ${extras}` : `•••• ${digitos}`
 }
 
 type TransacaoGrupo = {
     key: string
+    cartaoNumeroId: number | null
     digitos: string | null
     label: string
     items: TransacoesList[]
     subtotal: number
 }
 
-const groupTransacoesPorFinal = (rows: TransacoesList[]): TransacaoGrupo[] => {
+const groupTransacoesPorFinal = (
+    rows: TransacoesList[],
+    metaGrupos?: FaturaGrupoPorCartao[] | null
+): TransacaoGrupo[] => {
+    const metaByKey = new Map<string, FaturaGrupoPorCartao>()
+    ;(metaGrupos ?? []).forEach((g) => {
+        const key = g.cartao_numero_id != null
+            ? `numero_${g.cartao_numero_id}`
+            : (g.ultimos_digitos
+                ? `digitos_${String(g.ultimos_digitos).replace(/\D/g, '').slice(-4)}`
+                : '__sem_cartao__')
+        metaByKey.set(key, g)
+    })
+
     const map = new Map<string, TransacaoGrupo>()
 
     rows.forEach((tx) => {
         const digitos = getTxUltimosDigitos(tx)
-        const key = digitos ?? '__sem_cartao__'
+        const key = getTxNumeroKey(tx)
+        const cartaoNumeroId = tx.cartao_numero_id ?? tx.cartao_numero?.id ?? null
+        const meta = metaByKey.get(key)
         const current = map.get(key)
         if (current) {
             current.items.push(tx)
@@ -83,18 +106,36 @@ const groupTransacoesPorFinal = (rows: TransacoesList[]): TransacaoGrupo[] => {
         }
         map.set(key, {
             key,
+            cartaoNumeroId,
             digitos,
-            label: getTxNumeroLabel(tx),
+            label: meta?.label || getTxNumeroLabel(tx),
             items: [tx],
             subtotal: Number(tx.valor ?? 0),
         })
     })
 
-    return Array.from(map.values()).sort((a, b) => {
-        if (a.digitos == null) return 1
-        if (b.digitos == null) return -1
-        return a.digitos.localeCompare(b.digitos, 'pt-BR')
+    // Inclui grupos da API sem linhas (ex.: após filtro local)
+    metaByKey.forEach((meta, key) => {
+        if (map.has(key)) return
+        map.set(key, {
+            key,
+            cartaoNumeroId: meta.cartao_numero_id ?? null,
+            digitos: meta.ultimos_digitos
+                ? String(meta.ultimos_digitos).replace(/\D/g, '').slice(-4) || null
+                : null,
+            label: meta.label || (meta.ultimos_digitos ? `•••• ${meta.ultimos_digitos}` : 'Sem cartão identificado'),
+            items: [],
+            subtotal: Number(meta.valor_total ?? 0),
+        })
     })
+
+    return Array.from(map.values())
+        .filter((g) => g.items.length > 0)
+        .sort((a, b) => {
+            if (a.digitos == null) return 1
+            if (b.digitos == null) return -1
+            return a.digitos.localeCompare(b.digitos, 'pt-BR')
+        })
 }
 
 const FaturasViewPage = () => {
@@ -129,6 +170,8 @@ const FaturasViewPage = () => {
     const [valorDrafts, setValorDrafts] = useState<Record<number, string>>({})
     const [observacaoDrafts, setObservacaoDrafts] = useState<Record<number, string>>({})
     const [exporting, setExporting] = useState(false)
+    /** null = todos; '__sem_cartao__' ou chave do grupo */
+    const [filtroFinalKey, setFiltroFinalKey] = useState<string | null>(null)
 
     const isMeuResponsavel = (responsavelId?: number | null) => {
         if (responsavelId == null) return true
@@ -584,9 +627,21 @@ const FaturasViewPage = () => {
     }, [categoriasResumo])
 
     const gruposPorFinal = useMemo(
-        () => groupTransacoesPorFinal(transacoes),
-        [transacoes]
+        () => groupTransacoesPorFinal(transacoes, fatura?.grupos_por_cartao),
+        [transacoes, fatura?.grupos_por_cartao]
     )
+
+    const gruposVisiveis = useMemo(() => {
+        if (!filtroFinalKey) return gruposPorFinal
+        const filtered = gruposPorFinal.filter((g) => g.key === filtroFinalKey)
+        return filtered.length > 0 ? filtered : gruposPorFinal
+    }, [gruposPorFinal, filtroFinalKey])
+
+    useEffect(() => {
+        if (filtroFinalKey && !gruposPorFinal.some((g) => g.key === filtroFinalKey)) {
+            setFiltroFinalKey(null)
+        }
+    }, [gruposPorFinal, filtroFinalKey])
 
     if (loading) {
         return (
@@ -840,7 +895,7 @@ const FaturasViewPage = () => {
                                 <div>
                                     <h5 className="card-title mb-1">Transações</h5>
                                     <small className="text-muted">
-                                        Ajuste valor, origem, categoria, subcategoria e observação em cada linha. Use a coluna Resp. para definir outro responsável (padrão: Eu).
+                                        Agrupadas por final do cartão. Ajuste valor, origem, categoria, subcategoria e observação em cada linha.
                                     </small>
                                 </div>
                                 <div className="d-flex flex-wrap gap-2">
@@ -876,6 +931,33 @@ const FaturasViewPage = () => {
                                     </Button>
                                 </div>
                             </div>
+                            {gruposPorFinal.length > 1 && (
+                                <div className="d-flex flex-wrap gap-2 mb-3">
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        color={filtroFinalKey == null ? 'primary' : 'light'}
+                                        className={filtroFinalKey == null ? '' : 'border'}
+                                        onClick={() => setFiltroFinalKey(null)}
+                                    >
+                                        Todos ({transacoes.length})
+                                    </Button>
+                                    {gruposPorFinal.map((grupo) => (
+                                        <Button
+                                            key={`filtro_${grupo.key}`}
+                                            type="button"
+                                            size="sm"
+                                            color={filtroFinalKey === grupo.key ? 'primary' : 'light'}
+                                            className={filtroFinalKey === grupo.key ? '' : 'border'}
+                                            onClick={() => setFiltroFinalKey(grupo.key)}
+                                            title={formatCurrency(grupo.subtotal)}
+                                        >
+                                            {grupo.label}
+                                            <span className="ms-1 opacity-75">({grupo.items.length})</span>
+                                        </Button>
+                                    ))}
+                                </div>
+                            )}
                             {transacoes.length === 0 ? (
                                 <div className="text-center text-muted py-5">
                                     {isProcessing
@@ -900,7 +982,7 @@ const FaturasViewPage = () => {
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {gruposPorFinal.map((grupo) => (
+                                            {gruposVisiveis.map((grupo) => (
                                                 <React.Fragment key={grupo.key}>
                                                     <tr className="table-secondary">
                                                         <td colSpan={10} className="py-2">

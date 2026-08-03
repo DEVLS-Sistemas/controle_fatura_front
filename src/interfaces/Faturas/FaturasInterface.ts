@@ -49,6 +49,17 @@ export interface FaturasCartaoGroup {
 /** @deprecated Use FaturasCartaoGroup — mantido só para compatibilidade de imports */
 export type FaturasList = FaturasCartaoGroup
 
+/** Grupo de transações por final do cartão — `GET /faturas/listar/{id}` */
+export interface FaturaGrupoPorCartao {
+    cartao_numero_id?: number | null
+    ultimos_digitos?: string | null
+    tipo?: string | null
+    apelido?: string | null
+    label?: string
+    total_transacoes?: number
+    valor_total?: number | string
+}
+
 export interface FaturasView extends FaturaResumo {
     cartao_id?: number
     cartao_nome?: string
@@ -57,6 +68,7 @@ export interface FaturasView extends FaturaResumo {
     cartao_bandeira?: string
     cartao_bandeira_id?: number | null
     pdf_url?: string
+    grupos_por_cartao?: FaturaGrupoPorCartao[]
 }
 
 export interface FaturasModel {

@@ -67,6 +67,8 @@ export interface TransacoesModel {
     id?: number | null
     transacao_id?: number | null
     cartao_id: number | string | null
+    /** Número/final do cartão que realizou a compra */
+    cartao_numero_id?: number | string | null
     fatura_id?: number | string | null
     data?: string | null
     estabelecimento_id?: number | string | null
@@ -169,6 +171,7 @@ export const TransacoesDefaultValues: TransacoesModel = {
     id: null,
     transacao_id: null,
     cartao_id: null,
+    cartao_numero_id: null,
     fatura_id: null,
     data: null,
     estabelecimento_id: null,

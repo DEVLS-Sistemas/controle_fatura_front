@@ -29,7 +29,17 @@ import {
 import { TransacoesService } from 'services/Transacoes/TransacoesService'
 import { EstabelecimentosService } from 'services/Estabelecimentos/EstabelecimentosService'
 import { SubcategoriasService } from 'services/Subcategorias/SubcategoriasService'
+import { CartoesService } from 'services/Cartoes/CartoesService'
+import { NumeroListItem } from 'interfaces/Cartoes/CartoesInterface'
 import ResponsavelModal from '../ResponsavelModal/ResponsavelModal'
+
+const formatNumeroOptionLabel = (n: NumeroListItem): string => {
+    if (n.label) return n.label
+    const digitos = String(n.ultimos_digitos ?? '').replace(/\D/g, '').slice(-4)
+    const base = digitos ? `•••• ${digitos}` : `#${n.value}`
+    const extras = [n.bandeira, n.apelido || (n.tipo ? String(n.tipo) : null)].filter(Boolean)
+    return extras.length ? `${extras.join(' · ')} · ${base}` : base
+}
 
 /**
  * UX: ao trocar o estabelecimento, a UI sempre reaplica
@@ -55,6 +65,7 @@ const TransacoesForm = () => {
                 ...state.source,
                 transacao_id: state.source.transacao_id ?? state.source.id,
                 cartao_id: state.source.cartao_id ?? null,
+                cartao_numero_id: state.source.cartao_numero_id ?? state.source.cartao_numero?.id ?? null,
                 fatura_id: state.source.fatura_id ?? null,
                 estabelecimento_id: state.source.estabelecimento_id ?? null,
                 subcategoria_id: state.source.subcategoria_id ?? null,
@@ -72,6 +83,10 @@ const TransacoesForm = () => {
     })
 
     const [cartoesOptions, setCartoesOptions] = useState<SelectOptions[]>([])
+    const [numerosOptions, setNumerosOptions] = useState<SelectOptions[]>([])
+    const [showNumeroSelect, setShowNumeroSelect] = useState(false)
+    const [semNumeros, setSemNumeros] = useState(false)
+    const [numerosLoading, setNumerosLoading] = useState(false)
     const [categoriasOptions, setCategoriasOptions] = useState<SelectOptions[]>([])
     const [subcategoriasOptions, setSubcategoriasOptions] = useState<SelectOptions[]>([])
     const defaultOrigensCompraOptions: SelectOptions[] = Object.entries(origemCompraLabel).map(
@@ -85,6 +100,7 @@ const TransacoesForm = () => {
 
     const skipEstabelecimentoEffect = useRef(true)
     const skipCategoriaEffect = useRef(true)
+    const skipCartaoNumeroEffect = useRef(true)
     const applyingEstabelecimentoDefaults = useRef(false)
     const estabelecimentosCache = useRef<Map<number, EstabelecimentoLookup>>(new Map())
 
@@ -93,9 +109,11 @@ const TransacoesForm = () => {
     const transacoesService = new TransacoesService()
     const estabelecimentosService = new EstabelecimentosService()
     const subcategoriasService = new SubcategoriasService()
+    const cartoesService = useRef(new CartoesService()).current
     const isEdit = Boolean(record.transacao_id ?? record.id)
     const fromFatura = Boolean(record.fatura_id)
 
+    const cartaoId = watch('cartao_id')
     const estabelecimentoId = watch('estabelecimento_id')
     const categoriaId = watch('categoria_id')
     const responsavelId = watch('responsavel_id')
@@ -158,6 +176,68 @@ const TransacoesForm = () => {
         } catch (error) {
             console.error('Erro ao carregar subcategorias:', error)
             setSubcategoriasOptions([])
+        }
+    }
+
+    const loadNumeros = async (opts: {
+        cartao_id?: number | string | null
+        fatura_id?: number | string | null
+        preserveSelection?: boolean
+    }) => {
+        const { cartao_id, fatura_id, preserveSelection = false } = opts
+        if (!cartao_id && !fatura_id) {
+            setNumerosOptions([])
+            setShowNumeroSelect(false)
+            setSemNumeros(false)
+            if (!preserveSelection) setValue('cartao_numero_id', null)
+            return
+        }
+
+        setNumerosLoading(true)
+        setSemNumeros(false)
+        try {
+            const list = (await cartoesService.AsyncListNumeros({
+                ...(fatura_id ? { fatura_id } : {}),
+                ...(cartao_id && !fatura_id ? { cartao_id } : {}),
+            })) ?? []
+
+            if (list.length === 0) {
+                setNumerosOptions([])
+                setShowNumeroSelect(false)
+                setSemNumeros(true)
+                if (!preserveSelection) setValue('cartao_numero_id', null)
+                return
+            }
+
+            setNumerosOptions(
+                list.map((n) => ({
+                    value: n.value,
+                    label: formatNumeroOptionLabel(n),
+                }))
+            )
+
+            if (list.length === 1) {
+                setShowNumeroSelect(false)
+                setValue('cartao_numero_id', list[0].value ?? null)
+                return
+            }
+
+            setShowNumeroSelect(true)
+            if (preserveSelection) {
+                const current = record.cartao_numero_id
+                const stillValid = list.some((n) => Number(n.value) === Number(current))
+                setValue('cartao_numero_id', stillValid ? current : null)
+            } else {
+                setValue('cartao_numero_id', null)
+            }
+        } catch (error) {
+            console.error('Erro ao carregar finais do cartão:', error)
+            setNumerosOptions([])
+            setShowNumeroSelect(false)
+            setSemNumeros(true)
+            if (!preserveSelection) setValue('cartao_numero_id', null)
+        } finally {
+            setNumerosLoading(false)
         }
     }
 
@@ -243,11 +323,21 @@ const TransacoesForm = () => {
 
     const onSubmit: SubmitHandler<TransacoesModel> = async (data) => {
         try {
+            if (semNumeros) {
+                toast.warning('Cadastre um final neste cartão antes de registrar a compra')
+                return
+            }
+            if (showNumeroSelect && !data.cartao_numero_id) {
+                toast.warning('Selecione o final do cartão da compra')
+                return
+            }
+
             if (isEdit) {
                 const payload: TransacoesModel = {
                     id: record.id ?? record.transacao_id,
                     transacao_id: record.transacao_id ?? record.id,
                     cartao_id: data.cartao_id,
+                    cartao_numero_id: data.cartao_numero_id || undefined,
                     fatura_id: data.fatura_id,
                     data: data.data,
                     estabelecimento_id: data.estabelecimento_id,
@@ -273,6 +363,7 @@ const TransacoesForm = () => {
 
                 const payload: TransacoesModel = {
                     cartao_id: data.cartao_id,
+                    cartao_numero_id: data.cartao_numero_id || undefined,
                     data: data.data,
                     estabelecimento_id: data.estabelecimento_id,
                     valor_compra: toBrPayload(data.valor_compra),
@@ -326,6 +417,23 @@ const TransacoesForm = () => {
     useEffect(() => {
         setActiveMenu('/transacoes')
     }, [])
+
+    // Carrega finais do cartão (grupo) ou da bandeira da fatura
+    useEffect(() => {
+        const isFirst = skipCartaoNumeroEffect.current
+        if (isFirst) skipCartaoNumeroEffect.current = false
+
+        if (fromFatura && record.fatura_id && !isEdit) {
+            loadNumeros({ fatura_id: record.fatura_id, preserveSelection: isFirst })
+            return
+        }
+
+        loadNumeros({
+            cartao_id: cartaoId,
+            preserveSelection: isFirst && Boolean(record.cartao_numero_id),
+        })
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [cartaoId, fromFatura, isEdit, record.fatura_id])
 
     // Redistribui parcelas ao mudar valor_compra ou N (create)
     useEffect(() => {
@@ -416,7 +524,7 @@ const TransacoesForm = () => {
                                 <CardBody>
                                     <form onSubmit={handleSubmit(onSubmit)}>
                                         <Row>
-                                            <Col md={6}>
+                                            <Col md={showNumeroSelect || semNumeros || numerosLoading ? 4 : 6}>
                                                 <div className="mb-3">
                                                     <Label htmlFor="cartao_id" className="form-label">Cartão</Label>
                                                     <SelectListControlled<TransacoesModel>
@@ -431,7 +539,40 @@ const TransacoesForm = () => {
                                                     )}
                                                 </div>
                                             </Col>
-                                            <Col md={3}>
+                                            {(showNumeroSelect || semNumeros || numerosLoading) && (
+                                                <Col md={4}>
+                                                    <div className="mb-3">
+                                                        <Label htmlFor="cartao_numero_id" className="form-label">
+                                                            Final do cartão
+                                                        </Label>
+                                                        {numerosLoading ? (
+                                                            <div className="form-control-plaintext text-muted">Carregando...</div>
+                                                        ) : semNumeros ? (
+                                                            <div className="alert alert-warning mb-0 py-2">
+                                                                Cadastre um final neste cartão antes de registrar a compra.{' '}
+                                                                {cartaoId && (
+                                                                    <Link to={`/cartoes/edit/${cartaoId}`}>
+                                                                        Abrir cartão
+                                                                    </Link>
+                                                                )}
+                                                            </div>
+                                                        ) : (
+                                                            <SelectListControlled<TransacoesModel>
+                                                                options={numerosOptions}
+                                                                field="cartao_numero_id"
+                                                                control={control}
+                                                                required={required}
+                                                            />
+                                                        )}
+                                                        {!semNumeros && !numerosLoading && (
+                                                            <small className="text-muted">
+                                                                Qual plástico/virtual fez a compra
+                                                            </small>
+                                                        )}
+                                                    </div>
+                                                </Col>
+                                            )}
+                                            <Col md={showNumeroSelect || semNumeros || numerosLoading ? 2 : 3}>
                                                 <div className="mb-3">
                                                     <Label htmlFor="data" className="form-label">Data da compra</Label>
                                                     <InputDate<TransacoesModel>
@@ -445,7 +586,7 @@ const TransacoesForm = () => {
                                                     )}
                                                 </div>
                                             </Col>
-                                            <Col md={3}>
+                                            <Col md={showNumeroSelect || semNumeros || numerosLoading ? 2 : 3}>
                                                 <div className="mb-3">
                                                     <Label htmlFor="tipo" className="form-label">Tipo</Label>
                                                     <SelectListControlled<TransacoesModel>
@@ -637,7 +778,7 @@ const TransacoesForm = () => {
                                                             onChange={(e) => setValue('propagar_grupo', e.target.checked)}
                                                         />
                                                         <Label className="form-check-label" htmlFor="propagar_grupo">
-                                                            Aplicar estabelecimento, origem, categoria, responsável e observação a todas as parcelas da compra
+                                                            Aplicar estabelecimento, origem, final do cartão, categoria, responsável e observação a todas as parcelas da compra
                                                         </Label>
                                                     </div>
                                                 </Col>
@@ -651,7 +792,11 @@ const TransacoesForm = () => {
                                                     <button
                                                         type="submit"
                                                         className="btn btn-primary"
-                                                        disabled={!isEdit && nParcelas > 1 && !totaisBatem}
+                                                        disabled={
+                                                            semNumeros
+                                                            || numerosLoading
+                                                            || (!isEdit && nParcelas > 1 && !totaisBatem)
+                                                        }
                                                     >
                                                         Salvar
                                                     </button>

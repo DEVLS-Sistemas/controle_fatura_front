@@ -51,6 +51,15 @@ const formatPeriodoFatura = (mes?: number, ano?: number) => {
     return `${String(mes).padStart(2, '0')}/${ano}`
 }
 
+const formatFinalCartao = (row: TransacoesList): string => {
+    const digitos = String(row.ultimos_digitos ?? row.cartao_numero?.ultimos_digitos ?? '')
+        .replace(/\D/g, '')
+        .slice(-4)
+    if (!digitos) return '-'
+    const apelido = row.cartao_numero?.apelido
+    return apelido ? `•••• ${digitos} · ${apelido}` : `•••• ${digitos}`
+}
+
 const truncate = (text?: string, max = 40) => {
     if (!text) return '-'
     if (text.length <= max) return text
@@ -264,6 +273,7 @@ export const TransacoesTable = ({
                                                                 <th scope="col" className="text-start">Observação</th>
                                                                 <th scope="col" style={{ width: "100px" }} title="Responsável">Resp.</th>
                                                                 <th scope="col">Fatura / Cartão</th>
+                                                                <th scope="col">Final</th>
                                                                 <th scope="col">Parcelas</th>
                                                                 <th scope="col" style={{ width: "120px" }}>Ações</th>
                                                             </tr>
@@ -362,6 +372,7 @@ export const TransacoesTable = ({
                                                                                 )}
                                                                             </small>
                                                                         </td>
+                                                                        <td className="text-nowrap">{formatFinalCartao(row)}</td>
                                                                         <td>{formatParcelas(row.parcela_atual, row.parcelas_total)}</td>
                                                                         <td>
                                                                             <ButtonGroup>
