@@ -170,7 +170,7 @@ export const CartoesTable = ({ data, getData, setPerPage, perPage, filters }: Ca
                                                                             <span className="text-muted small">
                                                                                 {qtdBandeiras} bandeira{qtdBandeiras === 1 ? '' : 's'}
                                                                                 {' · '}
-                                                                                {qtdNumeros} cartão{qtdNumeros === 1 ? '' : 'ões'}
+                                                                                {qtdNumeros} {qtdNumeros === 1 ? 'cartão' : 'cartões'}
                                                                             </span>
                                                                         </td>
                                                                         <td className={`text-start small ${VALOR_TEXT_CLASS}`}>

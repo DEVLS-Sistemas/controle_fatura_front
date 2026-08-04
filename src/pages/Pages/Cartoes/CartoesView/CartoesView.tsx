@@ -150,7 +150,7 @@ const CartoesViewPage = () => {
                                             <p className="text-muted mb-0">
                                                 {qtdBandeiras} bandeira{qtdBandeiras === 1 ? '' : 's'}
                                                 {' · '}
-                                                {qtdNumeros} cartão{qtdNumeros === 1 ? '' : 'ões'}
+                                                {qtdNumeros} {qtdNumeros === 1 ? 'cartão' : 'cartões'}
                                             </p>
                                         </Col>
                                     </Row>

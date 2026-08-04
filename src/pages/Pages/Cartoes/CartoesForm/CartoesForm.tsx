@@ -239,14 +239,32 @@ const CartoesForm = () => {
             toast.warning('Selecione a bandeira')
             return
         }
-        if (digitos.length !== 4) {
-            toast.warning('Informe exatamente 4 dígitos do final do cartão')
+        if (digitos.length > 0 && digitos.length !== 4) {
+            toast.warning('Informe exatamente 4 dígitos do final do cartão (ou deixe em branco)')
             return
         }
 
         const existing = bandeiras.find(
             (b) => b.bandeira.toLowerCase() === bandeiraNome.toLowerCase()
         )
+
+        if (digitos.length === 0) {
+            if (existing) {
+                toast.warning('Esta bandeira já está na lista. Informe um final para adicionar um cartão nela.')
+                return
+            }
+            const limiteCents = toCentavos(novoCartao.limite_credito)
+            const novaBandeira: CartaoBandeira = {
+                _key: newLocalKey(),
+                bandeira: bandeiraNome,
+                limite_credito: limiteCents > 0 ? String(limiteCents) : null,
+                ativo: true,
+                numeros: [],
+            }
+            setBandeiras((prev) => [...prev, novaBandeira])
+            setNovoCartao(novoCartaoDefault)
+            return
+        }
 
         if (existing?.numeros?.some((n) => n.ultimos_digitos === digitos)) {
             toast.warning('Este final já está cadastrado nesta bandeira')
@@ -330,20 +348,33 @@ const CartoesForm = () => {
         const numerosRestantes = (bandeira.numeros ?? []).filter(
             (n) => (n._key ?? n.id) !== numeroKey
         )
-        if (numerosRestantes.length === 0 && bandeira.id) {
+
+        setBandeiras((prev) =>
+            prev.map((b) => {
+                if ((b._key ?? b.id) !== bandeiraKey) return b
+                return { ...b, numeros: numerosRestantes }
+            })
+        )
+    }
+
+    const handleRemoveBandeira = (bandeira: CartaoBandeira) => {
+        const bandeiraKey = bandeira._key ?? bandeira.id
+
+        if (bandeira.id) {
             setBandeirasRemover((prev) =>
                 prev.includes(bandeira.id!) ? prev : [...prev, bandeira.id!]
             )
         }
 
-        setBandeiras((prev) =>
-            prev
-                .map((b) => {
-                    if ((b._key ?? b.id) !== bandeiraKey) return b
-                    return { ...b, numeros: numerosRestantes }
-                })
-                .filter((b) => (b.numeros ?? []).length > 0)
-        )
+        for (const numero of bandeira.numeros ?? []) {
+            if (numero.id) {
+                setNumerosRemover((prev) =>
+                    prev.includes(numero.id!) ? prev : [...prev, numero.id!]
+                )
+            }
+        }
+
+        setBandeiras((prev) => prev.filter((b) => (b._key ?? b.id) !== bandeiraKey))
     }
 
     const startEditLimite = (bandeira: CartaoBandeira) => {
@@ -368,11 +399,6 @@ const CartoesForm = () => {
 
     const onSubmit: SubmitHandler<CartoesModel> = async (data) => {
         try {
-            if (bandeiras.length === 0) {
-                toast.warning('Adicione ao menos um cartão (final + bandeira)')
-                return
-            }
-
             const bandeirasPayload = bandeiras.map((b) => {
                 const limiteCents = toCentavos(b.limite_credito)
                 return {
@@ -643,8 +669,10 @@ const CartoesForm = () => {
 
                                         <h6 className="text-muted text-uppercase mb-3">Cartões deste grupo</h6>
                                         <p className="text-muted small mb-3">
-                                            Adicione finais e bandeiras. O limite é único por bandeira — vários cartões
-                                            (físico, virtual, adicional) compartilham o mesmo limite.
+                                            Finais são opcionais — você pode salvar o grupo só com nome/ciclo, ou
+                                            cadastrar bandeiras sem finais e adicioná-los depois.
+                                            O limite é único por bandeira — vários cartões (físico, virtual, adicional)
+                                            compartilham o mesmo limite.
                                             O <strong>nome no cartão</strong> é o texto impresso no plástico
                                             (ex.: LEONARDO S FERREIRA), usado para identificar os grupos na fatura.
                                             O <strong>apelido</strong> é só um rótulo interno.
@@ -686,7 +714,7 @@ const CartoesForm = () => {
                                                 )}
                                             </Col>
                                             <Col md={2}>
-                                                <Label className="form-label">Final</Label>
+                                                <Label className="form-label">Final <span className="text-muted fw-normal">(opcional)</span></Label>
                                                 <Input
                                                     type="text"
                                                     inputMode="numeric"
@@ -784,13 +812,14 @@ const CartoesForm = () => {
 
                                         {bandeiras.length === 0 ? (
                                             <div className="text-muted border rounded p-3 text-center mb-3">
-                                                Nenhum cartão adicionado ainda.
+                                                Nenhuma bandeira/final adicionado — opcional no cadastro.
                                             </div>
                                         ) : (
                                             <div className="mb-3">
                                                 {bandeiras.map((bandeira) => {
                                                     const bKey = String(bandeira._key ?? bandeira.id)
                                                     const isEditingLimite = editingLimiteKey === bKey
+                                                    const numerosBandeira = bandeira.numeros ?? []
                                                     return (
                                                         <div
                                                             key={bKey}
@@ -849,85 +878,100 @@ const CartoesForm = () => {
                                                                     )}
                                                                 </div>
                                                                 {!isEditingLimite && (
-                                                                    <button
-                                                                        type="button"
-                                                                        className="btn btn-sm btn-soft-secondary"
-                                                                        onClick={() => startEditLimite(bandeira)}
-                                                                    >
-                                                                        Editar limite
-                                                                    </button>
+                                                                    <div className="d-flex gap-1">
+                                                                        <button
+                                                                            type="button"
+                                                                            className="btn btn-sm btn-soft-secondary"
+                                                                            onClick={() => startEditLimite(bandeira)}
+                                                                        >
+                                                                            Editar limite
+                                                                        </button>
+                                                                        <button
+                                                                            type="button"
+                                                                            className="btn btn-sm btn-soft-danger"
+                                                                            onClick={() => handleRemoveBandeira(bandeira)}
+                                                                        >
+                                                                            Remover bandeira
+                                                                        </button>
+                                                                    </div>
                                                                 )}
                                                             </div>
-                                                            <ul className="list-group list-group-flush">
-                                                                {(bandeira.numeros ?? []).map((numero) => {
-                                                                    const nKey = String(numero._key ?? numero.id)
-                                                                    const labelTipo = tipoLabel(numero.tipo, tiposOptions)
-                                                                    return (
-                                                                        <li
-                                                                            key={nKey}
-                                                                            className="list-group-item d-flex flex-wrap align-items-center justify-content-between gap-2"
-                                                                        >
-                                                                            <div className="d-flex flex-wrap align-items-center gap-2 flex-grow-1">
-                                                                                <span className="fw-medium">
-                                                                                    •••• {numero.ultimos_digitos}
-                                                                                </span>
-                                                                                <Input
-                                                                                    type="text"
-                                                                                    bsSize="sm"
-                                                                                    style={{ maxWidth: 220 }}
-                                                                                    placeholder="Nome no cartão"
-                                                                                    value={numero.nome_no_cartao ?? ''}
-                                                                                    onChange={(e) =>
-                                                                                        handleNomeNoCartaoChange(
-                                                                                            bandeira._key ?? bandeira.id!,
-                                                                                            numero._key ?? numero.id!,
-                                                                                            e.target.value
-                                                                                        )
-                                                                                    }
-                                                                                />
-                                                                                {labelTipo && (
-                                                                                    <span className="badge bg-light text-dark">
-                                                                                        {labelTipo}
+                                                            {numerosBandeira.length === 0 ? (
+                                                                <div className="px-3 py-2 text-muted small">
+                                                                    Nenhum final cadastrado nesta bandeira.
+                                                                </div>
+                                                            ) : (
+                                                                <ul className="list-group list-group-flush">
+                                                                    {numerosBandeira.map((numero) => {
+                                                                        const nKey = String(numero._key ?? numero.id)
+                                                                        const labelTipo = tipoLabel(numero.tipo, tiposOptions)
+                                                                        return (
+                                                                            <li
+                                                                                key={nKey}
+                                                                                className="list-group-item d-flex flex-wrap align-items-center justify-content-between gap-2"
+                                                                            >
+                                                                                <div className="d-flex flex-wrap align-items-center gap-2 flex-grow-1">
+                                                                                    <span className="fw-medium">
+                                                                                        •••• {numero.ultimos_digitos}
                                                                                     </span>
-                                                                                )}
-                                                                                {numero.apelido && (
-                                                                                    <span className="text-muted small">
-                                                                                        · {numero.apelido}
-                                                                                    </span>
-                                                                                )}
-                                                                                {!numero.ativo && (
-                                                                                    <span className="badge bg-danger">
-                                                                                        Inativo
-                                                                                    </span>
-                                                                                )}
-                                                                            </div>
-                                                                            <div className="d-flex gap-1">
-                                                                                <button
-                                                                                    type="button"
-                                                                                    className={`btn btn-sm ${numero.ativo ? 'btn-soft-warning' : 'btn-soft-success'}`}
-                                                                                    onClick={() =>
-                                                                                        handleToggleNumero(
-                                                                                            bandeira._key ?? bandeira.id!,
-                                                                                            numero._key ?? numero.id!
-                                                                                        )
-                                                                                    }
-                                                                                >
-                                                                                    {numero.ativo ? 'Desativar' : 'Ativar'}
-                                                                                </button>
-                                                                                <button
-                                                                                    type="button"
-                                                                                    className="btn btn-sm btn-soft-danger"
-                                                                                    onClick={() =>
-                                                                                        handleRemoveNumero(bandeira, numero)
-                                                                                    }
-                                                                                >
-                                                                                    Remover
-                                                                                </button>
-                                                                            </div>
-                                                                        </li>
-                                                                    )
-                                                                })}
-                                                            </ul>
+                                                                                    <Input
+                                                                                        type="text"
+                                                                                        bsSize="sm"
+                                                                                        style={{ maxWidth: 220 }}
+                                                                                        placeholder="Nome no cartão"
+                                                                                        value={numero.nome_no_cartao ?? ''}
+                                                                                        onChange={(e) =>
+                                                                                            handleNomeNoCartaoChange(
+                                                                                                bandeira._key ?? bandeira.id!,
+                                                                                                numero._key ?? numero.id!,
+                                                                                                e.target.value
+                                                                                            )
+                                                                                        }
+                                                                                    />
+                                                                                    {labelTipo && (
+                                                                                        <span className="badge bg-light text-dark">
+                                                                                            {labelTipo}
+                                                                                        </span>
+                                                                                    )}
+                                                                                    {numero.apelido && (
+                                                                                        <span className="text-muted small">
+                                                                                            · {numero.apelido}
+                                                                                        </span>
+                                                                                    )}
+                                                                                    {!numero.ativo && (
+                                                                                        <span className="badge bg-danger">
+                                                                                            Inativo
+                                                                                        </span>
+                                                                                    )}
+                                                                                </div>
+                                                                                <div className="d-flex gap-1">
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        className={`btn btn-sm ${numero.ativo ? 'btn-soft-warning' : 'btn-soft-success'}`}
+                                                                                        onClick={() =>
+                                                                                            handleToggleNumero(
+                                                                                                bandeira._key ?? bandeira.id!,
+                                                                                                numero._key ?? numero.id!
+                                                                                            )
+                                                                                        }
+                                                                                    >
+                                                                                        {numero.ativo ? 'Desativar' : 'Ativar'}
+                                                                                    </button>
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        className="btn btn-sm btn-soft-danger"
+                                                                                        onClick={() =>
+                                                                                            handleRemoveNumero(bandeira, numero)
+                                                                                        }
+                                                                                    >
+                                                                                        Remover
+                                                                                    </button>
+                                                                                </div>
+                                                                            </li>
+                                                                        )
+                                                                    })}
+                                                                </ul>
+                                                            )}
                                                         </div>
                                                     )
                                                 })}

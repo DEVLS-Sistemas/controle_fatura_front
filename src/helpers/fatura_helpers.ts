@@ -63,6 +63,13 @@ export const faturaStatusColor: Record<string, string> = {
   erro: 'danger',
 }
 
+/** Quitação da fatura (`pago`) — distinto do status de processamento do PDF */
+export const faturaQuitacaoLabel = (pago?: boolean | null): string =>
+  pago ? 'Paga' : 'Em aberto'
+
+export const faturaQuitacaoColor = (pago?: boolean | null): string =>
+  pago ? 'success' : 'warning'
+
 const hexToRgba = (hex: string, alpha: number): string => {
   const raw = hex.replace('#', '').trim()
   const full = raw.length === 3

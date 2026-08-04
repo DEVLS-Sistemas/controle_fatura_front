@@ -20,6 +20,10 @@ export interface FaturaResumo {
     periodo_fim?: string
     data_vencimento?: string
     valor_total?: number | string
+    /** Quitação: true quando valor_restante é 0 (não confundir com status do PDF) */
+    pago?: boolean
+    valor_pago?: number | string
+    valor_restante?: number | string
     arquivo_pdf?: string | null
     tem_pdf?: boolean
     status?: string
@@ -68,6 +72,14 @@ export interface FaturasView extends FaturaResumo {
     cartao_cor_texto?: string | null
     cartao_bandeira?: string
     cartao_bandeira_id?: number | null
+    cartao_dia_limite_fatura?: number | null
+    cartao_dia_vencimento_fatura?: number | null
+    /** Soma dos pagamentos lançados nesta fatura (extrato) */
+    pagamentos_total?: number | string
+    /** Parte dos pagamentos que quitou a fatura anterior */
+    pagamentos_abatido_anterior?: number | string
+    /** Parte dos pagamentos que antecipou este ciclo */
+    pagamentos_antecipado?: number | string
     pdf_url?: string
     grupos_por_cartao?: FaturaGrupoPorCartao[]
 }

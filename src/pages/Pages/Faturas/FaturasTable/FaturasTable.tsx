@@ -9,7 +9,10 @@ import { toast } from "react-toastify"
 import { PaginateInterface, PaginateSearch, PerPageProps } from "interfaces/SystemInterfaces/PaginateInterface"
 import CustomModal from "Components/ComponentController/Modal/CustomModal"
 import { useNavegacao } from "helpers/functions_helpers"
-import { formatCurrency, formatDateBr, faturaStatusColor, VALOR_TEXT_CLASS } from "helpers/fatura_helpers"
+import {
+    formatCurrency, formatDateBr, faturaStatusColor,
+    faturaQuitacaoLabel, faturaQuitacaoColor, VALOR_TEXT_CLASS,
+} from "helpers/fatura_helpers"
 import { CartaoChip } from "helpers/cartao_helpers"
 import { FaturaResumo, FaturasCartaoGroup, FaturasSearch } from "interfaces/Faturas/FaturasInterface"
 import { FaturasService } from "services/Faturas/FaturasService"
@@ -198,8 +201,11 @@ export const FaturasTable = ({ data, getData, setPerPage, perPage, filters }: Fa
                                                                 <th scope="col">Competência</th>
                                                                 <th scope="col">Período</th>
                                                                 <th scope="col">Vencimento</th>
-                                                                <th scope="col" className={VALOR_TEXT_CLASS}>Valor</th>
-                                                                <th scope="col">Status</th>
+                                                                <th scope="col" className={VALOR_TEXT_CLASS}>Total</th>
+                                                                <th scope="col" className={VALOR_TEXT_CLASS}>Pago</th>
+                                                                <th scope="col" className={VALOR_TEXT_CLASS}>Restante</th>
+                                                                <th scope="col">Quitação</th>
+                                                                <th scope="col">Status PDF</th>
                                                                 <th scope="col">Lançamentos</th>
                                                                 <th scope="col" style={{ width: "220px" }}>Ações</th>
                                                             </tr>
@@ -207,7 +213,7 @@ export const FaturasTable = ({ data, getData, setPerPage, perPage, filters }: Fa
                                                         <tbody>
                                                             {rows.length === 0 ? (
                                                                 <tr>
-                                                                    <td colSpan={9} className="text-muted py-4">
+                                                                    <td colSpan={12} className="text-muted py-4">
                                                                         Nenhuma fatura neste período
                                                                     </td>
                                                                 </tr>
@@ -251,6 +257,17 @@ export const FaturasTable = ({ data, getData, setPerPage, perPage, filters }: Fa
                                                                         <td>{formatDateBr(row.data_vencimento)}</td>
                                                                         <td className={VALOR_TEXT_CLASS}>
                                                                             {formatCurrency(row.valor_total)}
+                                                                        </td>
+                                                                        <td className={VALOR_TEXT_CLASS}>
+                                                                            {formatCurrency(row.valor_pago)}
+                                                                        </td>
+                                                                        <td className={VALOR_TEXT_CLASS}>
+                                                                            {formatCurrency(row.valor_restante)}
+                                                                        </td>
+                                                                        <td>
+                                                                            <span className={`badge bg-${faturaQuitacaoColor(row.pago)}`}>
+                                                                                {faturaQuitacaoLabel(row.pago)}
+                                                                            </span>
                                                                         </td>
                                                                         <td>
                                                                             <span className={`badge bg-${faturaStatusColor[row.status ?? ''] ?? 'secondary'}`}>

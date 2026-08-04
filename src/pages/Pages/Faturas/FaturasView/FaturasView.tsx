@@ -10,6 +10,7 @@ import {
 import { toast } from 'react-toastify'
 import {
     formatCurrency, formatDateBr, faturaStatusColor,
+    faturaQuitacaoLabel, faturaQuitacaoColor,
     tipoTransacaoColor, tipoTransacaoLabel,
     origemCompraLabel,
     FATURA_FILE_ACCEPT, isValidFaturaFile,
@@ -912,7 +913,13 @@ const FaturasViewPage = () => {
                                         </span>
                                     )}
                                     <span>
-                                        <strong>Status:</strong>{' '}
+                                        <strong>Quitação:</strong>{' '}
+                                        <Badge color={faturaQuitacaoColor(fatura.pago)}>
+                                            {faturaQuitacaoLabel(fatura.pago)}
+                                        </Badge>
+                                    </span>
+                                    <span>
+                                        <strong>Status PDF:</strong>{' '}
                                         <Badge color={faturaStatusColor[fatura.status ?? ''] ?? 'secondary'}>
                                             {statusLabel[fatura.status ?? ''] ?? fatura.status}
                                         </Badge>
@@ -922,15 +929,61 @@ const FaturasViewPage = () => {
                                         <span><strong>Processado em:</strong> {formatDateBr(fatura.processado_em)}</span>
                                     )}
                                 </div>
-                                <div className="d-inline-flex flex-column bg-light rounded px-3 py-2 text-md-end ms-auto">
-                                    <small className="text-muted text-uppercase">Total da fatura</small>
-                                    <span
-                                        className={`fw-semibold text-primary ${VALOR_TEXT_CLASS}`}
-                                        style={{ fontSize: '2rem', lineHeight: 1.15 }}
-                                    >
-                                        {formatCurrency(fatura.valor_total)}
-                                    </span>
-                                </div>
+                            </div>
+
+                            <div className="bg-light rounded p-3 mb-3">
+                                <Row className="g-3 text-center text-md-start">
+                                    <Col xs={6} md={3}>
+                                        <small className="text-muted text-uppercase d-block">Total da fatura</small>
+                                        <span
+                                            className={`fw-semibold text-primary ${VALOR_TEXT_CLASS} d-block`}
+                                            style={{ fontSize: '1.5rem', lineHeight: 1.2 }}
+                                        >
+                                            {formatCurrency(fatura.valor_total)}
+                                        </span>
+                                    </Col>
+                                    <Col xs={6} md={3}>
+                                        <small className="text-muted text-uppercase d-block">Total pago</small>
+                                        <span
+                                            className={`fw-semibold text-success ${VALOR_TEXT_CLASS} d-block`}
+                                            style={{ fontSize: '1.5rem', lineHeight: 1.2 }}
+                                        >
+                                            {formatCurrency(fatura.valor_pago)}
+                                        </span>
+                                    </Col>
+                                    <Col xs={6} md={3}>
+                                        <small className="text-muted text-uppercase d-block">Restante</small>
+                                        <span
+                                            className={`fw-semibold ${Number(fatura.valor_restante ?? 0) > 0 ? 'text-warning' : 'text-muted'} ${VALOR_TEXT_CLASS} d-block`}
+                                            style={{ fontSize: '1.5rem', lineHeight: 1.2 }}
+                                        >
+                                            {formatCurrency(fatura.valor_restante)}
+                                        </span>
+                                    </Col>
+                                    <Col xs={6} md={3} className="d-flex flex-column justify-content-center">
+                                        <small className="text-muted text-uppercase d-block mb-1">Status</small>
+                                        <Badge
+                                            color={faturaQuitacaoColor(fatura.pago)}
+                                            className="align-self-md-start"
+                                            style={{ fontSize: '0.95rem' }}
+                                        >
+                                            {faturaQuitacaoLabel(fatura.pago)}
+                                        </Badge>
+                                    </Col>
+                                </Row>
+                                {Number(fatura.pagamentos_total ?? 0) > 0 && (
+                                    <div className="text-muted small mt-3 pt-3 border-top">
+                                        Dos pagamentos desta fatura ({formatCurrency(fatura.pagamentos_total)}):
+                                        <ul className="mb-0 mt-1 ps-3">
+                                            <li>
+                                                {formatCurrency(fatura.pagamentos_abatido_anterior)} quitou a fatura anterior
+                                            </li>
+                                            <li>
+                                                {formatCurrency(fatura.pagamentos_antecipado)} antecipou este ciclo
+                                            </li>
+                                        </ul>
+                                    </div>
+                                )}
                             </div>
 
                             <Row className="align-items-center">
