@@ -3,8 +3,10 @@ import React, { useEffect, useState } from "react"
 import { Link } from "react-router-dom"
 import { useForm } from "react-hook-form"
 import {
-    Breadcrumb, BreadcrumbItem, Button, Card, CardHeader, Col, Collapse, Label, Row
+    Breadcrumb, BreadcrumbItem, Button, Card, CardHeader, Col, Collapse,
+    Input, Label, Modal, ModalBody, ModalHeader, Row, Spinner
 } from "reactstrap"
+import { toast } from "react-toastify"
 import { InputTextControlled } from "Components/ComponentController/Inputs/Text/InputTextControlled"
 import { SelectListControlled } from "Components/ComponentController/Selects/Select/SelectListControlled"
 import { SelectOptions } from "interfaces/SystemInterfaces/SelectInterface"
@@ -16,6 +18,8 @@ import { FaturasService } from "services/Faturas/FaturasService"
 export interface FaturasFilterProps {
     getRemoteFaturasList: (data: any) => void
 }
+
+const isDev = process.env.NODE_ENV === 'development'
 
 const optStatus: SelectOptions[] = [
     { value: '', label: 'Todos' },
@@ -29,6 +33,9 @@ const FaturasFilter = ({ getRemoteFaturasList }: FaturasFilterProps) => {
     const { handleSubmit, control, register } = useForm<FaturasSearch>({ defaultValues: {} })
     const [showFilter, setShowFilter] = useState<boolean>(false)
     const [cartoesOptions, setCartoesOptions] = useState<SelectOptions[]>([{ value: '', label: 'Todos' }])
+    const [limparModalOpen, setLimparModalOpen] = useState(false)
+    const [confirmado, setConfirmado] = useState(false)
+    const [excluindoTodas, setExcluindoTodas] = useState(false)
     const faturasService = new FaturasService()
 
     useEffect(() => {
@@ -58,6 +65,34 @@ const FaturasFilter = ({ getRemoteFaturasList }: FaturasFilterProps) => {
 
     const optMeses: SelectOptions[] = [{ value: '', label: 'Todos' }, ...mesesOptions]
 
+    const toggleLimparModal = () => {
+        if (excluindoTodas) return
+        setLimparModalOpen((open) => !open)
+        setConfirmado(false)
+    }
+
+    const handleExcluirTodas = async () => {
+        if (!confirmado) return
+        setExcluindoTodas(true)
+        try {
+            const result = await faturasService.deleteAllFaturas()
+            const data = result?.fatura?.data
+            const faturas = data?.faturas_excluidas ?? 0
+            const transacoes = data?.transacoes_excluidas ?? 0
+            toast.success(
+                `${result?.fatura?.message ?? 'Limpeza concluída.'} (${faturas} fatura(s), ${transacoes} transação(ões))`
+            )
+            setLimparModalOpen(false)
+            setConfirmado(false)
+            await getRemoteFaturasList({})
+        } catch (error: any) {
+            console.error('Erro ao excluir todas as faturas:', error)
+            toast.error(error?.message || 'Erro ao excluir faturas e transações')
+        } finally {
+            setExcluindoTodas(false)
+        }
+    }
+
     return (
         <React.Fragment>
             <UiContent />
@@ -81,7 +116,18 @@ const FaturasFilter = ({ getRemoteFaturasList }: FaturasFilterProps) => {
 
             <Row>
                 <Col xs={12}>
-                    <div className="d-flex flex-row justify-content-end align-items-center mb-4">
+                    <div className="d-flex flex-row justify-content-end align-items-center gap-2 mb-4">
+                        {isDev && (
+                            <Button
+                                color="soft-danger"
+                                className="btn btn-soft-danger"
+                                onClick={toggleLimparModal}
+                                title="Ferramenta de testes: zera faturas e compras"
+                            >
+                                <i className="ri-delete-bin-2-line align-middle me-1"></i>
+                                Limpar faturas
+                            </Button>
+                        )}
                         <Link to="/faturas/add" className="btn btn-primary">
                             <i className="ri-add-circle-line align-middle me-1"></i> Adicionar Fatura
                         </Link>
@@ -191,6 +237,53 @@ const FaturasFilter = ({ getRemoteFaturasList }: FaturasFilterProps) => {
                     </Card>
                 </Col>
             </Row>
+
+            {isDev && (
+                <Modal isOpen={limparModalOpen} toggle={toggleLimparModal} centered backdrop="static">
+                    <ModalHeader toggle={toggleLimparModal}>Excluir todas as faturas?</ModalHeader>
+                    <ModalBody>
+                        <div className="text-center mb-3">
+                            <i className="ri-error-warning-line display-5 text-danger"></i>
+                        </div>
+                        <p className="mb-2">
+                            Isso remove <strong>todas as faturas e transações</strong>. Cartões e cadastros
+                            (estabelecimentos, categorias…) permanecem. Esta ação é para testes e não pode
+                            ser desfeita pela UI.
+                        </p>
+                        <div className="form-check mb-4">
+                            <Input
+                                className="form-check-input"
+                                type="checkbox"
+                                id="confirmar-excluir-todas"
+                                checked={confirmado}
+                                onChange={(e) => setConfirmado(e.target.checked)}
+                                disabled={excluindoTodas}
+                            />
+                            <Label className="form-check-label" htmlFor="confirmar-excluir-todas">
+                                Entendi e quero excluir tudo
+                            </Label>
+                        </div>
+                        <div className="d-flex gap-2 justify-content-end">
+                            <Button color="light" onClick={toggleLimparModal} disabled={excluindoTodas}>
+                                Cancelar
+                            </Button>
+                            <Button
+                                color="danger"
+                                onClick={handleExcluirTodas}
+                                disabled={!confirmado || excluindoTodas}
+                            >
+                                {excluindoTodas ? (
+                                    <>
+                                        <Spinner size="sm" className="me-1" /> Excluindo…
+                                    </>
+                                ) : (
+                                    'Excluir tudo'
+                                )}
+                            </Button>
+                        </div>
+                    </ModalBody>
+                </Modal>
+            )}
         </React.Fragment>
     )
 }

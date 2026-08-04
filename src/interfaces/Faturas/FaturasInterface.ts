@@ -96,6 +96,20 @@ export interface LookupsFaturas {
     cartoes?: CartaoLookup[]
 }
 
+/** Resposta de `DELETE /faturas/excluir-todas` */
+export interface ExcluirTodasFaturasData {
+    faturas_excluidas: number
+    transacoes_excluidas: number
+}
+
+export interface ExcluirTodasFaturasResponse {
+    fatura?: {
+        data?: ExcluirTodasFaturasData
+        status?: boolean
+        message?: string
+    }
+}
+
 export interface FaturasInterface {
     getViewFaturas(params: any): Promise<FaturasView | undefined>
     listFaturasPaginate(params: FaturasSearch): Promise<any>
@@ -103,6 +117,7 @@ export interface FaturasInterface {
     createFaturas(params: FaturasModel): Promise<any>
     editFaturas(params: FaturasModel): Promise<any>
     deleteFaturas(id: number): Promise<any>
+    deleteAllFaturas(): Promise<ExcluirTodasFaturasResponse>
     getLookupsFaturas(): Promise<LookupsFaturas | undefined>
     uploadPdf(params: { id: number; arquivo_pdf: File; processar_automatico?: boolean }): Promise<any>
     processarPdf(id: number): Promise<any>

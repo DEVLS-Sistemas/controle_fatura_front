@@ -4,6 +4,7 @@ import { UnexpectedError } from "../../libs/api/exceptions/UnexpectedError"
 import { ValidationError } from "../../libs/api/exceptions/ValidationError"
 import { PaginateInterface } from "interfaces/SystemInterfaces/PaginateInterface"
 import {
+    ExcluirTodasFaturasResponse,
     FaturasCartaoGroup,
     FaturasInterface,
     FaturasModel,
@@ -114,6 +115,19 @@ export class FaturasService implements FaturasInterface {
         switch (response.statusCode) {
             case HttpStatusCode.ok: return response
             case HttpStatusCode.noContent: return
+            case HttpStatusCode.unauthorized: throw new AccessDeniedError()
+            case HttpStatusCode.invalidForm: throw new ValidationError(response.body)
+            default: throw new UnexpectedError(response.message)
+        }
+    }
+
+    async deleteAllFaturas(): Promise<ExcluirTodasFaturasResponse> {
+        const response = await this.httpClient.delete<ExcluirTodasFaturasResponse>({
+            url: this.url + '/excluir-todas',
+            body: { confirmar: true },
+        })
+        switch (response.statusCode) {
+            case HttpStatusCode.ok: return response.body
             case HttpStatusCode.unauthorized: throw new AccessDeniedError()
             case HttpStatusCode.invalidForm: throw new ValidationError(response.body)
             default: throw new UnexpectedError(response.message)
