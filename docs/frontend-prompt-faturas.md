@@ -13,7 +13,8 @@ A tela de faturas deve:
 3. **Não exibir transações** na listagem — só resumo da fatura
 4. Exibir o **intervalo do ciclo** (início/fim) e a competência, com base no ciclo do **grupo**
 5. Abrir o **detalhe** (e as transações) só ao clicar em uma fatura
-6. No detalhe, **agrupar transações pelo final do cartão** (`ultimos_digitos`)
+6. No detalhe, **agrupar transações pelo final do cartão** (`ultimos_digitos` / `nome_no_cartao`)
+7. Separar **pagamentos de fatura** em grupo próprio **Operacionais** (não pedem final)
 
 Hierarquia relevante: ver [`frontend-prompt-cartoes.md`](frontend-prompt-cartoes.md).
 
@@ -180,14 +181,36 @@ GET /api/v1/cartoes/bandeiras-list?cartao_id={id}
 3. Clique na fatura → tela/drawer de detalhe
 4. Ações na linha: upload PDF, processar, excluir, ver PDF
 
-### Tela de detalhe (view)
+### Tela de detalhe (view) — cabeçalho
 
-1. Cabeçalho do grupo + **bandeira** + competência + intervalo + vencimento
-2. Valor total e status
-3. Bloco de PDF (preview / reprocessar)
-4. **Só aqui** carregar transações via `GET /transacoes/listar?fatura_id=`  
+Layout em duas faixas principais (destaque visual):
+
+```
+[chip] PICPAY                         Competência
+       Mastercard                     06/2026
+──────────────────────────── <hr> ────────────────────────────
+Ciclo · Vencimento · Status · …     [fundo claro]
+                                    Total da fatura
+                                    R$ 2.271,47
+```
+
+1. **Linha 1 (destaque):**
+   - Esquerda: chip grande com `cor_fundo`/`cor_texto` + nome do cartão (grupo) em tipografia grande + badge da **bandeira**
+   - Direita: label “Competência” + valor (`06/2026`) em tipografia grande
+2. **`<hr>`** separando a faixa de identidade da faixa de resumo
+3. **Linha 2:**
+   - Esquerda: ciclo (`periodo_inicio`–`periodo_fim`), vencimento, status, lançamentos, processado em
+   - Direita: **Total da fatura** em destaque, com fundo claro (`bg-light`) e valor em `text-primary` (maior que o restante)
+4. Ações (Voltar / Editar / Reprocessar), upload PDF e blocos de categorias/gráficos abaixo
+5. **Só aqui** carregar transações via `GET /transacoes/listar?fatura_id=`  
    (a API já ordena por `ultimos_digitos` asc → `data` asc quando `fatura_id` é informado)
-5. **Agrupar a exibição por final do cartão** — preferir `grupos_por_cartao` do `GET /faturas/listar/{id}` para cabeçalhos/subtotais; as linhas vêm de `/transacoes/listar`:
+6. **Agrupar a exibição** — preferir `grupos_por_cartao` do `GET /faturas/listar/{id}` para cabeçalhos/subtotais; as linhas vêm de `/transacoes/listar`. Incluir grupos locais:
+
+| Grupo | Quando |
+|-------|--------|
+| `•••• 7025 · LEONARDO S FERREIRA` | Transações com `cartao_numero_id` / `ultimos_digitos` |
+| Sem cartão identificado | Compra sem final (`cartao_numero_id` null), **exceto** operacionais |
+| **Operacionais** | Pagamento de fatura — ver regra abaixo |
 
 ```json
 "grupos_por_cartao": [
@@ -221,22 +244,81 @@ GET /api/v1/cartoes/bandeiras-list?cartao_id={id}
 ]
 ```
 
-UI sugerida:
+UI sugerida dos grupos:
 
 ```
 •••• 7025 · LEONARDO S FERREIRA    subtotal R$ …
-  10/06  PAGAMENTO DE FATURA …
-
-•••• 7033 · LEONARDO S FERREIRA    subtotal R$ …
   01/06  MP *ALIEXPRESS …
 
+•••• 7033 · LEONARDO S FERREIRA    subtotal R$ …
+  06/06  AMAZON …
+
 Sem cartão identificado            subtotal R$ …
+  [linha extra: select Final do cartão]
   04/08  Estabelecimento  R$ 15,00
+
+Operacionais                       subtotal R$ …
+  11/05  PAGAMENTO DE FATURA  -1.530,27
 ```
+
+**Ordem dos grupos:** finais por `ultimos_digitos` asc → “Sem cartão identificado” → “Operacionais”.
 
 Cada linha de transação traz `cartao_numero_id`, `ultimos_digitos`, `cartao_numero_tipo`, `cartao_numero_apelido`, `cartao_numero_nome_no_cartao`.
 Filtro opcional na view: `GET /transacoes/listar?fatura_id=&cartao_numero_id=` ou `&ultimos_digitos=1234`.
 Ao **adicionar compra** nesta tela: select de final via `GET /cartoes/numeros-list?fatura_id=` (só finais da bandeira da fatura) e enviar `cartao_numero_id`.
+
+### Grupo Operacionais (pagamento de fatura)
+
+Pagamentos de fatura **não pertencem a um final específico** — quitam a fatura como um todo.
+
+Critério (qualquer um):
+
+- `tipo === 'payment'`, ou
+- `origem_compra === 'PAGAMENTO_FATURA'`, ou
+- nome do estabelecimento contendo “PAGAMENTO DE FATURA” / “PAGAMENTO FATURA”
+
+Regras:
+
+1. Agrupar em seção exclusiva com título **Operacionais**
+2. **Não** exibir select de final nessas linhas
+3. Não misturar com “Sem cartão identificado” nem com um final do PDF (mesmo que o import tenha colocado sob um cartão)
+
+### Atribuir / corrigir final — só em “Sem cartão identificado”
+
+Nem sempre o final vem preenchido no create/import (PDF sem cabeçalho de cartão, linha legada, etc.). Nessas linhas `cartao_numero_id` fica `null` e elas caem em **“Sem cartão identificado”** (desde que não sejam operacionais).
+
+**Grupos que já têm final** (ex.: `•••• 7025 · LEONARDO S FERREIRA`): uma linha só, com os campos padrão (data, estabelecimento, valor, origem, categoria…). **Sem** select de final.
+
+**Grupo “Sem cartão identificado”:** cada transação usa **duas linhas**:
+
+1. **Linha de cima** — select “Final do cartão” (`GET /cartoes/numeros-list?fatura_id=`)
+2. **Linha de baixo** — campos padrão que já existiam
+
+Salvar com:
+
+```http
+PUT /api/v1/transacoes/editar
+```
+
+```json
+{
+  "id": 123,
+  "cartao_numero_id": 10
+}
+```
+
+**Não redistribuir de imediato:** após salvar o final, a linha **permanece** em “Sem cartão identificado” com o select preenchido (estado local). A redistribuição para o grupo do final só ocorre quando o usuário **atualiza a tela** (reload / refetch completo). Isso evita perder o contexto de qual linha acabou de ser editada.
+
+Outras regras:
+
+1. No formulário global de **editar** transação, o select Final fica sempre visível (mesmo com 1 final).
+2. Label sugerido: `•••• 7025 · LEONARDO S FERREIRA` (usar `label` / `nome_no_cartao` da API).
+3. Se a compra for parcelada (`compra_grupo_id`):
+   - default: alterar **só esta parcela**;
+   - oferecer “Aplicar a todas as parcelas” → `propagar_grupo: true` (também sem redistribuir até refresh).
+4. Permitir limpar o final (`cartao_numero_id: null`) só se fizer sentido na UI.
+
+> O backend já aceita `cartao_numero_id` no `PUT /transacoes/editar` e valida que o final pertence à bandeira da fatura.
 
 ### Empty states
 
@@ -252,10 +334,16 @@ Ao **adicionar compra** nesta tela: select de final via `GET /cartoes/numeros-li
 - [ ] Cadastro: select de bandeira **só** quando o cartão tem mais de uma
 - [ ] Cadastro: com 1 bandeira, envia `cartao_bandeira_id` automaticamente
 - [ ] Transações **não** aparecem na listagem
-- [ ] Detalhe usa `grupos_por_cartao` + lista de transações agrupada por final
-- [ ] Grupo “Sem cartão identificado” para transações sem `cartao_numero_id`
+- [ ] Detalhe: cabeçalho com cartão/bandeira à esquerda e competência à direita (destaque)
+- [ ] Detalhe: `<hr>` + linha com ciclo/status e **total** em destaque (`bg-light` + `text-primary`) à direita
+- [ ] Detalhe usa `grupos_por_cartao` + lista agrupada por final (`nome_no_cartao` no label)
+- [ ] Grupo “Sem cartão identificado” para compras sem `cartao_numero_id` (não operacionais)
+- [ ] Grupo **Operacionais** para pagamentos de fatura (sem select de final)
+- [ ] Select de final **somente** no grupo “Sem cartão identificado” (duas linhas por transação)
+- [ ] Grupos com final já definido: uma linha, sem select de final
+- [ ] Após salvar o final, a linha **não muda de grupo** até o usuário atualizar a tela
+- [ ] Parceladas: opção de propagar o final com `propagar_grupo: true`
 - [ ] Cadastro de compra na fatura envia `cartao_numero_id`
-- [ ] Cada fatura mostra competência, intervalo início/fim e vencimento
 - [ ] Chip usa `cor_fundo` + `cor_texto`
 - [ ] Ordenação: competência → cartão → status
 - [ ] Paginação trata `perPage` como quantidade de **faturas** (resposta agrupada por cartão)

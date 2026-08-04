@@ -15,15 +15,25 @@ import {
     FATURA_FILE_ACCEPT, isValidFaturaFile,
     getCategoriaFieldStyle, VALOR_TEXT_CLASS,
 } from 'helpers/fatura_helpers'
-import { CartaoChip } from 'helpers/cartao_helpers'
 import { SelectOptions } from 'interfaces/SystemInterfaces/SelectInterface'
 import { FaturaGrupoPorCartao, FaturasView } from 'interfaces/Faturas/FaturasInterface'
 import { CategoriaLookup, ResponsavelLookup, TransacoesList } from 'interfaces/Transacoes/TransacoesInterface'
+import { NumeroListItem } from 'interfaces/Cartoes/CartoesInterface'
 import { FaturasService } from 'services/Faturas/FaturasService'
 import { TransacoesService } from 'services/Transacoes/TransacoesService'
 import { SubcategoriasService } from 'services/Subcategorias/SubcategoriasService'
+import { CartoesService } from 'services/Cartoes/CartoesService'
 import ResponsavelModal from 'pages/Pages/Transacoes/ResponsavelModal/ResponsavelModal'
 import { getApiBaseUrl } from 'libs/api/ApiConfig'
+
+const formatNumeroOptionLabel = (n: NumeroListItem): string => {
+    if (n.label) return n.label
+    const digitos = String(n.ultimos_digitos ?? '').replace(/\D/g, '').slice(-4)
+    const base = digitos ? `•••• ${digitos}` : `#${n.value}`
+    const nome = n.nome_no_cartao?.trim() || null
+    if (nome) return `${base} · ${nome}`
+    return n.apelido ? `${base} · ${n.apelido}` : base
+}
 
 const statusLabel: Record<string, string> = {
     pendente: 'Pendente',
@@ -44,6 +54,20 @@ const formatParcelas = (atual?: number, total?: number) => {
     return `${atual ?? 1}/${total}`
 }
 
+const OPERACIONAIS_KEY = '__operacionais__'
+const SEM_CARTAO_KEY = '__sem_cartao__'
+
+/** Pagamento de fatura (e similares) não pertencem a um final específico */
+const isTxOperacional = (tx: TransacoesList): boolean => {
+    if (tx.tipo === 'payment') return true
+    if (tx.origem_compra === 'PAGAMENTO_FATURA') return true
+    const nome = (tx.estabelecimento_nome ?? tx.estabelecimento ?? '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toUpperCase()
+    return nome.includes('PAGAMENTO DE FATURA') || nome.includes('PAGAMENTO FATURA')
+}
+
 const getTxUltimosDigitos = (tx: TransacoesList): string | null => {
     const digitos = tx.ultimos_digitos
         ?? tx.cartao_numero?.ultimos_digitos
@@ -53,10 +77,11 @@ const getTxUltimosDigitos = (tx: TransacoesList): string | null => {
 }
 
 const getTxNumeroKey = (tx: TransacoesList): string => {
+    if (isTxOperacional(tx)) return OPERACIONAIS_KEY
     if (tx.cartao_numero_id != null) return `numero_${tx.cartao_numero_id}`
     if (tx.cartao_numero?.id != null) return `numero_${tx.cartao_numero.id}`
     const digitos = getTxUltimosDigitos(tx)
-    return digitos ? `digitos_${digitos}` : '__sem_cartao__'
+    return digitos ? `digitos_${digitos}` : SEM_CARTAO_KEY
 }
 
 const getTxNomeNoCartao = (tx: TransacoesList): string | null => {
@@ -67,6 +92,7 @@ const getTxNomeNoCartao = (tx: TransacoesList): string | null => {
 }
 
 const getTxNumeroLabel = (tx: TransacoesList): string => {
+    if (isTxOperacional(tx)) return 'Operacionais'
     const digitos = getTxUltimosDigitos(tx)
     if (!digitos) return 'Sem cartão identificado'
     const nomeNoCartao = getTxNomeNoCartao(tx)
@@ -94,6 +120,12 @@ type TransacaoGrupo = {
     subtotal: number
 }
 
+const grupoSortOrder = (g: TransacaoGrupo): number => {
+    if (g.key === OPERACIONAIS_KEY) return 2
+    if (g.key === SEM_CARTAO_KEY) return 1
+    return 0
+}
+
 const groupTransacoesPorFinal = (
     rows: TransacoesList[],
     metaGrupos?: FaturaGrupoPorCartao[] | null
@@ -104,17 +136,20 @@ const groupTransacoesPorFinal = (
             ? `numero_${g.cartao_numero_id}`
             : (g.ultimos_digitos
                 ? `digitos_${String(g.ultimos_digitos).replace(/\D/g, '').slice(-4)}`
-                : '__sem_cartao__')
+                : SEM_CARTAO_KEY)
         metaByKey.set(key, g)
     })
 
     const map = new Map<string, TransacaoGrupo>()
 
     rows.forEach((tx) => {
-        const digitos = getTxUltimosDigitos(tx)
         const key = getTxNumeroKey(tx)
-        const cartaoNumeroId = tx.cartao_numero_id ?? tx.cartao_numero?.id ?? null
-        const meta = metaByKey.get(key)
+        const isOperacional = key === OPERACIONAIS_KEY
+        const digitos = isOperacional ? null : getTxUltimosDigitos(tx)
+        const cartaoNumeroId = isOperacional
+            ? null
+            : (tx.cartao_numero_id ?? tx.cartao_numero?.id ?? null)
+        const meta = isOperacional ? undefined : metaByKey.get(key)
         const current = map.get(key)
         if (current) {
             current.items.push(tx)
@@ -125,7 +160,9 @@ const groupTransacoesPorFinal = (
             key,
             cartaoNumeroId,
             digitos,
-            label: (meta ? formatGrupoLabel(meta) : null) || getTxNumeroLabel(tx),
+            label: isOperacional
+                ? 'Operacionais'
+                : ((meta ? formatGrupoLabel(meta) : null) || getTxNumeroLabel(tx)),
             items: [tx],
             subtotal: Number(tx.valor ?? 0),
         })
@@ -133,7 +170,7 @@ const groupTransacoesPorFinal = (
 
     // Inclui grupos da API sem linhas (ex.: após filtro local)
     metaByKey.forEach((meta, key) => {
-        if (map.has(key)) return
+        if (map.has(key) || key === OPERACIONAIS_KEY) return
         map.set(key, {
             key,
             cartaoNumeroId: meta.cartao_numero_id ?? null,
@@ -149,6 +186,8 @@ const groupTransacoesPorFinal = (
     return Array.from(map.values())
         .filter((g) => g.items.length > 0)
         .sort((a, b) => {
+            const orderDiff = grupoSortOrder(a) - grupoSortOrder(b)
+            if (orderDiff !== 0) return orderDiff
             if (a.digitos == null) return 1
             if (b.digitos == null) return -1
             return a.digitos.localeCompare(b.digitos, 'pt-BR')
@@ -162,6 +201,7 @@ const FaturasViewPage = () => {
     const faturasService = useRef(new FaturasService()).current
     const transacoesService = useRef(new TransacoesService()).current
     const subcategoriasService = useRef(new SubcategoriasService()).current
+    const cartoesService = useRef(new CartoesService()).current
     const loadedSubcategoriasRef = useRef<Set<number>>(new Set())
     const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -180,12 +220,16 @@ const FaturasViewPage = () => {
     const [origensCompraOptions, setOrigensCompraOptions] = useState<SelectOptions[]>(
         () => Object.entries(origemCompraLabel).map(([value, label]) => ({ value, label }))
     )
+    const [numerosOptions, setNumerosOptions] = useState<SelectOptions[]>([])
+    const [numerosLoading, setNumerosLoading] = useState(false)
     const [defaultResponsavelId, setDefaultResponsavelId] = useState<number | null>(null)
     const [responsavelModalOpen, setResponsavelModalOpen] = useState(false)
     const [rowForResponsavel, setRowForResponsavel] = useState<TransacoesList | null>(null)
     const [savingIds, setSavingIds] = useState<Record<number, boolean>>({})
     const [valorDrafts, setValorDrafts] = useState<Record<number, string>>({})
     const [observacaoDrafts, setObservacaoDrafts] = useState<Record<number, string>>({})
+    /** Finais salvos na sessão “Sem cartão identificado” — não redistribui até atualizar a tela */
+    const [finalSelecionados, setFinalSelecionados] = useState<Record<number, number | null>>({})
     const [exporting, setExporting] = useState(false)
     /** null = todos; '__sem_cartao__' ou chave do grupo */
     const [filtroFinalKey, setFiltroFinalKey] = useState<string | null>(null)
@@ -288,6 +332,7 @@ const FaturasViewPage = () => {
             })
             setValorDrafts(drafts)
             setObservacaoDrafts(obsDrafts)
+            setFinalSelecionados({})
             await Promise.all(Array.from(categoriaIds).map((catId) => loadSubcategoriasForCategoria(catId)))
         } catch (error) {
             console.error('Erro ao carregar transações:', error)
@@ -331,6 +376,24 @@ const FaturasViewPage = () => {
         }
     }, [transacoesService])
 
+    const loadNumeros = useCallback(async (faturaId: string) => {
+        setNumerosLoading(true)
+        try {
+            const list = (await cartoesService.AsyncListNumeros({ fatura_id: faturaId })) ?? []
+            setNumerosOptions(
+                list.map((n) => ({
+                    value: n.value,
+                    label: formatNumeroOptionLabel(n),
+                }))
+            )
+        } catch (error) {
+            console.error('Erro ao carregar finais do cartão:', error)
+            setNumerosOptions([])
+        } finally {
+            setNumerosLoading(false)
+        }
+    }, [cartoesService])
+
     const loadFatura = useCallback(async (opts?: { silent?: boolean }) => {
         if (!id) return
         if (!opts?.silent) setLoading(true)
@@ -340,7 +403,7 @@ const FaturasViewPage = () => {
                 setFatura(view)
                 setShowPdfPreview(false)
                 clearPdfBlobUrl()
-                await loadTransacoes(id)
+                await Promise.all([loadTransacoes(id), loadNumeros(id)])
             }
         } catch (error) {
             console.error('Erro ao carregar fatura:', error)
@@ -348,7 +411,7 @@ const FaturasViewPage = () => {
         } finally {
             if (!opts?.silent) setLoading(false)
         }
-    }, [id, faturasService, clearPdfBlobUrl, loadTransacoes])
+    }, [id, faturasService, clearPdfBlobUrl, loadTransacoes, loadNumeros])
 
     const handleReprocessar = async () => {
         if (!id) return
@@ -544,6 +607,76 @@ const FaturasViewPage = () => {
         await saveTransacao(tx, { origem_compra: origem })
     }
 
+    const handleUpdateFinal = async (tx: TransacoesList, value: string) => {
+        if (!tx.id || !id) return
+        const parsed = value === '' ? null : Number(value)
+        const current = finalSelecionados[tx.id] !== undefined
+            ? finalSelecionados[tx.id]
+            : (tx.cartao_numero_id ?? tx.cartao_numero?.id ?? null)
+        if ((current == null && parsed == null) || Number(current) === Number(parsed)) return
+
+        let propagarGrupo = false
+        if (tx.compra_grupo_id && parsed != null) {
+            propagarGrupo = window.confirm(
+                'Esta compra é parcelada. Deseja aplicar o final a todas as parcelas?'
+            )
+        }
+
+        setSavingIds((prev) => ({ ...prev, [tx.id!]: true }))
+        try {
+            await transacoesService.editTransacoes({
+                id: tx.id,
+                transacao_id: tx.id,
+                cartao_id: tx.cartao_id ?? fatura?.cartao_id ?? null,
+                fatura_id: tx.fatura_id ?? Number(id),
+                estabelecimento_id: tx.estabelecimento_id ?? null,
+                estabelecimento: tx.estabelecimento_id ? undefined : (tx.estabelecimento ?? null),
+                valor: tx.valor ?? null,
+                valor_parcela: tx.valor ?? null,
+                data: tx.data ?? null,
+                tipo: tx.tipo ?? null,
+                origem_compra: tx.origem_compra ?? null,
+                categoria_id: tx.categoria_id ?? null,
+                subcategoria_id: tx.subcategoria_id ?? null,
+                responsavel_id: tx.responsavel_id ?? null,
+                observacoes: tx.observacoes ?? null,
+                cartao_numero_id: parsed,
+                propagar_grupo: propagarGrupo,
+            })
+
+            // Mantém a linha em “Sem cartão identificado”; redistribui só ao atualizar a tela
+            setFinalSelecionados((prev) => {
+                const next = { ...prev, [tx.id!]: parsed }
+                if (propagarGrupo && tx.compra_grupo_id) {
+                    transacoes.forEach((item) => {
+                        if (
+                            item.id != null
+                            && item.compra_grupo_id === tx.compra_grupo_id
+                            && (item.cartao_numero_id == null && item.cartao_numero?.id == null)
+                        ) {
+                            next[item.id] = parsed
+                        }
+                    })
+                }
+                return next
+            })
+            toast.success(
+                parsed == null
+                    ? 'Final removido. Atualize a tela para redistribuir.'
+                    : 'Final salvo. Atualize a tela para redistribuir as transações.'
+            )
+        } catch (error) {
+            console.error('Erro ao atualizar final do cartão:', error)
+            toast.error('Erro ao atualizar final do cartão')
+        } finally {
+            setSavingIds((prev) => {
+                const next = { ...prev }
+                delete next[tx.id!]
+                return next
+            })
+        }
+    }
+
     const handleValorBlur = async (tx: TransacoesList) => {
         if (!tx.id) return
         const raw = (valorDrafts[tx.id] ?? '').replace(',', '.').trim()
@@ -707,63 +840,106 @@ const FaturasViewPage = () => {
 
                     <Card className="mb-4">
                         <CardBody>
+                            <div
+                                className="d-flex flex-wrap align-items-center justify-content-between gap-3"
+                            >
+                                <div className="d-flex align-items-center gap-3 min-w-0">
+                                    {fatura.cartao_cor_fundo && (
+                                        <span
+                                            className="d-inline-flex align-items-center justify-content-center rounded-3 flex-shrink-0 fw-bold"
+                                            style={{
+                                                width: 56,
+                                                height: 56,
+                                                fontSize: '1.5rem',
+                                                backgroundColor: fatura.cartao_cor_fundo,
+                                                color: fatura.cartao_cor_texto || '#ffffff',
+                                                boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
+                                            }}
+                                            title={fatura.cartao_nome || undefined}
+                                        >
+                                            {fatura.cartao_nome
+                                                ? String(fatura.cartao_nome).slice(0, 1).toUpperCase()
+                                                : '•'}
+                                        </span>
+                                    )}
+                                    <div className="min-w-0">
+                                        <div
+                                            className="fw-bold text-truncate"
+                                            style={{ fontSize: '1.75rem', lineHeight: 1.2 }}
+                                        >
+                                            {fatura.cartao_nome || 'Cartão'}
+                                        </div>
+                                        {(fatura.bandeira || fatura.cartao_bandeira) && (
+                                            <div className="mt-1">
+                                                <span
+                                                    className="badge bg-primary-subtle text-primary-emphasis"
+                                                    style={{ fontSize: '0.95rem', fontWeight: 600 }}
+                                                >
+                                                    {fatura.bandeira || fatura.cartao_bandeira}
+                                                </span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                                <div className="text-md-end">
+                                    <div className="text-muted text-uppercase small fw-semibold mb-1">
+                                        Competência
+                                    </div>
+                                    <div
+                                        className="fw-bold text-primary"
+                                        style={{ fontSize: '1.75rem', lineHeight: 1.2, letterSpacing: '0.02em' }}
+                                    >
+                                        {fatura.competencia ?? formatPeriodo(fatura.mes, fatura.ano)}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <hr className="my-3" />
+
+                            <div
+                                className="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3"
+                            >
+                                <div className="d-flex flex-wrap gap-3 text-muted">
+                                    {(fatura.periodo_inicio || fatura.periodo_fim) && (
+                                        <span>
+                                            <strong>Ciclo:</strong>{' '}
+                                            {formatDateBr(fatura.periodo_inicio)} – {formatDateBr(fatura.periodo_fim)}
+                                        </span>
+                                    )}
+                                    {fatura.data_vencimento && (
+                                        <span>
+                                            <strong>Vencimento:</strong> {formatDateBr(fatura.data_vencimento)}
+                                        </span>
+                                    )}
+                                    <span>
+                                        <strong>Status:</strong>{' '}
+                                        <Badge color={faturaStatusColor[fatura.status ?? ''] ?? 'secondary'}>
+                                            {statusLabel[fatura.status ?? ''] ?? fatura.status}
+                                        </Badge>
+                                    </span>
+                                    <span><strong>Lançamentos:</strong> {fatura.total_transacoes ?? transacoes.length}</span>
+                                    {fatura.processado_em && (
+                                        <span><strong>Processado em:</strong> {formatDateBr(fatura.processado_em)}</span>
+                                    )}
+                                </div>
+                                <div className="d-inline-flex flex-column bg-light rounded px-3 py-2 text-md-end ms-auto">
+                                    <small className="text-muted text-uppercase">Total da fatura</small>
+                                    <span
+                                        className={`fw-semibold text-primary ${VALOR_TEXT_CLASS}`}
+                                        style={{ fontSize: '2rem', lineHeight: 1.15 }}
+                                    >
+                                        {formatCurrency(fatura.valor_total)}
+                                    </span>
+                                </div>
+                            </div>
+
                             <Row className="align-items-center">
                                 <Col md={8}>
-                                    <h5 className="mb-2 d-flex align-items-center gap-2 flex-wrap">
-                                        {fatura.cartao_cor_fundo && (
-                                            <CartaoChip
-                                                cor_fundo={fatura.cartao_cor_fundo}
-                                                cor_texto={fatura.cartao_cor_texto}
-                                                label={fatura.cartao_nome
-                                                    ? String(fatura.cartao_nome).slice(0, 1)
-                                                    : '•'}
-                                            />
-                                        )}
-                                        <span>{fatura.cartao_nome}</span>
-                                        {(fatura.bandeira || fatura.cartao_bandeira) && (
-                                            <span className="badge bg-light text-dark">
-                                                {fatura.bandeira || fatura.cartao_bandeira}
-                                            </span>
-                                        )}
-                                    </h5>
-                                    <div className="d-flex flex-wrap gap-3 text-muted mb-3">
-                                        <span>
-                                            <strong>Competência:</strong>{' '}
-                                            {fatura.competencia ?? formatPeriodo(fatura.mes, fatura.ano)}
-                                        </span>
-                                        {(fatura.periodo_inicio || fatura.periodo_fim) && (
-                                            <span>
-                                                <strong>Ciclo:</strong>{' '}
-                                                {formatDateBr(fatura.periodo_inicio)} – {formatDateBr(fatura.periodo_fim)}
-                                            </span>
-                                        )}
-                                        {fatura.data_vencimento && (
-                                            <span>
-                                                <strong>Vencimento:</strong> {formatDateBr(fatura.data_vencimento)}
-                                            </span>
-                                        )}
-                                        <span>
-                                            <strong>Status:</strong>{' '}
-                                            <Badge color={faturaStatusColor[fatura.status ?? ''] ?? 'secondary'}>
-                                                {statusLabel[fatura.status ?? ''] ?? fatura.status}
-                                            </Badge>
-                                        </span>
-                                        <span><strong>Lançamentos:</strong> {fatura.total_transacoes ?? transacoes.length}</span>
-                                        {fatura.processado_em && (
-                                            <span><strong>Processado em:</strong> {formatDateBr(fatura.processado_em)}</span>
-                                        )}
-                                    </div>
-                                    <div className="d-inline-flex flex-column bg-light rounded px-3 py-2">
-                                        <small className="text-muted text-uppercase">Total da fatura</small>
-                                        <span className={`fs-3 fw-semibold text-primary ${VALOR_TEXT_CLASS}`}>
-                                            {formatCurrency(fatura.valor_total)}
-                                        </span>
-                                    </div>
                                     {fatura.erro_mensagem && (
-                                        <div className="alert alert-danger mt-3 mb-0">{fatura.erro_mensagem}</div>
+                                        <div className="alert alert-danger mb-0">{fatura.erro_mensagem}</div>
                                     )}
                                     {isProcessing && (
-                                        <div className="alert alert-info mt-3 mb-0">
+                                        <div className="alert alert-info mb-0">
                                             Fatura pendente/processando. Use <strong>Reprocessar</strong> para atualizar as transações.
                                         </div>
                                     )}
@@ -912,7 +1088,7 @@ const FaturasViewPage = () => {
                                 <div>
                                     <h5 className="card-title mb-1">Transações</h5>
                                     <small className="text-muted">
-                                        Agrupadas por final do cartão. Ajuste valor, origem, categoria, subcategoria e observação em cada linha.
+                                        Agrupadas por final do cartão. Em “Sem cartão identificado”, escolha o final na linha de cima da transação.
                                     </small>
                                 </div>
                                 <div className="d-flex flex-wrap gap-2">
@@ -1025,8 +1201,55 @@ const FaturasViewPage = () => {
                                                             tx.responsavel_nome
                                                             ?? responsaveisLookup.find((r) => Number(r.id) === Number(tx.responsavel_id))?.nome
                                                             ?? responsaveisOptions.find((o) => Number(o.value) === Number(tx.responsavel_id))?.label
+                                                        const isSemCartaoGrupo = grupo.key === SEM_CARTAO_KEY
+                                                        const finalSalvo = tx.id != null && finalSelecionados[tx.id] !== undefined
+                                                            ? finalSelecionados[tx.id]
+                                                            : (tx.cartao_numero_id ?? tx.cartao_numero?.id ?? null)
+                                                        const selectFinalValue = finalSalvo ?? ''
+                                                        const rowKey = tx.id ?? `${grupo.key}_${idx}`
                                                         return (
-                                                        <tr key={tx.id ?? `${grupo.key}_${idx}`}>
+                                                        <React.Fragment key={rowKey}>
+                                                        {isSemCartaoGrupo && (
+                                                            <tr className="table-warning">
+                                                                <td colSpan={10} className="py-2">
+                                                                    <div className="d-flex flex-wrap align-items-center gap-2">
+                                                                        <span className="text-muted small text-nowrap">
+                                                                            <i className="ri-bank-card-line me-1"></i>
+                                                                            Final do cartão
+                                                                        </span>
+                                                                        {numerosLoading ? (
+                                                                            <span className="text-muted small">Carregando...</span>
+                                                                        ) : numerosOptions.length === 0 ? (
+                                                                            <span className="text-muted small">Sem finais cadastrados nesta bandeira</span>
+                                                                        ) : (
+                                                                            <Input
+                                                                                type="select"
+                                                                                bsSize="sm"
+                                                                                style={{ maxWidth: 320 }}
+                                                                                value={selectFinalValue}
+                                                                                disabled={!!savingIds[tx.id!]}
+                                                                                className={finalSalvo == null ? 'border-warning' : undefined}
+                                                                                title="Definir final do cartão"
+                                                                                onChange={(e) => handleUpdateFinal(tx, e.target.value)}
+                                                                            >
+                                                                                <option value="">Definir final...</option>
+                                                                                {numerosOptions.map((opt) => (
+                                                                                    <option key={String(opt.value)} value={opt.value}>
+                                                                                        {opt.label}
+                                                                                    </option>
+                                                                                ))}
+                                                                            </Input>
+                                                                        )}
+                                                                        {finalSalvo != null && (
+                                                                            <span className="text-success small">
+                                                                                Salvo — atualize a tela para redistribuir
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                </td>
+                                                            </tr>
+                                                        )}
+                                                        <tr>
                                                             <td>{formatDateBr(tx.data)}</td>
                                                             <td>{tx.estabelecimento_nome ?? tx.estabelecimento ?? '-'}</td>
                                                             <td className={VALOR_TEXT_CLASS}>
@@ -1154,6 +1377,7 @@ const FaturasViewPage = () => {
                                                                 </Button>
                                                             </td>
                                                         </tr>
+                                                        </React.Fragment>
                                                         )
                                                     })}
                                                 </React.Fragment>

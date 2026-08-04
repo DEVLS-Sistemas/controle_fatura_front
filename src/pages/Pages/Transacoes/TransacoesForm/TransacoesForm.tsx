@@ -130,6 +130,8 @@ const TransacoesForm = () => {
     const totalParcelasCentavos = parcelasValores.reduce((acc, v) => acc + toCentavos(v), 0)
     const valorCompraCentavos = toCentavos(valorCompraWatch)
     const totaisBatem = nParcelas <= 1 || totalParcelasCentavos === valorCompraCentavos
+    const showFinalField = showNumeroSelect || semNumeros || numerosLoading
+        || (isEdit && (numerosOptions.length > 0 || semNumeros || numerosLoading))
 
     const responsavelAtual = responsaveisLookup.find((r) => Number(r.id) === Number(responsavelId))
     const isMeuResponsavel =
@@ -188,8 +190,10 @@ const TransacoesForm = () => {
         cartao_id?: number | string | null
         fatura_id?: number | string | null
         preserveSelection?: boolean
+        /** No edit, o select fica sempre visível (mesmo com 1 final) */
+        forceShowSelect?: boolean
     }) => {
-        const { cartao_id, fatura_id, preserveSelection = false } = opts
+        const { cartao_id, fatura_id, preserveSelection = false, forceShowSelect = false } = opts
         if (!cartao_id && !fatura_id) {
             setNumerosOptions([])
             setShowNumeroSelect(false)
@@ -222,8 +226,15 @@ const TransacoesForm = () => {
             )
 
             if (list.length === 1) {
-                setShowNumeroSelect(false)
-                setValue('cartao_numero_id', list[0].value ?? null)
+                // Create: oculta e pré-seleciona. Edit: mantém visível para corrigir/atribuir.
+                setShowNumeroSelect(forceShowSelect)
+                if (preserveSelection) {
+                    const current = record.cartao_numero_id
+                    const stillValid = list.some((n) => Number(n.value) === Number(current))
+                    setValue('cartao_numero_id', stillValid ? current : (list[0].value ?? null))
+                } else {
+                    setValue('cartao_numero_id', list[0].value ?? null)
+                }
                 return
             }
 
@@ -332,7 +343,7 @@ const TransacoesForm = () => {
                 toast.warning('Cadastre um final neste cartão antes de registrar a compra')
                 return
             }
-            if (showNumeroSelect && !data.cartao_numero_id) {
+            if ((showNumeroSelect || (isEdit && numerosOptions.length > 1)) && !data.cartao_numero_id) {
                 toast.warning('Selecione o final do cartão da compra')
                 return
             }
@@ -342,7 +353,7 @@ const TransacoesForm = () => {
                     id: record.id ?? record.transacao_id,
                     transacao_id: record.transacao_id ?? record.id,
                     cartao_id: data.cartao_id,
-                    cartao_numero_id: data.cartao_numero_id || undefined,
+                    cartao_numero_id: data.cartao_numero_id || null,
                     fatura_id: data.fatura_id,
                     data: data.data,
                     estabelecimento_id: data.estabelecimento_id,
@@ -428,14 +439,26 @@ const TransacoesForm = () => {
         const isFirst = skipCartaoNumeroEffect.current
         if (isFirst) skipCartaoNumeroEffect.current = false
 
-        if (fromFatura && record.fatura_id && !isEdit) {
+        // Edit com fatura: só finais da bandeira da fatura (corrigir/atribuir final)
+        if (isEdit && record.fatura_id) {
+            loadNumeros({
+                fatura_id: record.fatura_id,
+                preserveSelection: true,
+                forceShowSelect: true,
+            })
+            return
+        }
+
+        // Create a partir da fatura
+        if (!isEdit && fromFatura && record.fatura_id) {
             loadNumeros({ fatura_id: record.fatura_id, preserveSelection: isFirst })
             return
         }
 
         loadNumeros({
             cartao_id: cartaoId,
-            preserveSelection: isFirst && Boolean(record.cartao_numero_id),
+            preserveSelection: isEdit || (isFirst && Boolean(record.cartao_numero_id)),
+            forceShowSelect: isEdit,
         })
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [cartaoId, fromFatura, isEdit, record.fatura_id])
@@ -529,7 +552,7 @@ const TransacoesForm = () => {
                                 <CardBody>
                                     <form onSubmit={handleSubmit(onSubmit)}>
                                         <Row>
-                                            <Col md={showNumeroSelect || semNumeros || numerosLoading ? 4 : 6}>
+                                            <Col md={showFinalField ? 4 : 6}>
                                                 <div className="mb-3">
                                                     <Label htmlFor="cartao_id" className="form-label">Cartão</Label>
                                                     <SelectListControlled<TransacoesModel>
@@ -544,7 +567,7 @@ const TransacoesForm = () => {
                                                     )}
                                                 </div>
                                             </Col>
-                                            {(showNumeroSelect || semNumeros || numerosLoading) && (
+                                            {showFinalField && (
                                                 <Col md={4}>
                                                     <div className="mb-3">
                                                         <Label htmlFor="cartao_numero_id" className="form-label">
@@ -571,13 +594,15 @@ const TransacoesForm = () => {
                                                         )}
                                                         {!semNumeros && !numerosLoading && (
                                                             <small className="text-muted">
-                                                                Qual plástico/virtual fez a compra
+                                                                {isEdit
+                                                                    ? 'Atribua ou corrija o final quando a compra veio sem cartão identificado'
+                                                                    : 'Qual plástico/virtual fez a compra'}
                                                             </small>
                                                         )}
                                                     </div>
                                                 </Col>
                                             )}
-                                            <Col md={showNumeroSelect || semNumeros || numerosLoading ? 2 : 3}>
+                                            <Col md={showFinalField ? 2 : 3}>
                                                 <div className="mb-3">
                                                     <Label htmlFor="data" className="form-label">Data da compra</Label>
                                                     <InputDate<TransacoesModel>
@@ -591,7 +616,7 @@ const TransacoesForm = () => {
                                                     )}
                                                 </div>
                                             </Col>
-                                            <Col md={showNumeroSelect || semNumeros || numerosLoading ? 2 : 3}>
+                                            <Col md={showFinalField ? 2 : 3}>
                                                 <div className="mb-3">
                                                     <Label htmlFor="tipo" className="form-label">Tipo</Label>
                                                     <SelectListControlled<TransacoesModel>
