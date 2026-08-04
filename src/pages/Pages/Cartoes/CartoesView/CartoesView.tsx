@@ -182,6 +182,11 @@ const CartoesViewPage = () => {
                                                                 <span className="fw-medium me-2">
                                                                     •••• {numero.ultimos_digitos}
                                                                 </span>
+                                                                {numero.nome_no_cartao && (
+                                                                    <span className="me-2">
+                                                                        {numero.nome_no_cartao}
+                                                                    </span>
+                                                                )}
                                                                 <span className="badge bg-light text-dark me-1">
                                                                     {tipoLabel(numero.tipo)}
                                                                 </span>

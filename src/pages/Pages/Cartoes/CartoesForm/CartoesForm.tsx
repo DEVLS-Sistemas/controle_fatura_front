@@ -101,6 +101,7 @@ const ColorSwatch = ({
 type NovoCartaoForm = {
     bandeira: string
     ultimos_digitos: string
+    nome_no_cartao: string
     tipo: string
     apelido: string
     limite_credito: string
@@ -109,6 +110,7 @@ type NovoCartaoForm = {
 const novoCartaoDefault: NovoCartaoForm = {
     bandeira: '',
     ultimos_digitos: '',
+    nome_no_cartao: '',
     tipo: 'fisico',
     apelido: '',
     limite_credito: '',
@@ -255,6 +257,7 @@ const CartoesForm = () => {
             _key: newLocalKey(),
             ultimos_digitos: digitos,
             tipo: novoCartao.tipo || 'fisico',
+            nome_no_cartao: novoCartao.nome_no_cartao.trim() || null,
             apelido: novoCartao.apelido.trim() || null,
             ativo: true,
         }
@@ -290,6 +293,26 @@ const CartoesForm = () => {
                     ...b,
                     numeros: (b.numeros ?? []).map((n) =>
                         (n._key ?? n.id) === numeroKey ? { ...n, ativo: !n.ativo } : n
+                    ),
+                }
+            })
+        )
+    }
+
+    const handleNomeNoCartaoChange = (
+        bandeiraKey: string | number,
+        numeroKey: string | number,
+        value: string
+    ) => {
+        setBandeiras((prev) =>
+            prev.map((b) => {
+                if ((b._key ?? b.id) !== bandeiraKey) return b
+                return {
+                    ...b,
+                    numeros: (b.numeros ?? []).map((n) =>
+                        (n._key ?? n.id) === numeroKey
+                            ? { ...n, nome_no_cartao: value || null }
+                            : n
                     ),
                 }
             })
@@ -361,6 +384,7 @@ const CartoesForm = () => {
                         ...(n.id ? { id: n.id } : {}),
                         ultimos_digitos: n.ultimos_digitos,
                         tipo: n.tipo || 'fisico',
+                        nome_no_cartao: n.nome_no_cartao || null,
                         apelido: n.apelido || null,
                         ativo: n.ativo !== false,
                     })),
@@ -621,10 +645,13 @@ const CartoesForm = () => {
                                         <p className="text-muted small mb-3">
                                             Adicione finais e bandeiras. O limite é único por bandeira — vários cartões
                                             (físico, virtual, adicional) compartilham o mesmo limite.
+                                            O <strong>nome no cartão</strong> é o texto impresso no plástico
+                                            (ex.: LEONARDO S FERREIRA), usado para identificar os grupos na fatura.
+                                            O <strong>apelido</strong> é só um rótulo interno.
                                         </p>
 
                                         <Row className="align-items-end g-2 mb-3">
-                                            <Col md={3}>
+                                            <Col md={2}>
                                                 <Label className="form-label">Bandeira</Label>
                                                 {bandeirasOptions.length > 0 ? (
                                                     <Input
@@ -674,6 +701,20 @@ const CartoesForm = () => {
                                                     }
                                                 />
                                             </Col>
+                                            <Col md={3}>
+                                                <Label className="form-label">Nome no cartão</Label>
+                                                <Input
+                                                    type="text"
+                                                    placeholder="Ex.: LEONARDO S FERREIRA"
+                                                    value={novoCartao.nome_no_cartao}
+                                                    onChange={(e) =>
+                                                        setNovoCartao((prev) => ({
+                                                            ...prev,
+                                                            nome_no_cartao: e.target.value,
+                                                        }))
+                                                    }
+                                                />
+                                            </Col>
                                             <Col md={2}>
                                                 <Label className="form-label">Tipo</Label>
                                                 <Input
@@ -697,7 +738,7 @@ const CartoesForm = () => {
                                                 <Label className="form-label">Apelido</Label>
                                                 <Input
                                                     type="text"
-                                                    placeholder="Opcional"
+                                                    placeholder="Rótulo interno"
                                                     value={novoCartao.apelido}
                                                     onChange={(e) =>
                                                         setNovoCartao((prev) => ({
@@ -826,12 +867,26 @@ const CartoesForm = () => {
                                                                             key={nKey}
                                                                             className="list-group-item d-flex flex-wrap align-items-center justify-content-between gap-2"
                                                                         >
-                                                                            <div>
-                                                                                <span className="fw-medium me-2">
+                                                                            <div className="d-flex flex-wrap align-items-center gap-2 flex-grow-1">
+                                                                                <span className="fw-medium">
                                                                                     •••• {numero.ultimos_digitos}
                                                                                 </span>
+                                                                                <Input
+                                                                                    type="text"
+                                                                                    bsSize="sm"
+                                                                                    style={{ maxWidth: 220 }}
+                                                                                    placeholder="Nome no cartão"
+                                                                                    value={numero.nome_no_cartao ?? ''}
+                                                                                    onChange={(e) =>
+                                                                                        handleNomeNoCartaoChange(
+                                                                                            bandeira._key ?? bandeira.id!,
+                                                                                            numero._key ?? numero.id!,
+                                                                                            e.target.value
+                                                                                        )
+                                                                                    }
+                                                                                />
                                                                                 {labelTipo && (
-                                                                                    <span className="badge bg-light text-dark me-1">
+                                                                                    <span className="badge bg-light text-dark">
                                                                                         {labelTipo}
                                                                                     </span>
                                                                                 )}
@@ -841,7 +896,7 @@ const CartoesForm = () => {
                                                                                     </span>
                                                                                 )}
                                                                                 {!numero.ativo && (
-                                                                                    <span className="badge bg-danger ms-2">
+                                                                                    <span className="badge bg-danger">
                                                                                         Inativo
                                                                                     </span>
                                                                                 )}

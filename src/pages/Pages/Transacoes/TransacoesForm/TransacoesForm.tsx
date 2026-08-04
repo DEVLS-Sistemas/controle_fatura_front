@@ -37,7 +37,12 @@ const formatNumeroOptionLabel = (n: NumeroListItem): string => {
     if (n.label) return n.label
     const digitos = String(n.ultimos_digitos ?? '').replace(/\D/g, '').slice(-4)
     const base = digitos ? `•••• ${digitos}` : `#${n.value}`
-    const extras = [n.bandeira, n.apelido || (n.tipo ? String(n.tipo) : null)].filter(Boolean)
+    const nome = n.nome_no_cartao?.trim() || null
+    const extras = [
+        n.bandeira,
+        nome,
+        !nome ? (n.apelido || (n.tipo ? String(n.tipo) : null)) : null,
+    ].filter(Boolean)
     return extras.length ? `${extras.join(' · ')} · ${base}` : base
 }
 

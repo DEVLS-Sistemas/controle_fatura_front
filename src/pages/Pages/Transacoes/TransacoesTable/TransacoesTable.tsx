@@ -56,7 +56,11 @@ const formatFinalCartao = (row: TransacoesList): string => {
         .replace(/\D/g, '')
         .slice(-4)
     if (!digitos) return '-'
-    const apelido = row.cartao_numero?.apelido
+    const nomeNoCartao = row.cartao_numero_nome_no_cartao
+        ?? row.cartao_numero?.nome_no_cartao
+        ?? null
+    if (nomeNoCartao?.trim()) return `•••• ${digitos} · ${nomeNoCartao.trim()}`
+    const apelido = row.cartao_numero_apelido ?? row.cartao_numero?.apelido
     return apelido ? `•••• ${digitos} · ${apelido}` : `•••• ${digitos}`
 }
 

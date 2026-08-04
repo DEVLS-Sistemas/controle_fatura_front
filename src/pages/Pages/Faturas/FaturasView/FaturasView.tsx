@@ -59,13 +59,30 @@ const getTxNumeroKey = (tx: TransacoesList): string => {
     return digitos ? `digitos_${digitos}` : '__sem_cartao__'
 }
 
+const getTxNomeNoCartao = (tx: TransacoesList): string | null => {
+    const nome = tx.cartao_numero_nome_no_cartao
+        ?? tx.cartao_numero?.nome_no_cartao
+        ?? null
+    return nome?.trim() || null
+}
+
 const getTxNumeroLabel = (tx: TransacoesList): string => {
     const digitos = getTxUltimosDigitos(tx)
     if (!digitos) return 'Sem cartão identificado'
-    const tipo = tx.cartao_numero?.tipo
-    const apelido = tx.cartao_numero?.apelido
+    const nomeNoCartao = getTxNomeNoCartao(tx)
+    if (nomeNoCartao) return `•••• ${digitos} · ${nomeNoCartao}`
+    const tipo = tx.cartao_numero?.tipo ?? tx.cartao_numero_tipo
+    const apelido = tx.cartao_numero?.apelido ?? tx.cartao_numero_apelido
     const extras = [apelido || tipo].filter(Boolean).join(' · ')
     return extras ? `•••• ${digitos} · ${extras}` : `•••• ${digitos}`
+}
+
+const formatGrupoLabel = (meta: FaturaGrupoPorCartao): string => {
+    if (meta.label) return meta.label
+    if (!meta.ultimos_digitos) return 'Sem cartão identificado'
+    const digitos = String(meta.ultimos_digitos).replace(/\D/g, '').slice(-4)
+    if (meta.nome_no_cartao?.trim()) return `•••• ${digitos} · ${meta.nome_no_cartao.trim()}`
+    return `•••• ${digitos}`
 }
 
 type TransacaoGrupo = {
@@ -108,7 +125,7 @@ const groupTransacoesPorFinal = (
             key,
             cartaoNumeroId,
             digitos,
-            label: meta?.label || getTxNumeroLabel(tx),
+            label: (meta ? formatGrupoLabel(meta) : null) || getTxNumeroLabel(tx),
             items: [tx],
             subtotal: Number(tx.valor ?? 0),
         })
@@ -123,7 +140,7 @@ const groupTransacoesPorFinal = (
             digitos: meta.ultimos_digitos
                 ? String(meta.ultimos_digitos).replace(/\D/g, '').slice(-4) || null
                 : null,
-            label: meta.label || (meta.ultimos_digitos ? `•••• ${meta.ultimos_digitos}` : 'Sem cartão identificado'),
+            label: formatGrupoLabel(meta),
             items: [],
             subtotal: Number(meta.valor_total ?? 0),
         })

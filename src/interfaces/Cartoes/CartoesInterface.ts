@@ -16,7 +16,10 @@ export interface CartaoNumero {
     _key?: string
     ultimos_digitos: string
     tipo?: TipoNumeroCartao | string | null
+    /** Rótulo interno do usuário */
     apelido?: string | null
+    /** Nome impresso no plástico (aparece na fatura PDF) */
+    nome_no_cartao?: string | null
     ativo?: boolean
 }
 
@@ -92,6 +95,7 @@ export interface NumeroListItem {
     label: string
     tipo?: string | null
     apelido?: string | null
+    nome_no_cartao?: string | null
     ultimos_digitos?: string | null
     bandeira?: string | null
     cartao_bandeira_id?: number | null

@@ -55,6 +55,7 @@ export interface FaturaGrupoPorCartao {
     ultimos_digitos?: string | null
     tipo?: string | null
     apelido?: string | null
+    nome_no_cartao?: string | null
     label?: string
     total_transacoes?: number
     valor_total?: number | string

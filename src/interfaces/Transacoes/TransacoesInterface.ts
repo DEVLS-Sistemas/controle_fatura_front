@@ -49,8 +49,13 @@ export interface TransacoesList {
         ultimos_digitos?: string
         tipo?: string | null
         apelido?: string | null
+        nome_no_cartao?: string | null
     } | null
     ultimos_digitos?: string | null
+    cartao_numero_tipo?: string | null
+    cartao_numero_apelido?: string | null
+    cartao_numero_nome_no_cartao?: string | null
+    cartao_bandeira?: string | null
     fatura_mes?: number
     fatura_ano?: number
     observacoes?: string
