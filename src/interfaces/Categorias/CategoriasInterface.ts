@@ -23,13 +23,36 @@ export interface CategoriasModel {
     ativo?: boolean
 }
 
-export interface LookupsCategorias {}
+export interface LookupsCategorias {
+    cores?: string[]
+}
+
+export interface CategoriaRapidoPayload {
+    nome: string
+    cor?: string | null
+}
+
+export interface CategoriaRapidoData {
+    id: number
+    user_id?: number
+    nome: string
+    cor?: string | null
+    ativo?: boolean
+}
+
+export interface CategoriaRapidoResult {
+    data: CategoriaRapidoData
+    status: boolean
+    criado: boolean
+    message: string
+}
 
 export interface CategoriasInterface {
     getViewCategorias(params: { id: number | string }): Promise<CategoriasView | undefined>
     listCategoriasPaginate(params: CategoriasSearch): Promise<any>
     AsyncListCategorias(params: CategoriasSearch): Promise<CategoriasModel[] | undefined>
     createCategorias(params: CategoriasModel): Promise<any>
+    createCategoriasRapido(params: CategoriaRapidoPayload): Promise<CategoriaRapidoResult>
     editCategorias(params: CategoriasModel): Promise<any>
     deleteCategorias(id: number): Promise<any>
     getLookupsCategorias(): Promise<LookupsCategorias | undefined>

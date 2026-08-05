@@ -187,6 +187,18 @@ Regras UX gerais:
 }
 ```
 
+### UX — cadastro rápido de categoria e subcategoria (obrigatório)
+
+Mesmo espírito do modal de Responsável: botão **+** ao lado dos selects, sem ir para outra tela.
+
+Detalhe completo (endpoints `cadastrar-rapido`, payloads, checklist): [`frontend-prompt-cadastro-rapido-categoria-subcategoria.md`](frontend-prompt-cadastro-rapido-categoria-subcategoria.md).
+
+Resumo:
+1. Categoria: `POST /categorias/cadastrar-rapido` `{ nome, cor? }` → selecionar id → se compra já existe, `PUT /transacoes/editar`.
+2. Subcategoria: exige categoria; `POST /subcategorias/cadastrar-rapido` `{ nome, categoria_id }` → selecionar id → `PUT /transacoes/editar`.
+3. Backend deduplica por nome (case-insensitive) e, na subcategoria, vincula à categoria atual se o nome já existir.
+4. Em parceladas na edição: `propagar_grupo: true` se quiser aplicar a todas as parcelas.
+
 ### UX — seleção do final do cartão (obrigatório)
 
 Hierarquia: **Grupo → Bandeira → Número (final)**. A compra aponta para o **número** (`cartao_numero_id`). A fatura é da **bandeira** (derivada do número).
@@ -207,7 +219,7 @@ Hierarquia: **Grupo → Bandeira → Número (final)**. A compra aponta para o *
 
 Quando o final **não pôde ser selecionado/detectado** (import PDF, linha sem `cartao_numero_id`, etc.), a edição da transação **deve** permitir escolher o final:
 
-1. No formulário de **editar** transação, o select **Final do cartão** fica sempre visível (mesmo que no create tenha sido oculto por haver só 1 final). Preferir `numeros-list?fatura_id=` quando a linha tiver fatura.
+1. No formulário de **editar** transação, o select **Final do cartão** fica sempre visível (mesmo que no create tenha sido oculto por haver só 1 final).
 2. Fonte das opções:
    - Na tela da fatura: `GET /cartoes/numeros-list?fatura_id={fatura_id}`
    - Na tela global: `GET /cartoes/numeros-list?cartao_id={cartao_id}` (ou pela bandeira da fatura da linha: `cartao_bandeira_id`)
@@ -225,17 +237,9 @@ PUT /api/v1/transacoes/editar
 ```
 
 4. Se `compra_grupo_id` existir, oferecer “Aplicar a todas as parcelas” → `propagar_grupo: true`.
-5. Label do select: incluir `nome_no_cartao` quando existir (`•••• 7025 · LEONARDO S FERREIRA`).
+5. Após salvar, atualizar a linha (`ultimos_digitos`, `cartao_numero_nome_no_cartao`) e, no detalhe da fatura, o agrupamento por final.
 
-#### No detalhe da fatura (inline)
-
-- Select de final **apenas** no grupo **“Sem cartão identificado”**
-- Cada uma dessas transações usa **duas linhas**: cima = select do final; baixo = campos padrão
-- Transações que **já têm final**: uma linha só, **sem** select
-- Pagamentos de fatura (`tipo=payment`, `origem_compra=PAGAMENTO_FATURA` ou estabelecimento “PAGAMENTO DE FATURA”) vão para o grupo **Operacionais** — sem select de final
-- Após salvar o final: **manter a linha no grupo atual** com o valor selecionado; redistribuir só quando o usuário **atualizar a tela**
-
-Detalhes completos da view: ver [`frontend-prompt-faturas.md`](frontend-prompt-faturas.md).
+Detalhes da view da fatura (grupo “Sem cartão identificado”, atalho “Definir final”): ver [`frontend-prompt-faturas.md`](frontend-prompt-faturas.md).
 
 - No formulário global: selecionar **cartão** (`cartao_id`) + **final** (`cartao_numero_id`). Não enviar `fatura_id`.
 - Backend cria/vincula fatura da **bandeira do número** pelo ciclo do cartão (`dia_limite_fatura`): compras até o dia limite entram na fatura do mês; após o limite, na fatura seguinte. Parcelas seguintes avançam +1 mês a partir desse período.
@@ -245,7 +249,8 @@ Detalhes completos da view: ver [`frontend-prompt-faturas.md`](frontend-prompt-f
 - `valor_compra` / valores de parcela em formato BR (`125,50`).
 - Omitir `categoria_id`/`subcategoria_id`/`responsavel_id` no create aplica defaults.
 - Listagem: mostrar `k/N`; se a linha tiver `compra_grupo_id`, na exclusão oferecer “Excluir só esta parcela” vs “Excluir todas as parcelas da compra” (`DELETE .../excluir/{id}?excluir_grupo=1`).
-- Edit de campos compartilhados (categoria, responsável, estabelecimento, observação, origem_compra, `cartao_numero_id`) pode enviar `propagar_grupo: true` para atualizar o grupo.
+- Edit de `responsavel_id` ou `observacoes` já sincroniza sozinho em todas as parcelas do `compra_grupo_id`.
+- Edit de outros campos compartilhados (categoria, estabelecimento, origem_compra, `cartao_numero_id`) pode enviar `propagar_grupo: true` para atualizar o grupo.
 - `origem_compra` é obrigatório no create; omitir → 422.
 - `cartao_numero_id` é obrigatório no create quando há 2+ finais; com 1 final o backend preenche sozinho.
 - No **edit**, `cartao_numero_id` pode ser enviado a qualquer momento para preencher ou corrigir o final.
@@ -260,7 +265,7 @@ Detalhes completos da view: ver [`frontend-prompt-faturas.md`](frontend-prompt-f
 - Botão (ex.: “Responsável” / ícone pessoa) abre **modal** para:
   - selecionar responsável existente, ou
   - cadastrar novo (`POST /responsaveis/cadastrar`) e já vincular.
-- Ao fechar o modal com sucesso, atualizar só o texto do responsável na linha (`PUT /transacoes/editar` com `id` + `responsavel_id`).
+- Ao fechar o modal com sucesso, chamar `PUT /transacoes/editar` com `id` + `responsavel_id`. Em compra parcelada o backend aplica o responsável a **todas** as parcelas do `compra_grupo_id`; atualizar o texto do responsável nas linhas irmãs da listagem/detalhe.
 
 ### Formulário de nova compra
 - Mesmo padrão: não exibir select grande por padrão; mostrar “Responsável: Eu” (usar `default_responsavel_id` dos lookups) + botão para abrir modal e trocar.
@@ -294,6 +299,7 @@ O backend já tem `responsavel_id` obrigatório e embrião no dashboard (`por_re
 - [ ] Tela Subcategorias com multi categorias
 - [ ] Compra pré-seleciona padrões do estabelecimento
 - [ ] Na tela de fatura → transações: add/edit de categoria **e** subcategoria
+- [ ] Botões de cadastro rápido (+ ) de categoria e subcategoria (ver prompt dedicado)
 - [ ] Primeira categorização de um estabelecimento sem padrão → vira padrão + preenche vazias
 - [ ] Editar categoria quando já há padrão → altera só a compra (não sobrescreve outras)
 - [ ] Subcategoria exige categoria
@@ -304,10 +310,7 @@ O backend já tem `responsavel_id` obrigatório e embrião no dashboard (`por_re
 - [ ] Select obrigatório de origem da compra (`origem_compra`) no formulário
 - [ ] Select de final do cartão (`cartao_numero_id`) — oculto se só houver 1 no create
 - [ ] Create envia `cartao_numero_id` (quando aplicável)
-- [ ] Edit: select de final sempre visível; permite atribuir quando a compra veio sem final
-- [ ] View da fatura: select de final só em “Sem cartão identificado” (duas linhas); sem redistribuir até refresh
-- [ ] View da fatura: grupo **Operacionais** para pagamentos de fatura
-- [ ] Labels de final usam `nome_no_cartao` quando disponível
+- [ ] Edit permite escolher/alterar `cartao_numero_id` quando a transação veio sem final
 - [ ] Listagem/filtro exibem origem da compra e final do cartão
 - [ ] Create parcelado materializa N transações (sem input de parcela_atual)
 - [ ] Excluir grupo de compra quando houver `compra_grupo_id`

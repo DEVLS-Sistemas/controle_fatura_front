@@ -25,6 +25,8 @@ import { TransacoesService } from 'services/Transacoes/TransacoesService'
 import { SubcategoriasService } from 'services/Subcategorias/SubcategoriasService'
 import { CartoesService } from 'services/Cartoes/CartoesService'
 import ResponsavelModal from 'pages/Pages/Transacoes/ResponsavelModal/ResponsavelModal'
+import CategoriaRapidoModal, { CategoriaRapidoConfirm } from 'pages/Pages/Transacoes/CategoriaRapidoModal/CategoriaRapidoModal'
+import SubcategoriaRapidoModal, { SubcategoriaRapidoConfirm } from 'pages/Pages/Transacoes/SubcategoriaRapidoModal/SubcategoriaRapidoModal'
 import { getApiBaseUrl } from 'libs/api/ApiConfig'
 
 const formatNumeroOptionLabel = (n: NumeroListItem): string => {
@@ -219,6 +221,10 @@ const FaturasViewPage = () => {
     const [defaultResponsavelId, setDefaultResponsavelId] = useState<number | null>(null)
     const [responsavelModalOpen, setResponsavelModalOpen] = useState(false)
     const [rowForResponsavel, setRowForResponsavel] = useState<TransacoesList | null>(null)
+    const [categoriaRapidoOpen, setCategoriaRapidoOpen] = useState(false)
+    const [subcategoriaRapidoOpen, setSubcategoriaRapidoOpen] = useState(false)
+    const [rowForCategoriaRapido, setRowForCategoriaRapido] = useState<TransacoesList | null>(null)
+    const [rowForSubcategoriaRapido, setRowForSubcategoriaRapido] = useState<TransacoesList | null>(null)
     const [savingIds, setSavingIds] = useState<Record<number, boolean>>({})
     const [valorDrafts, setValorDrafts] = useState<Record<number, string>>({})
     const [observacaoDrafts, setObservacaoDrafts] = useState<Record<number, string>>({})
@@ -564,7 +570,20 @@ const FaturasViewPage = () => {
 
     const saveTransacao = async (
         tx: TransacoesList,
-        patch: Partial<Pick<TransacoesList, 'categoria_id' | 'subcategoria_id' | 'responsavel_id' | 'valor' | 'observacoes' | 'origem_compra'>>
+        patch: Partial<Pick<
+            TransacoesList,
+            | 'categoria_id'
+            | 'categoria_nome'
+            | 'categoria_cor'
+            | 'subcategoria_id'
+            | 'subcategoria_nome'
+            | 'responsavel_id'
+            | 'valor'
+            | 'observacoes'
+            | 'origem_compra'
+        >> & {
+            propagar_grupo?: boolean
+        }
     ) => {
         if (!tx.id) return
         setSavingIds((prev) => ({ ...prev, [tx.id!]: true }))
@@ -577,6 +596,7 @@ const FaturasViewPage = () => {
             const origemCompra = patch.origem_compra !== undefined
                 ? patch.origem_compra
                 : (tx.origem_compra ?? null)
+            const { propagar_grupo: propagarGrupo, ...rowPatch } = patch
 
             await transacoesService.editTransacoes({
                 id: tx.id,
@@ -594,35 +614,43 @@ const FaturasViewPage = () => {
                 subcategoria_id: subcategoriaId,
                 responsavel_id: patch.responsavel_id !== undefined ? patch.responsavel_id : (tx.responsavel_id ?? null),
                 observacoes: patch.observacoes !== undefined ? patch.observacoes : (tx.observacoes ?? null),
+                propagar_grupo: propagarGrupo || undefined,
             })
             setTransacoes((prev) =>
                 prev.map((item) => {
-                    if (item.id !== tx.id) return item
-                    const next = { ...item, ...patch }
-                    if (patch.categoria_id !== undefined) {
-                        const categoria = categoriasLookup.find((o) => o.id === patch.categoria_id)
-                        next.categoria_nome = categoria?.nome
-                        next.categoria_cor = categoria?.cor
-                        if (patch.subcategoria_id === undefined && patch.categoria_id !== tx.categoria_id) {
+                    const sameGrupo = Boolean(
+                        propagarGrupo
+                        && tx.compra_grupo_id
+                        && item.compra_grupo_id === tx.compra_grupo_id
+                    )
+                    if (item.id !== tx.id && !sameGrupo) return item
+                    const next = { ...item, ...rowPatch }
+                    if (rowPatch.categoria_id !== undefined) {
+                        const categoria = categoriasLookup.find((o) => o.id === rowPatch.categoria_id)
+                        next.categoria_nome = rowPatch.categoria_nome ?? categoria?.nome
+                        next.categoria_cor = rowPatch.categoria_cor ?? categoria?.cor
+                        if (rowPatch.subcategoria_id === undefined && rowPatch.categoria_id !== item.categoria_id) {
                             next.subcategoria_id = null
                             next.subcategoria_nome = undefined
                         }
                     }
-                    if (patch.subcategoria_id !== undefined) {
+                    if (rowPatch.subcategoria_id !== undefined) {
                         const opts = categoriaId ? (subcategoriasByCategoria[categoriaId] ?? []) : []
-                        next.subcategoria_nome = opts.find((o) => Number(o.value) === patch.subcategoria_id)?.label
+                        next.subcategoria_nome =
+                            rowPatch.subcategoria_nome
+                            ?? opts.find((o) => Number(o.value) === rowPatch.subcategoria_id)?.label
                     }
-                    if (patch.origem_compra !== undefined) {
+                    if (rowPatch.origem_compra !== undefined) {
                         next.origem_compra_label =
-                            origensCompraOptions.find((o) => o.value === patch.origem_compra)?.label
-                            ?? origemCompraLabel[patch.origem_compra ?? '']
+                            origensCompraOptions.find((o) => o.value === rowPatch.origem_compra)?.label
+                            ?? origemCompraLabel[rowPatch.origem_compra ?? '']
                             ?? null
                     }
-                    if (patch.responsavel_id !== undefined) {
+                    if (rowPatch.responsavel_id !== undefined) {
                         const responsavel =
-                            responsaveisLookup.find((r) => Number(r.id) === Number(patch.responsavel_id))
+                            responsaveisLookup.find((r) => Number(r.id) === Number(rowPatch.responsavel_id))
                             ?? null
-                        const fromOptions = responsaveisOptions.find((o) => Number(o.value) === patch.responsavel_id)
+                        const fromOptions = responsaveisOptions.find((o) => Number(o.value) === rowPatch.responsavel_id)
                         next.responsavel_nome = responsavel?.nome ?? fromOptions?.label
                         next.responsavel_tipo = responsavel?.tipo ?? next.responsavel_tipo
                     }
@@ -815,6 +843,74 @@ const FaturasViewPage = () => {
             return [...prev, { value: responsavel.id!, label: responsavel.nome ?? `#${responsavel.id}` }]
         })
         await saveTransacao(rowForResponsavel, { responsavel_id: responsavel.id ?? null })
+    }
+
+    const openCategoriaRapidoModal = (tx: TransacoesList) => {
+        setRowForCategoriaRapido(tx)
+        setCategoriaRapidoOpen(true)
+    }
+
+    const openSubcategoriaRapidoModal = (tx: TransacoesList) => {
+        if (!tx.categoria_id) {
+            toast.warning('Selecione uma categoria antes')
+            return
+        }
+        setRowForSubcategoriaRapido(tx)
+        setSubcategoriaRapidoOpen(true)
+    }
+
+    const handleConfirmCategoriaRapido = async (result: CategoriaRapidoConfirm) => {
+        if (!rowForCategoriaRapido?.id) return
+        const cat = result.data
+        setCategoriasLookup((prev) => {
+            if (prev.some((c) => Number(c.id) === Number(cat.id))) {
+                return prev.map((c) =>
+                    Number(c.id) === Number(cat.id)
+                        ? { ...c, nome: cat.nome, cor: cat.cor ?? c.cor }
+                        : c
+                )
+            }
+            return [...prev, { id: cat.id, nome: cat.nome, cor: cat.cor ?? undefined }]
+        })
+        setCategoriasOptions((prev) => {
+            if (prev.some((o) => Number(o.value) === Number(cat.id))) {
+                return prev.map((o) =>
+                    Number(o.value) === Number(cat.id) ? { ...o, label: cat.nome } : o
+                )
+            }
+            return [...prev, { value: cat.id, label: cat.nome }]
+        })
+        await loadSubcategoriasForCategoria(cat.id)
+        await saveTransacao(rowForCategoriaRapido, {
+            categoria_id: cat.id,
+            categoria_nome: cat.nome,
+            categoria_cor: cat.cor ?? undefined,
+            subcategoria_id: null,
+            propagar_grupo: result.propagar_grupo,
+        })
+        setRowForCategoriaRapido(null)
+    }
+
+    const handleConfirmSubcategoriaRapido = async (result: SubcategoriaRapidoConfirm) => {
+        if (!rowForSubcategoriaRapido?.id || !rowForSubcategoriaRapido.categoria_id) return
+        const sub = result.data
+        const catId = Number(rowForSubcategoriaRapido.categoria_id)
+        setSubcategoriasByCategoria((prev) => {
+            const current = prev[catId] ?? []
+            const exists = current.some((o) => Number(o.value) === Number(sub.id))
+            const nextOpts = exists
+                ? current.map((o) => (Number(o.value) === Number(sub.id) ? { ...o, label: sub.nome } : o))
+                : [...current, { value: sub.id, label: sub.nome }]
+            return { ...prev, [catId]: nextOpts }
+        })
+        loadedSubcategoriasRef.current.add(catId)
+        await saveTransacao(rowForSubcategoriaRapido, {
+            categoria_id: catId,
+            subcategoria_id: sub.id,
+            subcategoria_nome: sub.nome,
+            propagar_grupo: result.propagar_grupo,
+        })
+        setRowForSubcategoriaRapido(null)
     }
 
     useEffect(() => {
@@ -1437,7 +1533,7 @@ const FaturasViewPage = () => {
                                                                             >
                                                                                 <option value="">Definir final...</option>
                                                                                 {numerosOptions.map((opt) => (
-                                                                                    <option key={String(opt.value)} value={opt.value}>
+                                                                                    <option key={String(opt.value)} value={opt.value ?? ''}>
                                                                                         {opt.label}
                                                                                     </option>
                                                                                 ))}
@@ -1503,41 +1599,67 @@ const FaturasViewPage = () => {
                                                                     ))}
                                                                 </Input>
                                                             </td>
-                                                            <td>
-                                                                <Input
-                                                                    type="select"
-                                                                    bsSize="sm"
-                                                                    value={tx.categoria_id ?? ''}
-                                                                    disabled={!!savingIds[tx.id!]}
-                                                                    onChange={(e) => handleUpdateSelect(tx, 'categoria_id', e.target.value)}
-                                                                    style={
-                                                                        tx.categoria_id
-                                                                            ? (getCategoriaFieldStyle(
-                                                                                tx.categoria_cor
-                                                                                ?? categoriasLookup.find((c) => c.id === tx.categoria_id)?.cor
-                                                                            ) ?? undefined)
-                                                                            : undefined
-                                                                    }
-                                                                >
-                                                                    <option value="">Sem categoria</option>
-                                                                    {categoriasOptions.map((opt) => (
-                                                                        <option key={opt.value} value={opt.value}>{opt.label}</option>
-                                                                    ))}
-                                                                </Input>
+                                                            <td style={{ minWidth: 160 }}>
+                                                                <div className="d-flex gap-1 align-items-center">
+                                                                    <Input
+                                                                        type="select"
+                                                                        bsSize="sm"
+                                                                        value={tx.categoria_id ?? ''}
+                                                                        disabled={!!savingIds[tx.id!]}
+                                                                        onChange={(e) => handleUpdateSelect(tx, 'categoria_id', e.target.value)}
+                                                                        style={
+                                                                            tx.categoria_id
+                                                                                ? (getCategoriaFieldStyle(
+                                                                                    tx.categoria_cor
+                                                                                    ?? categoriasLookup.find((c) => c.id === tx.categoria_id)?.cor
+                                                                                ) ?? undefined)
+                                                                                : undefined
+                                                                        }
+                                                                    >
+                                                                        <option value="">Sem categoria</option>
+                                                                        {categoriasOptions.map((opt) => (
+                                                                            <option key={String(opt.value)} value={opt.value ?? ''}>{opt.label}</option>
+                                                                        ))}
+                                                                    </Input>
+                                                                    <Button
+                                                                        type="button"
+                                                                        color="light"
+                                                                        size="sm"
+                                                                        className="border px-1"
+                                                                        title="Nova categoria"
+                                                                        disabled={!!savingIds[tx.id!]}
+                                                                        onClick={() => openCategoriaRapidoModal(tx)}
+                                                                    >
+                                                                        <i className="ri-add-line"></i>
+                                                                    </Button>
+                                                                </div>
                                                             </td>
-                                                            <td>
-                                                                <Input
-                                                                    type="select"
-                                                                    bsSize="sm"
-                                                                    value={tx.subcategoria_id ?? ''}
-                                                                    disabled={!tx.categoria_id || !!savingIds[tx.id!]}
-                                                                    onChange={(e) => handleUpdateSelect(tx, 'subcategoria_id', e.target.value)}
-                                                                >
-                                                                    <option value="">Sem subcategoria</option>
-                                                                    {subOptions.map((opt) => (
-                                                                        <option key={opt.value} value={opt.value}>{opt.label}</option>
-                                                                    ))}
-                                                                </Input>
+                                                            <td style={{ minWidth: 160 }}>
+                                                                <div className="d-flex gap-1 align-items-center">
+                                                                    <Input
+                                                                        type="select"
+                                                                        bsSize="sm"
+                                                                        value={tx.subcategoria_id ?? ''}
+                                                                        disabled={!tx.categoria_id || !!savingIds[tx.id!]}
+                                                                        onChange={(e) => handleUpdateSelect(tx, 'subcategoria_id', e.target.value)}
+                                                                    >
+                                                                        <option value="">Sem subcategoria</option>
+                                                                        {subOptions.map((opt) => (
+                                                                            <option key={String(opt.value)} value={opt.value ?? ''}>{opt.label}</option>
+                                                                        ))}
+                                                                    </Input>
+                                                                    <Button
+                                                                        type="button"
+                                                                        color="light"
+                                                                        size="sm"
+                                                                        className="border px-1"
+                                                                        title={!tx.categoria_id ? 'Selecione uma categoria antes' : 'Nova subcategoria'}
+                                                                        disabled={!tx.categoria_id || !!savingIds[tx.id!]}
+                                                                        onClick={() => openSubcategoriaRapidoModal(tx)}
+                                                                    >
+                                                                        <i className="ri-add-line"></i>
+                                                                    </Button>
+                                                                </div>
                                                             </td>
                                                             <td>
                                                                 <Input
@@ -1602,6 +1724,35 @@ const FaturasViewPage = () => {
                         currentResponsavelId={rowForResponsavel?.responsavel_id}
                         onResponsaveisChange={setResponsaveisLookup}
                         onConfirm={handleConfirmResponsavel}
+                    />
+
+                    <CategoriaRapidoModal
+                        isOpen={categoriaRapidoOpen}
+                        toggle={() => {
+                            setCategoriaRapidoOpen(false)
+                            setRowForCategoriaRapido(null)
+                        }}
+                        showPropagarGrupo={Boolean(rowForCategoriaRapido?.compra_grupo_id)}
+                        onConfirm={handleConfirmCategoriaRapido}
+                    />
+
+                    <SubcategoriaRapidoModal
+                        isOpen={subcategoriaRapidoOpen}
+                        toggle={() => {
+                            setSubcategoriaRapidoOpen(false)
+                            setRowForSubcategoriaRapido(null)
+                        }}
+                        categoriaId={rowForSubcategoriaRapido?.categoria_id}
+                        categoriaNome={
+                            rowForSubcategoriaRapido?.categoria_nome
+                            ?? categoriasLookup.find((c) => c.id === rowForSubcategoriaRapido?.categoria_id)?.nome
+                        }
+                        categoriaCor={
+                            rowForSubcategoriaRapido?.categoria_cor
+                            ?? categoriasLookup.find((c) => c.id === rowForSubcategoriaRapido?.categoria_id)?.cor
+                        }
+                        showPropagarGrupo={Boolean(rowForSubcategoriaRapido?.compra_grupo_id)}
+                        onConfirm={handleConfirmSubcategoriaRapido}
                     />
 
                     <Card className="mb-4">

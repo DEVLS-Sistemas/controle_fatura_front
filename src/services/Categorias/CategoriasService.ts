@@ -4,6 +4,8 @@ import { UnexpectedError } from "../../libs/api/exceptions/UnexpectedError"
 import { ValidationError } from "../../libs/api/exceptions/ValidationError"
 import { PaginateInterface } from "interfaces/SystemInterfaces/PaginateInterface"
 import {
+    CategoriaRapidoPayload,
+    CategoriaRapidoResult,
     CategoriasInterface,
     CategoriasList,
     CategoriasModel,
@@ -85,6 +87,37 @@ export class CategoriasService implements CategoriasInterface {
             case HttpStatusCode.unauthorized: throw new AccessDeniedError()
             case HttpStatusCode.invalidForm: throw new ValidationError(response.body)
             default: throw new UnexpectedError(response.message)
+        }
+    }
+
+    async createCategoriasRapido(params: CategoriaRapidoPayload): Promise<CategoriaRapidoResult> {
+        const response = await this.httpClient.post({
+            url: this.url + '/cadastrar-rapido',
+            body: params,
+        })
+
+        switch (response.statusCode) {
+            case HttpStatusCode.ok:
+            case HttpStatusCode.created: {
+                const wrap = response.body?.categoria ?? response.body
+                const data = wrap?.data ?? wrap
+                if (!data?.id) throw new UnexpectedError(response.message || 'Resposta inválida do cadastro rápido')
+                return {
+                    data: {
+                        id: Number(data.id),
+                        user_id: data.user_id,
+                        nome: String(data.nome ?? params.nome),
+                        cor: data.cor ?? params.cor ?? null,
+                        ativo: data.ativo ?? true,
+                    },
+                    status: Boolean(wrap?.status ?? true),
+                    criado: Boolean(wrap?.criado),
+                    message: String(wrap?.message ?? response.message ?? 'Categoria salva'),
+                }
+            }
+            case HttpStatusCode.unauthorized: throw new AccessDeniedError()
+            case HttpStatusCode.invalidForm: throw new ValidationError(response.body)
+            default: throw new UnexpectedError(response.body?.message || response.message)
         }
     }
 

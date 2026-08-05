@@ -21,6 +21,7 @@ import { SelectListControlled } from 'Components/ComponentController/Selects/Sel
 import { AsyncSelectListControlled } from 'Components/ComponentController/Selects/AsyncSelect/AsyncSelectListControlled'
 import { SelectOptions } from 'interfaces/SystemInterfaces/SelectInterface'
 import {
+    CategoriaLookup,
     EstabelecimentoLookup,
     ResponsavelLookup,
     TransacoesDefaultValues,
@@ -32,6 +33,8 @@ import { SubcategoriasService } from 'services/Subcategorias/SubcategoriasServic
 import { CartoesService } from 'services/Cartoes/CartoesService'
 import { NumeroListItem } from 'interfaces/Cartoes/CartoesInterface'
 import ResponsavelModal from '../ResponsavelModal/ResponsavelModal'
+import CategoriaRapidoModal, { CategoriaRapidoConfirm } from '../CategoriaRapidoModal/CategoriaRapidoModal'
+import SubcategoriaRapidoModal, { SubcategoriaRapidoConfirm } from '../SubcategoriaRapidoModal/SubcategoriaRapidoModal'
 
 const formatNumeroOptionLabel = (n: NumeroListItem): string => {
     if (n.label) return n.label
@@ -101,6 +104,9 @@ const TransacoesForm = () => {
     const [responsaveisLookup, setResponsaveisLookup] = useState<ResponsavelLookup[]>([])
     const [defaultResponsavelId, setDefaultResponsavelId] = useState<number | null>(null)
     const [responsavelModalOpen, setResponsavelModalOpen] = useState(false)
+    const [categoriaRapidoOpen, setCategoriaRapidoOpen] = useState(false)
+    const [subcategoriaRapidoOpen, setSubcategoriaRapidoOpen] = useState(false)
+    const [categoriasLookup, setCategoriasLookup] = useState<CategoriaLookup[]>([])
     const [parcelasValores, setParcelasValores] = useState<string[]>([])
 
     const skipEstabelecimentoEffect = useRef(true)
@@ -291,6 +297,7 @@ const TransacoesForm = () => {
                 )
             }
             if (lookups?.categorias) {
+                setCategoriasLookup(lookups.categorias)
                 setCategoriasOptions(
                     lookups.categorias.map((c) => ({
                         value: c.id!,
@@ -336,6 +343,89 @@ const TransacoesForm = () => {
         const digits = removeMask(raw)
         setParcelasValores((prev) => prev.map((v, i) => (i === index ? digits : v)))
     }
+
+    const upsertCategoriaOption = (cat: CategoriaLookup) => {
+        if (!cat.id) return
+        setCategoriasLookup((prev) => {
+            if (prev.some((c) => Number(c.id) === Number(cat.id))) {
+                return prev.map((c) => (Number(c.id) === Number(cat.id) ? { ...c, ...cat } : c))
+            }
+            return [...prev, cat]
+        })
+        setCategoriasOptions((prev) => {
+            if (prev.some((o) => Number(o.value) === Number(cat.id))) {
+                return prev.map((o) =>
+                    Number(o.value) === Number(cat.id)
+                        ? { ...o, label: cat.nome ?? o.label }
+                        : o
+                )
+            }
+            return [...prev, { value: cat.id!, label: cat.nome ?? `#${cat.id}` }]
+        })
+    }
+
+    const upsertSubcategoriaOption = (id: number, nome: string) => {
+        setSubcategoriasOptions((prev) => {
+            if (prev.some((o) => Number(o.value) === Number(id))) {
+                return prev.map((o) => (Number(o.value) === Number(id) ? { ...o, label: nome } : o))
+            }
+            return [...prev, { value: id, label: nome }]
+        })
+    }
+
+    const handleConfirmCategoriaRapido = async (result: CategoriaRapidoConfirm) => {
+        const cat = result.data
+        upsertCategoriaOption({ id: cat.id, nome: cat.nome, cor: cat.cor ?? undefined })
+        const categoriaMudou = Number(categoriaId) !== Number(cat.id)
+        setValue('categoria_id', cat.id)
+        if (categoriaMudou) {
+            setValue('subcategoria_id', null)
+            await loadSubcategorias(cat.id)
+        }
+
+        if (isEdit) {
+            const txId = record.id ?? record.transacao_id
+            if (!txId) return
+            try {
+                await transacoesService.editTransacoes({
+                    id: txId,
+                    transacao_id: txId,
+                    categoria_id: cat.id,
+                    subcategoria_id: null,
+                    propagar_grupo: result.propagar_grupo || undefined,
+                } as TransacoesModel)
+            } catch (error) {
+                console.error('Erro ao vincular categoria na transação:', error)
+                toast.error('Categoria cadastrada, mas falhou ao salvar na compra')
+            }
+        }
+    }
+
+    const handleConfirmSubcategoriaRapido = async (result: SubcategoriaRapidoConfirm) => {
+        const sub = result.data
+        if (!categoriaId) return
+        upsertSubcategoriaOption(sub.id, sub.nome)
+        setValue('subcategoria_id', sub.id)
+
+        if (isEdit) {
+            const txId = record.id ?? record.transacao_id
+            if (!txId) return
+            try {
+                await transacoesService.editTransacoes({
+                    id: txId,
+                    transacao_id: txId,
+                    categoria_id: categoriaId,
+                    subcategoria_id: sub.id,
+                    propagar_grupo: result.propagar_grupo || undefined,
+                } as TransacoesModel)
+            } catch (error) {
+                console.error('Erro ao vincular subcategoria na transação:', error)
+                toast.error('Subcategoria cadastrada, mas falhou ao salvar na compra')
+            }
+        }
+    }
+
+    const categoriaAtual = categoriasLookup.find((c) => Number(c.id) === Number(categoriaId))
 
     const onSubmit: SubmitHandler<TransacoesModel> = async (data) => {
         try {
@@ -703,22 +793,51 @@ const TransacoesForm = () => {
                                             <Col md={4}>
                                                 <div className="mb-3">
                                                     <Label htmlFor="categoria_id" className="form-label">Categoria</Label>
-                                                    <SelectListControlled<TransacoesModel>
-                                                        options={categoriasOptions}
-                                                        field="categoria_id"
-                                                        control={control}
-                                                    />
+                                                    <div className="d-flex gap-2 align-items-start">
+                                                        <div className="flex-grow-1">
+                                                            <SelectListControlled<TransacoesModel>
+                                                                options={categoriasOptions}
+                                                                field="categoria_id"
+                                                                control={control}
+                                                            />
+                                                        </div>
+                                                        <Button
+                                                            type="button"
+                                                            color="light"
+                                                            className="border flex-shrink-0"
+                                                            title="Nova categoria"
+                                                            onClick={() => setCategoriaRapidoOpen(true)}
+                                                        >
+                                                            <i className="ri-add-line me-1"></i>
+                                                            Nova
+                                                        </Button>
+                                                    </div>
                                                 </div>
                                             </Col>
                                             <Col md={4}>
                                                 <div className="mb-3">
                                                     <Label htmlFor="subcategoria_id" className="form-label">Subcategoria</Label>
-                                                    <SelectListControlled<TransacoesModel>
-                                                        options={subcategoriasOptions}
-                                                        field="subcategoria_id"
-                                                        control={control}
-                                                        disabled={!categoriaId}
-                                                    />
+                                                    <div className="d-flex gap-2 align-items-start">
+                                                        <div className="flex-grow-1">
+                                                            <SelectListControlled<TransacoesModel>
+                                                                options={subcategoriasOptions}
+                                                                field="subcategoria_id"
+                                                                control={control}
+                                                                disabled={!categoriaId}
+                                                            />
+                                                        </div>
+                                                        <Button
+                                                            type="button"
+                                                            color="light"
+                                                            className="border flex-shrink-0"
+                                                            title={!categoriaId ? 'Selecione uma categoria antes' : 'Nova subcategoria'}
+                                                            disabled={!categoriaId}
+                                                            onClick={() => setSubcategoriaRapidoOpen(true)}
+                                                        >
+                                                            <i className="ri-add-line me-1"></i>
+                                                            Nova
+                                                        </Button>
+                                                    </div>
                                                 </div>
                                             </Col>
                                             <Col md={4}>
@@ -858,6 +977,23 @@ const TransacoesForm = () => {
                     setValue('responsavel_id', responsavel.id ?? null)
                     toast.success(`Responsável: ${responsavel.nome}`)
                 }}
+            />
+
+            <CategoriaRapidoModal
+                isOpen={categoriaRapidoOpen}
+                toggle={() => setCategoriaRapidoOpen(false)}
+                showPropagarGrupo={isEdit && Boolean(record.compra_grupo_id)}
+                onConfirm={handleConfirmCategoriaRapido}
+            />
+
+            <SubcategoriaRapidoModal
+                isOpen={subcategoriaRapidoOpen}
+                toggle={() => setSubcategoriaRapidoOpen(false)}
+                categoriaId={categoriaId ? Number(categoriaId) : null}
+                categoriaNome={categoriaAtual?.nome}
+                categoriaCor={categoriaAtual?.cor}
+                showPropagarGrupo={isEdit && Boolean(record.compra_grupo_id)}
+                onConfirm={handleConfirmSubcategoriaRapido}
             />
         </React.Fragment>
     )

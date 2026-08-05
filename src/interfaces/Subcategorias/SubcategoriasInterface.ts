@@ -36,11 +36,33 @@ export interface LookupsSubcategorias {
     categorias?: { id?: number; nome?: string }[]
 }
 
+export interface SubcategoriaRapidoPayload {
+    nome: string
+    categoria_id: number
+    categoria_ids?: number[]
+}
+
+export interface SubcategoriaRapidoData {
+    id: number
+    nome: string
+    ativo?: boolean
+    categorias?: { id?: number; nome?: string; cor?: string }[]
+    categoria_ids?: number[]
+}
+
+export interface SubcategoriaRapidoResult {
+    data: SubcategoriaRapidoData
+    status: boolean
+    criado: boolean
+    message: string
+}
+
 export interface SubcategoriasInterface {
     getViewSubcategorias(params: { id: number | string }): Promise<SubcategoriasView | undefined>
     listSubcategoriasPaginate(params: SubcategoriasSearch): Promise<any>
     AsyncListSubcategorias(params: SubcategoriasSearch): Promise<SubcategoriaLookup[] | undefined>
     createSubcategorias(params: SubcategoriasModel): Promise<any>
+    createSubcategoriasRapido(params: SubcategoriaRapidoPayload): Promise<SubcategoriaRapidoResult>
     editSubcategorias(params: SubcategoriasModel): Promise<any>
     deleteSubcategorias(id: number): Promise<any>
     getLookupsSubcategorias(): Promise<LookupsSubcategorias | undefined>

@@ -6,6 +6,8 @@ import { PaginateInterface } from "interfaces/SystemInterfaces/PaginateInterface
 import {
     LookupsSubcategorias,
     SubcategoriaLookup,
+    SubcategoriaRapidoPayload,
+    SubcategoriaRapidoResult,
     SubcategoriasInterface,
     SubcategoriasList,
     SubcategoriasModel,
@@ -84,6 +86,37 @@ export class SubcategoriasService implements SubcategoriasInterface {
             case HttpStatusCode.unauthorized: throw new AccessDeniedError()
             case HttpStatusCode.invalidForm: throw new ValidationError(response.body)
             default: throw new UnexpectedError(response.message)
+        }
+    }
+
+    async createSubcategoriasRapido(params: SubcategoriaRapidoPayload): Promise<SubcategoriaRapidoResult> {
+        const response = await this.httpClient.post({
+            url: this.url + '/cadastrar-rapido',
+            body: params,
+        })
+
+        switch (response.statusCode) {
+            case HttpStatusCode.ok:
+            case HttpStatusCode.created: {
+                const wrap = response.body?.subcategoria ?? response.body
+                const data = wrap?.data ?? wrap
+                if (!data?.id) throw new UnexpectedError(response.message || 'Resposta inválida do cadastro rápido')
+                return {
+                    data: {
+                        id: Number(data.id),
+                        nome: String(data.nome ?? params.nome),
+                        ativo: data.ativo ?? true,
+                        categorias: data.categorias,
+                        categoria_ids: data.categoria_ids ?? [params.categoria_id],
+                    },
+                    status: Boolean(wrap?.status ?? true),
+                    criado: Boolean(wrap?.criado),
+                    message: String(wrap?.message ?? response.message ?? 'Subcategoria salva'),
+                }
+            }
+            case HttpStatusCode.unauthorized: throw new AccessDeniedError()
+            case HttpStatusCode.invalidForm: throw new ValidationError(response.body)
+            default: throw new UnexpectedError(response.body?.message || response.message)
         }
     }
 
