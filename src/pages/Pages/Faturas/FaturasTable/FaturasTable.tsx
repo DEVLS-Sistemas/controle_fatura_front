@@ -12,12 +12,11 @@ import { useNavegacao } from "helpers/functions_helpers"
 import {
     formatCurrency, formatDateBr, faturaStatusColor,
     faturaQuitacaoLabel, faturaQuitacaoColor, VALOR_TEXT_CLASS,
-    resolveFaturaAnexo,
+    resolveFaturaAnexo, downloadFaturaAnexo, FaturaAnexoDownloadTipo, FaturaAnexoDownloadMeta,
 } from "helpers/fatura_helpers"
 import { CartaoChip } from "helpers/cartao_helpers"
 import { FaturaResumo, FaturasCartaoGroup, FaturasSearch } from "interfaces/Faturas/FaturasInterface"
 import { FaturasService } from "services/Faturas/FaturasService"
-import { getApiBaseUrl } from "libs/api/ApiConfig"
 
 export interface FaturasTableProps {
     data: PaginateInterface<FaturasCartaoGroup> | undefined
@@ -108,26 +107,25 @@ export const FaturasTable = ({ data, getData, setPerPage, perPage, filters }: Fa
         }
     }
 
-    const handleVerAnexo = async (id: number) => {
+    const handleDownloadAnexo = async (
+        id: number,
+        tipo: FaturaAnexoDownloadTipo,
+        meta?: FaturaAnexoDownloadMeta,
+    ) => {
         try {
-            const raw = sessionStorage.getItem('authUser')
-            const token = raw ? JSON.parse(raw).token : null
-            const base = getApiBaseUrl()
-            const res = await fetch(`${base}faturas/pdf/${id}`, {
-                headers: token ? { Authorization: `Bearer ${token}` } : {},
-            })
-            if (!res.ok) {
-                toast.error('Anexo não disponível')
-                return
-            }
-            const blob = await res.blob()
-            const url = URL.createObjectURL(blob)
-            window.open(url, '_blank')
+            await downloadFaturaAnexo(id, tipo, meta)
         } catch (error) {
-            console.error('Erro ao abrir anexo:', error)
-            toast.error('Erro ao abrir anexo')
+            console.error('Erro ao baixar anexo:', error)
+            toast.error(tipo === 'pdf' ? 'PDF não disponível' : 'CSV não disponível')
         }
     }
+
+    const anexoDownloadMeta = (row: FaturaRow): FaturaAnexoDownloadMeta => ({
+        cartaoNome: row.cartao_nome,
+        competencia: formatCompetencia(row),
+        mes: row.mes,
+        ano: row.ano,
+    })
 
     /** Grupos com mais de uma bandeira — chip discreto na linha */
     const bandeirasPorCartao = useMemo(() => {
@@ -235,7 +233,6 @@ export const FaturasTable = ({ data, getData, setPerPage, perPage, filters }: Fa
                                                             ) : (
                                                                 rows.map((row, index) => {
                                                                     const anexo = resolveFaturaAnexo(row)
-                                                                    const temAnexo = anexo.temPdf || anexo.temCsv
                                                                     const multiBandeira = row.cartao_id != null
                                                                         && (bandeirasPorCartao.get(row.cartao_id)?.size ?? 0) > 1
                                                                     return (
@@ -264,31 +261,30 @@ export const FaturasTable = ({ data, getData, setPerPage, perPage, filters }: Fa
                                                                             </div>
                                                                         </td>
                                                                         <td>
-                                                                            {anexo.temPdf ? (
-                                                                                <button
-                                                                                    type="button"
-                                                                                    className="btn btn-link p-0 border-0"
-                                                                                    title="PDF anexado"
-                                                                                    onClick={() => row.id && handleVerAnexo(row.id)}
-                                                                                >
-                                                                                    <i className="ri-file-pdf-2-fill text-danger fs-4" />
-                                                                                </button>
-                                                                            ) : anexo.temCsv ? (
-                                                                                <button
-                                                                                    type="button"
-                                                                                    className="btn btn-link p-0 border-0"
-                                                                                    title="CSV anexado"
-                                                                                    onClick={() => row.id && handleVerAnexo(row.id)}
-                                                                                >
-                                                                                    <i className="ri-file-excel-2-fill text-success fs-4" />
-                                                                                </button>
-                                                                            ) : (
-                                                                                <i
-                                                                                    className="ri-file-line text-muted fs-5"
-                                                                                    title="Sem anexo"
-                                                                                    style={{ opacity: 0.4 }}
-                                                                                />
-                                                                            )}
+                                                                            {(anexo.temPdf || anexo.temCsv) ? (
+                                                                                <div className="d-inline-flex align-items-center gap-1">
+                                                                                    {anexo.temPdf && (
+                                                                                        <button
+                                                                                            type="button"
+                                                                                            className="btn btn-link p-0 border-0"
+                                                                                            title="Baixar PDF"
+                                                                                            onClick={() => row.id && handleDownloadAnexo(row.id, 'pdf', anexoDownloadMeta(row))}
+                                                                                        >
+                                                                                            <i className="mdi mdi-file-pdf-box text-danger fs-4" />
+                                                                                        </button>
+                                                                                    )}
+                                                                                    {anexo.temCsv && (
+                                                                                        <button
+                                                                                            type="button"
+                                                                                            className="btn btn-link p-0 border-0"
+                                                                                            title="Baixar CSV"
+                                                                                            onClick={() => row.id && handleDownloadAnexo(row.id, 'csv', anexoDownloadMeta(row))}
+                                                                                        >
+                                                                                            <i className="las la-file-csv text-success fs-4" />
+                                                                                        </button>
+                                                                                    )}
+                                                                                </div>
+                                                                            ) : null}
                                                                         </td>
                                                                         <td>
                                                                             <Link
@@ -361,9 +357,14 @@ export const FaturasTable = ({ data, getData, setPerPage, perPage, filters }: Fa
                                                                                             <DropdownItem onClick={() => navigate(`/faturas/view/${row.id}`)}>
                                                                                                 Upload anexo
                                                                                             </DropdownItem>
-                                                                                            {temAnexo && row.id && (
-                                                                                                <DropdownItem onClick={() => handleVerAnexo(row.id!)}>
-                                                                                                    Ver anexo
+                                                                                            {anexo.temPdf && row.id && (
+                                                                                                <DropdownItem onClick={() => handleDownloadAnexo(row.id!, 'pdf', anexoDownloadMeta(row))}>
+                                                                                                    Baixar PDF
+                                                                                                </DropdownItem>
+                                                                                            )}
+                                                                                            {anexo.temCsv && row.id && (
+                                                                                                <DropdownItem onClick={() => handleDownloadAnexo(row.id!, 'csv', anexoDownloadMeta(row))}>
+                                                                                                    Baixar CSV
                                                                                                 </DropdownItem>
                                                                                             )}
                                                                                             <DropdownItem onClick={() => row.id && handleReprocessar(row.id)}>

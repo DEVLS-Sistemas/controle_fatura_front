@@ -13,7 +13,7 @@ import {
     faturaQuitacaoLabel, faturaQuitacaoColor,
     tipoTransacaoColor, tipoTransacaoLabel,
     origemCompraLabel,
-    FATURA_FILE_ACCEPT, isValidFaturaFile, resolveFaturaAnexo,
+    FATURA_FILE_ACCEPT, isValidFaturaFile, resolveFaturaAnexo, downloadFaturaAnexo,
     getCategoriaFieldStyle, VALOR_TEXT_CLASS,
 } from 'helpers/fatura_helpers'
 import { SelectOptions } from 'interfaces/SystemInterfaces/SelectInterface'
@@ -41,13 +41,6 @@ const statusLabel: Record<string, string> = {
     processando: 'Processando',
     processada: 'Processada',
     erro: 'Erro',
-}
-
-const getArquivoExtensao = (path?: string | null) => {
-    if (!path) return ''
-    const clean = path.split('?')[0]
-    const parts = clean.split('.')
-    return parts.length > 1 ? parts[parts.length - 1].toLowerCase() : ''
 }
 
 const formatParcelas = (atual?: number, total?: number) => {
@@ -534,6 +527,21 @@ const FaturasViewPage = () => {
         }
     }
 
+    const handleDownloadAnexo = async (tipo: 'pdf' | 'csv') => {
+        if (!id || !fatura) return
+        try {
+            await downloadFaturaAnexo(id, tipo, {
+                cartaoNome: fatura.cartao_nome,
+                competencia: fatura.competencia ?? formatPeriodo(fatura.mes, fatura.ano),
+                mes: fatura.mes,
+                ano: fatura.ano,
+            })
+        } catch (error) {
+            console.error('Erro ao baixar anexo:', error)
+            toast.error(tipo === 'pdf' ? 'PDF não disponível' : 'CSV não disponível')
+        }
+    }
+
     const handleExportCsv = async () => {
         if (!id) return
         setExporting(true)
@@ -918,8 +926,6 @@ const FaturasViewPage = () => {
 
     const isProcessing = fatura.status === 'pendente' || fatura.status === 'processando'
     const anexo = resolveFaturaAnexo(fatura)
-    const arquivoExt = anexo.tipo ?? getArquivoExtensao(fatura.arquivo_pdf)
-    const temArquivo = anexo.temPdf || anexo.temCsv || Boolean(fatura.pdf_url || fatura.arquivo_pdf)
     const competenciaAtual = fatura.competencia ?? formatPeriodo(fatura.mes, fatura.ano)
     const bandeiraLabel = fatura.bandeira || fatura.cartao_bandeira
 
@@ -1600,28 +1606,53 @@ const FaturasViewPage = () => {
 
                     <Card className="mb-4">
                         <CardBody>
-                            <div className="d-flex align-items-center justify-content-between mb-3">
-                                <h5 className="card-title mb-0">Visualização do arquivo</h5>
-                                {temArquivo && (!arquivoExt || arquivoExt === 'pdf') && showPdfPreview && pdfBlobUrl && (
-                                    <Button
-                                        color="light"
-                                        size="sm"
-                                        className="border"
-                                        onClick={() => {
-                                            setShowPdfPreview(false)
-                                            clearPdfBlobUrl()
-                                        }}
-                                    >
-                                        <i className="ri-eye-off-line me-1"></i>
-                                        Ocultar preview
-                                    </Button>
-                                )}
-                            </div>
-                            {temArquivo && arquivoExt && arquivoExt !== 'pdf' ? (
-                                <div className="text-center text-muted py-5">
-                                    Arquivo <strong>.{arquivoExt}</strong> anexado. A pré-visualização está disponível apenas para PDF.
+                            <div className="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+                                <h5 className="card-title mb-0">Anexos da fatura</h5>
+                                <div className="d-flex flex-wrap gap-2">
+                                    {anexo.temPdf && (
+                                        <Button
+                                            color="danger"
+                                            outline
+                                            size="sm"
+                                            onClick={() => handleDownloadAnexo('pdf')}
+                                        >
+                                            <i className="mdi mdi-file-pdf-box me-1"></i>
+                                            Baixar PDF
+                                        </Button>
+                                    )}
+                                    {anexo.temCsv && (
+                                        <Button
+                                            color="success"
+                                            outline
+                                            size="sm"
+                                            onClick={() => handleDownloadAnexo('csv')}
+                                        >
+                                            <i className="las la-file-csv me-1"></i>
+                                            Baixar CSV
+                                        </Button>
+                                    )}
+                                    {anexo.temPdf && showPdfPreview && pdfBlobUrl && (
+                                        <Button
+                                            color="light"
+                                            size="sm"
+                                            className="border"
+                                            onClick={() => {
+                                                setShowPdfPreview(false)
+                                                clearPdfBlobUrl()
+                                            }}
+                                        >
+                                            <i className="ri-eye-off-line me-1"></i>
+                                            Ocultar preview
+                                        </Button>
+                                    )}
                                 </div>
-                            ) : temArquivo && (!arquivoExt || arquivoExt === 'pdf') ? (
+                            </div>
+                            {anexo.temCsv && !anexo.temPdf ? (
+                                <div className="text-center text-muted py-5">
+                                    Arquivo <strong>CSV</strong> anexado. Use o botão acima para baixar.
+                                    A pré-visualização está disponível apenas para PDF.
+                                </div>
+                            ) : anexo.temPdf ? (
                                 showPdfPreview && pdfBlobUrl ? (
                                     <iframe
                                         src={pdfBlobUrl}

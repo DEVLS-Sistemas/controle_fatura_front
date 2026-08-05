@@ -28,14 +28,17 @@ export interface FaturaResumo {
     valor_pago?: number | string
     valor_restante?: number | string
     arquivo_pdf?: string | null
+    arquivo_csv?: string | null
     /** Tipo do anexo atual: pdf | csv | null */
     tipo_arquivo?: 'pdf' | 'csv' | null
     /** true somente se o anexo for PDF */
     tem_pdf?: boolean
     /** true somente se o anexo for CSV */
     tem_csv?: boolean
-    /** URL autenticada para abrir/baixar o anexo */
+    /** URL autenticada para abrir/baixar o PDF */
     pdf_url?: string | null
+    /** URL autenticada para abrir/baixar o CSV */
+    csv_url?: string | null
     status?: string
     erro_mensagem?: string | null
     processado_em?: string | null

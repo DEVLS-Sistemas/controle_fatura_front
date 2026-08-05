@@ -1,3 +1,5 @@
+import { getApiBaseUrl } from 'libs/api/ApiConfig'
+
 /** Classe CSS para alinhar valores monetários à direita */
 export const VALOR_TEXT_CLASS = 'text-valor'
 
@@ -110,38 +112,96 @@ export const FATURA_FILE_EXTENSIONS = ['pdf', 'csv'] as const
 
 export type FaturaAnexoTipo = 'pdf' | 'csv' | null
 
-/** Resolve o tipo do anexo a partir dos campos da API (com fallback pela extensão). */
+/** Resolve anexos a partir dos campos da API (PDF e CSV podem coexistir). */
 export const resolveFaturaAnexo = (fatura: {
   tipo_arquivo?: string | null
   tem_pdf?: boolean
   tem_csv?: boolean
   arquivo_pdf?: string | null
+  arquivo_csv?: string | null
 }): { tipo: FaturaAnexoTipo; temPdf: boolean; temCsv: boolean } => {
-  const ext = fatura.arquivo_pdf
+  const extPdf = fatura.arquivo_pdf
     ? (fatura.arquivo_pdf.split('?')[0].split('.').pop() || '').toLowerCase()
     : ''
 
   const tipoApi = fatura.tipo_arquivo?.toLowerCase()
+  let temPdf = fatura.tem_pdf === true || Boolean(fatura.arquivo_pdf)
+  let temCsv = fatura.tem_csv === true || Boolean(fatura.arquivo_csv)
+
+  // Legado: CSV guardado em arquivo_pdf (sem arquivo_csv)
+  if (!fatura.arquivo_csv && extPdf === 'csv') {
+    temPdf = false
+    temCsv = true
+  }
+
+  if (!temPdf && !temCsv) {
+    if (tipoApi === 'pdf' || extPdf === 'pdf') temPdf = true
+    else if (tipoApi === 'csv' || extPdf === 'csv') temCsv = true
+  }
+
   let tipo: FaturaAnexoTipo = null
+  if (tipoApi === 'pdf' || tipoApi === 'csv') tipo = tipoApi
+  else if (temPdf) tipo = 'pdf'
+  else if (temCsv) tipo = 'csv'
 
-  if (tipoApi === 'pdf' || tipoApi === 'csv') {
-    tipo = tipoApi
-  } else if (fatura.tem_csv === true) {
-    tipo = 'csv'
-  } else if (fatura.tem_pdf === true) {
-    // Legado: tem_pdf podia significar “tem arquivo”; respeita extensão CSV
-    tipo = ext === 'csv' ? 'csv' : 'pdf'
-  } else if (ext === 'pdf') {
-    tipo = 'pdf'
-  } else if (ext === 'csv') {
-    tipo = 'csv'
-  }
+  return { tipo, temPdf, temCsv }
+}
 
-  return {
-    tipo,
-    temPdf: tipo === 'pdf',
-    temCsv: tipo === 'csv',
+export type FaturaAnexoDownloadTipo = 'pdf' | 'csv'
+
+export type FaturaAnexoDownloadMeta = {
+  cartaoNome?: string | null
+  competencia?: string | null
+  mes?: number | string | null
+  ano?: number | string | null
+}
+
+const sanitizeFilenamePart = (value: string): string =>
+  value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[\\/:*?"<>|]+/g, '-')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+/** Monta o nome do arquivo: fatura - {cartão} - {competência}.{ext} */
+export const buildFaturaAnexoFilename = (
+  tipo: FaturaAnexoDownloadTipo,
+  meta?: FaturaAnexoDownloadMeta,
+): string => {
+  const cartao = sanitizeFilenamePart(meta?.cartaoNome?.trim() || 'cartao')
+  const competenciaRaw = meta?.competencia
+    || (meta?.mes != null && meta?.ano != null
+      ? `${String(meta.mes).padStart(2, '0')}/${meta.ano}`
+      : '')
+  const competencia = sanitizeFilenamePart(competenciaRaw || 'sem-competencia')
+  return `fatura - ${cartao} - ${competencia}.${tipo}`
+}
+
+/** Baixa o anexo autenticado (`GET /faturas/pdf|{csv}/{id}`). */
+export const downloadFaturaAnexo = async (
+  id: number | string,
+  tipo: FaturaAnexoDownloadTipo,
+  meta?: FaturaAnexoDownloadMeta,
+): Promise<void> => {
+  const raw = sessionStorage.getItem('authUser')
+  const token = raw ? JSON.parse(raw).token : null
+  const base = getApiBaseUrl()
+  const res = await fetch(`${base}faturas/${tipo}/${id}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  })
+  if (!res.ok) {
+    throw new Error(tipo === 'pdf' ? 'PDF não disponível' : 'CSV não disponível')
   }
+  const blob = await res.blob()
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = buildFaturaAnexoFilename(tipo, meta)
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
 }
 
 export const isValidFaturaFile = (file: File): boolean => {
