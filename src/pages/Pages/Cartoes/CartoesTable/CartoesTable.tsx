@@ -24,18 +24,30 @@ export interface CartoesTableProps {
 }
 
 const formatLimitesResumo = (row: CartoesList) => {
-    const bandeiras = row.bandeiras ?? []
+    const bandeiras = [...(row.bandeiras ?? [])]
     if (bandeiras.length === 0) return null
 
-    return bandeiras
-        .map((b) => {
-            const nome = b.bandeira
-            if (b.limite_credito != null && Number(b.limite_credito) > 0) {
-                return `${nome} ${formatCurrency(b.limite_credito)}`
-            }
-            return nome
-        })
-        .join(' · ')
+    bandeiras.sort((a, b) => {
+        const limiteA = a.limite_credito != null ? Number(a.limite_credito) : 0
+        const limiteB = b.limite_credito != null ? Number(b.limite_credito) : 0
+        return limiteB - limiteA
+    })
+
+    return (
+        <div className="d-flex flex-column gap-1">
+            {bandeiras.map((b) => {
+                const key = b.id ?? b.bandeira
+                const limite = b.limite_credito != null ? Number(b.limite_credito) : 0
+
+                return (
+                    <div key={key} className="d-flex justify-content-between gap-3">
+                        <span>{b.bandeira}</span>
+                        <span className={VALOR_TEXT_CLASS}>{formatCurrency(limite)}</span>
+                    </div>
+                )
+            })}
+        </div>
+    )
 }
 
 export const CartoesTable = ({ data, getData, setPerPage, perPage, filters }: CartoesTableProps) => {
@@ -173,7 +185,7 @@ export const CartoesTable = ({ data, getData, setPerPage, perPage, filters }: Ca
                                                                                 {qtdNumeros} {qtdNumeros === 1 ? 'cartão' : 'cartões'}
                                                                             </span>
                                                                         </td>
-                                                                        <td className={`text-start small ${VALOR_TEXT_CLASS}`}>
+                                                                        <td className="text-start small">
                                                                             {limites || <span className="text-muted">-</span>}
                                                                         </td>
                                                                         <td>
