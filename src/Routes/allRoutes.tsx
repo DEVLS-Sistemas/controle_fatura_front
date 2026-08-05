@@ -42,6 +42,7 @@ import SubcategoriasForm from "pages/Pages/Subcategorias/SubcategoriasForm/Subca
 
 import RelatoriosPage from "pages/Pages/Relatorios/RelatoriosPage";
 import ProjecaoFaturasPage from "pages/Pages/ProjecaoFaturas/ProjecaoFaturasPage";
+import FaturaResponsavelView from "pages/Pages/ProjecaoFaturas/FaturaResponsavelView/FaturaResponsavelView";
 
 const authProtectedRoutes = [
   { path: "/dashboard", component: <DashboardsHome /> },
@@ -85,6 +86,7 @@ const authProtectedRoutes = [
   { path: "/subcategorias/edit/:id", component: <SubcategoriasForm /> },
 
   { path: "/relatorios", component: <RelatoriosPage /> },
+  { path: "/projecao-faturas/responsaveis/:responsavelId/fatura", component: <FaturaResponsavelView /> },
   { path: "/projecao-faturas", component: <ProjecaoFaturasPage /> },
 
   { path: "/profile", component: <SimplePage /> },

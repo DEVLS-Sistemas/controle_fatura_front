@@ -154,6 +154,12 @@ export const ResponsaveisTable = ({ data, getData, setPerPage, perPage, filters 
                                                                                     <Link to={`/responsaveis/edit/${rowId(row)}`} state={{ source: row }}>
                                                                                         <DropdownItem>Editar</DropdownItem>
                                                                                     </Link>
+                                                                                    <Link
+                                                                                        to={`/projecao-faturas/responsaveis/${rowId(row)}/fatura?mes=${new Date().getMonth() + 1}&ano=${new Date().getFullYear()}`}
+                                                                                        state={{ nome: row.nome, tipo: row.tipo }}
+                                                                                    >
+                                                                                        <DropdownItem>Ver fatura</DropdownItem>
+                                                                                    </Link>
                                                                                     <DropdownItem
                                                                                         onClick={() => {
                                                                                             setSelectedId(rowId(row)!)

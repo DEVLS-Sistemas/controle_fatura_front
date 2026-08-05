@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   Badge,
   Card,
@@ -19,6 +20,7 @@ import {
   ProjecaoValor,
   ProjecaoFaturasView,
 } from 'interfaces/ProjecaoFaturas/ProjecaoFaturasInterface'
+import { FaturaResponsavelLocationState } from '../FaturaResponsavelView/FaturaResponsavelView'
 
 const stickyColStyle: React.CSSProperties = {
   position: 'sticky',
@@ -156,22 +158,60 @@ const LimiteUsoResumo = ({
   )
 }
 
+const buildFaturaResponsavelPath = (
+  responsavelId: number | string,
+  mes: number,
+  ano: number,
+  cartaoId?: number | null
+) => {
+  const qs = new URLSearchParams({
+    mes: String(mes),
+    ano: String(ano),
+  })
+  if (cartaoId != null) qs.set('cartao_id', String(cartaoId))
+  return `/projecao-faturas/responsaveis/${responsavelId}/fatura?${qs.toString()}`
+}
+
 const ProjecaoCelula = ({
   valor,
   coluna,
   cellId,
   showUsoLimite,
   limiteCredito,
+  onClick,
+  clickTitle,
 }: {
   valor: ProjecaoValor | undefined
   coluna: ProjecaoColuna
   cellId: string
   showUsoLimite?: boolean
   limiteCredito?: number | null
+  onClick?: () => void
+  clickTitle?: string
 }) => {
-  if (!valor || valor.fonte === 'vazio' || Number(valor.total) === 0) {
+  const clickable = typeof onClick === 'function'
+  const empty = !valor || valor.fonte === 'vazio' || Number(valor.total) === 0
+
+  if (empty) {
     return (
-      <td className={cellClassName(valor, coluna.referencia)}>
+      <td
+        className={`${cellClassName(valor, coluna.referencia)}${clickable ? ' cursor-pointer' : ''}`}
+        role={clickable ? 'button' : undefined}
+        tabIndex={clickable ? 0 : undefined}
+        title={clickable ? (clickTitle || 'Ver fatura do responsável') : undefined}
+        onClick={clickable ? onClick : undefined}
+        onKeyDown={
+          clickable
+            ? (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  onClick?.()
+                }
+              }
+            : undefined
+        }
+        style={clickable ? { cursor: 'pointer' } : undefined}
+      >
         <span className="text-muted">-</span>
       </td>
     )
@@ -183,7 +223,24 @@ const ProjecaoCelula = ({
   const tone = showPct ? percentualTone(Number(pct)) : null
 
   return (
-    <td className={cellClassName(valor, coluna.referencia)}>
+    <td
+      className={`${cellClassName(valor, coluna.referencia)}${clickable ? ' cursor-pointer' : ''}`}
+      role={clickable ? 'button' : undefined}
+      tabIndex={clickable ? 0 : undefined}
+      title={clickable ? (clickTitle || 'Ver fatura do responsável') : undefined}
+      onClick={clickable ? onClick : undefined}
+      onKeyDown={
+        clickable
+          ? (e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                onClick?.()
+              }
+            }
+          : undefined
+      }
+      style={clickable ? { cursor: 'pointer' } : undefined}
+    >
       <span id={cellId} className="d-inline-flex flex-column align-items-end gap-1">
         <span className="d-inline-flex align-items-center gap-1">
           <CurrencyValue value={valor.total} />
@@ -210,6 +267,12 @@ const ProjecaoCelula = ({
             {' | '}
             Disponível: {formatCurrency(valor.disponivel)}
             {' '}({formatPercentual(pct)})
+          </>
+        )}
+        {clickable && (
+          <>
+            {' | '}
+            Clique para ver a fatura do responsável
           </>
         )}
       </UncontrolledTooltip>
@@ -300,6 +363,8 @@ const ProjecaoMatriz = ({
   totais,
   prefix,
   showUsoLimite = false,
+  onCelulaClick,
+  onLinhaLabelClick,
 }: {
   titulo: string
   colunas: ProjecaoColuna[]
@@ -307,8 +372,11 @@ const ProjecaoMatriz = ({
   totais: Array<{ realizado: number; projetado: number; total: number }>
   prefix: string
   showUsoLimite?: boolean
+  onCelulaClick?: (linha: LinhaTabela, coluna: ProjecaoColuna, valor: ProjecaoValor | undefined) => void
+  onLinhaLabelClick?: (linha: LinhaTabela) => void
 }) => {
   const idxReferencia = colunas.findIndex((c) => c.referencia)
+  const labelClickable = typeof onLinhaLabelClick === 'function'
 
   return (
     <Card>
@@ -338,7 +406,27 @@ const ProjecaoMatriz = ({
                     idxReferencia >= 0 ? linha.valores[idxReferencia] : undefined
                   return (
                     <tr key={linha.id}>
-                      <td className="text-start" style={stickyColStyle}>
+                      <td
+                        className="text-start"
+                        style={{
+                          ...stickyColStyle,
+                          ...(labelClickable ? { cursor: 'pointer' } : {}),
+                        }}
+                        role={labelClickable ? 'button' : undefined}
+                        tabIndex={labelClickable ? 0 : undefined}
+                        title={labelClickable ? 'Ver fatura do responsável (mês de referência)' : undefined}
+                        onClick={labelClickable ? () => onLinhaLabelClick?.(linha) : undefined}
+                        onKeyDown={
+                          labelClickable
+                            ? (e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault()
+                                  onLinhaLabelClick?.(linha)
+                                }
+                              }
+                            : undefined
+                        }
+                      >
                         <span className="d-flex align-items-center gap-2 fw-medium">
                           {linha.cor_fundo && (
                             <CartaoChip
@@ -347,7 +435,9 @@ const ProjecaoMatriz = ({
                               label={String(linha.label).slice(0, 1)}
                             />
                           )}
-                          <span>{linha.label}</span>
+                          <span className={labelClickable ? 'text-primary text-decoration-underline-hover' : undefined}>
+                            {linha.label}
+                          </span>
                         </span>
                         {linha.sublabel && (
                           <span className="d-block text-muted fs-12">{linha.sublabel}</span>
@@ -368,6 +458,11 @@ const ProjecaoMatriz = ({
                           cellId={`${prefix}-${linha.id}-${col.chave}`}
                           showUsoLimite={showUsoLimite}
                           limiteCredito={linha.limite_credito}
+                          onClick={
+                            onCelulaClick
+                              ? () => onCelulaClick(linha, col, linha.valores[idx])
+                              : undefined
+                          }
                         />
                       ))}
                       <td className={`text-end fw-semibold ${VALOR_TEXT_CLASS}`}>
@@ -391,11 +486,18 @@ const ProjecaoMatrizCruzamento = ({
   colunas,
   cartoes,
   prefix,
+  onCelulaClick,
 }: {
   titulo: string
   colunas: ProjecaoColuna[]
   cartoes: CartaoCruzamento[]
   prefix: string
+  onCelulaClick?: (
+    cartao: CartaoCruzamento,
+    resp: ResponsavelCruzamento,
+    coluna: ProjecaoColuna,
+    valor: ProjecaoValor | undefined
+  ) => void
 }) => {
   const [selecionado, setSelecionado] = useState<CartaoCruzamento | null>(null)
   const modalOpen = selecionado != null
@@ -544,6 +646,11 @@ const ProjecaoMatrizCruzamento = ({
                                 valor={resp.valores[idx]}
                                 coluna={col}
                                 cellId={`${prefix}-${selecionado.cartaoId}-${resp.responsavelId}-${col.chave}`}
+                                onClick={
+                                  onCelulaClick
+                                    ? () => onCelulaClick(selecionado, resp, col, resp.valores[idx])
+                                    : undefined
+                                }
                               />
                             ))}
                             <td className={`text-end fw-semibold ${VALOR_TEXT_CLASS}`}>
@@ -618,6 +725,8 @@ const ProjecaoMatrizCruzamento = ({
 }
 
 export const ProjecaoFaturasTable = ({ data }: ProjecaoFaturasTableProps) => {
+  const navigate = useNavigate()
+
   if (!data) {
     return (
       <Row>
@@ -632,6 +741,17 @@ export const ProjecaoFaturasTable = ({ data }: ProjecaoFaturasTableProps) => {
 
   const colunas = data.colunas || []
   const idxReferencia = colunas.findIndex((c) => c.referencia)
+  const colunaReferencia = idxReferencia >= 0 ? colunas[idxReferencia] : colunas[0]
+
+  const goFaturaResponsavel = (
+    responsavelId: number | string,
+    mes: number,
+    ano: number,
+    meta: FaturaResponsavelLocationState & { cartaoId?: number | null }
+  ) => {
+    const { cartaoId, ...state } = meta
+    navigate(buildFaturaResponsavelPath(responsavelId, mes, ano, cartaoId), { state })
+  }
 
   const linhasCartoes: LinhaTabela[] = (data.por_cartao || []).map((c) => ({
     id: c.cartao_id,
@@ -708,6 +828,28 @@ export const ProjecaoFaturasTable = ({ data }: ProjecaoFaturasTableProps) => {
             linhas={linhasResponsaveis}
             totais={totaisResponsaveis}
             prefix="proj-resp"
+            onLinhaLabelClick={(linha) => {
+              if (!colunaReferencia) return
+              const valor = colunaReferencia
+                ? linha.valores[idxReferencia >= 0 ? idxReferencia : 0]
+                : undefined
+              goFaturaResponsavel(linha.id, colunaReferencia.mes, colunaReferencia.ano, {
+                nome: linha.label,
+                tipo: linha.sublabel?.toLowerCase(),
+                realizado: valor?.realizado,
+                projetado: valor?.projetado,
+                total: valor?.total,
+              })
+            }}
+            onCelulaClick={(linha, coluna, valor) => {
+              goFaturaResponsavel(linha.id, coluna.mes, coluna.ano, {
+                nome: linha.label,
+                tipo: linha.sublabel?.toLowerCase(),
+                realizado: valor?.realizado,
+                projetado: valor?.projetado,
+                total: valor?.total,
+              })
+            }}
           />
         </Col>
       </Row>
@@ -718,6 +860,16 @@ export const ProjecaoFaturasTable = ({ data }: ProjecaoFaturasTableProps) => {
             colunas={colunas}
             cartoes={cartoesCruzamento}
             prefix="proj-cruz"
+            onCelulaClick={(cartao, resp, coluna, valor) => {
+              goFaturaResponsavel(resp.responsavelId, coluna.mes, coluna.ano, {
+                nome: resp.responsavelLabel,
+                tipo: resp.responsavelSublabel?.toLowerCase(),
+                realizado: valor?.realizado,
+                projetado: valor?.projetado,
+                total: valor?.total,
+                cartaoId: cartao.cartaoId,
+              })
+            }}
           />
         </Col>
       </Row>
@@ -733,6 +885,9 @@ export const ProjecaoFaturasTable = ({ data }: ProjecaoFaturasTableProps) => {
               <span className="badge bg-warning-subtle text-warning me-1">50–80%</span>
               <span className="badge bg-danger-subtle text-danger me-1">&gt;80%</span>
               uso do limite
+            </span>
+            <span className="text-muted fs-13">
+              Clique no responsável ou na célula do mês para abrir a fatura do responsável
             </span>
           </div>
         </Col>
