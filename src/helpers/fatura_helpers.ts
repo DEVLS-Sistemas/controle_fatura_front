@@ -74,9 +74,9 @@ export const faturaQuitacaoColor = (pago?: boolean | null): string =>
 
 /** Repasse do responsável — distinto da quitação da bandeira */
 export const statusRepasseLabel: Record<string, string> = {
-  pendente: 'Pendente',
-  parcial: 'Parcial',
-  pago: 'Repassado',
+  pendente: 'Não pagou',
+  parcial: 'Pagou parcial',
+  pago: 'Já pagou',
 }
 
 export const statusRepasseColor: Record<string, string> = {

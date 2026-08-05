@@ -15,7 +15,6 @@ import {
 } from 'reactstrap'
 import { useForm } from 'react-hook-form'
 import { toast } from 'react-toastify'
-import { required } from 'Components/ComponentController/ValidatorForm/ValidatorForm'
 import { InputTextControlled } from 'Components/ComponentController/Inputs/Text/InputTextControlled'
 import { InputDate } from 'Components/ComponentController/Inputs/Date/InputDate'
 import TableActionsDropdown from 'Components/Common/TableActionsDropdown'
@@ -183,13 +182,13 @@ const RepasseModal = ({ isOpen, toggle, context, onSaved }: RepasseModalProps) =
       }
       if (editingId) {
         await service.editRepasse(payload)
-        toast.success('Repasse atualizado')
+        toast.success('Pagamento atualizado')
         await onSaved()
         await loadRepasses()
         resetFormNovo()
       } else {
         await service.createRepasse(payload)
-        toast.success('Repasse registrado')
+        toast.success('Pagamento registrado')
         await onSaved()
         toggle()
       }
@@ -204,7 +203,7 @@ const RepasseModal = ({ isOpen, toggle, context, onSaved }: RepasseModalProps) =
   const handleQuitar = async () => {
     if (!celula?.transacao_id) return
     if (valorAberto <= 0) {
-      toast.info('Parcela já está quitada com o responsável')
+      toast.info('Esta parcela já está marcada como paga')
       return
     }
     setSaving(true)
@@ -214,7 +213,7 @@ const RepasseModal = ({ isOpen, toggle, context, onSaved }: RepasseModalProps) =
         quitar: true,
         data_pagamento: todayIso(),
       })
-      toast.success('Parcela quitada com o responsável')
+      toast.success('Parcela marcada como paga')
       await onSaved()
       toggle()
     } catch (error) {
@@ -227,11 +226,11 @@ const RepasseModal = ({ isOpen, toggle, context, onSaved }: RepasseModalProps) =
 
   const handleDelete = async (id?: number) => {
     if (!id) return
-    if (!window.confirm('Excluir este repasse?')) return
+    if (!window.confirm('Excluir este pagamento?')) return
     setSaving(true)
     try {
       await service.deleteRepasse(id)
-      toast.success('Repasse excluído')
+      toast.success('Pagamento excluído')
       if (editingId === id) resetFormNovo()
       await onSaved()
       await loadRepasses()
@@ -251,11 +250,15 @@ const RepasseModal = ({ isOpen, toggle, context, onSaved }: RepasseModalProps) =
   return (
     <Modal isOpen={isOpen} toggle={toggle} size="lg" centered>
       <ModalHeader toggle={toggle}>
-        Registrar repasse
+        O responsável pagou esta parcela?
       </ModalHeader>
       <ModalBody>
         {context && celula ? (
           <>
+            <div className="alert alert-info border-0 py-2 small mb-3">
+              Informe o valor e a data em que o responsável te devolveu este valor.
+              Se pagou tudo, use <strong>Marcar como pago</strong>.
+            </div>
             <div className="mb-3">
               <div className="fw-semibold">
                 {context.estabelecimento || 'Compra'}
@@ -271,15 +274,15 @@ const RepasseModal = ({ isOpen, toggle, context, onSaved }: RepasseModalProps) =
 
             <Row className="g-2 mb-3 text-center text-md-start">
               <Col xs={4}>
-                <small className="text-muted text-uppercase d-block">Devido</small>
+                <small className="text-muted text-uppercase d-block">Valor devido</small>
                 <span className={`fw-semibold ${VALOR_TEXT_CLASS}`}>{formatCurrency(valorDevido)}</span>
               </Col>
               <Col xs={4}>
-                <small className="text-muted text-uppercase d-block">Já repassado</small>
-                <span className={`fw-semibold ${VALOR_TEXT_CLASS}`}>{formatCurrency(valorPago)}</span>
+                <small className="text-muted text-uppercase d-block">Já recebido</small>
+                <span className={`fw-semibold text-success ${VALOR_TEXT_CLASS}`}>{formatCurrency(valorPago)}</span>
               </Col>
               <Col xs={4}>
-                <small className="text-muted text-uppercase d-block">Em aberto</small>
+                <small className="text-muted text-uppercase d-block">Ainda falta</small>
                 <span className={`fw-semibold text-danger ${VALOR_TEXT_CLASS}`}>{formatCurrency(valorAberto)}</span>
                 <div className="mt-1">
                   <Badge color={statusRepasseColor[status] ?? 'secondary'}>
@@ -291,11 +294,11 @@ const RepasseModal = ({ isOpen, toggle, context, onSaved }: RepasseModalProps) =
 
             <div className="mb-3">
               <div className="d-flex justify-content-between align-items-center mb-2">
-                <h6 className="mb-0">Repasses lançados</h6>
+                <h6 className="mb-0">Pagamentos já registrados</h6>
                 {loadingList && <Spinner size="sm" />}
               </div>
               {repasses.length === 0 && !loadingList ? (
-                <div className="text-muted small">Nenhum repasse nesta parcela.</div>
+                <div className="text-muted small">Nenhum pagamento registrado nesta parcela.</div>
               ) : (
                 <div className="table-responsive">
                   <Table size="sm" className="align-middle mb-0">
@@ -333,7 +336,7 @@ const RepasseModal = ({ isOpen, toggle, context, onSaved }: RepasseModalProps) =
 
             <form id="repasse-form" onSubmit={handleSubmit(onSubmit)}>
               <div className="d-flex justify-content-between align-items-center mb-2">
-                <h6 className="mb-0">{editingId ? 'Editar repasse' : 'Novo repasse'}</h6>
+                <h6 className="mb-0">{editingId ? 'Editar pagamento' : 'Registrar pagamento recebido'}</h6>
                 {editingId && (
                   <Button type="button" color="link" size="sm" className="p-0" onClick={resetFormNovo}>
                     Cancelar edição
@@ -342,22 +345,22 @@ const RepasseModal = ({ isOpen, toggle, context, onSaved }: RepasseModalProps) =
               </div>
               <Row className="g-3">
                 <Col md={4}>
-                  <Label className="form-label">Data do repasse</Label>
+                  <Label className="form-label">Data em que pagou</Label>
                   <InputDate<ModalForm>
                     field="data_pagamento"
                     register={register}
-                    required={required('Data obrigatória')}
+                    required={{ value: true, message: 'Data obrigatória' }}
                     errors={errors.data_pagamento}
                   />
                 </Col>
                 <Col md={4}>
-                  <Label className="form-label">Valor</Label>
+                  <Label className="form-label">Valor pago</Label>
                   <InputTextControlled<ModalForm>
                     field="valor"
                     control={control}
                     mask="preco"
                     textValor
-                    required={required('Valor obrigatório')}
+                    required={{ value: true, message: 'Valor obrigatório' }}
                     errors={errors.valor}
                     placeholder="0,00"
                   />
@@ -383,11 +386,11 @@ const RepasseModal = ({ isOpen, toggle, context, onSaved }: RepasseModalProps) =
           <Button
             type="button"
             color="success"
-            outline
             disabled={saving || !celula || valorAberto <= 0}
             onClick={handleQuitar}
           >
-            Quitar restante
+            <i className="ri-check-double-line me-1"></i>
+            Marcar como pago (valor restante)
           </Button>
         </div>
         <div className="d-flex gap-2">
@@ -395,7 +398,7 @@ const RepasseModal = ({ isOpen, toggle, context, onSaved }: RepasseModalProps) =
             Cancelar
           </Button>
           <Button type="submit" form="repasse-form" color="primary" disabled={saving || !celula}>
-            {saving ? 'Salvando...' : editingId ? 'Atualizar' : 'Salvar'}
+            {saving ? 'Salvando...' : editingId ? 'Atualizar' : 'Salvar pagamento'}
           </Button>
         </div>
       </ModalFooter>

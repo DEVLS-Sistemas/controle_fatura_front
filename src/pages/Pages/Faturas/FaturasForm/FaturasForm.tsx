@@ -34,7 +34,6 @@ const FaturasForm = () => {
     const [bandeirasOptions, setBandeirasOptions] = useState<SelectOptions[]>([])
     const [showBandeiraSelect, setShowBandeiraSelect] = useState(false)
     const [bandeirasLoading, setBandeirasLoading] = useState(false)
-    const [semBandeiras, setSemBandeiras] = useState(false)
     const [arquivoFile, setArquivoFile] = useState<File | null>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
     const { voltarParaRotaAnterior } = useNavegacao()
@@ -66,20 +65,17 @@ const FaturasForm = () => {
         if (!id) {
             setBandeirasOptions([])
             setShowBandeiraSelect(false)
-            setSemBandeiras(false)
             setValue('cartao_bandeira_id', null)
             return
         }
 
         setBandeirasLoading(true)
-        setSemBandeiras(false)
         try {
             const list = (await cartoesService.AsyncListBandeiras({ cartao_id: id })) ?? []
 
             if (list.length === 0) {
                 setBandeirasOptions([])
                 setShowBandeiraSelect(false)
-                setSemBandeiras(true)
                 setValue('cartao_bandeira_id', null)
                 return
             }
@@ -103,7 +99,6 @@ const FaturasForm = () => {
             console.error('Erro ao carregar bandeiras:', error)
             setBandeirasOptions([])
             setShowBandeiraSelect(false)
-            setSemBandeiras(true)
             setValue('cartao_bandeira_id', null)
         } finally {
             setBandeirasLoading(false)
@@ -117,15 +112,9 @@ const FaturasForm = () => {
 
     const onSubmit: SubmitHandler<FaturasModel> = async (data) => {
         try {
-            if (!isEdit) {
-                if (semBandeiras || !data.cartao_bandeira_id) {
-                    toast.warning(
-                        semBandeiras
-                            ? 'Cadastre uma bandeira/número neste cartão antes de criar a fatura'
-                            : 'Selecione a bandeira da fatura'
-                    )
-                    return
-                }
+            if (!isEdit && showBandeiraSelect && !data.cartao_bandeira_id) {
+                toast.warning('Selecione a bandeira da fatura')
+                return
             }
 
             if (isEdit) {
@@ -267,14 +256,6 @@ const FaturasForm = () => {
                                                 </div>
                                             </Col>
                                         </Row>
-                                        {!isEdit && semBandeiras && cartaoId && (
-                                            <div className="alert alert-warning">
-                                                Este cartão ainda não possui bandeira/número cadastrado.{' '}
-                                                <Link to={`/cartoes/edit/${cartaoId}`}>
-                                                    Cadastre uma bandeira/número neste cartão
-                                                </Link>
-                                            </div>
-                                        )}
                                         {!isEdit && (
                                             <Row>
                                                 <Col md={6}>
@@ -319,7 +300,7 @@ const FaturasForm = () => {
                                                     <button
                                                         type="submit"
                                                         className="btn btn-primary"
-                                                        disabled={!isEdit && (semBandeiras || bandeirasLoading)}
+                                                        disabled={!isEdit && bandeirasLoading}
                                                     >
                                                         Salvar
                                                     </button>

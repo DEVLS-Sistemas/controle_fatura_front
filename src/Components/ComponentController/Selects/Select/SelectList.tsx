@@ -57,7 +57,13 @@ export function SelectList(props: SelectProps) {
     )
 
     if (!props.isMulti) {
-        const value = props.options.filter(option => option.value === props.value)
+        const value = props.options.filter(
+            (option) =>
+                option.value != null &&
+                props.value != null &&
+                props.value !== '' &&
+                String(option.value) === String(props.value)
+        )
         return (
             <>
                 <Select

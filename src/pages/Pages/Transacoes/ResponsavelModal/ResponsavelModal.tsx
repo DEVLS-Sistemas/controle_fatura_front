@@ -53,19 +53,44 @@ const ResponsavelModal = ({
 
     const selectedId = watch('responsavel_id')
 
-    const options: SelectOptions[] = localResponsaveis.map((r) => ({
-        value: r.id!,
-        label: r.nome ?? `#${r.id}`,
-    }))
+    const toValidId = (value: unknown): number | null => {
+        if (value == null || value === '') return null
+        const n = Number(value)
+        return Number.isFinite(n) ? n : null
+    }
+
+    const extractCreatedId = (created: any): number | null => {
+        const candidates = [
+            created?.responsavel?.data?.id,
+            created?.responsavel?.id,
+            created?.data?.id,
+            created?.id,
+            created?.responsavel_id,
+        ]
+        for (const candidate of candidates) {
+            const id = toValidId(candidate)
+            if (id != null) return id
+        }
+        return null
+    }
+
+    const options: SelectOptions[] = localResponsaveis
+        .filter((r) => toValidId(r.id) != null)
+        .map((r) => ({
+            value: toValidId(r.id)!,
+            label: r.nome ?? `#${r.id}`,
+        }))
 
     useEffect(() => {
-        setLocalResponsaveis(responsaveis)
+        setLocalResponsaveis(
+            (responsaveis ?? []).filter((r) => toValidId(r.id) != null)
+        )
     }, [responsaveis])
 
     useEffect(() => {
         if (isOpen) {
             reset({
-                responsavel_id: currentResponsavelId ?? null,
+                responsavel_id: toValidId(currentResponsavelId),
                 novo_nome: null,
                 novo_tipo: 'pessoal',
             })
@@ -90,16 +115,24 @@ const ResponsavelModal = ({
                 ativo: true,
             }
             const created = await responsaveisService.createResponsaveis(payload)
-            const newId = created?.id ?? created?.responsavel_id ?? created
-            const novo: ResponsavelLookup = {
-                id: Number(newId),
-                nome: nome.trim(),
-                tipo: String(tipo),
+            const newId = extractCreatedId(created)
+            if (newId == null) {
+                toast.error('Responsável cadastrado, mas o ID não foi retornado')
+                return
             }
-            const updated = [...localResponsaveis, novo]
+            const createdData = created?.responsavel?.data ?? created?.responsavel ?? created?.data ?? created
+            const novo: ResponsavelLookup = {
+                id: newId,
+                nome: createdData?.nome?.trim?.() || nome.trim(),
+                tipo: String(createdData?.tipo ?? tipo),
+            }
+            const updated = [
+                ...localResponsaveis.filter((r) => toValidId(r.id) != null && Number(r.id) !== newId),
+                novo,
+            ]
             setLocalResponsaveis(updated)
             onResponsaveisChange?.(updated)
-            setValue('responsavel_id', novo.id!)
+            setValue('responsavel_id', novo.id!, { shouldValidate: true, shouldDirty: true })
             setShowCreate(false)
             toast.success('Responsável cadastrado')
         } catch (error) {
@@ -111,11 +144,12 @@ const ResponsavelModal = ({
     }
 
     const onSubmit = async (data: ModalForm) => {
-        if (!data.responsavel_id) {
+        const selected = toValidId(data.responsavel_id)
+        if (selected == null) {
             toast.error('Selecione um responsável')
             return
         }
-        const found = localResponsaveis.find((r) => Number(r.id) === Number(data.responsavel_id))
+        const found = localResponsaveis.find((r) => Number(r.id) === selected)
         if (!found) {
             toast.error('Responsável inválido')
             return
@@ -197,7 +231,7 @@ const ResponsavelModal = ({
                         </div>
                     )}
 
-                    {selectedId && (
+                    {toValidId(selectedId) != null && (
                         <p className="text-muted mt-3 mb-0 small">
                             Selecionado: {localResponsaveis.find((r) => Number(r.id) === Number(selectedId))?.nome}
                         </p>

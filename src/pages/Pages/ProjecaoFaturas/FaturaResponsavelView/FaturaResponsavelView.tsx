@@ -985,6 +985,33 @@ const FaturaResponsavelView = () => {
                                 </Row>
                             </div>
 
+                            <div className="alert alert-success border-0 mb-3" role="alert">
+                                <div className="fw-semibold mb-1">
+                                    <i className="ri-money-dollar-circle-line me-1"></i>
+                                    Como marcar o que {nomeResponsavel} já pagou?
+                                </div>
+                                <ol className="mb-2 ps-3 small">
+                                    <li>
+                                        Na tabela abaixo, em cada compra, clique em{' '}
+                                        <strong>Marcar pagamento</strong> e informe valor + data.
+                                    </li>
+                                    <li>
+                                        Ou abra a visão completa mês a mês em{' '}
+                                        <Link
+                                            to={repassesPath}
+                                            state={{ nome: nomeResponsavel, tipo: tipoResponsavel }}
+                                            className="alert-link"
+                                        >
+                                            Marcar pagamentos (todas as parcelas)
+                                        </Link>
+                                        .
+                                    </li>
+                                </ol>
+                                <small className="text-muted">
+                                    Isso registra o que o responsável te devolveu — não é a quitação da fatura do cartão com o banco.
+                                </small>
+                            </div>
+
                             <div className="d-flex flex-wrap gap-2 justify-content-end">
                                 <button type="button" className="btn btn-soft-success" onClick={voltarParaRotaAnterior}>
                                     Voltar
@@ -992,10 +1019,10 @@ const FaturaResponsavelView = () => {
                                 <Link
                                     to={repassesPath}
                                     state={{ nome: nomeResponsavel, tipo: tipoResponsavel }}
-                                    className="btn btn-soft-warning"
+                                    className="btn btn-success"
                                 >
-                                    <i className="ri-exchange-dollar-line me-1"></i>
-                                    Controle de repasses
+                                    <i className="ri-money-dollar-circle-line me-1"></i>
+                                    Marcar pagamentos (todas as parcelas)
                                 </Link>
                                 <Link to="/projecao-faturas" className="btn btn-soft-primary">
                                     Ir à Projeção
@@ -1008,9 +1035,9 @@ const FaturaResponsavelView = () => {
                         <CardBody>
                             <div className="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
                                 <div>
-                                    <h5 className="card-title mb-1">Compras</h5>
+                                    <h5 className="card-title mb-1">Compras deste mês</h5>
                                     <small className="text-muted">
-                                        Agrupadas por cartão e, dentro, por final. Todas as bandeiras desta competência.
+                                        Use a coluna <strong>Pagou?</strong> para marcar se o responsável já te devolveu cada compra.
                                     </small>
                                 </div>
                                 <div className="d-flex flex-wrap gap-2">
@@ -1068,7 +1095,7 @@ const FaturaResponsavelView = () => {
                                                 <th>Estabelecimento</th>
                                                 <th className={VALOR_TEXT_CLASS} style={{ minWidth: 130 }}>Valor</th>
                                                 <th style={{ width: 90 }}>Parcelas</th>
-                                                <th style={{ minWidth: 110 }}>Repasse</th>
+                                                <th style={{ minWidth: 160 }}>Pagou?</th>
                                                 <th>Tipo</th>
                                                 <th>Origem</th>
                                                 <th style={{ minWidth: 150 }}>Categoria</th>
@@ -1173,32 +1200,45 @@ const FaturaResponsavelView = () => {
                                                                             {formatParcelas(tx.parcela_atual, tx.parcelas_total)}
                                                                         </td>
                                                                         <td>
-                                                                            <div className="d-flex flex-column align-items-start gap-1">
-                                                                                {tx.status_repasse ? (
-                                                                                    <span className={`badge ${statusRepasseBadgeClass[tx.status_repasse] ?? 'bg-secondary-subtle text-secondary'}`}>
-                                                                                        {statusRepasseLabel[tx.status_repasse] ?? tx.status_repasse}
-                                                                                    </span>
-                                                                                ) : (
-                                                                                    <span className="badge bg-light text-muted">—</span>
-                                                                                )}
-                                                                                {Number(tx.valor_aberto_repasse ?? 0) > 0 && (
-                                                                                    <span className={`small text-danger ${VALOR_TEXT_CLASS}`}>
-                                                                                        Aberto {formatCurrency(tx.valor_aberto_repasse)}
-                                                                                    </span>
-                                                                                )}
-                                                                                <Button
-                                                                                    type="button"
-                                                                                    color="success"
-                                                                                    outline
-                                                                                    size="sm"
-                                                                                    className="px-1 py-0"
-                                                                                    title="Registrar repasse"
-                                                                                    disabled={!!savingIds[tx.id!]}
-                                                                                    onClick={() => openRepasseModal(tx)}
-                                                                                >
-                                                                                    <i className="ri-exchange-dollar-line"></i>
-                                                                                </Button>
-                                                                            </div>
+                                                                            {(() => {
+                                                                                const devido = Number(tx.valor ?? 0)
+                                                                                const pago = Number(tx.valor_pago_repasse ?? 0)
+                                                                                const aberto = tx.valor_aberto_repasse != null
+                                                                                    ? Number(tx.valor_aberto_repasse)
+                                                                                    : Math.max(devido - pago, 0)
+                                                                                const status = tx.status_repasse
+                                                                                    || (pago <= 0 ? 'pendente' : aberto <= 0 ? 'pago' : 'parcial')
+                                                                                const labelBtn =
+                                                                                    status === 'pago'
+                                                                                        ? 'Ver pagamento'
+                                                                                        : status === 'parcial'
+                                                                                            ? 'Completar pagamento'
+                                                                                            : 'Marcar pagamento'
+                                                                                return (
+                                                                                    <div className="d-flex flex-column align-items-stretch gap-1" style={{ minWidth: 140 }}>
+                                                                                        <span className={`badge align-self-start ${statusRepasseBadgeClass[status] ?? 'bg-secondary-subtle text-secondary'}`}>
+                                                                                            {statusRepasseLabel[status] ?? status}
+                                                                                        </span>
+                                                                                        {aberto > 0 && (
+                                                                                            <span className={`small text-danger ${VALOR_TEXT_CLASS}`}>
+                                                                                                Falta {formatCurrency(aberto)}
+                                                                                            </span>
+                                                                                        )}
+                                                                                        <Button
+                                                                                            type="button"
+                                                                                            color={status === 'pago' ? 'light' : 'success'}
+                                                                                            size="sm"
+                                                                                            className={status === 'pago' ? 'border' : ''}
+                                                                                            title={labelBtn}
+                                                                                            disabled={!!savingIds[tx.id!]}
+                                                                                            onClick={() => openRepasseModal(tx)}
+                                                                                        >
+                                                                                            <i className={`${status === 'pago' ? 'ri-eye-line' : 'ri-check-line'} me-1`}></i>
+                                                                                            {labelBtn}
+                                                                                        </Button>
+                                                                                    </div>
+                                                                                )
+                                                                            })()}
                                                                         </td>
                                                                         <td>
                                                                             <Badge color={tipoTransacaoColor[tx.tipo ?? ''] ?? 'secondary'}>

@@ -654,14 +654,15 @@ const ProjecaoMatriz = ({
                           {repassesClickable && !linha.eh_eu && (
                             <button
                               type="button"
-                              className="btn btn-sm btn-soft-success px-1 py-0"
-                              title="Controle de repasses"
+                              className="btn btn-sm btn-success"
+                              title="Marcar o que este responsável já te pagou"
                               onClick={(e) => {
                                 e.stopPropagation()
                                 onRepassesClick?.(linha)
                               }}
                             >
-                              <i className="ri-exchange-dollar-line"></i>
+                              <i className="ri-money-dollar-circle-line me-1"></i>
+                              Pagou?
                             </button>
                           )}
                         </span>
@@ -1217,11 +1218,11 @@ export const ProjecaoFaturasTable = ({ data }: ProjecaoFaturasTableProps) => {
               split do consumo
             </span>
             <span className="text-muted fs-13">
-              Clique no responsável ou na célula do mês para abrir a fatura do responsável
+              Clique no responsável ou na célula do mês para abrir a fatura
             </span>
             <span className="text-muted fs-13">
-              <i className="ri-exchange-dollar-line text-success me-1"></i>
-              controle de repasses (o que o responsável te pagou)
+              <span className="badge bg-success me-1">Pagou?</span>
+              marcar o que o responsável já te devolveu
             </span>
           </div>
         </Col>
