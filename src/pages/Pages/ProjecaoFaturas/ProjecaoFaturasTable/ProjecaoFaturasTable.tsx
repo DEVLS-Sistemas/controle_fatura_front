@@ -302,6 +302,18 @@ const buildFaturaResponsavelPath = (
   return `/projecao-faturas/responsaveis/${responsavelId}/fatura?${qs.toString()}`
 }
 
+const buildRepassesResponsavelPath = (
+  responsavelId: number | string,
+  mes: number,
+  ano: number
+) => {
+  const qs = new URLSearchParams({
+    mes: String(mes),
+    ano: String(ano),
+  })
+  return `/projecao-faturas/responsaveis/${responsavelId}/repasses?${qs.toString()}`
+}
+
 const ProjecaoCelula = ({
   valor,
   coluna,
@@ -541,6 +553,7 @@ const ProjecaoMatriz = ({
   resumoEuOutros,
   onCelulaClick,
   onLinhaLabelClick,
+  onRepassesClick,
 }: {
   titulo: string
   colunas: ProjecaoColuna[]
@@ -553,9 +566,11 @@ const ProjecaoMatriz = ({
   resumoEuOutros?: ProjecaoResumoEuOutros | null
   onCelulaClick?: (linha: LinhaTabela, coluna: ProjecaoColuna, valor: ProjecaoValor | undefined) => void
   onLinhaLabelClick?: (linha: LinhaTabela) => void
+  onRepassesClick?: (linha: LinhaTabela) => void
 }) => {
   const idxReferencia = colunas.findIndex((c) => c.referencia)
   const labelClickable = typeof onLinhaLabelClick === 'function'
+  const repassesClickable = typeof onRepassesClick === 'function'
   const labelColunaRef =
     idxReferencia >= 0 ? colunas[idxReferencia]?.label : undefined
 
@@ -636,6 +651,19 @@ const ProjecaoMatriz = ({
                               </Badge>
                             )}
                           </span>
+                          {repassesClickable && !linha.eh_eu && (
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-soft-success px-1 py-0"
+                              title="Controle de repasses"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                onRepassesClick?.(linha)
+                              }}
+                            >
+                              <i className="ri-exchange-dollar-line"></i>
+                            </button>
+                          )}
                         </span>
                         {linha.sublabel && (
                           <span className="d-block text-muted fs-12">{linha.sublabel}</span>
@@ -1012,6 +1040,15 @@ export const ProjecaoFaturasTable = ({ data }: ProjecaoFaturasTableProps) => {
     navigate(buildFaturaResponsavelPath(responsavelId, mes, ano, cartaoId), { state })
   }
 
+  const goRepassesResponsavel = (
+    responsavelId: number | string,
+    mes: number,
+    ano: number,
+    meta: { nome?: string; tipo?: string }
+  ) => {
+    navigate(buildRepassesResponsavelPath(responsavelId, mes, ano), { state: meta })
+  }
+
   const linhasCartoes: LinhaTabela[] = (data.por_cartao || []).map((c) => ({
     id: c.cartao_id,
     label: c.nome,
@@ -1122,6 +1159,13 @@ export const ProjecaoFaturasTable = ({ data }: ProjecaoFaturasTableProps) => {
                 total: valor?.total,
               })
             }}
+            onRepassesClick={(linha) => {
+              if (!colunaReferencia) return
+              goRepassesResponsavel(linha.id, colunaReferencia.mes, colunaReferencia.ano, {
+                nome: linha.label,
+                tipo: linha.sublabel?.toLowerCase(),
+              })
+            }}
             onCelulaClick={(linha, coluna, valor) => {
               goFaturaResponsavel(linha.id, coluna.mes, coluna.ano, {
                 nome: linha.label,
@@ -1174,6 +1218,10 @@ export const ProjecaoFaturasTable = ({ data }: ProjecaoFaturasTableProps) => {
             </span>
             <span className="text-muted fs-13">
               Clique no responsável ou na célula do mês para abrir a fatura do responsável
+            </span>
+            <span className="text-muted fs-13">
+              <i className="ri-exchange-dollar-line text-success me-1"></i>
+              controle de repasses (o que o responsável te pagou)
             </span>
           </div>
         </Col>

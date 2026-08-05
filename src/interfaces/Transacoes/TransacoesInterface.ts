@@ -59,6 +59,11 @@ export interface TransacoesList {
     fatura_mes?: number
     fatura_ano?: number
     observacoes?: string
+    /** Repasse do responsável (não confundir com quitação da bandeira) */
+    valor_pago_repasse?: number | null
+    valor_aberto_repasse?: number | null
+    status_repasse?: 'pendente' | 'parcial' | 'pago' | null
+    data_ultimo_repasse?: string | null
 }
 
 export interface TransacoesView extends TransacoesList {}

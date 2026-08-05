@@ -23,6 +23,8 @@ import {
     formatDateBr,
     getCategoriaFieldStyle,
     origemCompraLabel,
+    statusRepasseBadgeClass,
+    statusRepasseLabel,
     tipoTransacaoColor,
     tipoTransacaoLabel,
     VALOR_TEXT_CLASS,
@@ -40,6 +42,8 @@ import { SubcategoriasService } from 'services/Subcategorias/SubcategoriasServic
 import ResponsavelModal from 'pages/Pages/Transacoes/ResponsavelModal/ResponsavelModal'
 import CategoriaRapidoModal, { CategoriaRapidoConfirm } from 'pages/Pages/Transacoes/CategoriaRapidoModal/CategoriaRapidoModal'
 import SubcategoriaRapidoModal, { SubcategoriaRapidoConfirm } from 'pages/Pages/Transacoes/SubcategoriaRapidoModal/SubcategoriaRapidoModal'
+import RepasseModal, { RepasseModalContext } from '../RepasseModal/RepasseModal'
+import { RepasseCelula } from 'interfaces/Repasses/RepassesInterface'
 
 const SEM_CARTAO_KEY = '__sem_cartao__'
 const SEM_FINAL_KEY = '__sem_final__'
@@ -229,6 +233,8 @@ const FaturaResponsavelView = () => {
     const [savingIds, setSavingIds] = useState<Record<number, boolean>>({})
     const [valorDrafts, setValorDrafts] = useState<Record<number, string>>({})
     const [observacaoDrafts, setObservacaoDrafts] = useState<Record<number, string>>({})
+    const [repasseModalOpen, setRepasseModalOpen] = useState(false)
+    const [repasseModalContext, setRepasseModalContext] = useState<RepasseModalContext | null>(null)
 
     const projetadoInfo = Number(locationState.projetado ?? 0)
 
@@ -423,6 +429,67 @@ const FaturaResponsavelView = () => {
         () => transacoes.reduce((acc, tx) => acc + Number(tx.valor ?? 0), 0),
         [transacoes]
     )
+
+    const totalRepassado = useMemo(
+        () => transacoes.reduce((acc, tx) => acc + Number(tx.valor_pago_repasse ?? 0), 0),
+        [transacoes]
+    )
+
+    const totalAbertoRepasse = useMemo(
+        () => transacoes.reduce((acc, tx) => {
+            if (tx.valor_aberto_repasse != null) return acc + Number(tx.valor_aberto_repasse)
+            const devido = Number(tx.valor ?? 0)
+            const pago = Number(tx.valor_pago_repasse ?? 0)
+            return acc + Math.max(devido - pago, 0)
+        }, 0),
+        [transacoes]
+    )
+
+    const temDadosRepasse = useMemo(
+        () => transacoes.some((tx) =>
+            tx.status_repasse != null
+            || tx.valor_pago_repasse != null
+            || tx.valor_aberto_repasse != null
+        ),
+        [transacoes]
+    )
+
+    const repassesPath = useMemo(() => {
+        if (!responsavelId) return '/projecao-faturas'
+        const qs = new URLSearchParams({ mes: String(mes), ano: String(ano) })
+        if (filtroCartaoId != null) qs.set('cartao_id', String(filtroCartaoId))
+        return `/projecao-faturas/responsaveis/${responsavelId}/repasses?${qs.toString()}`
+    }, [responsavelId, mes, ano, filtroCartaoId])
+
+    const openRepasseModal = (tx: TransacoesList) => {
+        if (!tx.id) return
+        const devido = Number(tx.valor ?? 0)
+        const pago = Number(tx.valor_pago_repasse ?? 0)
+        const aberto = tx.valor_aberto_repasse != null
+            ? Number(tx.valor_aberto_repasse)
+            : Math.max(devido - pago, 0)
+        const status = (tx.status_repasse
+            || (pago <= 0 ? 'pendente' : aberto <= 0 ? 'pago' : 'parcial')) as RepasseCelula['status_repasse']
+        const celula: RepasseCelula = {
+            transacao_id: tx.id,
+            fatura_id: tx.fatura_id ?? null,
+            parcela_atual: tx.parcela_atual ?? null,
+            parcelas_total: tx.parcelas_total ?? null,
+            valor_devido: devido,
+            valor_pago: pago,
+            valor_aberto: aberto,
+            status_repasse: status,
+            data_ultimo_pagamento: tx.data_ultimo_repasse ?? null,
+            qtd_repasses: undefined,
+        }
+        setRepasseModalContext({
+            estabelecimento: tx.estabelecimento_nome ?? tx.estabelecimento,
+            observacoes: tx.observacoes,
+            competenciaLabel: formatPeriodo(mes, ano),
+            celula,
+        })
+        setRepasseModalOpen(true)
+    }
 
     const nomeResponsavel =
         responsavel?.nome
@@ -862,8 +929,8 @@ const FaturaResponsavelView = () => {
 
                             <div className="bg-light rounded p-3 mb-3">
                                 <Row className="g-3 text-center text-md-start">
-                                    <Col xs={6} md={4}>
-                                        <small className="text-muted text-uppercase d-block">Total do responsável</small>
+                                    <Col xs={6} md={temDadosRepasse ? 3 : 4}>
+                                        <small className="text-muted text-uppercase d-block">Total devido</small>
                                         <span
                                             className={`fw-semibold text-primary ${VALOR_TEXT_CLASS} d-block`}
                                             style={{ fontSize: '1.5rem', lineHeight: 1.2 }}
@@ -871,7 +938,29 @@ const FaturaResponsavelView = () => {
                                             {formatCurrency(totalValor)}
                                         </span>
                                     </Col>
-                                    <Col xs={6} md={4}>
+                                    {temDadosRepasse && (
+                                        <>
+                                            <Col xs={6} md={3}>
+                                                <small className="text-muted text-uppercase d-block">Já repassado</small>
+                                                <span
+                                                    className={`fw-semibold text-success ${VALOR_TEXT_CLASS} d-block`}
+                                                    style={{ fontSize: '1.5rem', lineHeight: 1.2 }}
+                                                >
+                                                    {formatCurrency(totalRepassado)}
+                                                </span>
+                                            </Col>
+                                            <Col xs={6} md={3}>
+                                                <small className="text-muted text-uppercase d-block">Em aberto (responsável)</small>
+                                                <span
+                                                    className={`fw-semibold text-danger ${VALOR_TEXT_CLASS} d-block`}
+                                                    style={{ fontSize: '1.5rem', lineHeight: 1.2 }}
+                                                >
+                                                    {formatCurrency(totalAbertoRepasse)}
+                                                </span>
+                                            </Col>
+                                        </>
+                                    )}
+                                    <Col xs={6} md={temDadosRepasse ? 3 : 4}>
                                         <small className="text-muted text-uppercase d-block">Lançamentos</small>
                                         <span
                                             className="fw-semibold d-block"
@@ -879,18 +968,20 @@ const FaturaResponsavelView = () => {
                                         >
                                             {transacoes.length}
                                         </span>
-                                    </Col>
-                                    <Col xs={12} md={4}>
-                                        <small className="text-muted text-uppercase d-block">Realizado nesta tela</small>
-                                        <span className={`fw-semibold ${VALOR_TEXT_CLASS} d-block`}>
-                                            {formatCurrency(totalValor)}
-                                        </span>
                                         {projetadoInfo > 0 && (
                                             <span className="badge bg-info-subtle text-info mt-1">
                                                 + {formatCurrency(projetadoInfo)} projetado (projeção)
                                             </span>
                                         )}
                                     </Col>
+                                    {!temDadosRepasse && (
+                                        <Col xs={12} md={4}>
+                                            <small className="text-muted text-uppercase d-block">Realizado nesta tela</small>
+                                            <span className={`fw-semibold ${VALOR_TEXT_CLASS} d-block`}>
+                                                {formatCurrency(totalValor)}
+                                            </span>
+                                        </Col>
+                                    )}
                                 </Row>
                             </div>
 
@@ -898,6 +989,14 @@ const FaturaResponsavelView = () => {
                                 <button type="button" className="btn btn-soft-success" onClick={voltarParaRotaAnterior}>
                                     Voltar
                                 </button>
+                                <Link
+                                    to={repassesPath}
+                                    state={{ nome: nomeResponsavel, tipo: tipoResponsavel }}
+                                    className="btn btn-soft-warning"
+                                >
+                                    <i className="ri-exchange-dollar-line me-1"></i>
+                                    Controle de repasses
+                                </Link>
                                 <Link to="/projecao-faturas" className="btn btn-soft-primary">
                                     Ir à Projeção
                                 </Link>
@@ -969,6 +1068,7 @@ const FaturaResponsavelView = () => {
                                                 <th>Estabelecimento</th>
                                                 <th className={VALOR_TEXT_CLASS} style={{ minWidth: 130 }}>Valor</th>
                                                 <th style={{ width: 90 }}>Parcelas</th>
+                                                <th style={{ minWidth: 110 }}>Repasse</th>
                                                 <th>Tipo</th>
                                                 <th>Origem</th>
                                                 <th style={{ minWidth: 150 }}>Categoria</th>
@@ -981,7 +1081,7 @@ const FaturaResponsavelView = () => {
                                             {gruposPorCartao.map((cartao) => (
                                                 <React.Fragment key={cartao.key}>
                                                     <tr className="table-primary">
-                                                        <td colSpan={10} className="py-2">
+                                                        <td colSpan={11} className="py-2">
                                                             <div className="d-flex flex-wrap align-items-center justify-content-between gap-2">
                                                                 <span className="d-flex align-items-center gap-2 fw-semibold">
                                                                     {cartao.corFundo && (
@@ -1019,7 +1119,7 @@ const FaturaResponsavelView = () => {
                                                     {cartao.finais.map((final) => (
                                                         <React.Fragment key={`${cartao.key}_${final.key}`}>
                                                             <tr className="table-secondary">
-                                                                <td colSpan={10} className="py-2">
+                                                                <td colSpan={11} className="py-2">
                                                                     <div className="d-flex flex-wrap align-items-center justify-content-between gap-2">
                                                                         <span className="fw-semibold">
                                                                             {final.label}
@@ -1071,6 +1171,34 @@ const FaturaResponsavelView = () => {
                                                                         </td>
                                                                         <td className="text-center text-nowrap">
                                                                             {formatParcelas(tx.parcela_atual, tx.parcelas_total)}
+                                                                        </td>
+                                                                        <td>
+                                                                            <div className="d-flex flex-column align-items-start gap-1">
+                                                                                {tx.status_repasse ? (
+                                                                                    <span className={`badge ${statusRepasseBadgeClass[tx.status_repasse] ?? 'bg-secondary-subtle text-secondary'}`}>
+                                                                                        {statusRepasseLabel[tx.status_repasse] ?? tx.status_repasse}
+                                                                                    </span>
+                                                                                ) : (
+                                                                                    <span className="badge bg-light text-muted">—</span>
+                                                                                )}
+                                                                                {Number(tx.valor_aberto_repasse ?? 0) > 0 && (
+                                                                                    <span className={`small text-danger ${VALOR_TEXT_CLASS}`}>
+                                                                                        Aberto {formatCurrency(tx.valor_aberto_repasse)}
+                                                                                    </span>
+                                                                                )}
+                                                                                <Button
+                                                                                    type="button"
+                                                                                    color="success"
+                                                                                    outline
+                                                                                    size="sm"
+                                                                                    className="px-1 py-0"
+                                                                                    title="Registrar repasse"
+                                                                                    disabled={!!savingIds[tx.id!]}
+                                                                                    onClick={() => openRepasseModal(tx)}
+                                                                                >
+                                                                                    <i className="ri-exchange-dollar-line"></i>
+                                                                                </Button>
+                                                                            </div>
                                                                         </td>
                                                                         <td>
                                                                             <Badge color={tipoTransacaoColor[tx.tipo ?? ''] ?? 'secondary'}>
@@ -1246,6 +1374,18 @@ const FaturaResponsavelView = () => {
                         }
                         showPropagarGrupo={Boolean(rowForSubcategoriaRapido?.compra_grupo_id)}
                         onConfirm={handleConfirmSubcategoriaRapido}
+                    />
+
+                    <RepasseModal
+                        isOpen={repasseModalOpen}
+                        toggle={() => {
+                            setRepasseModalOpen(false)
+                            setRepasseModalContext(null)
+                        }}
+                        context={repasseModalContext}
+                        onSaved={async () => {
+                            await loadData()
+                        }}
                     />
                 </Container>
             </div>

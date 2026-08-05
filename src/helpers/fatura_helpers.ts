@@ -72,6 +72,25 @@ export const faturaQuitacaoLabel = (pago?: boolean | null): string =>
 export const faturaQuitacaoColor = (pago?: boolean | null): string =>
   pago ? 'success' : 'warning'
 
+/** Repasse do responsável — distinto da quitação da bandeira */
+export const statusRepasseLabel: Record<string, string> = {
+  pendente: 'Pendente',
+  parcial: 'Parcial',
+  pago: 'Repassado',
+}
+
+export const statusRepasseColor: Record<string, string> = {
+  pendente: 'secondary',
+  parcial: 'warning',
+  pago: 'success',
+}
+
+export const statusRepasseBadgeClass: Record<string, string> = {
+  pendente: 'bg-secondary-subtle text-secondary',
+  parcial: 'bg-warning-subtle text-warning',
+  pago: 'bg-success-subtle text-success',
+}
+
 const hexToRgba = (hex: string, alpha: number): string => {
   const raw = hex.replace('#', '').trim()
   const full = raw.length === 3
