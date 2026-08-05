@@ -10,6 +10,7 @@ import {
     EstabelecimentosModel,
     EstabelecimentosSearch,
     EstabelecimentosView,
+    ExcluirTodosEstabelecimentosResponse,
     LookupsEstabelecimentos,
 } from "interfaces/Estabelecimentos/EstabelecimentosInterface"
 
@@ -107,6 +108,19 @@ export class EstabelecimentosService implements EstabelecimentosInterface {
         switch (response.statusCode) {
             case HttpStatusCode.ok: return response
             case HttpStatusCode.noContent: return
+            case HttpStatusCode.unauthorized: throw new AccessDeniedError()
+            case HttpStatusCode.invalidForm: throw new ValidationError(response.body)
+            default: throw new UnexpectedError(response.message)
+        }
+    }
+
+    async deleteAllEstabelecimentos(): Promise<ExcluirTodosEstabelecimentosResponse> {
+        const response = await this.httpClient.delete<ExcluirTodosEstabelecimentosResponse>({
+            url: this.url + '/excluir-todos',
+            body: { confirmar: true },
+        })
+        switch (response.statusCode) {
+            case HttpStatusCode.ok: return response.body
             case HttpStatusCode.unauthorized: throw new AccessDeniedError()
             case HttpStatusCode.invalidForm: throw new ValidationError(response.body)
             default: throw new UnexpectedError(response.message)

@@ -39,6 +39,21 @@ export interface LookupsEstabelecimentos {
     categorias?: { id?: number; nome?: string }[]
 }
 
+/** Resposta de `DELETE /estabelecimentos/excluir-todos` */
+export interface ExcluirTodosEstabelecimentosData {
+    estabelecimentos_excluidos: number
+    categorias_excluidas: number
+    subcategorias_excluidas: number
+}
+
+export interface ExcluirTodosEstabelecimentosResponse {
+    estabelecimento?: {
+        data?: ExcluirTodosEstabelecimentosData
+        status?: boolean
+        message?: string
+    }
+}
+
 export interface EstabelecimentosInterface {
     getViewEstabelecimentos(params: { id: number | string }): Promise<EstabelecimentosView | undefined>
     listEstabelecimentosPaginate(params: EstabelecimentosSearch): Promise<any>
@@ -46,6 +61,7 @@ export interface EstabelecimentosInterface {
     createEstabelecimentos(params: EstabelecimentosModel): Promise<any>
     editEstabelecimentos(params: EstabelecimentosModel): Promise<any>
     deleteEstabelecimentos(id: number): Promise<any>
+    deleteAllEstabelecimentos(): Promise<ExcluirTodosEstabelecimentosResponse>
     getLookupsEstabelecimentos(): Promise<LookupsEstabelecimentos | undefined>
 }
 

@@ -3,18 +3,68 @@ import React, { useState } from "react"
 import { Link } from "react-router-dom"
 import { useForm } from "react-hook-form"
 import {
-    Breadcrumb, BreadcrumbItem, Button, Card, CardHeader, Col, Collapse, Label, Row
+    Breadcrumb, BreadcrumbItem, Button, Card, CardHeader, Col, Collapse,
+    Input, Label, Modal, ModalBody, ModalHeader, Row, Spinner
 } from "reactstrap"
+import { toast } from "react-toastify"
 import { InputTextControlled } from "Components/ComponentController/Inputs/Text/InputTextControlled"
 import { EstabelecimentosSearch } from "interfaces/Estabelecimentos/EstabelecimentosInterface"
+import { EstabelecimentosService } from "services/Estabelecimentos/EstabelecimentosService"
+import { ValidationError } from "libs/api/exceptions/ValidationError"
 
 export interface EstabelecimentosFilterProps {
     getRemoteEstabelecimentosList: (data: any) => void
 }
 
+const isDev = process.env.NODE_ENV === 'development'
+
+const extractErrorMessage = (error: unknown): string => {
+    if (error instanceof ValidationError) {
+        const body = error.errors as any
+        if (typeof body?.message === 'string') return body.message
+        if (typeof body?.estabelecimento?.message === 'string') return body.estabelecimento.message
+        if (typeof body === 'string') return body
+    }
+    if (error instanceof Error && error.message) return error.message
+    return 'Erro ao excluir estabelecimentos e categorias'
+}
+
 const EstabelecimentosFilter = ({ getRemoteEstabelecimentosList }: EstabelecimentosFilterProps) => {
     const { handleSubmit, control, register } = useForm<EstabelecimentosSearch>({ defaultValues: {} })
     const [showFilter, setShowFilter] = useState<boolean>(false)
+    const [limparModalOpen, setLimparModalOpen] = useState(false)
+    const [confirmado, setConfirmado] = useState(false)
+    const [excluindoTodos, setExcluindoTodos] = useState(false)
+    const estabelecimentosService = new EstabelecimentosService()
+
+    const toggleLimparModal = () => {
+        if (excluindoTodos) return
+        setLimparModalOpen((open) => !open)
+        setConfirmado(false)
+    }
+
+    const handleExcluirTodos = async () => {
+        if (!confirmado) return
+        setExcluindoTodos(true)
+        try {
+            const result = await estabelecimentosService.deleteAllEstabelecimentos()
+            const data = result?.estabelecimento?.data
+            const estabelecimentos = data?.estabelecimentos_excluidos ?? 0
+            const categorias = data?.categorias_excluidas ?? 0
+            const subcategorias = data?.subcategorias_excluidas ?? 0
+            toast.success(
+                `${result?.estabelecimento?.message ?? 'Limpeza concluída.'} (${estabelecimentos} estabelecimento(s), ${categorias} categoria(s), ${subcategorias} subcategoria(s))`
+            )
+            setLimparModalOpen(false)
+            setConfirmado(false)
+            await getRemoteEstabelecimentosList({})
+        } catch (error: unknown) {
+            console.error('Erro ao excluir todos os estabelecimentos:', error)
+            toast.error(extractErrorMessage(error))
+        } finally {
+            setExcluindoTodos(false)
+        }
+    }
 
     return (
         <React.Fragment>
@@ -39,7 +89,18 @@ const EstabelecimentosFilter = ({ getRemoteEstabelecimentosList }: Estabelecimen
 
             <Row>
                 <Col xs={12}>
-                    <div className="d-flex flex-row justify-content-end align-items-center mb-4">
+                    <div className="d-flex flex-row justify-content-end align-items-center gap-2 mb-4">
+                        {isDev && (
+                            <Button
+                                color="soft-danger"
+                                className="btn btn-soft-danger"
+                                onClick={toggleLimparModal}
+                                title="Ferramenta de testes: zera estabelecimentos, categorias e subcategorias"
+                            >
+                                <i className="ri-delete-bin-2-line align-middle me-1"></i>
+                                Limpar estabelecimentos
+                            </Button>
+                        )}
                         <Link to="/estabelecimentos/add" className="btn btn-primary">
                             <i className="ri-add-circle-line align-middle me-1"></i> Add
                         </Link>
@@ -128,6 +189,53 @@ const EstabelecimentosFilter = ({ getRemoteEstabelecimentosList }: Estabelecimen
                     </Card>
                 </Col>
             </Row>
+
+            {isDev && (
+                <Modal isOpen={limparModalOpen} toggle={toggleLimparModal} centered backdrop="static">
+                    <ModalHeader toggle={toggleLimparModal}>Excluir todos os estabelecimentos?</ModalHeader>
+                    <ModalBody>
+                        <div className="text-center mb-3">
+                            <i className="ri-error-warning-line display-5 text-danger"></i>
+                        </div>
+                        <p className="mb-2">
+                            Isso remove <strong>todos os estabelecimentos, categorias e subcategorias</strong>.
+                            Faturas/transações e cartões permanecem. Se ainda houver compras, limpe as faturas
+                            antes. Esta ação é para testes e não pode ser desfeita pela UI.
+                        </p>
+                        <div className="form-check mb-4">
+                            <Input
+                                className="form-check-input"
+                                type="checkbox"
+                                id="confirmar-excluir-todos-estabelecimentos"
+                                checked={confirmado}
+                                onChange={(e) => setConfirmado(e.target.checked)}
+                                disabled={excluindoTodos}
+                            />
+                            <Label className="form-check-label" htmlFor="confirmar-excluir-todos-estabelecimentos">
+                                Entendi e quero excluir tudo
+                            </Label>
+                        </div>
+                        <div className="d-flex gap-2 justify-content-end">
+                            <Button color="light" onClick={toggleLimparModal} disabled={excluindoTodos}>
+                                Cancelar
+                            </Button>
+                            <Button
+                                color="danger"
+                                onClick={handleExcluirTodos}
+                                disabled={!confirmado || excluindoTodos}
+                            >
+                                {excluindoTodos ? (
+                                    <>
+                                        <Spinner size="sm" className="me-1" /> Excluindo…
+                                    </>
+                                ) : (
+                                    'Excluir tudo'
+                                )}
+                            </Button>
+                        </div>
+                    </ModalBody>
+                </Modal>
+            )}
         </React.Fragment>
     )
 }
