@@ -1,5 +1,16 @@
-import React from 'react'
-import { Card, CardBody, Col, Progress, Row, UncontrolledTooltip } from 'reactstrap'
+import React, { useState } from 'react'
+import {
+  Badge,
+  Card,
+  CardBody,
+  Col,
+  Modal,
+  ModalBody,
+  ModalHeader,
+  Progress,
+  Row,
+  UncontrolledTooltip,
+} from 'reactstrap'
 import { CurrencyValue } from 'Components/Common/CurrencyValue'
 import { formatCurrency, VALOR_TEXT_CLASS } from 'helpers/fatura_helpers'
 import { CartaoChip } from 'helpers/cartao_helpers'
@@ -29,21 +40,6 @@ const stickyFootStyle: React.CSSProperties = {
   zIndex: 3,
   backgroundColor: 'var(--vz-light, #f3f6f9)',
   fontWeight: 600,
-}
-
-const stickySecondColStyle: React.CSSProperties = {
-  position: 'sticky',
-  left: 200,
-  zIndex: 2,
-  backgroundColor: 'var(--vz-secondary-bg, #fff)',
-  minWidth: 140,
-  maxWidth: 200,
-}
-
-const stickySecondHeadStyle: React.CSSProperties = {
-  ...stickySecondColStyle,
-  zIndex: 3,
-  backgroundColor: 'var(--vz-light, #f3f6f9)',
 }
 
 const MESES_ABREV = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
@@ -83,7 +79,15 @@ type LinhaTabela = {
   total: number
 }
 
-type LinhaCruzamento = {
+type ResponsavelCruzamento = {
+  responsavelId: number
+  responsavelLabel: string
+  responsavelSublabel?: string
+  valores: ProjecaoValor[]
+  total: number
+}
+
+type CartaoCruzamento = {
   cartaoId: number
   cartaoLabel: string
   cartaoSublabel?: string
@@ -91,13 +95,9 @@ type LinhaCruzamento = {
   cartaoCorTexto?: string | null
   limite_credito?: number | null
   valorReferencia?: ProjecaoValor
-  responsavelId: number
-  responsavelLabel: string
-  responsavelSublabel?: string
   valores: ProjecaoValor[]
   total: number
-  isFirstOfCartao: boolean
-  cartaoRowSpan: number
+  responsaveis: ResponsavelCruzamento[]
 }
 
 const cellClassName = (valor: ProjecaoValor | undefined, isReferencia: boolean): string => {
@@ -389,94 +389,233 @@ const ProjecaoMatriz = ({
 const ProjecaoMatrizCruzamento = ({
   titulo,
   colunas,
-  linhas,
+  cartoes,
   prefix,
 }: {
   titulo: string
   colunas: ProjecaoColuna[]
-  linhas: LinhaCruzamento[]
+  cartoes: CartaoCruzamento[]
   prefix: string
-}) => (
-  <Card>
-    <CardBody>
-      <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
-        <h5 className="card-title mb-0">{titulo}</h5>
-        <span className="text-muted fs-13">
-          Quanto cada responsável gerou em cada cartão
-        </span>
-      </div>
-      {linhas.length === 0 ? (
-        <div className="bg-primary text-white border-0 alert alert-primary fade show text-center mb-0">
-          Nenhum dado encontrado para o período selecionado.
+}) => {
+  const [selecionado, setSelecionado] = useState<CartaoCruzamento | null>(null)
+  const modalOpen = selecionado != null
+
+  const closeModal = () => setSelecionado(null)
+
+  return (
+    <Card>
+      <CardBody>
+        <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+          <h5 className="card-title mb-0">{titulo}</h5>
+          <span className="text-muted fs-13">
+            Clique no cartão para ver responsáveis e totais
+          </span>
         </div>
-      ) : (
-        <div className="table-responsive">
-          <table className="table align-middle table-nowrap table-striped-columns mb-0">
-            <thead className="table-light">
-              <tr>
-                <th scope="col" className="text-start" style={stickyHeadStyle}>
-                  Cartão
-                </th>
-                <th scope="col" className="text-start" style={stickySecondHeadStyle}>
-                  Responsável
-                </th>
-                <CabecalhoMeses colunas={colunas} />
-                <th scope="col" className="text-end" style={{ minWidth: 90 }}>
-                  Total
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {linhas.map((linha) => (
-                <tr key={`${linha.cartaoId}-${linha.responsavelId}`}>
-                  {linha.isFirstOfCartao && (
-                    <td className="text-start align-middle" style={stickyColStyle} rowSpan={linha.cartaoRowSpan}>
-                      <span className="d-flex align-items-center gap-2 fw-medium">
-                        {linha.cartaoCorFundo && (
-                          <CartaoChip
-                            cor_fundo={linha.cartaoCorFundo}
-                            cor_texto={linha.cartaoCorTexto}
-                            label={String(linha.cartaoLabel).slice(0, 1)}
-                          />
-                        )}
-                        <span>{linha.cartaoLabel}</span>
-                      </span>
-                      {linha.cartaoSublabel && (
-                        <span className="d-block text-muted fs-12">{linha.cartaoSublabel}</span>
+        {cartoes.length === 0 ? (
+          <div className="bg-primary text-white border-0 alert alert-primary fade show text-center mb-0">
+            Nenhum dado encontrado para o período selecionado.
+          </div>
+        ) : (
+          <Row className="g-3">
+            {cartoes.map((cartao) => {
+              const qtdResp = cartao.responsaveis.length
+              return (
+                <Col key={cartao.cartaoId} xs={12} sm={6} lg={4} xl={3}>
+                  <Card
+                    className="card-animate h-100 mb-0 border shadow-none"
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setSelecionado(cartao)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault()
+                        setSelecionado(cartao)
+                      }
+                    }}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    <CardBody className="d-flex flex-column gap-2 p-3">
+                      <div className="d-flex align-items-start justify-content-between gap-2">
+                        <span className="d-flex align-items-center gap-2 fw-medium min-w-0">
+                          {cartao.cartaoCorFundo && (
+                            <CartaoChip
+                              cor_fundo={cartao.cartaoCorFundo}
+                              cor_texto={cartao.cartaoCorTexto}
+                              label={String(cartao.cartaoLabel).slice(0, 1)}
+                            />
+                          )}
+                          <span className="text-truncate">{cartao.cartaoLabel}</span>
+                        </span>
+                        <i className="ri-arrow-right-s-line fs-18 text-muted flex-shrink-0" />
+                      </div>
+                      {cartao.cartaoSublabel && (
+                        <span className="text-muted fs-12">{cartao.cartaoSublabel}</span>
                       )}
                       <LimiteUsoResumo
-                        limite={linha.limite_credito}
-                        valorReferencia={linha.valorReferencia}
-                        idPrefix={`${prefix}-${linha.cartaoId}`}
+                        limite={cartao.limite_credito}
+                        valorReferencia={cartao.valorReferencia}
+                        idPrefix={`${prefix}-card-${cartao.cartaoId}`}
                       />
-                    </td>
-                  )}
-                  <td className="text-start" style={stickySecondColStyle}>
-                    <span className="fw-medium">{linha.responsavelLabel}</span>
-                    {linha.responsavelSublabel && (
-                      <span className="d-block text-muted fs-12">{linha.responsavelSublabel}</span>
-                    )}
-                  </td>
-                  {colunas.map((col, idx) => (
-                    <ProjecaoCelula
-                      key={`${linha.cartaoId}-${linha.responsavelId}-${col.chave}`}
-                      valor={linha.valores[idx]}
-                      coluna={col}
-                      cellId={`${prefix}-${linha.cartaoId}-${linha.responsavelId}-${col.chave}`}
+                      <div className="mt-auto pt-2 d-flex align-items-end justify-content-between gap-2 border-top">
+                        <Badge color="light" className="text-muted fw-normal">
+                          {qtdResp} {qtdResp === 1 ? 'responsável' : 'responsáveis'}
+                        </Badge>
+                        <span className={`fw-semibold ${VALOR_TEXT_CLASS}`}>
+                          <CurrencyValue value={cartao.total} />
+                        </span>
+                      </div>
+                    </CardBody>
+                  </Card>
+                </Col>
+              )
+            })}
+          </Row>
+        )}
+
+        <Modal isOpen={modalOpen} toggle={closeModal} size="xl" centered scrollable>
+          {selecionado && (
+            <>
+              <ModalHeader toggle={closeModal}>
+                <span className="d-flex align-items-center gap-2">
+                  {selecionado.cartaoCorFundo && (
+                    <CartaoChip
+                      cor_fundo={selecionado.cartaoCorFundo}
+                      cor_texto={selecionado.cartaoCorTexto}
+                      label={String(selecionado.cartaoLabel).slice(0, 1)}
                     />
-                  ))}
-                  <td className={`text-end fw-semibold ${VALOR_TEXT_CLASS}`}>
-                    <CurrencyValue value={linha.total} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </CardBody>
-  </Card>
-)
+                  )}
+                  <span>
+                    {selecionado.cartaoLabel}
+                    {selecionado.cartaoSublabel && (
+                      <span className="d-block text-muted fs-12 fw-normal">
+                        {selecionado.cartaoSublabel}
+                      </span>
+                    )}
+                  </span>
+                </span>
+              </ModalHeader>
+              <ModalBody>
+                <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+                  <div>
+                    <span className="text-muted fs-13 d-block">Total do cartão no período</span>
+                    <span className={`fs-5 fw-semibold ${VALOR_TEXT_CLASS}`}>
+                      <CurrencyValue value={selecionado.total} />
+                    </span>
+                  </div>
+                  <LimiteUsoResumo
+                    limite={selecionado.limite_credito}
+                    valorReferencia={selecionado.valorReferencia}
+                    idPrefix={`${prefix}-modal-${selecionado.cartaoId}`}
+                  />
+                </div>
+
+                {selecionado.responsaveis.length === 0 ? (
+                  <div className="bg-primary text-white border-0 alert alert-primary fade show text-center mb-0">
+                    Nenhum responsável encontrado para este cartão.
+                  </div>
+                ) : (
+                  <div className="table-responsive">
+                    <table className="table align-middle table-nowrap table-striped-columns mb-0">
+                      <thead className="table-light">
+                        <tr>
+                          <th scope="col" className="text-start" style={stickyHeadStyle}>
+                            Responsável
+                          </th>
+                          <CabecalhoMeses colunas={colunas} />
+                          <th scope="col" className="text-end" style={{ minWidth: 90 }}>
+                            Total
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {selecionado.responsaveis.map((resp) => (
+                          <tr key={resp.responsavelId}>
+                            <td className="text-start" style={stickyColStyle}>
+                              <span className="fw-medium">{resp.responsavelLabel}</span>
+                              {resp.responsavelSublabel && (
+                                <span className="d-block text-muted fs-12">
+                                  {resp.responsavelSublabel}
+                                </span>
+                              )}
+                            </td>
+                            {colunas.map((col, idx) => (
+                              <ProjecaoCelula
+                                key={`${selecionado.cartaoId}-${resp.responsavelId}-${col.chave}`}
+                                valor={resp.valores[idx]}
+                                coluna={col}
+                                cellId={`${prefix}-${selecionado.cartaoId}-${resp.responsavelId}-${col.chave}`}
+                              />
+                            ))}
+                            <td className={`text-end fw-semibold ${VALOR_TEXT_CLASS}`}>
+                              <CurrencyValue value={resp.total} />
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot className="table-light">
+                        <tr>
+                          <td className="text-start" style={stickyFootStyle}>
+                            Total
+                          </td>
+                          {colunas.map((col, idx) => {
+                            const soma = selecionado.responsaveis.reduce(
+                              (acc, r) => acc + Number(r.valores[idx]?.total || 0),
+                              0
+                            )
+                            const projetado = selecionado.responsaveis.reduce(
+                              (acc, r) => acc + Number(r.valores[idx]?.projetado || 0),
+                              0
+                            )
+                            const realizado = selecionado.responsaveis.reduce(
+                              (acc, r) => acc + Number(r.valores[idx]?.realizado || 0),
+                              0
+                            )
+                            const cellId = `${prefix}-modal-total-${selecionado.cartaoId}-${col.chave}`
+                            return (
+                              <td
+                                key={col.chave}
+                                className={`text-end fw-semibold ${col.referencia ? 'table-primary' : ''} ${VALOR_TEXT_CLASS}`}
+                              >
+                                {soma > 0 ? (
+                                  <>
+                                    <span id={cellId}>
+                                      <CurrencyValue value={soma} />
+                                      {projetado > 0 && (
+                                        <span
+                                          className="badge bg-info-subtle text-info ms-1"
+                                          style={{ fontSize: '0.65rem' }}
+                                        >
+                                          proj.
+                                        </span>
+                                      )}
+                                    </span>
+                                    <UncontrolledTooltip placement="top" target={cellId}>
+                                      Realizado: {formatCurrency(realizado)} | Projetado:{' '}
+                                      {formatCurrency(projetado)}
+                                    </UncontrolledTooltip>
+                                  </>
+                                ) : (
+                                  <span className="text-muted">-</span>
+                                )}
+                              </td>
+                            )
+                          })}
+                          <td className={`text-end fw-semibold ${VALOR_TEXT_CLASS}`}>
+                            <CurrencyValue value={selecionado.total} />
+                          </td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                )}
+              </ModalBody>
+            </>
+          )}
+        </Modal>
+      </CardBody>
+    </Card>
+  )
+}
 
 export const ProjecaoFaturasTable = ({ data }: ProjecaoFaturasTableProps) => {
   if (!data) {
@@ -515,24 +654,24 @@ export const ProjecaoFaturasTable = ({ data }: ProjecaoFaturasTableProps) => {
     total: r.total,
   }))
 
-  const linhasCruzamento: LinhaCruzamento[] = []
-  ;(data.por_cartao_responsavel || []).forEach((cartao) => {
-    const responsaveis = cartao.por_responsavel || []
+  const cartoesCruzamento: CartaoCruzamento[] = (data.por_cartao_responsavel || []).map((cartao) => {
     const cartaoSublabel = [cartao.bandeira, cartao.ultimos_digitos ? `•••• ${cartao.ultimos_digitos}` : null]
       .filter(Boolean)
       .join(' · ')
     const valorReferencia =
       idxReferencia >= 0 ? (cartao.valores || [])[idxReferencia] : undefined
 
-    responsaveis.forEach((resp, idx) => {
-      linhasCruzamento.push({
-        cartaoId: cartao.cartao_id,
-        cartaoLabel: cartao.nome,
-        cartaoSublabel: cartaoSublabel || undefined,
-        cartaoCorFundo: cartao.cor_fundo,
-        cartaoCorTexto: cartao.cor_texto,
-        limite_credito: cartao.limite_credito,
-        valorReferencia,
+    return {
+      cartaoId: cartao.cartao_id,
+      cartaoLabel: cartao.nome,
+      cartaoSublabel: cartaoSublabel || undefined,
+      cartaoCorFundo: cartao.cor_fundo,
+      cartaoCorTexto: cartao.cor_texto,
+      limite_credito: cartao.limite_credito,
+      valorReferencia,
+      valores: cartao.valores || [],
+      total: cartao.total,
+      responsaveis: (cartao.por_responsavel || []).map((resp) => ({
         responsavelId: resp.responsavel_id,
         responsavelLabel: resp.nome,
         responsavelSublabel: resp.tipo
@@ -540,10 +679,8 @@ export const ProjecaoFaturasTable = ({ data }: ProjecaoFaturasTableProps) => {
           : undefined,
         valores: resp.valores || [],
         total: resp.total,
-        isFirstOfCartao: idx === 0,
-        cartaoRowSpan: responsaveis.length,
-      })
-    })
+      })),
+    }
   })
 
   const totaisCartoes = (data.totais_por_coluna || []).map((t) => t.cartoes)
@@ -579,7 +716,7 @@ export const ProjecaoFaturasTable = ({ data }: ProjecaoFaturasTableProps) => {
           <ProjecaoMatrizCruzamento
             titulo="Por cartão × responsável"
             colunas={colunas}
-            linhas={linhasCruzamento}
+            cartoes={cartoesCruzamento}
             prefix="proj-cruz"
           />
         </Col>
