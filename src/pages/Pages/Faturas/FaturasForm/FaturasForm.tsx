@@ -160,7 +160,7 @@ const FaturasForm = () => {
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0] ?? null
         if (file && !isValidFaturaFile(file)) {
-            toast.error('Formato inválido. Envie PDF, CSV ou XML.')
+            toast.error('Formato inválido. Envie PDF ou CSV.')
             e.target.value = ''
             setArquivoFile(null)
             setValue('arquivo_pdf', null)
@@ -280,7 +280,7 @@ const FaturasForm = () => {
                                                 <Col md={6}>
                                                     <div className="mb-3">
                                                         <Label htmlFor="arquivo_fatura" className="form-label">
-                                                            Arquivo da fatura
+                                                            Anexo da fatura (PDF ou CSV)
                                                         </Label>
                                                         <Input
                                                             id="arquivo_fatura"
@@ -290,7 +290,7 @@ const FaturasForm = () => {
                                                             onChange={handleFileChange}
                                                         />
                                                         <small className="text-muted">
-                                                            Formatos aceitos: PDF, CSV ou XML (máx. 10MB)
+                                                            Formatos aceitos: PDF ou CSV (máx. 10MB)
                                                         </small>
                                                         {arquivoFile && (
                                                             <div className="mt-1 text-success">

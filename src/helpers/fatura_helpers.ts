@@ -102,11 +102,47 @@ export const mesesOptions = Array.from({ length: 12 }, (_, i) => ({
   label: String(i + 1).padStart(2, '0'),
 }))
 
-/** Extensões e MIME types aceitos no upload de fatura */
+/** Extensões e MIME types aceitos no upload de fatura (apenas PDF e CSV) */
 export const FATURA_FILE_ACCEPT =
-  '.pdf,.csv,.xml,application/pdf,text/csv,text/xml,application/xml,application/vnd.ms-excel'
+  '.pdf,.csv,application/pdf,text/csv,application/vnd.ms-excel'
 
-export const FATURA_FILE_EXTENSIONS = ['pdf', 'csv', 'xml'] as const
+export const FATURA_FILE_EXTENSIONS = ['pdf', 'csv'] as const
+
+export type FaturaAnexoTipo = 'pdf' | 'csv' | null
+
+/** Resolve o tipo do anexo a partir dos campos da API (com fallback pela extensão). */
+export const resolveFaturaAnexo = (fatura: {
+  tipo_arquivo?: string | null
+  tem_pdf?: boolean
+  tem_csv?: boolean
+  arquivo_pdf?: string | null
+}): { tipo: FaturaAnexoTipo; temPdf: boolean; temCsv: boolean } => {
+  const ext = fatura.arquivo_pdf
+    ? (fatura.arquivo_pdf.split('?')[0].split('.').pop() || '').toLowerCase()
+    : ''
+
+  const tipoApi = fatura.tipo_arquivo?.toLowerCase()
+  let tipo: FaturaAnexoTipo = null
+
+  if (tipoApi === 'pdf' || tipoApi === 'csv') {
+    tipo = tipoApi
+  } else if (fatura.tem_csv === true) {
+    tipo = 'csv'
+  } else if (fatura.tem_pdf === true) {
+    // Legado: tem_pdf podia significar “tem arquivo”; respeita extensão CSV
+    tipo = ext === 'csv' ? 'csv' : 'pdf'
+  } else if (ext === 'pdf') {
+    tipo = 'pdf'
+  } else if (ext === 'csv') {
+    tipo = 'csv'
+  }
+
+  return {
+    tipo,
+    temPdf: tipo === 'pdf',
+    temCsv: tipo === 'csv',
+  }
+}
 
 export const isValidFaturaFile = (file: File): boolean => {
   const ext = file.name.split('.').pop()?.toLowerCase() || ''
@@ -118,8 +154,6 @@ export const isValidFaturaFile = (file: File): boolean => {
   return [
     'application/pdf',
     'text/csv',
-    'text/xml',
-    'application/xml',
     'application/vnd.ms-excel',
     'text/plain',
   ].includes(mime)

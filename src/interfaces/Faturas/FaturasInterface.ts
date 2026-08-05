@@ -2,10 +2,13 @@ export interface FaturasSearch {
     id?: string | null
     fatura_id?: string | null
     cartao_id?: string | number | null
+    cartao_bandeira_id?: string | number | null
     mes?: string | number | null
     ano?: string | number | null
     status?: string | null
     palavra_chave?: string | null | unknown
+    page?: number
+    perPage?: number
 }
 
 /** Resumo de uma fatura (sem array de transações) */
@@ -25,7 +28,14 @@ export interface FaturaResumo {
     valor_pago?: number | string
     valor_restante?: number | string
     arquivo_pdf?: string | null
+    /** Tipo do anexo atual: pdf | csv | null */
+    tipo_arquivo?: 'pdf' | 'csv' | null
+    /** true somente se o anexo for PDF */
     tem_pdf?: boolean
+    /** true somente se o anexo for CSV */
+    tem_csv?: boolean
+    /** URL autenticada para abrir/baixar o anexo */
+    pdf_url?: string | null
     status?: string
     erro_mensagem?: string | null
     processado_em?: string | null
@@ -80,7 +90,11 @@ export interface FaturasView extends FaturaResumo {
     pagamentos_abatido_anterior?: number | string
     /** Parte dos pagamentos que antecipou este ciclo */
     pagamentos_antecipado?: number | string
-    pdf_url?: string
+    /** Competência imediatamente anterior (mesma bandeira), ou null */
+    fatura_anterior_id?: number | null
+    fatura_proxima_id?: number | null
+    fatura_anterior_competencia?: string | null
+    fatura_proxima_competencia?: string | null
     grupos_por_cartao?: FaturaGrupoPorCartao[]
 }
 

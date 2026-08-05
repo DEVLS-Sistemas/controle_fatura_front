@@ -70,7 +70,7 @@ const FaturasPage = () => {
                                 page={page}
                             />
                         ) : (
-                            <div className="text-center">
+                            <div className="text-center py-5">
                                 <Spinner animation="border" variant="primary" />
                             </div>
                         )}

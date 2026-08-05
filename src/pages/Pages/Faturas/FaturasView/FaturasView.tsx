@@ -13,7 +13,7 @@ import {
     faturaQuitacaoLabel, faturaQuitacaoColor,
     tipoTransacaoColor, tipoTransacaoLabel,
     origemCompraLabel,
-    FATURA_FILE_ACCEPT, isValidFaturaFile,
+    FATURA_FILE_ACCEPT, isValidFaturaFile, resolveFaturaAnexo,
     getCategoriaFieldStyle, VALOR_TEXT_CLASS,
 } from 'helpers/fatura_helpers'
 import { SelectOptions } from 'interfaces/SystemInterfaces/SelectInterface'
@@ -234,6 +234,13 @@ const FaturasViewPage = () => {
     const [exporting, setExporting] = useState(false)
     /** null = todos; '__sem_cartao__' ou chave do grupo */
     const [filtroFinalKey, setFiltroFinalKey] = useState<string | null>(null)
+    /** Navegação anterior/próxima (fallback se a API não enviar os ids) */
+    const [navVizinhos, setNavVizinhos] = useState<{
+        anteriorId: number | null
+        proximaId: number | null
+        anteriorCompetencia: string | null
+        proximaCompetencia: string | null
+    }>({ anteriorId: null, proximaId: null, anteriorCompetencia: null, proximaCompetencia: null })
 
     const isMeuResponsavel = (responsavelId?: number | null) => {
         if (responsavelId == null) return true
@@ -395,6 +402,79 @@ const FaturasViewPage = () => {
         }
     }, [cartoesService])
 
+    const formatCompetenciaLabel = (mes?: number, ano?: number, competencia?: string | null) => {
+        if (competencia) return competencia
+        if (!mes || !ano) return null
+        return `${String(mes).padStart(2, '0')}/${ano}`
+    }
+
+    const resolveNavVizinhos = useCallback(async (view: FaturasView) => {
+        if (view.fatura_anterior_id != null || view.fatura_proxima_id != null) {
+            setNavVizinhos({
+                anteriorId: view.fatura_anterior_id ?? null,
+                proximaId: view.fatura_proxima_id ?? null,
+                anteriorCompetencia: view.fatura_anterior_competencia ?? null,
+                proximaCompetencia: view.fatura_proxima_competencia ?? null,
+            })
+            return
+        }
+
+        const bandeiraId = view.cartao_bandeira_id
+        if (!bandeiraId || !view.id) {
+            setNavVizinhos({
+                anteriorId: null,
+                proximaId: null,
+                anteriorCompetencia: null,
+                proximaCompetencia: null,
+            })
+            return
+        }
+
+        try {
+            const list = await faturasService.listFaturasPaginate({
+                cartao_bandeira_id: bandeiraId,
+                perPage: 100,
+                page: 1,
+            })
+            const faturas = (list?.data ?? [])
+                .flatMap((g) => g.faturas ?? [])
+                .filter((f) => f.cartao_bandeira_id == null || Number(f.cartao_bandeira_id) === Number(bandeiraId))
+                .sort((a, b) => {
+                    const anoDiff = Number(a.ano ?? 0) - Number(b.ano ?? 0)
+                    if (anoDiff !== 0) return anoDiff
+                    return Number(a.mes ?? 0) - Number(b.mes ?? 0)
+                })
+
+            const idx = faturas.findIndex((f) => Number(f.id) === Number(view.id))
+            if (idx < 0) {
+                setNavVizinhos({
+                    anteriorId: null,
+                    proximaId: null,
+                    anteriorCompetencia: null,
+                    proximaCompetencia: null,
+                })
+                return
+            }
+
+            const anterior = idx > 0 ? faturas[idx - 1] : null
+            const proxima = idx < faturas.length - 1 ? faturas[idx + 1] : null
+            setNavVizinhos({
+                anteriorId: anterior?.id ?? null,
+                proximaId: proxima?.id ?? null,
+                anteriorCompetencia: formatCompetenciaLabel(anterior?.mes, anterior?.ano, anterior?.competencia),
+                proximaCompetencia: formatCompetenciaLabel(proxima?.mes, proxima?.ano, proxima?.competencia),
+            })
+        } catch (error) {
+            console.error('Erro ao resolver navegação de faturas:', error)
+            setNavVizinhos({
+                anteriorId: null,
+                proximaId: null,
+                anteriorCompetencia: null,
+                proximaCompetencia: null,
+            })
+        }
+    }, [faturasService])
+
     const loadFatura = useCallback(async (opts?: { silent?: boolean }) => {
         if (!id) return
         if (!opts?.silent) setLoading(true)
@@ -404,7 +484,11 @@ const FaturasViewPage = () => {
                 setFatura(view)
                 setShowPdfPreview(false)
                 clearPdfBlobUrl()
-                await Promise.all([loadTransacoes(id), loadNumeros(id)])
+                await Promise.all([
+                    loadTransacoes(id),
+                    loadNumeros(id),
+                    resolveNavVizinhos(view),
+                ])
             }
         } catch (error) {
             console.error('Erro ao carregar fatura:', error)
@@ -412,13 +496,14 @@ const FaturasViewPage = () => {
         } finally {
             if (!opts?.silent) setLoading(false)
         }
-    }, [id, faturasService, clearPdfBlobUrl, loadTransacoes, loadNumeros])
+    }, [id, faturasService, clearPdfBlobUrl, loadTransacoes, loadNumeros, resolveNavVizinhos])
 
     const handleReprocessar = async () => {
         if (!id) return
         try {
             await faturasService.processarPdf(Number(id))
             toast.success('Reprocessamento concluído')
+            // Refetch completo para atualizar quitação (inclui competência anterior na listagem ao voltar)
             await loadFatura({ silent: true })
         } catch (error) {
             toast.error('Erro ao reprocessar fatura')
@@ -428,11 +513,11 @@ const FaturasViewPage = () => {
     const handleUploadPdf = async () => {
         const file = fileInputRef.current?.files?.[0]
         if (!file || !id) {
-            toast.warning('Selecione um arquivo PDF, CSV ou XML')
+            toast.warning('Selecione um arquivo PDF ou CSV')
             return
         }
         if (!isValidFaturaFile(file)) {
-            toast.error('Formato inválido. Envie PDF, CSV ou XML.')
+            toast.error('Formato inválido. Envie PDF ou CSV.')
             return
         }
         try {
@@ -740,6 +825,24 @@ const FaturasViewPage = () => {
         }
     }, [pdfBlobUrl])
 
+    useEffect(() => {
+        const onKeyDown = (e: KeyboardEvent) => {
+            const tag = (e.target as HTMLElement)?.tagName?.toLowerCase()
+            if (tag === 'input' || tag === 'textarea' || tag === 'select' || (e.target as HTMLElement)?.isContentEditable) {
+                return
+            }
+            if (e.key === 'ArrowLeft' && navVizinhos.anteriorId != null) {
+                e.preventDefault()
+                navigate(`/faturas/view/${navVizinhos.anteriorId}`)
+            } else if (e.key === 'ArrowRight' && navVizinhos.proximaId != null) {
+                e.preventDefault()
+                navigate(`/faturas/view/${navVizinhos.proximaId}`)
+            }
+        }
+        window.addEventListener('keydown', onKeyDown)
+        return () => window.removeEventListener('keydown', onKeyDown)
+    }, [navVizinhos.anteriorId, navVizinhos.proximaId, navigate])
+
     const totalTransacoes = transacoes.length || fatura?.total_transacoes || 0
     const transacoesComCategoria = useMemo(
         () => transacoes.filter((tx) => tx.categoria_id != null).length,
@@ -814,8 +917,11 @@ const FaturasViewPage = () => {
     }
 
     const isProcessing = fatura.status === 'pendente' || fatura.status === 'processando'
-    const arquivoExt = getArquivoExtensao(fatura.arquivo_pdf)
-    const temArquivo = Boolean(fatura.tem_pdf || fatura.pdf_url || fatura.arquivo_pdf)
+    const anexo = resolveFaturaAnexo(fatura)
+    const arquivoExt = anexo.tipo ?? getArquivoExtensao(fatura.arquivo_pdf)
+    const temArquivo = anexo.temPdf || anexo.temCsv || Boolean(fatura.pdf_url || fatura.arquivo_pdf)
+    const competenciaAtual = fatura.competencia ?? formatPeriodo(fatura.mes, fatura.ano)
+    const bandeiraLabel = fatura.bandeira || fatura.cartao_bandeira
 
     return (
         <React.Fragment>
@@ -838,6 +944,44 @@ const FaturasViewPage = () => {
                             </div>
                         </Col>
                     </Row>
+
+                    <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3 sticky-top py-2 bg-body" style={{ zIndex: 10 }}>
+                        <Button
+                            type="button"
+                            color="light"
+                            className="border"
+                            disabled={navVizinhos.anteriorId == null}
+                            title={navVizinhos.anteriorCompetencia
+                                ? `Fatura anterior (${navVizinhos.anteriorCompetencia})`
+                                : 'Não há fatura anterior'}
+                            onClick={() => navVizinhos.anteriorId != null && navigate(`/faturas/view/${navVizinhos.anteriorId}`)}
+                        >
+                            <i className="ri-arrow-left-line me-1"></i>
+                            Anterior
+                            {navVizinhos.anteriorCompetencia && (
+                                <span className="ms-1 text-muted">{navVizinhos.anteriorCompetencia}</span>
+                            )}
+                        </Button>
+                        <div className="text-center small text-muted d-none d-md-block">
+                            {[fatura.cartao_nome, bandeiraLabel, competenciaAtual].filter(Boolean).join(' · ')}
+                        </div>
+                        <Button
+                            type="button"
+                            color="light"
+                            className="border"
+                            disabled={navVizinhos.proximaId == null}
+                            title={navVizinhos.proximaCompetencia
+                                ? `Próxima fatura (${navVizinhos.proximaCompetencia})`
+                                : 'Não há próxima fatura'}
+                            onClick={() => navVizinhos.proximaId != null && navigate(`/faturas/view/${navVizinhos.proximaId}`)}
+                        >
+                            {navVizinhos.proximaCompetencia && (
+                                <span className="me-1 text-muted">{navVizinhos.proximaCompetencia}</span>
+                            )}
+                            Próxima
+                            <i className="ri-arrow-right-line ms-1"></i>
+                        </Button>
+                    </div>
 
                     <Card className="mb-4">
                         <CardBody>
@@ -1014,9 +1158,9 @@ const FaturasViewPage = () => {
 
                             <Row className="mt-3 align-items-end">
                                 <Col md={4}>
-                                    <Label htmlFor="upload_pdf" className="form-label">Upload (PDF / CSV / XML)</Label>
+                                    <Label htmlFor="upload_pdf" className="form-label">Anexo da fatura (PDF ou CSV)</Label>
                                     <Input innerRef={fileInputRef} type="file" accept={FATURA_FILE_ACCEPT} />
-                                    <small className="text-muted">PDF, CSV ou XML</small>
+                                    <small className="text-muted">PDF ou CSV</small>
                                 </Col>
                                 <Col md={3}>
                                     <div className="form-check form-switch mt-4">
@@ -1514,7 +1658,7 @@ const FaturasViewPage = () => {
                                 )
                             ) : (
                                 <div className="text-center text-muted py-5">
-                                    Nenhum PDF disponível para visualização.
+                                    Nenhum anexo disponível para visualização.
                                 </div>
                             )}
                         </CardBody>

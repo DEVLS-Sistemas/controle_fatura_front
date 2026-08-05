@@ -12,6 +12,7 @@ import { useNavegacao } from "helpers/functions_helpers"
 import {
     formatCurrency, formatDateBr, faturaStatusColor,
     faturaQuitacaoLabel, faturaQuitacaoColor, VALOR_TEXT_CLASS,
+    resolveFaturaAnexo,
 } from "helpers/fatura_helpers"
 import { CartaoChip } from "helpers/cartao_helpers"
 import { FaturaResumo, FaturasCartaoGroup, FaturasSearch } from "interfaces/Faturas/FaturasInterface"
@@ -107,7 +108,7 @@ export const FaturasTable = ({ data, getData, setPerPage, perPage, filters }: Fa
         }
     }
 
-    const handleVerPdf = async (id: number) => {
+    const handleVerAnexo = async (id: number) => {
         try {
             const raw = sessionStorage.getItem('authUser')
             const token = raw ? JSON.parse(raw).token : null
@@ -116,17 +117,31 @@ export const FaturasTable = ({ data, getData, setPerPage, perPage, filters }: Fa
                 headers: token ? { Authorization: `Bearer ${token}` } : {},
             })
             if (!res.ok) {
-                toast.error('PDF não disponível')
+                toast.error('Anexo não disponível')
                 return
             }
             const blob = await res.blob()
             const url = URL.createObjectURL(blob)
             window.open(url, '_blank')
         } catch (error) {
-            console.error('Erro ao abrir PDF:', error)
-            toast.error('Erro ao abrir PDF')
+            console.error('Erro ao abrir anexo:', error)
+            toast.error('Erro ao abrir anexo')
         }
     }
+
+    /** Grupos com mais de uma bandeira — chip discreto na linha */
+    const bandeirasPorCartao = useMemo(() => {
+        const map = new Map<number, Set<string>>()
+        ;(data?.data ?? []).forEach((grupo) => {
+            if (grupo.cartao_id == null) return
+            const set = map.get(grupo.cartao_id) ?? new Set<string>()
+            ;(grupo.faturas ?? []).forEach((f) => {
+                if (f.bandeira) set.add(f.bandeira)
+            })
+            map.set(grupo.cartao_id, set)
+        })
+        return map
+    }, [data?.data])
 
     const handleThisRoute = async (url: string | null) => {
         if (!url) return
@@ -161,7 +176,7 @@ export const FaturasTable = ({ data, getData, setPerPage, perPage, filters }: Fa
                                     <div className="bg-primary text-white border-0 alert alert-primary fade show text-center">
                                         {temFiltroPeriodo
                                             ? 'Nenhuma fatura neste período para os filtros informados.'
-                                            : 'Nenhuma fatura encontrada. Cadastre uma compra ou importe um PDF.'}
+                                            : 'Nenhuma fatura encontrada. Cadastre uma compra ou importe um PDF/CSV.'}
                                     </div>
                                 ) : !data ? (
                                     <div className="bg-danger text-white border-0 alert alert-danger fade show text-center">
@@ -197,7 +212,7 @@ export const FaturasTable = ({ data, getData, setPerPage, perPage, filters }: Fa
                                                         <thead className="table-light">
                                                             <tr>
                                                                 <th scope="col" className="text-start">Cartão</th>
-                                                                <th scope="col">Bandeira</th>
+                                                                <th scope="col">Anexo</th>
                                                                 <th scope="col">Competência</th>
                                                                 <th scope="col">Período</th>
                                                                 <th scope="col">Vencimento</th>
@@ -218,7 +233,12 @@ export const FaturasTable = ({ data, getData, setPerPage, perPage, filters }: Fa
                                                                     </td>
                                                                 </tr>
                                                             ) : (
-                                                                rows.map((row, index) => (
+                                                                rows.map((row, index) => {
+                                                                    const anexo = resolveFaturaAnexo(row)
+                                                                    const temAnexo = anexo.temPdf || anexo.temCsv
+                                                                    const multiBandeira = row.cartao_id != null
+                                                                        && (bandeirasPorCartao.get(row.cartao_id)?.size ?? 0) > 1
+                                                                    return (
                                                                     <tr key={row.id ?? index}>
                                                                         <td className="text-start">
                                                                             <div className="d-flex align-items-center gap-2">
@@ -231,16 +251,43 @@ export const FaturasTable = ({ data, getData, setPerPage, perPage, filters }: Fa
                                                                                             : '•'}
                                                                                     />
                                                                                 )}
-                                                                                <span>{row.cartao_nome ?? '-'}</span>
+                                                                                <div>
+                                                                                    <span>{row.cartao_nome ?? '-'}</span>
+                                                                                    {multiBandeira && row.bandeira && (
+                                                                                        <div>
+                                                                                            <span className="badge bg-light text-muted border mt-1" style={{ fontSize: '0.7rem', fontWeight: 500 }}>
+                                                                                                {row.bandeira}
+                                                                                            </span>
+                                                                                        </div>
+                                                                                    )}
+                                                                                </div>
                                                                             </div>
                                                                         </td>
                                                                         <td>
-                                                                            {row.bandeira ? (
-                                                                                <span className="badge bg-light text-dark">
-                                                                                    {row.bandeira}
-                                                                                </span>
+                                                                            {anexo.temPdf ? (
+                                                                                <button
+                                                                                    type="button"
+                                                                                    className="btn btn-link p-0 border-0"
+                                                                                    title="PDF anexado"
+                                                                                    onClick={() => row.id && handleVerAnexo(row.id)}
+                                                                                >
+                                                                                    <i className="ri-file-pdf-2-fill text-danger fs-4" />
+                                                                                </button>
+                                                                            ) : anexo.temCsv ? (
+                                                                                <button
+                                                                                    type="button"
+                                                                                    className="btn btn-link p-0 border-0"
+                                                                                    title="CSV anexado"
+                                                                                    onClick={() => row.id && handleVerAnexo(row.id)}
+                                                                                >
+                                                                                    <i className="ri-file-excel-2-fill text-success fs-4" />
+                                                                                </button>
                                                                             ) : (
-                                                                                <span className="text-muted">-</span>
+                                                                                <i
+                                                                                    className="ri-file-line text-muted fs-5"
+                                                                                    title="Sem anexo"
+                                                                                    style={{ opacity: 0.4 }}
+                                                                                />
                                                                             )}
                                                                         </td>
                                                                         <td>
@@ -278,12 +325,6 @@ export const FaturasTable = ({ data, getData, setPerPage, perPage, filters }: Fa
                                                                             <span className="text-muted">
                                                                                 {row.total_transacoes ?? 0}
                                                                             </span>
-                                                                            {row.tem_pdf && (
-                                                                                <i
-                                                                                    className="ri-file-pdf-2-line text-danger ms-2"
-                                                                                    title="Possui arquivo"
-                                                                                />
-                                                                            )}
                                                                         </td>
                                                                         <td>
                                                                             <div className="d-flex justify-content-center align-items-center gap-1">
@@ -318,11 +359,11 @@ export const FaturasTable = ({ data, getData, setPerPage, perPage, filters }: Fa
                                                                                                 <DropdownItem>Editar</DropdownItem>
                                                                                             </Link>
                                                                                             <DropdownItem onClick={() => navigate(`/faturas/view/${row.id}`)}>
-                                                                                                Upload PDF
+                                                                                                Upload anexo
                                                                                             </DropdownItem>
-                                                                                            {row.tem_pdf && row.id && (
-                                                                                                <DropdownItem onClick={() => handleVerPdf(row.id!)}>
-                                                                                                    Ver PDF
+                                                                                            {temAnexo && row.id && (
+                                                                                                <DropdownItem onClick={() => handleVerAnexo(row.id!)}>
+                                                                                                    Ver anexo
                                                                                                 </DropdownItem>
                                                                                             )}
                                                                                             <DropdownItem onClick={() => row.id && handleReprocessar(row.id)}>
@@ -342,7 +383,8 @@ export const FaturasTable = ({ data, getData, setPerPage, perPage, filters }: Fa
                                                                             </div>
                                                                         </td>
                                                                     </tr>
-                                                                ))
+                                                                    )
+                                                                })
                                                             )}
                                                         </tbody>
                                                     </table>
