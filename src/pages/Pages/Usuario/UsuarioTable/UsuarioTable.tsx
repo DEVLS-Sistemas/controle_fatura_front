@@ -2,10 +2,11 @@ import UiContent from "Components/Common/UiContent";
 import { useNavegacao } from 'helpers/functions_helpers';
 import React, { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { ButtonGroup, Card, CardBody, Col, DropdownItem, DropdownMenu, DropdownToggle, Label, Row, UncontrolledDropdown } from "reactstrap";
+import { Card, CardBody, Col, DropdownItem, Label, Row } from "reactstrap";
 import './UsuarioTableCss.css';
 import { PaginateInterface, PaginateSearch, PerPageProps } from "interfaces/SystemInterfaces/PaginateInterface";
 import { UsuarioList, UsuarioSearch } from "interfaces/UsuarioInterface";
+import TableActionsDropdown from "Components/Common/TableActionsDropdown";
 
 export interface UsuarioTableProps {
     data: PaginateInterface<UsuarioList> | undefined,
@@ -155,15 +156,10 @@ export const UsuarioTable = ({ data, getData, setPerPage, setPage, perPage, }: U
                                                                                 </div>
                                                                             </td>
                                                                             <td >
-                                                                                <ButtonGroup>
-                                                                                    <UncontrolledDropdown direction="down">
-                                                                                        <DropdownToggle tag="button" className="btn"><i className="ri-more-2-fill"></i></DropdownToggle>
-                                                                                        <DropdownMenu style={{ zIndex: '999' }}>
-                                                                                            <Link to={`/usuarios/edit/${row.id}`} state={{ source: row }}><DropdownItem>Editar</DropdownItem></Link>
-                                                                                            <Link to={`/usuarios/edit/${row.id}`} state={{ source: row }}><DropdownItem>Excluir</DropdownItem></Link>
-                                                                                        </DropdownMenu>
-                                                                                    </UncontrolledDropdown>
-                                                                                </ButtonGroup>
+                                                                                <TableActionsDropdown>
+                                                                                    <Link to={`/usuarios/edit/${row.id}`} state={{ source: row }}><DropdownItem>Editar</DropdownItem></Link>
+                                                                                    <Link to={`/usuarios/edit/${row.id}`} state={{ source: row }}><DropdownItem>Excluir</DropdownItem></Link>
+                                                                                </TableActionsDropdown>
                                                                             </td>
                                                                         </tr>
                                                                     )

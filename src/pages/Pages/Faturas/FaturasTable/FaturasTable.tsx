@@ -2,12 +2,12 @@ import UiContent from "Components/Common/UiContent"
 import React, { useEffect, useMemo, useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import {
-    ButtonGroup, Card, CardBody, Col, DropdownItem,
-    DropdownMenu, DropdownToggle, Label, Row, UncontrolledDropdown
+    Card, CardBody, Col, DropdownItem, Label, Row
 } from "reactstrap"
 import { toast } from "react-toastify"
 import { PaginateInterface, PaginateSearch, PerPageProps } from "interfaces/SystemInterfaces/PaginateInterface"
 import CustomModal from "Components/ComponentController/Modal/CustomModal"
+import TableActionsDropdown from "Components/Common/TableActionsDropdown"
 import { useNavegacao } from "helpers/functions_helpers"
 import {
     formatCurrency, formatDateBr, faturaStatusColor,
@@ -332,55 +332,48 @@ export const FaturasTable = ({ data, getData, setPerPage, perPage, filters }: Fa
                                                                                     <i className="ri-eye-line me-1"></i>
                                                                                     Detalhe
                                                                                 </Link>
-                                                                                <ButtonGroup>
-                                                                                    <UncontrolledDropdown direction="down">
-                                                                                        <DropdownToggle tag="button" className="btn btn-sm">
-                                                                                            <i className="ri-more-2-fill"></i>
-                                                                                        </DropdownToggle>
-                                                                                        <DropdownMenu style={{ zIndex: '999' }}>
-                                                                                            <Link to={`/faturas/view/${row.id}`}>
-                                                                                                <DropdownItem>Ver detalhe</DropdownItem>
-                                                                                            </Link>
-                                                                                            <Link
-                                                                                                to={`/faturas/edit/${row.id}`}
-                                                                                                state={{
-                                                                                                    source: {
-                                                                                                        ...row,
-                                                                                                        fatura_id: row.id,
-                                                                                                        cartao_id: row.cartao_id,
-                                                                                                        cartao_bandeira_id: row.cartao_bandeira_id,
-                                                                                                    },
-                                                                                                }}
-                                                                                            >
-                                                                                                <DropdownItem>Editar</DropdownItem>
-                                                                                            </Link>
-                                                                                            <DropdownItem onClick={() => navigate(`/faturas/view/${row.id}`)}>
-                                                                                                Upload anexo
-                                                                                            </DropdownItem>
-                                                                                            {anexo.temPdf && row.id && (
-                                                                                                <DropdownItem onClick={() => handleDownloadAnexo(row.id!, 'pdf', anexoDownloadMeta(row))}>
-                                                                                                    Baixar PDF
-                                                                                                </DropdownItem>
-                                                                                            )}
-                                                                                            {anexo.temCsv && row.id && (
-                                                                                                <DropdownItem onClick={() => handleDownloadAnexo(row.id!, 'csv', anexoDownloadMeta(row))}>
-                                                                                                    Baixar CSV
-                                                                                                </DropdownItem>
-                                                                                            )}
-                                                                                            <DropdownItem onClick={() => row.id && handleReprocessar(row.id)}>
-                                                                                                Reprocessar
-                                                                                            </DropdownItem>
-                                                                                            <DropdownItem
-                                                                                                onClick={() => {
-                                                                                                    setSelectedId(row.id!)
-                                                                                                    toggleModal()
-                                                                                                }}
-                                                                                            >
-                                                                                                Excluir
-                                                                                            </DropdownItem>
-                                                                                        </DropdownMenu>
-                                                                                    </UncontrolledDropdown>
-                                                                                </ButtonGroup>
+                                                                                <TableActionsDropdown toggleClassName="btn btn-sm">
+                                                                                    <Link to={`/faturas/view/${row.id}`}>
+                                                                                        <DropdownItem>Ver detalhe</DropdownItem>
+                                                                                    </Link>
+                                                                                    <Link
+                                                                                        to={`/faturas/edit/${row.id}`}
+                                                                                        state={{
+                                                                                            source: {
+                                                                                                ...row,
+                                                                                                fatura_id: row.id,
+                                                                                                cartao_id: row.cartao_id,
+                                                                                                cartao_bandeira_id: row.cartao_bandeira_id,
+                                                                                            },
+                                                                                        }}
+                                                                                    >
+                                                                                        <DropdownItem>Editar</DropdownItem>
+                                                                                    </Link>
+                                                                                    <DropdownItem onClick={() => navigate(`/faturas/view/${row.id}`)}>
+                                                                                        Upload anexo
+                                                                                    </DropdownItem>
+                                                                                    {anexo.temPdf && row.id && (
+                                                                                        <DropdownItem onClick={() => handleDownloadAnexo(row.id!, 'pdf', anexoDownloadMeta(row))}>
+                                                                                            Baixar PDF
+                                                                                        </DropdownItem>
+                                                                                    )}
+                                                                                    {anexo.temCsv && row.id && (
+                                                                                        <DropdownItem onClick={() => handleDownloadAnexo(row.id!, 'csv', anexoDownloadMeta(row))}>
+                                                                                            Baixar CSV
+                                                                                        </DropdownItem>
+                                                                                    )}
+                                                                                    <DropdownItem onClick={() => row.id && handleReprocessar(row.id)}>
+                                                                                        Reprocessar
+                                                                                    </DropdownItem>
+                                                                                    <DropdownItem
+                                                                                        onClick={() => {
+                                                                                            setSelectedId(row.id!)
+                                                                                            toggleModal()
+                                                                                        }}
+                                                                                    >
+                                                                                        Excluir
+                                                                                    </DropdownItem>
+                                                                                </TableActionsDropdown>
                                                                             </div>
                                                                         </td>
                                                                     </tr>

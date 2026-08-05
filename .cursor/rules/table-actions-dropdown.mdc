@@ -1,0 +1,27 @@
+---
+description: Menu de ações em tabelas deve usar TableActionsDropdown
+globs: "**/*Table*.tsx"
+alwaysApply: false
+---
+
+# Ações de tabela
+
+Sempre use `TableActionsDropdown` (`Components/Common/TableActionsDropdown`) para o menu de Ações (três pontos) em tabelas. Não monte `UncontrolledDropdown` + `DropdownMenu` manualmente.
+
+O componente já aplica `strategy="fixed"` e `container="body"` para o menu não ser cortado pelo `.table-responsive`.
+
+```tsx
+import TableActionsDropdown from "Components/Common/TableActionsDropdown"
+import { DropdownItem } from "reactstrap"
+
+<td>
+  <TableActionsDropdown>
+    <Link to={`/recurso/edit/${row.id}`} state={{ source: row }}>
+      <DropdownItem>Editar</DropdownItem>
+    </Link>
+    <DropdownItem onClick={handleDelete}>Excluir</DropdownItem>
+  </TableActionsDropdown>
+</td>
+```
+
+Para botão menor (ex.: Faturas): `<TableActionsDropdown toggleClassName="btn btn-sm">`.

@@ -3,11 +3,11 @@ import React, { useEffect, useState } from "react"
 import { Link } from "react-router-dom"
 import { toast } from 'react-toastify'
 import {
-    ButtonGroup, Card, CardBody, Col, DropdownItem,
-    DropdownMenu, DropdownToggle, Label, Row, UncontrolledDropdown
+    Card, CardBody, Col, DropdownItem, Label, Row
 } from "reactstrap"
 import { PaginateInterface, PaginateSearch, PerPageProps } from "interfaces/SystemInterfaces/PaginateInterface"
 import CustomModal from "Components/ComponentController/Modal/CustomModal"
+import TableActionsDropdown from "Components/Common/TableActionsDropdown"
 import { useNavegacao } from "helpers/functions_helpers"
 import { CategoriasList, CategoriasSearch } from "interfaces/Categorias/CategoriasInterface"
 import { CategoriasService } from "services/Categorias/CategoriasService"
@@ -142,29 +142,22 @@ export const CategoriasTable = ({ data, getData, setPerPage, setPage, perPage, f
                                                                         </span>
                                                                     </td>
                                                                     <td>
-                                                                        <ButtonGroup>
-                                                                            <UncontrolledDropdown direction="down">
-                                                                                <DropdownToggle tag="button" className="btn">
-                                                                                    <i className="ri-more-2-fill"></i>
-                                                                                </DropdownToggle>
-                                                                                <DropdownMenu style={{ zIndex: '999' }}>
-                                                                                    <Link to={`/categorias/view/${row.id}`} state={{ source: row }}>
-                                                                                        <DropdownItem>Visualizar</DropdownItem>
-                                                                                    </Link>
-                                                                                    <Link to={`/categorias/edit/${row.id}`} state={{ source: row }}>
-                                                                                        <DropdownItem>Editar</DropdownItem>
-                                                                                    </Link>
-                                                                                    <DropdownItem
-                                                                                        onClick={() => {
-                                                                                            setSelectedId(row.id!)
-                                                                                            toggleModal()
-                                                                                        }}
-                                                                                    >
-                                                                                        Excluir
-                                                                                    </DropdownItem>
-                                                                                </DropdownMenu>
-                                                                            </UncontrolledDropdown>
-                                                                        </ButtonGroup>
+                                                                        <TableActionsDropdown>
+                                                                            <Link to={`/categorias/view/${row.id}`} state={{ source: row }}>
+                                                                                <DropdownItem>Visualizar</DropdownItem>
+                                                                            </Link>
+                                                                            <Link to={`/categorias/edit/${row.id}`} state={{ source: row }}>
+                                                                                <DropdownItem>Editar</DropdownItem>
+                                                                            </Link>
+                                                                            <DropdownItem
+                                                                                onClick={() => {
+                                                                                    setSelectedId(row.id!)
+                                                                                    toggleModal()
+                                                                                }}
+                                                                            >
+                                                                                Excluir
+                                                                            </DropdownItem>
+                                                                        </TableActionsDropdown>
                                                                     </td>
                                                                 </tr>
                                                             ))}

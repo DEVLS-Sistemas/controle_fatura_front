@@ -2,12 +2,12 @@ import UiContent from "Components/Common/UiContent"
 import React, { useEffect, useState } from "react"
 import { Link } from "react-router-dom"
 import {
-    ButtonGroup, Card, CardBody, Col, DropdownItem,
-    DropdownMenu, DropdownToggle, Label, Row, UncontrolledDropdown
+    Card, CardBody, Col, DropdownItem, Label, Row
 } from "reactstrap"
 import { toast } from "react-toastify"
 import { PaginateInterface, PaginateSearch, PerPageProps } from "interfaces/SystemInterfaces/PaginateInterface"
 import CustomModal from "Components/ComponentController/Modal/CustomModal"
+import TableActionsDropdown from "Components/Common/TableActionsDropdown"
 import { useNavegacao } from "helpers/functions_helpers"
 import { responsavelTipoColor } from "helpers/fatura_helpers"
 import { ResponsaveisList, ResponsaveisSearch } from "interfaces/Responsaveis/ResponsaveisInterface"
@@ -142,35 +142,28 @@ export const ResponsaveisTable = ({ data, getData, setPerPage, perPage, filters 
                                                                         </span>
                                                                     </td>
                                                                     <td>
-                                                                        <ButtonGroup>
-                                                                            <UncontrolledDropdown direction="down">
-                                                                                <DropdownToggle tag="button" className="btn">
-                                                                                    <i className="ri-more-2-fill"></i>
-                                                                                </DropdownToggle>
-                                                                                <DropdownMenu style={{ zIndex: '999' }}>
-                                                                                    <Link to={`/responsaveis/view/${rowId(row)}`} state={{ source: row }}>
-                                                                                        <DropdownItem>Visualizar</DropdownItem>
-                                                                                    </Link>
-                                                                                    <Link to={`/responsaveis/edit/${rowId(row)}`} state={{ source: row }}>
-                                                                                        <DropdownItem>Editar</DropdownItem>
-                                                                                    </Link>
-                                                                                    <Link
-                                                                                        to={`/projecao-faturas/responsaveis/${rowId(row)}/fatura?mes=${new Date().getMonth() + 1}&ano=${new Date().getFullYear()}`}
-                                                                                        state={{ nome: row.nome, tipo: row.tipo }}
-                                                                                    >
-                                                                                        <DropdownItem>Ver fatura</DropdownItem>
-                                                                                    </Link>
-                                                                                    <DropdownItem
-                                                                                        onClick={() => {
-                                                                                            setSelectedId(rowId(row)!)
-                                                                                            toggleModal()
-                                                                                        }}
-                                                                                    >
-                                                                                        Excluir
-                                                                                    </DropdownItem>
-                                                                                </DropdownMenu>
-                                                                            </UncontrolledDropdown>
-                                                                        </ButtonGroup>
+                                                                        <TableActionsDropdown>
+                                                                            <Link to={`/responsaveis/view/${rowId(row)}`} state={{ source: row }}>
+                                                                                <DropdownItem>Visualizar</DropdownItem>
+                                                                            </Link>
+                                                                            <Link to={`/responsaveis/edit/${rowId(row)}`} state={{ source: row }}>
+                                                                                <DropdownItem>Editar</DropdownItem>
+                                                                            </Link>
+                                                                            <Link
+                                                                                to={`/projecao-faturas/responsaveis/${rowId(row)}/fatura?mes=${new Date().getMonth() + 1}&ano=${new Date().getFullYear()}`}
+                                                                                state={{ nome: row.nome, tipo: row.tipo }}
+                                                                            >
+                                                                                <DropdownItem>Ver fatura</DropdownItem>
+                                                                            </Link>
+                                                                            <DropdownItem
+                                                                                onClick={() => {
+                                                                                    setSelectedId(rowId(row)!)
+                                                                                    toggleModal()
+                                                                                }}
+                                                                            >
+                                                                                Excluir
+                                                                            </DropdownItem>
+                                                                        </TableActionsDropdown>
                                                                     </td>
                                                                 </tr>
                                                             ))}

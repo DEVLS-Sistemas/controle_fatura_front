@@ -3,11 +3,11 @@ import React, { useEffect, useState } from "react"
 import { Link } from "react-router-dom"
 import { toast } from 'react-toastify'
 import {
-    ButtonGroup, Card, CardBody, Col, DropdownItem,
-    DropdownMenu, DropdownToggle, Label, Row, UncontrolledDropdown
+    Card, CardBody, Col, DropdownItem, Label, Row
 } from "reactstrap"
 import { PaginateInterface, PaginateSearch, PerPageProps } from "interfaces/SystemInterfaces/PaginateInterface"
 import CustomModal from "Components/ComponentController/Modal/CustomModal"
+import TableActionsDropdown from "Components/Common/TableActionsDropdown"
 import { SubcategoriasList, SubcategoriasSearch } from "interfaces/Subcategorias/SubcategoriasInterface"
 import { SubcategoriasService } from "services/Subcategorias/SubcategoriasService"
 
@@ -136,26 +136,19 @@ export const SubcategoriasTable = ({ data, getData, setPerPage, perPage, filters
                                                                         </span>
                                                                     </td>
                                                                     <td>
-                                                                        <ButtonGroup>
-                                                                            <UncontrolledDropdown direction="down">
-                                                                                <DropdownToggle tag="button" className="btn">
-                                                                                    <i className="ri-more-2-fill"></i>
-                                                                                </DropdownToggle>
-                                                                                <DropdownMenu style={{ zIndex: '999' }}>
-                                                                                    <Link to={`/subcategorias/edit/${row.id}`} state={{ source: row }}>
-                                                                                        <DropdownItem>Editar</DropdownItem>
-                                                                                    </Link>
-                                                                                    <DropdownItem
-                                                                                        onClick={() => {
-                                                                                            setSelectedId(row.id!)
-                                                                                            toggleModal()
-                                                                                        }}
-                                                                                    >
-                                                                                        Excluir
-                                                                                    </DropdownItem>
-                                                                                </DropdownMenu>
-                                                                            </UncontrolledDropdown>
-                                                                        </ButtonGroup>
+                                                                        <TableActionsDropdown>
+                                                                            <Link to={`/subcategorias/edit/${row.id}`} state={{ source: row }}>
+                                                                                <DropdownItem>Editar</DropdownItem>
+                                                                            </Link>
+                                                                            <DropdownItem
+                                                                                onClick={() => {
+                                                                                    setSelectedId(row.id!)
+                                                                                    toggleModal()
+                                                                                }}
+                                                                            >
+                                                                                Excluir
+                                                                            </DropdownItem>
+                                                                        </TableActionsDropdown>
                                                                     </td>
                                                                 </tr>
                                                             ))}
