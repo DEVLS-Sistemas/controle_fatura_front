@@ -5,7 +5,22 @@ import { setActiveMenu } from 'helpers/system_helpers'
 import { useNavegacao } from 'helpers/functions_helpers'
 import { centavosToBr, formatCurrency, toCentavos, VALOR_TEXT_CLASS } from 'helpers/fatura_helpers'
 import { CartaoChip } from 'helpers/cartao_helpers'
-import { Breadcrumb, BreadcrumbItem, Card, CardBody, Col, Container, Input, Label, Row } from 'reactstrap'
+import {
+    Breadcrumb,
+    BreadcrumbItem,
+    Button,
+    Card,
+    CardBody,
+    Col,
+    Container,
+    Input,
+    Label,
+    Modal,
+    ModalBody,
+    ModalFooter,
+    ModalHeader,
+    Row,
+} from 'reactstrap'
 import { SubmitHandler, useForm } from 'react-hook-form'
 import { required } from 'Components/ComponentController/ValidatorForm/ValidatorForm'
 import { InputTextControlled } from 'Components/ComponentController/Inputs/Text/InputTextControlled'
@@ -132,8 +147,9 @@ const CartoesForm = () => {
     const [novoCartao, setNovoCartao] = useState<NovoCartaoForm>(novoCartaoDefault)
     const [editingLimiteKey, setEditingLimiteKey] = useState<string | null>(null)
     const [limiteDraft, setLimiteDraft] = useState('')
+    const [limitePendenteModalOpen, setLimitePendenteModalOpen] = useState(false)
 
-    const { register, handleSubmit, control, reset, setValue, watch } = useForm<CartoesModel>({
+    const { register, handleSubmit, control, reset, setValue, watch, getValues } = useForm<CartoesModel>({
         defaultValues: record
     })
 
@@ -397,9 +413,39 @@ const CartoesForm = () => {
         setLimiteDraft('')
     }
 
-    const onSubmit: SubmitHandler<CartoesModel> = async (data) => {
+    const applyLimiteDraftToBandeiras = (source: CartaoBandeira[]): CartaoBandeira[] => {
+        if (editingLimiteKey == null) return source
+        const cents = toCentavos(limiteDraft)
+        return source.map((b) =>
+            String(b._key ?? b.id) === editingLimiteKey
+                ? { ...b, limite_credito: cents > 0 ? String(cents) : null }
+                : b
+        )
+    }
+
+    const getLimitesPendentes = () => {
+        if (editingLimiteKey == null) return []
+        const cents = toCentavos(limiteDraft)
+        if (cents <= 0) return []
+        const bandeira = bandeiras.find((b) => String(b._key ?? b.id) === editingLimiteKey)
+        if (!bandeira) return []
+        return [
+            {
+                key: editingLimiteKey,
+                bandeiraNome: bandeira.bandeira,
+                valorLabel: formatCurrency(cents / 100),
+                bandeira,
+            },
+        ]
+    }
+
+    const persistCartao = async (
+        data: CartoesModel,
+        bandeirasToSave: CartaoBandeira[],
+        options?: { stayOnPage?: boolean }
+    ) => {
         try {
-            const bandeirasPayload = bandeiras.map((b) => {
+            const bandeirasPayload = bandeirasToSave.map((b) => {
                 const limiteCents = toCentavos(b.limite_credito)
                 return {
                     ...(b.id ? { id: b.id } : {}),
@@ -445,11 +491,40 @@ const CartoesForm = () => {
                 await cartoesService.createCartoes(payload)
                 toast.success('Cartão cadastrado com sucesso!')
             }
+
+            if (options?.stayOnPage) {
+                setBandeirasRemover([])
+                setNumerosRemover([])
+                if (paramId) {
+                    await loadRecord(paramId)
+                }
+                return
+            }
+
             navigate('/cartoes')
         } catch (error) {
             console.error('Erro ao salvar cartão:', error)
             toast.error('Erro ao salvar cartão.')
         }
+    }
+
+    const handleAplicarLimitesPendentes = async () => {
+        const bandeirasAtualizadas = applyLimiteDraftToBandeiras(bandeiras)
+        setBandeiras(bandeirasAtualizadas)
+        setEditingLimiteKey(null)
+        setLimiteDraft('')
+        setLimitePendenteModalOpen(false)
+        await persistCartao(getValues(), bandeirasAtualizadas, { stayOnPage: true })
+    }
+
+    const onSubmit: SubmitHandler<CartoesModel> = async (data) => {
+        // Limite em edição fica só no draft até Ok; Salvar não pode ignorar silenciosamente
+        if (getLimitesPendentes().length > 0) {
+            setLimitePendenteModalOpen(true)
+            return
+        }
+
+        await persistCartao(data, bandeiras)
     }
 
     useEffect(() => {
@@ -474,8 +549,54 @@ const CartoesForm = () => {
         return formatCurrency(cents / 100)
     }
 
+    const limitesPendentes = getLimitesPendentes()
+
     return (
         <React.Fragment>
+            <Modal
+                isOpen={limitePendenteModalOpen}
+                toggle={() => setLimitePendenteModalOpen(false)}
+                centered
+            >
+                <ModalHeader toggle={() => setLimitePendenteModalOpen(false)}>
+                    Limite não confirmado
+                </ModalHeader>
+                <ModalBody>
+                    <p className="mb-3">
+                        Há limite em edição que ainda não foi confirmado com Ok. Deseja aplicar
+                        e salvar agora?
+                    </p>
+                    <ul className="list-group mb-0">
+                        {limitesPendentes.map((item) => (
+                            <li
+                                key={item.key}
+                                className="list-group-item d-flex justify-content-between align-items-center"
+                            >
+                                <span>
+                                    <strong>{item.bandeiraNome}</strong>
+                                </span>
+                                <span className={VALOR_TEXT_CLASS}>{item.valorLabel}</span>
+                            </li>
+                        ))}
+                    </ul>
+                    <p className="text-muted small mt-3 mb-0">
+                        Ao confirmar, o limite será gravado e você permanecerá nesta tela para
+                        continuar editando se quiser.
+                    </p>
+                </ModalBody>
+                <ModalFooter>
+                    <Button
+                        type="button"
+                        color="light"
+                        onClick={() => setLimitePendenteModalOpen(false)}
+                    >
+                        Fechar
+                    </Button>
+                    <Button type="button" color="primary" onClick={handleAplicarLimitesPendentes}>
+                        Aplicar e salvar
+                    </Button>
+                </ModalFooter>
+            </Modal>
             <div className="page-content">
                 <Container fluid>
                     <Row>
