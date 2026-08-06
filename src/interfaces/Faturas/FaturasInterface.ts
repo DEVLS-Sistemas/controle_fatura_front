@@ -1,3 +1,5 @@
+import { SenhaPdfRegraLookup } from 'interfaces/Cartoes/CartoesInterface'
+
 export interface FaturasSearch {
     id?: string | null
     fatura_id?: string | null
@@ -10,6 +12,19 @@ export interface FaturasSearch {
     page?: number
     perPage?: number
 }
+
+/** Metadados de senha do PDF quando a fatura precisa de desbloqueio */
+export interface SenhaPdfMeta {
+    necessaria?: boolean
+    motivo?: 'ausente' | 'incorreta' | string | null
+    regra?: string | null
+    orientacao?: string | null
+    label_regra?: string | null
+    tem_senha_cadastrada?: boolean
+    cartao_id?: number | null
+}
+
+export const PDF_SENHA_ERRO_CODIGOS = ['pdf_senha_necessaria', 'pdf_senha_incorreta'] as const
 
 /** Resumo de uma fatura (sem array de transações) */
 export interface FaturaResumo {
@@ -40,7 +55,10 @@ export interface FaturaResumo {
     /** URL autenticada para abrir/baixar o CSV */
     csv_url?: string | null
     status?: string
+    erro_codigo?: string | null
     erro_mensagem?: string | null
+    precisa_senha_pdf?: boolean
+    senha_pdf?: SenhaPdfMeta | null
     processado_em?: string | null
     total_transacoes?: number
     transacoes_com_categoria?: number
@@ -112,6 +130,13 @@ export interface FaturasModel {
     arquivo_pdf?: File | null
     processar_automatico?: boolean
     status?: string | null
+    senha_pdf?: string | null
+    salvar_senha_pdf?: boolean
+}
+
+export interface ProcessarPdfParams {
+    senha_pdf?: string
+    salvar_senha_pdf?: boolean
 }
 
 export interface CartaoLookup {
@@ -120,10 +145,14 @@ export interface CartaoLookup {
     cor_fundo?: string | null
     cor_texto?: string | null
     qtd_bandeiras?: number
+    tem_senha_pdf?: boolean
+    senha_pdf_regra?: string | null
+    senha_pdf_orientacao?: string | null
 }
 
 export interface LookupsFaturas {
     cartoes?: CartaoLookup[]
+    senhas_pdf_regras?: SenhaPdfRegraLookup[]
 }
 
 /** Resposta de `DELETE /faturas/excluir-todas` */
@@ -149,8 +178,65 @@ export interface FaturasInterface {
     deleteFaturas(id: number): Promise<any>
     deleteAllFaturas(): Promise<ExcluirTodasFaturasResponse>
     getLookupsFaturas(): Promise<LookupsFaturas | undefined>
-    uploadPdf(params: { id: number; arquivo_pdf: File; processar_automatico?: boolean }): Promise<any>
-    processarPdf(id: number): Promise<any>
+    uploadPdf(params: {
+        id: number
+        arquivo_pdf: File
+        processar_automatico?: boolean
+        senha_pdf?: string
+        salvar_senha_pdf?: boolean
+    }): Promise<any>
+    processarPdf(id: number, params?: ProcessarPdfParams): Promise<any>
+}
+
+/** Extrai payload de fatura aninhado em respostas `result.fatura` / `fatura.data` */
+export const extractFaturaPayload = (result: unknown): Record<string, any> | null => {
+    const body = result as Record<string, any> | null | undefined
+    if (!body) return null
+    return body?.fatura?.data ?? body?.data ?? body?.fatura ?? body
+}
+
+export const extractFaturaId = (result: unknown): number | string | null => {
+    const data = extractFaturaPayload(result)
+    return data?.id ?? (result as any)?.id ?? null
+}
+
+/** Detecta se a fatura/resposta exige senha do PDF */
+export const faturaPrecisaSenhaPdf = (
+    source?: {
+        precisa_senha_pdf?: boolean
+        erro_codigo?: string | null
+        senha_pdf?: SenhaPdfMeta | null
+        status?: string | null
+    } | null,
+    envelope?: Record<string, any> | null
+): boolean => {
+    if (envelope?.precisa_senha_pdf === true) return true
+    if (source?.precisa_senha_pdf === true) return true
+    if (source?.senha_pdf?.necessaria === true) return true
+    const codigo = source?.erro_codigo ?? envelope?.codigo ?? envelope?.erro_codigo
+    if (codigo && (PDF_SENHA_ERRO_CODIGOS as readonly string[]).includes(codigo)) return true
+    return false
+}
+
+export const resolveSenhaPdfMeta = (
+    source?: {
+        senha_pdf?: SenhaPdfMeta | null
+        erro_codigo?: string | null
+        erro_mensagem?: string | null
+        precisa_senha_pdf?: boolean
+    } | null,
+    envelope?: Record<string, any> | null
+): SenhaPdfMeta | null => {
+    const meta = source?.senha_pdf ?? envelope?.senha_pdf ?? null
+    if (meta) return meta
+    if (!faturaPrecisaSenhaPdf(source, envelope)) return null
+    const codigo = source?.erro_codigo ?? envelope?.codigo ?? envelope?.erro_codigo
+    return {
+        necessaria: true,
+        motivo: codigo === 'pdf_senha_incorreta' ? 'incorreta' : 'ausente',
+        orientacao: null,
+        tem_senha_cadastrada: false,
+    }
 }
 
 export const FaturasDefaultValues: FaturasModel = {

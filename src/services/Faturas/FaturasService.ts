@@ -11,7 +11,9 @@ import {
     FaturasSearch,
     FaturasView,
     LookupsFaturas,
+    ProcessarPdfParams,
 } from "interfaces/Faturas/FaturasInterface"
+import { PdfSenhaError } from "../../libs/api/exceptions/PdfSenhaError"
 
 export class FaturasService implements FaturasInterface {
     private readonly url: string
@@ -134,12 +136,24 @@ export class FaturasService implements FaturasInterface {
         }
     }
 
-    async uploadPdf(params: { id: number; arquivo_pdf: File; processar_automatico?: boolean }) {
+    async uploadPdf(params: {
+        id: number
+        arquivo_pdf: File
+        processar_automatico?: boolean
+        senha_pdf?: string
+        salvar_senha_pdf?: boolean
+    }) {
         const form = new FormData()
         form.append('id', String(params.id))
         form.append('arquivo_pdf', params.arquivo_pdf)
         if (params.processar_automatico !== undefined) {
             form.append('processar_automatico', String(params.processar_automatico))
+        }
+        if (params.senha_pdf != null && params.senha_pdf !== '') {
+            form.append('senha_pdf', params.senha_pdf)
+        }
+        if (params.salvar_senha_pdf !== undefined) {
+            form.append('salvar_senha_pdf', params.salvar_senha_pdf ? '1' : '0')
         }
         const response = await this.httpClient.post({
             url: this.url + '/upload-pdf',
@@ -150,20 +164,44 @@ export class FaturasService implements FaturasInterface {
             case HttpStatusCode.ok: return response.body
             case HttpStatusCode.noContent: return
             case HttpStatusCode.unauthorized: throw new AccessDeniedError()
-            case HttpStatusCode.invalidForm: throw new ValidationError(response.body)
+            case HttpStatusCode.invalidForm: {
+                const body = response.body as Record<string, any> | undefined
+                if (body?.precisa_senha_pdf || body?.codigo === 'pdf_senha_incorreta' || body?.codigo === 'pdf_senha_necessaria') {
+                    throw new PdfSenhaError(body)
+                }
+                throw new ValidationError(response.body)
+            }
             default: throw new UnexpectedError(response.message)
         }
     }
 
-    async processarPdf(id: number) {
+    async processarPdf(id: number, params?: ProcessarPdfParams) {
+        const body: ProcessarPdfParams = {}
+        if (params?.senha_pdf != null && params.senha_pdf !== '') {
+            body.senha_pdf = params.senha_pdf
+        }
+        if (params?.salvar_senha_pdf !== undefined) {
+            body.salvar_senha_pdf = params.salvar_senha_pdf
+        }
         const response = await this.httpClient.post({
-            url: `${this.url}/processar/${id}`
+            url: `${this.url}/processar/${id}`,
+            body: Object.keys(body).length ? body : undefined,
         })
         switch (response.statusCode) {
             case HttpStatusCode.ok: return response.body
             case HttpStatusCode.noContent: return
             case HttpStatusCode.unauthorized: throw new AccessDeniedError()
-            case HttpStatusCode.invalidForm: throw new ValidationError(response.body)
+            case HttpStatusCode.invalidForm: {
+                const respBody = response.body as Record<string, any> | undefined
+                if (
+                    respBody?.precisa_senha_pdf
+                    || respBody?.codigo === 'pdf_senha_incorreta'
+                    || respBody?.codigo === 'pdf_senha_necessaria'
+                ) {
+                    throw new PdfSenhaError(respBody)
+                }
+                throw new ValidationError(response.body)
+            }
             default: throw new UnexpectedError(response.message)
         }
     }

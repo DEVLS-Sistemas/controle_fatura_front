@@ -17,7 +17,14 @@ import {
     getCategoriaFieldStyle, VALOR_TEXT_CLASS,
 } from 'helpers/fatura_helpers'
 import { SelectOptions } from 'interfaces/SystemInterfaces/SelectInterface'
-import { FaturaGrupoPorCartao, FaturasView } from 'interfaces/Faturas/FaturasInterface'
+import {
+    extractFaturaPayload,
+    faturaPrecisaSenhaPdf,
+    FaturaGrupoPorCartao,
+    FaturasView,
+    resolveSenhaPdfMeta,
+    SenhaPdfMeta,
+} from 'interfaces/Faturas/FaturasInterface'
 import { CategoriaLookup, ResponsavelLookup, TransacoesList } from 'interfaces/Transacoes/TransacoesInterface'
 import { NumeroListItem } from 'interfaces/Cartoes/CartoesInterface'
 import { FaturasService } from 'services/Faturas/FaturasService'
@@ -27,6 +34,8 @@ import { CartoesService } from 'services/Cartoes/CartoesService'
 import ResponsavelModal from 'pages/Pages/Transacoes/ResponsavelModal/ResponsavelModal'
 import CategoriaRapidoModal, { CategoriaRapidoConfirm } from 'pages/Pages/Transacoes/CategoriaRapidoModal/CategoriaRapidoModal'
 import SubcategoriaRapidoModal, { SubcategoriaRapidoConfirm } from 'pages/Pages/Transacoes/SubcategoriaRapidoModal/SubcategoriaRapidoModal'
+import FaturaSenhaPdfModal from 'Components/Faturas/FaturaSenhaPdfModal'
+import { PdfSenhaError } from 'libs/api/exceptions/PdfSenhaError'
 import { getApiBaseUrl } from 'libs/api/ApiConfig'
 
 const formatNumeroOptionLabel = (n: NumeroListItem): string => {
@@ -208,6 +217,9 @@ const FaturasViewPage = () => {
     const [showPdfPreview, setShowPdfPreview] = useState(false)
     const [loadingPdf, setLoadingPdf] = useState(false)
     const [processarAuto, setProcessarAuto] = useState(true)
+    const [senhaModalOpen, setSenhaModalOpen] = useState(false)
+    const [senhaModalMeta, setSenhaModalMeta] = useState<SenhaPdfMeta | null>(null)
+    const senhaModalAutoOpenedRef = useRef<string | null>(null)
     const [categoriasOptions, setCategoriasOptions] = useState<SelectOptions[]>([])
     const [categoriasLookup, setCategoriasLookup] = useState<CategoriaLookup[]>([])
     const [subcategoriasByCategoria, setSubcategoriasByCategoria] = useState<Record<number, SelectOptions[]>>({})
@@ -474,7 +486,12 @@ const FaturasViewPage = () => {
         }
     }, [faturasService])
 
-    const loadFatura = useCallback(async (opts?: { silent?: boolean }) => {
+    const openSenhaModal = useCallback((meta?: SenhaPdfMeta | null) => {
+        setSenhaModalMeta(meta ?? null)
+        setSenhaModalOpen(true)
+    }, [])
+
+    const loadFatura = useCallback(async (opts?: { silent?: boolean; openSenhaIfNeeded?: boolean }) => {
         if (!id) return
         if (!opts?.silent) setLoading(true)
         try {
@@ -488,6 +505,12 @@ const FaturasViewPage = () => {
                     loadNumeros(id),
                     resolveNavVizinhos(view),
                 ])
+                if (opts?.openSenhaIfNeeded !== false && faturaPrecisaSenhaPdf(view)) {
+                    if (senhaModalAutoOpenedRef.current !== String(id)) {
+                        senhaModalAutoOpenedRef.current = String(id)
+                        openSenhaModal(resolveSenhaPdfMeta(view))
+                    }
+                }
             }
         } catch (error) {
             console.error('Erro ao carregar fatura:', error)
@@ -495,16 +518,24 @@ const FaturasViewPage = () => {
         } finally {
             if (!opts?.silent) setLoading(false)
         }
-    }, [id, faturasService, clearPdfBlobUrl, loadTransacoes, loadNumeros, resolveNavVizinhos])
+    }, [id, faturasService, clearPdfBlobUrl, loadTransacoes, loadNumeros, resolveNavVizinhos, openSenhaModal])
 
     const handleReprocessar = async () => {
         if (!id) return
+        if (fatura && faturaPrecisaSenhaPdf(fatura)) {
+            openSenhaModal(resolveSenhaPdfMeta(fatura))
+            return
+        }
         try {
             await faturasService.processarPdf(Number(id))
             toast.success('Reprocessamento concluído')
             // Refetch completo para atualizar quitação (inclui competência anterior na listagem ao voltar)
-            await loadFatura({ silent: true })
+            await loadFatura({ silent: true, openSenhaIfNeeded: false })
         } catch (error) {
+            if (error instanceof PdfSenhaError) {
+                openSenhaModal(error.senha_pdf ?? null)
+                return
+            }
             toast.error('Erro ao reprocessar fatura')
         }
     }
@@ -520,15 +551,30 @@ const FaturasViewPage = () => {
             return
         }
         try {
-            await faturasService.uploadPdf({
+            const result = await faturasService.uploadPdf({
                 id: Number(id),
                 arquivo_pdf: file,
                 processar_automatico: processarAuto,
             })
-            toast.success('Arquivo enviado com sucesso')
+            const faturaData = extractFaturaPayload(result)
+            const envelope = result as Record<string, any> | null
             if (fileInputRef.current) fileInputRef.current.value = ''
-            await loadFatura({ silent: true })
+
+            if (faturaPrecisaSenhaPdf(faturaData, envelope)) {
+                toast.info('Arquivo enviado. Informe a senha do PDF para continuar.')
+                await loadFatura({ silent: true, openSenhaIfNeeded: false })
+                openSenhaModal(resolveSenhaPdfMeta(faturaData, envelope))
+                return
+            }
+
+            toast.success('Arquivo enviado com sucesso')
+            await loadFatura({ silent: true, openSenhaIfNeeded: false })
         } catch (error) {
+            if (error instanceof PdfSenhaError) {
+                await loadFatura({ silent: true, openSenhaIfNeeded: false })
+                openSenhaModal(error.senha_pdf ?? null)
+                return
+            }
             toast.error('Erro ao enviar arquivo')
         }
     }
@@ -919,6 +965,7 @@ const FaturasViewPage = () => {
     }, [loadLookups])
 
     useEffect(() => {
+        senhaModalAutoOpenedRef.current = null
         loadFatura()
         // eslint-disable-next-line react-hooks/exhaustive-deps -- carga única ao abrir a tela / trocar id
     }, [id])
@@ -1021,12 +1068,23 @@ const FaturasViewPage = () => {
     }
 
     const isProcessing = fatura.status === 'pendente' || fatura.status === 'processando'
+    const precisaSenhaPdf = faturaPrecisaSenhaPdf(fatura)
     const anexo = resolveFaturaAnexo(fatura)
     const competenciaAtual = fatura.competencia ?? formatPeriodo(fatura.mes, fatura.ano)
     const bandeiraLabel = fatura.bandeira || fatura.cartao_bandeira
 
     return (
         <React.Fragment>
+            <FaturaSenhaPdfModal
+                isOpen={senhaModalOpen}
+                faturaId={id ?? null}
+                senhaMeta={senhaModalMeta}
+                onClose={() => setSenhaModalOpen(false)}
+                onSuccess={async () => {
+                    senhaModalAutoOpenedRef.current = String(id)
+                    await loadFatura({ silent: true, openSenhaIfNeeded: false })
+                }}
+            />
             <div className="page-content">
                 <Container fluid>
                     <Row>
@@ -1234,10 +1292,21 @@ const FaturasViewPage = () => {
 
                             <Row className="align-items-center">
                                 <Col md={8}>
-                                    {fatura.erro_mensagem && (
+                                    {precisaSenhaPdf && (
+                                        <div className="alert alert-warning mb-0">
+                                            {fatura.erro_mensagem
+                                                || 'Este PDF da fatura está protegido por senha. Informe a senha para continuar.'}
+                                            {fatura.senha_pdf?.orientacao && (
+                                                <div className="mt-1 small">
+                                                    {fatura.senha_pdf.orientacao}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                    {!precisaSenhaPdf && fatura.erro_mensagem && (
                                         <div className="alert alert-danger mb-0">{fatura.erro_mensagem}</div>
                                     )}
-                                    {isProcessing && (
+                                    {!precisaSenhaPdf && isProcessing && (
                                         <div className="alert alert-info mb-0">
                                             Fatura pendente/processando. Use <strong>Reprocessar</strong> para atualizar as transações.
                                         </div>
@@ -1251,9 +1320,20 @@ const FaturasViewPage = () => {
                                         <Link to={`/faturas/edit/${id}`} className="btn btn-soft-primary">
                                             Editar
                                         </Link>
-                                        <button type="button" className="btn btn-warning" onClick={handleReprocessar}>
-                                            Reprocessar
-                                        </button>
+                                        {precisaSenhaPdf ? (
+                                            <button
+                                                type="button"
+                                                className="btn btn-warning"
+                                                onClick={() => openSenhaModal(resolveSenhaPdfMeta(fatura))}
+                                            >
+                                                <i className="ri-lock-unlock-line me-1"></i>
+                                                Informar senha
+                                            </button>
+                                        ) : (
+                                            <button type="button" className="btn btn-warning" onClick={handleReprocessar}>
+                                                Reprocessar
+                                            </button>
+                                        )}
                                     </div>
                                 </Col>
                             </Row>

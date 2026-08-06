@@ -10,9 +10,18 @@ import { InputCheckbox } from 'Components/ComponentController/Inputs/Checkbox/In
 import { SelectListControlled } from 'Components/ComponentController/Selects/Select/SelectListControlled'
 import { SelectOptions } from 'interfaces/SystemInterfaces/SelectInterface'
 import { FATURA_FILE_ACCEPT, isValidFaturaFile, mesesOptions } from 'helpers/fatura_helpers'
-import { FaturasDefaultValues, FaturasModel } from 'interfaces/Faturas/FaturasInterface'
+import {
+    extractFaturaId,
+    extractFaturaPayload,
+    faturaPrecisaSenhaPdf,
+    FaturasDefaultValues,
+    FaturasModel,
+    resolveSenhaPdfMeta,
+    SenhaPdfMeta,
+} from 'interfaces/Faturas/FaturasInterface'
 import { FaturasService } from 'services/Faturas/FaturasService'
 import { CartoesService } from 'services/Cartoes/CartoesService'
+import FaturaSenhaPdfModal from 'Components/Faturas/FaturaSenhaPdfModal'
 
 const FaturasForm = () => {
     const { state } = useLocation()
@@ -35,6 +44,9 @@ const FaturasForm = () => {
     const [showBandeiraSelect, setShowBandeiraSelect] = useState(false)
     const [bandeirasLoading, setBandeirasLoading] = useState(false)
     const [arquivoFile, setArquivoFile] = useState<File | null>(null)
+    const [senhaModalOpen, setSenhaModalOpen] = useState(false)
+    const [senhaModalFaturaId, setSenhaModalFaturaId] = useState<number | string | null>(null)
+    const [senhaModalMeta, setSenhaModalMeta] = useState<SenhaPdfMeta | null>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
     const { voltarParaRotaAnterior } = useNavegacao()
     const navigate = useNavigate()
@@ -105,9 +117,10 @@ const FaturasForm = () => {
         }
     }
 
-    const extractFaturaId = (result: unknown): number | string | null => {
-        const body = result as Record<string, any> | null | undefined
-        return body?.fatura?.data?.id ?? body?.data?.id ?? body?.id ?? null
+    const openSenhaModal = (faturaId: number | string, meta: SenhaPdfMeta | null) => {
+        setSenhaModalFaturaId(faturaId)
+        setSenhaModalMeta(meta)
+        setSenhaModalOpen(true)
     }
 
     const onSubmit: SubmitHandler<FaturasModel> = async (data) => {
@@ -132,8 +145,17 @@ const FaturasForm = () => {
                     arquivo_pdf: arquivoFile,
                 }
                 const result = await faturasService.createFaturas(payload)
-                toast.success('Fatura cadastrada com sucesso')
+                const faturaData = extractFaturaPayload(result)
+                const envelope = result as Record<string, any> | null
                 const newId = extractFaturaId(result)
+
+                if (faturaPrecisaSenhaPdf(faturaData, envelope) && newId) {
+                    toast.info('Fatura cadastrada. Informe a senha do PDF para continuar.')
+                    openSenhaModal(newId, resolveSenhaPdfMeta(faturaData, envelope))
+                    return
+                }
+
+                toast.success('Fatura cadastrada com sucesso')
                 if (newId) {
                     navigate(`/faturas/view/${newId}`)
                 } else {
@@ -178,6 +200,22 @@ const FaturasForm = () => {
 
     return (
         <React.Fragment>
+            <FaturaSenhaPdfModal
+                isOpen={senhaModalOpen}
+                faturaId={senhaModalFaturaId}
+                senhaMeta={senhaModalMeta}
+                onClose={() => {
+                    setSenhaModalOpen(false)
+                    if (senhaModalFaturaId) {
+                        navigate(`/faturas/view/${senhaModalFaturaId}`)
+                    }
+                }}
+                onSuccess={async () => {
+                    if (senhaModalFaturaId) {
+                        navigate(`/faturas/view/${senhaModalFaturaId}`)
+                    }
+                }}
+            />
             <div className="page-content">
                 <Container fluid>
                     <Row>

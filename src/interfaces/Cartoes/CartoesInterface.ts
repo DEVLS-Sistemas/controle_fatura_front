@@ -34,6 +34,14 @@ export interface CartaoBandeira {
     numeros?: CartaoNumero[]
 }
 
+/** Regra de senha do PDF — item de `GET /cartoes/lookups` → `senhas_pdf_regras` */
+export interface SenhaPdfRegraLookup {
+    value: string
+    label: string
+    orientacao?: string | null
+    bancos_sugeridos?: string[]
+}
+
 export interface CartoesList {
     id?: number
     nome?: string
@@ -43,6 +51,11 @@ export interface CartoesList {
     cor_fundo?: string | null
     cor_texto?: string | null
     ativo?: boolean
+    /** Indica se há senha de PDF salva (API nunca devolve a senha em claro) */
+    tem_senha_pdf?: boolean
+    senha_pdf_regra?: string | null
+    senha_pdf_orientacao?: string | null
+    senha_pdf_regra_label?: string | null
     qtd_bandeiras?: number
     qtd_numeros?: number
     bandeiras?: CartaoBandeira[]
@@ -60,6 +73,15 @@ export interface CartoesModel {
     cor_fundo?: string | null
     cor_texto?: string | null
     ativo?: boolean
+    /** Write-only: só enviar se o usuário digitou um valor novo */
+    senha_pdf?: string | null
+    senha_pdf_regra?: string | null
+    /** No edit: true remove a senha salva (não enviar senha_pdf junto) */
+    limpar_senha_pdf?: boolean
+    /** Somente leitura (resposta da API) */
+    tem_senha_pdf?: boolean
+    senha_pdf_orientacao?: string | null
+    senha_pdf_regra_label?: string | null
     bandeiras?: CartaoBandeira[]
     bandeiras_remover?: number[]
     numeros_remover?: number[]
@@ -116,6 +138,7 @@ export interface LookupsCartoes {
     cores_texto?: string[]
     pares_cores?: ParCorLookup[]
     dias?: DiaLookup[]
+    senhas_pdf_regras?: SenhaPdfRegraLookup[]
 }
 
 export interface CartoesInterface {
@@ -140,9 +163,28 @@ export const CartoesDefaultValues: CartoesModel = {
     cor_fundo: null,
     cor_texto: null,
     ativo: true,
+    senha_pdf: null,
+    senha_pdf_regra: null,
+    limpar_senha_pdf: false,
+    tem_senha_pdf: false,
     bandeiras: [],
     bandeiras_remover: [],
     numeros_remover: [],
+}
+
+/** Sugere regra de senha PDF a partir do nome do banco (ex.: C6 → cpf_cnpj_6_digitos) */
+export const findSenhaPdfRegraByBanco = (
+    banco: string | null | undefined,
+    regras: SenhaPdfRegraLookup[] | undefined
+): SenhaPdfRegraLookup | undefined => {
+    if (!banco?.trim() || !regras?.length) return undefined
+    const normalized = banco.trim().toLowerCase().replace(/\s+/g, '')
+    return regras.find((r) =>
+        (r.bancos_sugeridos ?? []).some((b) => {
+            const sug = b.trim().toLowerCase().replace(/\s+/g, '')
+            return normalized.includes(sug) || sug.includes(normalized)
+        })
+    )
 }
 
 export const TIPOS_NUMERO_PADRAO: TipoNumeroLookup[] = [

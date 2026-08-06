@@ -145,6 +145,24 @@ const CartoesViewPage = () => {
                                                 </span>
                                             </p>
                                         </Col>
+                                        <Col md={6} className="mb-3">
+                                            <Label className="form-label fw-semibold">Senha do PDF</Label>
+                                            <p className="mb-0">
+                                                <span className={`badge bg-${record.tem_senha_pdf ? 'success' : 'secondary'}`}>
+                                                    {record.tem_senha_pdf ? 'Cadastrada' : 'Não cadastrada'}
+                                                </span>
+                                            </p>
+                                            {(record.senha_pdf_regra_label || record.senha_pdf_regra) && (
+                                                <small className="text-muted d-block mt-1">
+                                                    Regra: {record.senha_pdf_regra_label || record.senha_pdf_regra}
+                                                </small>
+                                            )}
+                                            {record.senha_pdf_orientacao && (
+                                                <small className="text-muted d-block mt-1">
+                                                    {record.senha_pdf_orientacao}
+                                                </small>
+                                            )}
+                                        </Col>
                                         <Col md={12} className="mb-3">
                                             <Label className="form-label fw-semibold">Resumo</Label>
                                             <p className="text-muted mb-0">

@@ -35,10 +35,13 @@ import {
     CartaoNumero,
     CartoesDefaultValues,
     CartoesModel,
+    findSenhaPdfRegraByBanco,
     ParCorLookup,
+    SenhaPdfRegraLookup,
     TIPOS_NUMERO_PADRAO,
 } from 'interfaces/Cartoes/CartoesInterface'
 import { CartoesService } from 'services/Cartoes/CartoesService'
+import PasswordRevealInput from 'Components/Common/PasswordRevealInput'
 
 const toPrecoDigits = (value: string | number | null | undefined): string | null => {
     if (value == null || value === '') return null
@@ -75,6 +78,13 @@ const buildRecordFromSource = (source: any): CartoesModel => ({
     dia_vencimento_fatura: source.dia_vencimento_fatura ?? null,
     cor_fundo: source.cor_fundo ?? source.cor ?? null,
     cor_texto: source.cor_texto ?? (source.cor_fundo || source.cor ? '#ffffff' : null),
+    // API nunca devolve a senha em claro
+    senha_pdf: null,
+    senha_pdf_regra: source.senha_pdf_regra ?? null,
+    limpar_senha_pdf: false,
+    tem_senha_pdf: Boolean(source.tem_senha_pdf),
+    senha_pdf_orientacao: source.senha_pdf_orientacao ?? null,
+    senha_pdf_regra_label: source.senha_pdf_regra_label ?? null,
     bandeiras: normalizeBandeiras(source.bandeiras),
     bandeiras_remover: [],
     numeros_remover: [],
@@ -148,6 +158,10 @@ const CartoesForm = () => {
     const [editingLimiteKey, setEditingLimiteKey] = useState<string | null>(null)
     const [limiteDraft, setLimiteDraft] = useState('')
     const [limitePendenteModalOpen, setLimitePendenteModalOpen] = useState(false)
+    const [temSenhaPdf, setTemSenhaPdf] = useState(Boolean(record.tem_senha_pdf))
+    const [limparSenhaPdf, setLimparSenhaPdf] = useState(false)
+    const [senhaPdfDigitada, setSenhaPdfDigitada] = useState('')
+    const [senhasPdfRegras, setSenhasPdfRegras] = useState<SenhaPdfRegraLookup[]>([])
 
     const { register, handleSubmit, control, reset, setValue, watch, getValues } = useForm<CartoesModel>({
         defaultValues: record
@@ -156,6 +170,8 @@ const CartoesForm = () => {
     const corFundo = watch('cor_fundo')
     const corTexto = watch('cor_texto')
     const nomePreview = watch('nome')
+    const bancoWatch = watch('banco')
+    const senhaPdfRegraWatch = watch('senha_pdf_regra')
     const { voltarParaRotaAnterior } = useNavegacao()
     const navigate = useNavigate()
     const cartoesService = new CartoesService()
@@ -170,6 +186,11 @@ const CartoesForm = () => {
     const [coresFundo, setCoresFundo] = useState<string[]>(CORES_UNIFICADAS_PADRAO)
     const [coresTexto, setCoresTexto] = useState<string[]>(CORES_UNIFICADAS_PADRAO)
     const [paresCores, setParesCores] = useState<ParCorLookup[]>(CARTAO_PARES_CORES_PADRAO)
+    const [senhaPdfRegraOptions, setSenhaPdfRegraOptions] = useState<SelectOptions[]>([])
+
+    const regraSelecionada = senhasPdfRegras.find(
+        (r) => String(r.value) === String(senhaPdfRegraWatch ?? '')
+    )
 
     const isEditing = !!(record.cartao_id || record.id || paramId)
     const bandeiraJaExiste = bandeiras.some(
@@ -215,6 +236,12 @@ const CartoesForm = () => {
             setCoresTexto(coresUnificadas)
             setParesCores(pares)
 
+            const regras = lookups?.senhas_pdf_regras ?? []
+            setSenhasPdfRegras(regras)
+            setSenhaPdfRegraOptions(
+                regras.map((r) => ({ value: r.value, label: r.label }))
+            )
+
             if (!record.cor_fundo || !record.cor_texto) {
                 const fallback = pares[0] ?? {
                     cor_fundo: coresUnificadas[0],
@@ -239,6 +266,9 @@ const CartoesForm = () => {
                 setBandeiras(loaded.bandeiras ?? [])
                 setBandeirasRemover([])
                 setNumerosRemover([])
+                setTemSenhaPdf(Boolean(loaded.tem_senha_pdf))
+                setLimparSenhaPdf(false)
+                setSenhaPdfDigitada('')
                 reset(loaded)
             }
         } catch (error) {
@@ -463,6 +493,11 @@ const CartoesForm = () => {
                 }
             })
 
+            const regraValue = data.senha_pdf_regra
+                ? String(data.senha_pdf_regra)
+                : null
+            const senhaNova = senhaPdfDigitada.trim()
+
             const payload: CartoesModel = {
                 nome: data.nome,
                 banco: data.banco,
@@ -475,9 +510,16 @@ const CartoesForm = () => {
                 cor_fundo: data.cor_fundo,
                 cor_texto: data.cor_texto,
                 ativo: data.ativo,
+                senha_pdf_regra: regraValue || null,
                 bandeiras: bandeirasPayload as CartaoBandeira[],
                 bandeiras_remover: bandeirasRemover,
                 numeros_remover: numerosRemover,
+            }
+
+            if (isEditing && limparSenhaPdf) {
+                payload.limpar_senha_pdf = true
+            } else if (senhaNova) {
+                payload.senha_pdf = senhaNova
             }
 
             if (isEditing) {
@@ -495,6 +537,8 @@ const CartoesForm = () => {
             if (options?.stayOnPage) {
                 setBandeirasRemover([])
                 setNumerosRemover([])
+                setSenhaPdfDigitada('')
+                setLimparSenhaPdf(false)
                 if (paramId) {
                     await loadRecord(paramId)
                 }
@@ -541,6 +585,17 @@ const CartoesForm = () => {
             loadRecord(paramId)
         }
     }, [paramId])
+
+    // Pré-seleciona regra de senha PDF quando o banco sugere (ex.: C6)
+    useEffect(() => {
+        if (!bancoWatch?.trim() || !senhasPdfRegras.length) return
+        const current = getValues('senha_pdf_regra')
+        if (current) return
+        const sugerida = findSenhaPdfRegraByBanco(bancoWatch, senhasPdfRegras)
+        if (sugerida) {
+            setValue('senha_pdf_regra', sugerida.value, { shouldDirty: true })
+        }
+    }, [bancoWatch, senhasPdfRegras, getValues, setValue])
 
     const formatLimiteDisplay = (limite?: number | string | null) => {
         if (limite == null || limite === '') return 'Sem limite'
@@ -685,6 +740,72 @@ const CartoesForm = () => {
                                                         id="ativo"
                                                     />
                                                     <Label className="form-check-label" htmlFor="ativo">Ativo</Label>
+                                                </div>
+                                            </Col>
+                                        </Row>
+
+                                        <h6 className="text-muted text-uppercase mb-3 mt-2">Senha do PDF da fatura</h6>
+                                        <Row>
+                                            <Col md={6}>
+                                                <div className="mb-3">
+                                                    <Label htmlFor="senha_pdf_regra" className="form-label">
+                                                        Regra da senha do PDF
+                                                    </Label>
+                                                    <SelectListControlled<CartoesModel>
+                                                        field="senha_pdf_regra"
+                                                        control={control}
+                                                        options={senhaPdfRegraOptions}
+                                                    />
+                                                    {regraSelecionada?.orientacao ? (
+                                                        <small className="text-muted d-block mt-1">
+                                                            {regraSelecionada.orientacao}
+                                                        </small>
+                                                    ) : (
+                                                        <small className="text-muted d-block mt-1">
+                                                            Opcional. Limpe o campo para nenhuma regra. Bancos como C6 são sugeridos automaticamente.
+                                                        </small>
+                                                    )}
+                                                </div>
+                                            </Col>
+                                            <Col md={6}>
+                                                <div className="mb-3">
+                                                    <Label htmlFor="senha_pdf" className="form-label">
+                                                        Senha do PDF da fatura
+                                                    </Label>
+                                                    <PasswordRevealInput
+                                                        id="senha_pdf"
+                                                        value={senhaPdfDigitada}
+                                                        disabled={limparSenhaPdf}
+                                                        placeholder={
+                                                            temSenhaPdf
+                                                                ? 'Senha já cadastrada — digite para alterar'
+                                                                : 'Opcional'
+                                                        }
+                                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                                                            setSenhaPdfDigitada(e.target.value)
+                                                            if (limparSenhaPdf) setLimparSenhaPdf(false)
+                                                        }}
+                                                    />
+                                                    <small className="text-muted d-block mt-1">
+                                                        Usada automaticamente ao importar faturas deste cartão. Opcional.
+                                                    </small>
+                                                    {isEditing && temSenhaPdf && (
+                                                        <div className="form-check mt-2">
+                                                            <input
+                                                                className="form-check-input"
+                                                                type="checkbox"
+                                                                id="limpar_senha_pdf"
+                                                                checked={limparSenhaPdf}
+                                                                onChange={(e) => {
+                                                                    setLimparSenhaPdf(e.target.checked)
+                                                                    if (e.target.checked) setSenhaPdfDigitada('')
+                                                                }}
+                                                            />
+                                                            <Label className="form-check-label" htmlFor="limpar_senha_pdf">
+                                                                Remover senha salva
+                                                            </Label>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </Col>
                                         </Row>

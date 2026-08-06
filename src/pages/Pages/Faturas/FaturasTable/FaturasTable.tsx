@@ -15,8 +15,17 @@ import {
     resolveFaturaAnexo, downloadFaturaAnexo, FaturaAnexoDownloadTipo, FaturaAnexoDownloadMeta,
 } from "helpers/fatura_helpers"
 import { CartaoChip } from "helpers/cartao_helpers"
-import { FaturaResumo, FaturasCartaoGroup, FaturasSearch } from "interfaces/Faturas/FaturasInterface"
+import {
+    faturaPrecisaSenhaPdf,
+    FaturaResumo,
+    FaturasCartaoGroup,
+    FaturasSearch,
+    resolveSenhaPdfMeta,
+    SenhaPdfMeta,
+} from "interfaces/Faturas/FaturasInterface"
 import { FaturasService } from "services/Faturas/FaturasService"
+import FaturaSenhaPdfModal from "Components/Faturas/FaturaSenhaPdfModal"
+import { PdfSenhaError } from "libs/api/exceptions/PdfSenhaError"
 
 export interface FaturasTableProps {
     data: PaginateInterface<FaturasCartaoGroup> | undefined
@@ -77,9 +86,18 @@ export const FaturasTable = ({ data, getData, setPerPage, perPage, filters }: Fa
     const navigate = useNavigate()
     const [modalIsOpen, setModalIsOpen] = useState(false)
     const [selectedId, setSelectedId] = useState<number | null>(null)
+    const [senhaModalOpen, setSenhaModalOpen] = useState(false)
+    const [senhaModalFaturaId, setSenhaModalFaturaId] = useState<number | null>(null)
+    const [senhaModalMeta, setSenhaModalMeta] = useState<SenhaPdfMeta | null>(null)
     const { voltarParaRotaAnterior } = useNavegacao()
 
     const toggleModal = () => setModalIsOpen(!modalIsOpen)
+
+    const openSenhaModal = (faturaId: number, meta: SenhaPdfMeta | null) => {
+        setSenhaModalFaturaId(faturaId)
+        setSenhaModalMeta(meta)
+        setSenhaModalOpen(true)
+    }
 
     const rows = useMemo(() => flattenFaturas(data?.data ?? []), [data?.data])
     const temFiltroPeriodo = Boolean(filters?.mes || filters?.ano)
@@ -96,12 +114,21 @@ export const FaturasTable = ({ data, getData, setPerPage, perPage, filters }: Fa
         }
     }
 
-    const handleReprocessar = async (id: number) => {
+    const handleReprocessar = async (row: FaturaRow) => {
+        if (!row.id) return
+        if (faturaPrecisaSenhaPdf(row)) {
+            openSenhaModal(row.id, resolveSenhaPdfMeta(row))
+            return
+        }
         try {
-            await faturasService.processarPdf(id)
+            await faturasService.processarPdf(row.id)
             toast.success('Reprocessamento iniciado')
             if (data) await handleThisRoute(data.first_page_url)
         } catch (error) {
+            if (error instanceof PdfSenhaError) {
+                openSenhaModal(row.id, error.senha_pdf ?? null)
+                return
+            }
             console.error('Erro ao reprocessar:', error)
             toast.error('Erro ao reprocessar fatura')
         }
@@ -165,6 +192,15 @@ export const FaturasTable = ({ data, getData, setPerPage, perPage, filters }: Fa
     return (
         <React.Fragment>
             <UiContent />
+            <FaturaSenhaPdfModal
+                isOpen={senhaModalOpen}
+                faturaId={senhaModalFaturaId}
+                senhaMeta={senhaModalMeta}
+                onClose={() => setSenhaModalOpen(false)}
+                onSuccess={async () => {
+                    if (data) await handleThisRoute(data.first_page_url)
+                }}
+            />
             <Row>
                 <Col xl={12}>
                     <Card>
@@ -362,9 +398,15 @@ export const FaturasTable = ({ data, getData, setPerPage, perPage, filters }: Fa
                                                                                             Baixar CSV
                                                                                         </DropdownItem>
                                                                                     )}
-                                                                                    <DropdownItem onClick={() => row.id && handleReprocessar(row.id)}>
-                                                                                        Reprocessar
-                                                                                    </DropdownItem>
+                                                                                    {faturaPrecisaSenhaPdf(row) ? (
+                                                                                        <DropdownItem onClick={() => row.id && openSenhaModal(row.id, resolveSenhaPdfMeta(row))}>
+                                                                                            Informar senha / Desbloquear PDF
+                                                                                        </DropdownItem>
+                                                                                    ) : (
+                                                                                        <DropdownItem onClick={() => handleReprocessar(row)}>
+                                                                                            Reprocessar
+                                                                                        </DropdownItem>
+                                                                                    )}
                                                                                     <DropdownItem
                                                                                         onClick={() => {
                                                                                             setSelectedId(row.id!)
