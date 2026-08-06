@@ -1,4 +1,4 @@
-import React, { ChangeEvent, useState } from 'react'
+import React, { ChangeEvent, InputHTMLAttributes, useState } from 'react'
 import { Input } from 'reactstrap'
 
 type PasswordRevealInputProps = {
@@ -8,6 +8,8 @@ type PasswordRevealInputProps = {
     disabled?: boolean
     invalid?: boolean
     className?: string
+    maxLength?: number
+    inputMode?: InputHTMLAttributes<HTMLInputElement>['inputMode']
     onChange?: (e: ChangeEvent<HTMLInputElement>) => void
     onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void
 }

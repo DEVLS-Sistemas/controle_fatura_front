@@ -137,6 +137,8 @@ export interface FaturasModel {
 export interface ProcessarPdfParams {
     senha_pdf?: string
     salvar_senha_pdf?: boolean
+    /** Atualiza a regra no cartão quando salvar_senha_pdf (ou junto ao desbloqueio) */
+    senha_pdf_regra?: string | null
 }
 
 export interface CartaoLookup {

@@ -129,6 +129,32 @@ export class CartoesService implements CartoesInterface {
         }
     }
 
+    /**
+     * Atualiza só a regra de senha do PDF no cartão (sem alterar a senha).
+     * Usado após desbloqueio com "salvar senha", pois o processar grava a senha
+     * mas pode não persistir `senha_pdf_regra`.
+     */
+    async atualizarSenhaPdfRegra(cartaoId: number, senhaPdfRegra: string) {
+        const view = await this.getViewCartoes({ id: cartaoId })
+        const cartao = ((view as any)?.data ?? (view as any)?.cartao?.data ?? view) as CartoesView | undefined
+        if (!cartao?.nome) {
+            throw new UnexpectedError('Não foi possível carregar o cartão para atualizar a regra da senha.')
+        }
+
+        return this.editCartoes({
+            id: cartaoId,
+            cartao_id: cartaoId,
+            nome: cartao.nome ?? null,
+            banco: cartao.banco ?? null,
+            dia_limite_fatura: cartao.dia_limite_fatura ?? null,
+            dia_vencimento_fatura: cartao.dia_vencimento_fatura ?? null,
+            cor_fundo: cartao.cor_fundo ?? null,
+            cor_texto: cartao.cor_texto ?? null,
+            ativo: cartao.ativo !== false,
+            senha_pdf_regra: senhaPdfRegra,
+        })
+    }
+
     async deleteCartoes(id: number) {
         const response = await this.httpClient.delete({
             url: this.url + '/excluir/' + id

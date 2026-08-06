@@ -36,6 +36,7 @@ import {
     CartoesDefaultValues,
     CartoesModel,
     findSenhaPdfRegraByBanco,
+    resolveSenhaPdfRegraDigitos,
     ParCorLookup,
     SenhaPdfRegraLookup,
     TIPOS_NUMERO_PADRAO,
@@ -191,6 +192,7 @@ const CartoesForm = () => {
     const regraSelecionada = senhasPdfRegras.find(
         (r) => String(r.value) === String(senhaPdfRegraWatch ?? '')
     )
+    const senhaPdfDigitos = resolveSenhaPdfRegraDigitos(regraSelecionada ?? senhaPdfRegraWatch, senhasPdfRegras)
 
     const isEditing = !!(record.cartao_id || record.id || paramId)
     const bandeiraJaExiste = bandeiras.some(
@@ -496,7 +498,13 @@ const CartoesForm = () => {
             const regraValue = data.senha_pdf_regra
                 ? String(data.senha_pdf_regra)
                 : null
-            const senhaNova = senhaPdfDigitada.trim()
+            const senhaNova = senhaPdfDigitada.replace(/\D/g, '')
+            const digitosRegra = resolveSenhaPdfRegraDigitos(regraValue, senhasPdfRegras)
+
+            if (senhaNova && digitosRegra != null && senhaNova.length !== digitosRegra) {
+                toast.warning(`A senha do PDF deve ter exatamente ${digitosRegra} dígitos conforme a regra selecionada.`)
+                return
+            }
 
             const payload: CartoesModel = {
                 nome: data.nome,
@@ -596,6 +604,15 @@ const CartoesForm = () => {
             setValue('senha_pdf_regra', sugerida.value, { shouldDirty: true })
         }
     }, [bancoWatch, senhasPdfRegras, getValues, setValue])
+
+    // Limita a senha digitada ao máximo de dígitos da regra selecionada
+    useEffect(() => {
+        if (senhaPdfDigitos == null || senhaPdfDigitos <= 0) return
+        setSenhaPdfDigitada((prev) => {
+            const digits = prev.replace(/\D/g, '').slice(0, senhaPdfDigitos)
+            return digits === prev ? prev : digits
+        })
+    }, [senhaPdfDigitos])
 
     const formatLimiteDisplay = (limite?: number | string | null) => {
         if (limite == null || limite === '') return 'Sem limite'
@@ -776,18 +793,30 @@ const CartoesForm = () => {
                                                         id="senha_pdf"
                                                         value={senhaPdfDigitada}
                                                         disabled={limparSenhaPdf}
+                                                        inputMode="numeric"
+                                                        maxLength={senhaPdfDigitos ?? undefined}
                                                         placeholder={
                                                             temSenhaPdf
                                                                 ? 'Senha já cadastrada — digite para alterar'
-                                                                : 'Opcional'
+                                                                : senhaPdfDigitos != null
+                                                                    ? `${senhaPdfDigitos} dígitos (opcional)`
+                                                                    : 'Opcional'
                                                         }
                                                         onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                                                            setSenhaPdfDigitada(e.target.value)
+                                                            const digits = e.target.value.replace(/\D/g, '')
+                                                            setSenhaPdfDigitada(
+                                                                senhaPdfDigitos != null
+                                                                    ? digits.slice(0, senhaPdfDigitos)
+                                                                    : digits
+                                                            )
                                                             if (limparSenhaPdf) setLimparSenhaPdf(false)
                                                         }}
                                                     />
                                                     <small className="text-muted d-block mt-1">
                                                         Usada automaticamente ao importar faturas deste cartão. Opcional.
+                                                        {senhaPdfDigitos != null
+                                                            ? ` Informe exatamente ${senhaPdfDigitos} dígitos conforme a regra.`
+                                                            : ''}
                                                     </small>
                                                     {isEditing && temSenhaPdf && (
                                                         <div className="form-check mt-2">

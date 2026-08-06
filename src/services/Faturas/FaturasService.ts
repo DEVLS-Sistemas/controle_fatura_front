@@ -183,6 +183,9 @@ export class FaturasService implements FaturasInterface {
         if (params?.salvar_senha_pdf !== undefined) {
             body.salvar_senha_pdf = params.salvar_senha_pdf
         }
+        if (params?.senha_pdf_regra != null && params.senha_pdf_regra !== '') {
+            body.senha_pdf_regra = params.senha_pdf_regra
+        }
         const response = await this.httpClient.post({
             url: `${this.url}/processar/${id}`,
             body: Object.keys(body).length ? body : undefined,

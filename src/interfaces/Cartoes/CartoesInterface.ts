@@ -39,7 +39,30 @@ export interface SenhaPdfRegraLookup {
     value: string
     label: string
     orientacao?: string | null
+    /** Quantidade de dígitos esperados (máscara / maxLength do campo senha) */
+    digitos?: number | null
     bancos_sugeridos?: string[]
+}
+
+/** Extrai a quantidade de dígitos a partir do código da regra (ex.: cpf_cnpj_6_digitos → 6) */
+export const resolveSenhaPdfRegraDigitos = (
+    regra?: SenhaPdfRegraLookup | string | null,
+    regras?: SenhaPdfRegraLookup[] | null
+): number | null => {
+    if (regra && typeof regra === 'object' && regra.digitos != null && Number(regra.digitos) > 0) {
+        return Number(regra.digitos)
+    }
+    const code = typeof regra === 'string'
+        ? regra
+        : (regra?.value ?? null)
+    if (!code) return null
+    const fromLookup = regras?.find((r) => String(r.value) === String(code))
+    if (fromLookup?.digitos != null && Number(fromLookup.digitos) > 0) {
+        return Number(fromLookup.digitos)
+    }
+    const match = String(code).match(/(\d+)_digitos$/)
+    if (match) return Number(match[1])
+    return null
 }
 
 export interface CartoesList {
@@ -149,6 +172,8 @@ export interface CartoesInterface {
     AsyncListNumeros(params: NumerosListParams): Promise<NumeroListItem[] | undefined>
     createCartoes(params: CartoesModel): Promise<any>
     editCartoes(params: CartoesModel): Promise<any>
+    /** Persiste `senha_pdf_regra` no cartão sem alterar a senha */
+    atualizarSenhaPdfRegra(cartaoId: number, senhaPdfRegra: string): Promise<any>
     deleteCartoes(id: number): Promise<any>
     getLookupsCartoes(): Promise<LookupsCartoes | undefined>
 }
