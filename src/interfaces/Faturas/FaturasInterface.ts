@@ -124,6 +124,12 @@ export interface FaturasModel {
     fatura_id?: number | null
     cartao_id: number | string | null
     cartao_bandeira_id?: number | string | null
+    /** Retry modal: nome da bandeira (lookup) quando `criar: true` */
+    bandeira?: string | null
+    /** Retry modal CSV: final existente */
+    cartao_numero_id?: number | string | null
+    /** Retry modal CSV: cria final com 4 dígitos */
+    ultimos_digitos?: string | null
     mes: number | string | null
     ano: number | string | null
     valor_total?: number | string | null
@@ -147,6 +153,9 @@ export interface CartaoLookup {
     cor_fundo?: string | null
     cor_texto?: string | null
     qtd_bandeiras?: number
+    qtd_numeros?: number
+    /** false → cadastro com PDF/CSV abre modal de bandeira/final */
+    tem_numeros?: boolean
     tem_senha_pdf?: boolean
     senha_pdf_regra?: string | null
     senha_pdf_orientacao?: string | null
@@ -186,6 +195,10 @@ export interface FaturasInterface {
         processar_automatico?: boolean
         senha_pdf?: string
         salvar_senha_pdf?: boolean
+        cartao_bandeira_id?: number | string | null
+        bandeira?: string | null
+        cartao_numero_id?: number | string | null
+        ultimos_digitos?: string | null
     }): Promise<any>
     processarPdf(id: number, params?: ProcessarPdfParams): Promise<any>
 }

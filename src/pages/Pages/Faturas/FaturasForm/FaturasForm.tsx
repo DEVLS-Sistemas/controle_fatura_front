@@ -22,6 +22,14 @@ import {
 import { FaturasService } from 'services/Faturas/FaturasService'
 import { CartoesService } from 'services/Cartoes/CartoesService'
 import FaturaSenhaPdfModal from 'Components/Faturas/FaturaSenhaPdfModal'
+import FaturaSelecaoModal, { FaturaSelecaoStep } from 'Components/Faturas/FaturaSelecaoModal'
+import {
+    FaturaSelecaoBandeiraOption,
+    FaturaSelecaoError,
+    FaturaSelecaoNumeroOption,
+    FaturaSelecaoRetryPayload,
+} from 'libs/api/exceptions/FaturaSelecaoError'
+import { PdfSenhaError } from 'libs/api/exceptions/PdfSenhaError'
 
 const FaturasForm = () => {
     const { state } = useLocation()
@@ -36,7 +44,7 @@ const FaturasForm = () => {
             }
             : FaturasDefaultValues
     )
-    const { register, handleSubmit, control, setValue, watch } = useForm<FaturasModel>({
+    const { register, handleSubmit, control, setValue, watch, getValues } = useForm<FaturasModel>({
         defaultValues: record
     })
     const [cartoesOptions, setCartoesOptions] = useState<SelectOptions[]>([])
@@ -47,6 +55,14 @@ const FaturasForm = () => {
     const [senhaModalOpen, setSenhaModalOpen] = useState(false)
     const [senhaModalFaturaId, setSenhaModalFaturaId] = useState<number | string | null>(null)
     const [senhaModalMeta, setSenhaModalMeta] = useState<SenhaPdfMeta | null>(null)
+    const [selecaoModalOpen, setSelecaoModalOpen] = useState(false)
+    const [selecaoStep, setSelecaoStep] = useState<FaturaSelecaoStep>('bandeira')
+    const [selecaoBandeiras, setSelecaoBandeiras] = useState<FaturaSelecaoBandeiraOption[]>([])
+    const [selecaoNumeros, setSelecaoNumeros] = useState<FaturaSelecaoNumeroOption[]>([])
+    const [selecaoCartaoBandeiraId, setSelecaoCartaoBandeiraId] = useState<number | null>(null)
+    const [selecaoBandeiraNome, setSelecaoBandeiraNome] = useState<string | null>(null)
+    const [selecaoLoading, setSelecaoLoading] = useState(false)
+    const pendingSelecaoRef = useRef<FaturaSelecaoRetryPayload>({})
     const fileInputRef = useRef<HTMLInputElement>(null)
     const { voltarParaRotaAnterior } = useNavegacao()
     const navigate = useNavigate()
@@ -123,6 +139,60 @@ const FaturasForm = () => {
         setSenhaModalOpen(true)
     }
 
+    const openSelecaoModal = (error: FaturaSelecaoError) => {
+        if (error.precisa_selecionar_final || error.codigo === 'precisa_selecionar_final') {
+            setSelecaoStep('final')
+            setSelecaoNumeros(error.numeros)
+            if (error.cartao_bandeira_id != null) {
+                setSelecaoCartaoBandeiraId(error.cartao_bandeira_id)
+                pendingSelecaoRef.current = {
+                    ...pendingSelecaoRef.current,
+                    cartao_bandeira_id: error.cartao_bandeira_id,
+                }
+            }
+        } else {
+            setSelecaoStep('bandeira')
+            setSelecaoBandeiras(error.bandeiras)
+            setSelecaoNumeros([])
+            setSelecaoCartaoBandeiraId(null)
+            setSelecaoBandeiraNome(null)
+            pendingSelecaoRef.current = {}
+        }
+        setSelecaoModalOpen(true)
+    }
+
+    const handleCreateSuccess = (result: unknown) => {
+        const faturaData = extractFaturaPayload(result)
+        const envelope = result as Record<string, any> | null
+        const newId = extractFaturaId(result)
+
+        if (faturaPrecisaSenhaPdf(faturaData, envelope) && newId) {
+            toast.info('Fatura cadastrada. Informe a senha do PDF para continuar.')
+            openSenhaModal(newId, resolveSenhaPdfMeta(faturaData, envelope))
+            return
+        }
+
+        toast.success('Fatura cadastrada com sucesso')
+        if (newId) {
+            navigate(`/faturas/view/${newId}`)
+        } else {
+            navigate('/faturas')
+        }
+    }
+
+    const submitCreate = async (extra?: FaturaSelecaoRetryPayload) => {
+        const data = getValues()
+        const payload: FaturasModel = {
+            ...data,
+            cartao_bandeira_id: extra?.cartao_bandeira_id ?? data.cartao_bandeira_id,
+            bandeira: extra?.bandeira ?? undefined,
+            cartao_numero_id: extra?.cartao_numero_id ?? undefined,
+            ultimos_digitos: extra?.ultimos_digitos ?? undefined,
+            arquivo_pdf: arquivoFile,
+        }
+        return faturasService.createFaturas(payload)
+    }
+
     const onSubmit: SubmitHandler<FaturasModel> = async (data) => {
         try {
             if (!isEdit && showBandeiraSelect && !data.cartao_bandeira_id) {
@@ -139,32 +209,69 @@ const FaturasForm = () => {
                 toast.success('Fatura atualizada com sucesso')
                 navigate(`/faturas/view/${record.fatura_id}`)
             } else {
-                const payload = {
-                    ...data,
-                    cartao_bandeira_id: data.cartao_bandeira_id,
-                    arquivo_pdf: arquivoFile,
-                }
-                const result = await faturasService.createFaturas(payload)
-                const faturaData = extractFaturaPayload(result)
-                const envelope = result as Record<string, any> | null
-                const newId = extractFaturaId(result)
-
-                if (faturaPrecisaSenhaPdf(faturaData, envelope) && newId) {
-                    toast.info('Fatura cadastrada. Informe a senha do PDF para continuar.')
-                    openSenhaModal(newId, resolveSenhaPdfMeta(faturaData, envelope))
-                    return
-                }
-
-                toast.success('Fatura cadastrada com sucesso')
-                if (newId) {
-                    navigate(`/faturas/view/${newId}`)
-                } else {
-                    navigate('/faturas')
-                }
+                const result = await submitCreate()
+                handleCreateSuccess(result)
             }
         } catch (error: any) {
+            if (error instanceof FaturaSelecaoError) {
+                openSelecaoModal(error)
+                return
+            }
+            if (error instanceof PdfSenhaError) {
+                // Cadastro pode retornar 422 de senha antes de criar em alguns fluxos
+                toast.error(error.message || 'PDF protegido por senha')
+                return
+            }
             toast.error(error?.message || 'Erro ao salvar fatura')
             throw error
+        }
+    }
+
+    const handleSelecaoConfirm = async (selection: FaturaSelecaoRetryPayload) => {
+        const merged: FaturaSelecaoRetryPayload = {
+            ...pendingSelecaoRef.current,
+            ...selection,
+        }
+        pendingSelecaoRef.current = merged
+
+        if (selection.bandeira) {
+            setSelecaoBandeiraNome(selection.bandeira)
+        }
+        if (selection.cartao_bandeira_id != null) {
+            setSelecaoCartaoBandeiraId(Number(selection.cartao_bandeira_id))
+        }
+
+        setSelecaoLoading(true)
+        try {
+            const result = await submitCreate(merged)
+            setSelecaoModalOpen(false)
+            handleCreateSuccess(result)
+        } catch (error) {
+            if (error instanceof FaturaSelecaoError) {
+                if (error.precisa_selecionar_final || error.codigo === 'precisa_selecionar_final') {
+                    setSelecaoStep('final')
+                    setSelecaoNumeros(error.numeros)
+                    if (error.cartao_bandeira_id != null) {
+                        setSelecaoCartaoBandeiraId(error.cartao_bandeira_id)
+                        pendingSelecaoRef.current = {
+                            ...pendingSelecaoRef.current,
+                            cartao_bandeira_id: error.cartao_bandeira_id,
+                        }
+                    }
+                    toast.info('Selecione o final do cartão para continuar')
+                    return
+                }
+                openSelecaoModal(error)
+                return
+            }
+            if (error instanceof PdfSenhaError) {
+                setSelecaoModalOpen(false)
+                toast.error(error.message || 'PDF protegido por senha')
+                return
+            }
+            toast.error((error as Error)?.message || 'Erro ao salvar fatura')
+        } finally {
+            setSelecaoLoading(false)
         }
     }
 
@@ -215,6 +322,17 @@ const FaturasForm = () => {
                         navigate(`/faturas/view/${senhaModalFaturaId}`)
                     }
                 }}
+            />
+            <FaturaSelecaoModal
+                isOpen={selecaoModalOpen}
+                step={selecaoStep}
+                bandeiras={selecaoBandeiras}
+                numeros={selecaoNumeros}
+                cartaoBandeiraId={selecaoCartaoBandeiraId}
+                bandeiraNome={selecaoBandeiraNome}
+                loading={selecaoLoading}
+                onClose={() => setSelecaoModalOpen(false)}
+                onConfirm={handleSelecaoConfirm}
             />
             <div className="page-content">
                 <Container fluid>

@@ -36,7 +36,14 @@ import ResponsavelModal from 'pages/Pages/Transacoes/ResponsavelModal/Responsave
 import CategoriaRapidoModal, { CategoriaRapidoConfirm } from 'pages/Pages/Transacoes/CategoriaRapidoModal/CategoriaRapidoModal'
 import SubcategoriaRapidoModal, { SubcategoriaRapidoConfirm } from 'pages/Pages/Transacoes/SubcategoriaRapidoModal/SubcategoriaRapidoModal'
 import FaturaSenhaPdfModal from 'Components/Faturas/FaturaSenhaPdfModal'
+import FaturaSelecaoModal, { FaturaSelecaoStep } from 'Components/Faturas/FaturaSelecaoModal'
 import { PdfSenhaError } from 'libs/api/exceptions/PdfSenhaError'
+import {
+    FaturaSelecaoBandeiraOption,
+    FaturaSelecaoError,
+    FaturaSelecaoNumeroOption,
+    FaturaSelecaoRetryPayload,
+} from 'libs/api/exceptions/FaturaSelecaoError'
 import { getApiBaseUrl } from 'libs/api/ApiConfig'
 
 const formatNumeroOptionLabel = (n: NumeroListItem): string => {
@@ -210,6 +217,15 @@ const FaturasViewPage = () => {
     const [senhaModalOpen, setSenhaModalOpen] = useState(false)
     const [senhaModalMeta, setSenhaModalMeta] = useState<SenhaPdfMeta | null>(null)
     const senhaModalAutoOpenedRef = useRef<string | null>(null)
+    const [selecaoModalOpen, setSelecaoModalOpen] = useState(false)
+    const [selecaoStep, setSelecaoStep] = useState<FaturaSelecaoStep>('bandeira')
+    const [selecaoBandeiras, setSelecaoBandeiras] = useState<FaturaSelecaoBandeiraOption[]>([])
+    const [selecaoNumeros, setSelecaoNumeros] = useState<FaturaSelecaoNumeroOption[]>([])
+    const [selecaoCartaoBandeiraId, setSelecaoCartaoBandeiraId] = useState<number | null>(null)
+    const [selecaoBandeiraNome, setSelecaoBandeiraNome] = useState<string | null>(null)
+    const [selecaoLoading, setSelecaoLoading] = useState(false)
+    const pendingSelecaoRef = useRef<FaturaSelecaoRetryPayload>({})
+    const pendingUploadFileRef = useRef<File | null>(null)
     const [categoriasOptions, setCategoriasOptions] = useState<SelectOptions[]>([])
     const [categoriasLookup, setCategoriasLookup] = useState<CategoriaLookup[]>([])
     const [subcategoriasByCategoria, setSubcategoriasByCategoria] = useState<Record<number, SelectOptions[]>>({})
@@ -530,6 +546,45 @@ const FaturasViewPage = () => {
         }
     }
 
+    const openSelecaoModal = (error: FaturaSelecaoError) => {
+        if (error.precisa_selecionar_final || error.codigo === 'precisa_selecionar_final') {
+            setSelecaoStep('final')
+            setSelecaoNumeros(error.numeros)
+            if (error.cartao_bandeira_id != null) {
+                setSelecaoCartaoBandeiraId(error.cartao_bandeira_id)
+                pendingSelecaoRef.current = {
+                    ...pendingSelecaoRef.current,
+                    cartao_bandeira_id: error.cartao_bandeira_id,
+                }
+            }
+        } else {
+            setSelecaoStep('bandeira')
+            setSelecaoBandeiras(error.bandeiras)
+            setSelecaoNumeros([])
+            setSelecaoCartaoBandeiraId(null)
+            setSelecaoBandeiraNome(null)
+            pendingSelecaoRef.current = {}
+        }
+        setSelecaoModalOpen(true)
+    }
+
+    const handleUploadSuccess = async (result: unknown) => {
+        const faturaData = extractFaturaPayload(result)
+        const envelope = result as Record<string, any> | null
+        if (fileInputRef.current) fileInputRef.current.value = ''
+        pendingUploadFileRef.current = null
+
+        if (faturaPrecisaSenhaPdf(faturaData, envelope)) {
+            toast.info('Arquivo enviado. Informe a senha do PDF para continuar.')
+            await loadFatura({ silent: true, openSenhaIfNeeded: false })
+            openSenhaModal(resolveSenhaPdfMeta(faturaData, envelope))
+            return
+        }
+
+        toast.success('Arquivo enviado com sucesso')
+        await loadFatura({ silent: true, openSenhaIfNeeded: false })
+    }
+
     const handleUploadPdf = async () => {
         const file = fileInputRef.current?.files?.[0]
         if (!file || !id) {
@@ -540,32 +595,86 @@ const FaturasViewPage = () => {
             toast.error('Formato inválido. Envie PDF ou CSV.')
             return
         }
+        pendingUploadFileRef.current = file
         try {
             const result = await faturasService.uploadPdf({
                 id: Number(id),
                 arquivo_pdf: file,
                 processar_automatico: processarAuto,
             })
-            const faturaData = extractFaturaPayload(result)
-            const envelope = result as Record<string, any> | null
-            if (fileInputRef.current) fileInputRef.current.value = ''
-
-            if (faturaPrecisaSenhaPdf(faturaData, envelope)) {
-                toast.info('Arquivo enviado. Informe a senha do PDF para continuar.')
-                await loadFatura({ silent: true, openSenhaIfNeeded: false })
-                openSenhaModal(resolveSenhaPdfMeta(faturaData, envelope))
+            await handleUploadSuccess(result)
+        } catch (error) {
+            if (error instanceof FaturaSelecaoError) {
+                openSelecaoModal(error)
                 return
             }
-
-            toast.success('Arquivo enviado com sucesso')
-            await loadFatura({ silent: true, openSenhaIfNeeded: false })
-        } catch (error) {
             if (error instanceof PdfSenhaError) {
                 await loadFatura({ silent: true, openSenhaIfNeeded: false })
                 openSenhaModal(error.senha_pdf ?? null)
                 return
             }
             toast.error('Erro ao enviar arquivo')
+        }
+    }
+
+    const handleSelecaoConfirm = async (selection: FaturaSelecaoRetryPayload) => {
+        const file = pendingUploadFileRef.current ?? fileInputRef.current?.files?.[0]
+        if (!file || !id) {
+            toast.warning('Selecione um arquivo PDF ou CSV')
+            setSelecaoModalOpen(false)
+            return
+        }
+
+        const merged: FaturaSelecaoRetryPayload = {
+            ...pendingSelecaoRef.current,
+            ...selection,
+        }
+        pendingSelecaoRef.current = merged
+
+        if (selection.bandeira) {
+            setSelecaoBandeiraNome(selection.bandeira)
+        }
+        if (selection.cartao_bandeira_id != null) {
+            setSelecaoCartaoBandeiraId(Number(selection.cartao_bandeira_id))
+        }
+
+        setSelecaoLoading(true)
+        try {
+            const result = await faturasService.uploadPdf({
+                id: Number(id),
+                arquivo_pdf: file,
+                processar_automatico: processarAuto,
+                ...merged,
+            })
+            setSelecaoModalOpen(false)
+            await handleUploadSuccess(result)
+        } catch (error) {
+            if (error instanceof FaturaSelecaoError) {
+                if (error.precisa_selecionar_final || error.codigo === 'precisa_selecionar_final') {
+                    setSelecaoStep('final')
+                    setSelecaoNumeros(error.numeros)
+                    if (error.cartao_bandeira_id != null) {
+                        setSelecaoCartaoBandeiraId(error.cartao_bandeira_id)
+                        pendingSelecaoRef.current = {
+                            ...pendingSelecaoRef.current,
+                            cartao_bandeira_id: error.cartao_bandeira_id,
+                        }
+                    }
+                    toast.info('Selecione o final do cartão para continuar')
+                    return
+                }
+                openSelecaoModal(error)
+                return
+            }
+            if (error instanceof PdfSenhaError) {
+                setSelecaoModalOpen(false)
+                await loadFatura({ silent: true, openSenhaIfNeeded: false })
+                openSenhaModal(error.senha_pdf ?? null)
+                return
+            }
+            toast.error('Erro ao enviar arquivo')
+        } finally {
+            setSelecaoLoading(false)
         }
     }
 
@@ -1074,6 +1183,20 @@ const FaturasViewPage = () => {
                     senhaModalAutoOpenedRef.current = String(id)
                     await loadFatura({ silent: true, openSenhaIfNeeded: false })
                 }}
+            />
+            <FaturaSelecaoModal
+                isOpen={selecaoModalOpen}
+                step={selecaoStep}
+                bandeiras={selecaoBandeiras}
+                numeros={selecaoNumeros}
+                cartaoBandeiraId={selecaoCartaoBandeiraId}
+                bandeiraNome={selecaoBandeiraNome}
+                loading={selecaoLoading}
+                onClose={() => {
+                    setSelecaoModalOpen(false)
+                    pendingUploadFileRef.current = null
+                }}
+                onConfirm={handleSelecaoConfirm}
             />
             <div className="page-content">
                 <Container fluid>
