@@ -35,6 +35,8 @@ Base: `/api/v1/cartoes` (Bearer Sanctum)
 
 CRUD padrão no grupo: `lookups`, `listar`, `listar/{id}`, `cadastrar`, `editar`, `excluir/{id}`, `cartoes-list`.
 
+`DELETE /excluir/{id}` retorna **422** se o cartão tiver fatura vinculada (`"Não é possível excluir cartão com fatura anexada vinculada"`). Exiba o erro e oriente a excluir as faturas antes.
+
 Extras:
 
 ```http
@@ -163,6 +165,7 @@ Campos do **grupo**:
 - Dia de vencimento (1–31) + ajuda: “Data limite para pagamento”
 - Par de cores (`pares_cores` ou swatches manuais) + preview do chip
 - Ativo
+- **Senha do PDF** + **regra de senha** — ver prompt dedicado [`frontend-prompt-senha-pdf-fatura.md`](frontend-prompt-senha-pdf-fatura.md) (input password com olho, select de regra, orientação C6 = 6 dígitos do CPF/CNPJ)
 
 **Remover** do topo: bandeira, últimos dígitos, limite de crédito (esses sobem/descem para a seção de baixo).
 
@@ -266,3 +269,4 @@ Sem cartão identificado
 - [ ] Remover uso dos campos flat `bandeira` / `ultimos_digitos` / `limite_credito` no root
 - [ ] Lookups: `bandeiras`, `tipos_numero`, cores, dias
 - [ ] Integrar regra de bandeira no cadastro de fatura e agrupamento por final na view
+- [x] Bloquear exclusão de cartão com fatura anexada (exibir 422 e orientar a excluir faturas antes)

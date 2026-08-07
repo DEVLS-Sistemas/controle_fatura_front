@@ -4,7 +4,7 @@ import { toast } from 'react-toastify'
 import { setActiveMenu } from 'helpers/system_helpers'
 import { useNavegacao } from 'helpers/functions_helpers'
 import { centavosToBr, formatCurrency, toCentavos, VALOR_TEXT_CLASS } from 'helpers/fatura_helpers'
-import { CartaoChip } from 'helpers/cartao_helpers'
+import { CartaoChip, extractCartaoErrorMessage } from 'helpers/cartao_helpers'
 import {
     Breadcrumb,
     BreadcrumbItem,
@@ -386,6 +386,13 @@ const CartoesForm = () => {
     }
 
     const handleRemoveNumero = (bandeira: CartaoBandeira, numero: CartaoNumero) => {
+        if (numero.id) {
+            const ok = window.confirm(
+                'Números/bandeiras com faturas vinculadas podem ser só desativados. Deseja continuar a remoção?'
+            )
+            if (!ok) return
+        }
+
         const bandeiraKey = bandeira._key ?? bandeira.id
         const numeroKey = numero._key ?? numero.id
 
@@ -406,6 +413,13 @@ const CartoesForm = () => {
     }
 
     const handleRemoveBandeira = (bandeira: CartaoBandeira) => {
+        if (bandeira.id) {
+            const ok = window.confirm(
+                'Números/bandeiras com faturas vinculadas podem ser só desativados. Deseja continuar a remoção?'
+            )
+            if (!ok) return
+        }
+
         const bandeiraKey = bandeira._key ?? bandeira.id
 
         if (bandeira.id) {
@@ -556,7 +570,7 @@ const CartoesForm = () => {
             navigate('/cartoes')
         } catch (error) {
             console.error('Erro ao salvar cartão:', error)
-            toast.error('Erro ao salvar cartão.')
+            toast.error(extractCartaoErrorMessage(error, 'Erro ao salvar cartão.'))
         }
     }
 

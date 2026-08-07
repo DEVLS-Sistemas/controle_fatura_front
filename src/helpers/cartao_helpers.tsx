@@ -1,8 +1,23 @@
 import React, { CSSProperties } from 'react'
+import { ValidationError } from 'libs/api/exceptions/ValidationError'
 
 export type CartaoCores = {
     cor_fundo?: string | null
     cor_texto?: string | null
+}
+
+/** Mensagem amigável de erros da API de cartões (ex.: 422 com fatura vinculada). */
+export const extractCartaoErrorMessage = (error: unknown, fallback: string): string => {
+    if (error instanceof ValidationError) {
+        const body = error.errors as any
+        if (typeof body?.message === 'string' && body.message.trim()) return body.message
+        if (typeof body?.cartao?.message === 'string' && body.cartao.message.trim()) {
+            return body.cartao.message
+        }
+        if (typeof body === 'string' && body.trim()) return body
+    }
+    if (error instanceof Error && error.message?.trim()) return error.message
+    return fallback
 }
 
 export const cartaoChipStyle = (

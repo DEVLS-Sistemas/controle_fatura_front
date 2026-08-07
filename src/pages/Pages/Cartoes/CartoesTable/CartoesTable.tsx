@@ -10,7 +10,7 @@ import CustomModal from "Components/ComponentController/Modal/CustomModal"
 import TableActionsDropdown from "Components/Common/TableActionsDropdown"
 import { CartoesList, CartoesSearch } from "interfaces/Cartoes/CartoesInterface"
 import { CartoesService } from "services/Cartoes/CartoesService"
-import { CartaoChip } from "helpers/cartao_helpers"
+import { CartaoChip, extractCartaoErrorMessage } from "helpers/cartao_helpers"
 import { formatCurrency, VALOR_TEXT_CLASS } from "helpers/fatura_helpers"
 
 export interface CartoesTableProps {
@@ -72,7 +72,13 @@ export const CartoesTable = ({ data, getData, setPerPage, perPage, filters }: Ca
             toggleModal()
         } catch (error) {
             console.error('Erro ao excluir:', error)
-            toast.error('Erro ao excluir cartão.')
+            const message = extractCartaoErrorMessage(error, 'Erro ao excluir cartão.')
+            const orienteFaturas = /fatura/i.test(message)
+            toast.error(
+                orienteFaturas
+                    ? `${message.replace(/\.*\s*$/, '')}. Exclua as faturas vinculadas antes de remover o cartão.`
+                    : message
+            )
         }
     }
 
@@ -291,7 +297,7 @@ export const CartoesTable = ({ data, getData, setPerPage, perPage, filters }: Ca
                 toggle={toggleModal}
                 title="Confirmação de Exclusão"
                 delete={true}
-                body="Deseja realmente excluir este cartão?"
+                body="Deseja realmente excluir este cartão? Cartões com fatura anexada vinculada não podem ser excluídos — remova as faturas antes."
                 onConfirmDelete={() => selectedId && handleRemoteDelete(selectedId)}
             />
             <Row>
