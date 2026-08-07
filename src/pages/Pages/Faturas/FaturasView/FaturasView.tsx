@@ -13,6 +13,7 @@ import {
     faturaQuitacaoLabel, faturaQuitacaoColor,
     tipoTransacaoColor, tipoTransacaoLabel,
     origemCompraLabel,
+    isTransacaoOperacional,
     FATURA_FILE_ACCEPT, isValidFaturaFile, resolveFaturaAnexo, downloadFaturaAnexo,
     getCategoriaFieldStyle, VALOR_TEXT_CLASS,
 } from 'helpers/fatura_helpers'
@@ -62,17 +63,6 @@ const formatParcelas = (atual?: number, total?: number) => {
 const OPERACIONAIS_KEY = '__operacionais__'
 const SEM_CARTAO_KEY = '__sem_cartao__'
 
-/** Pagamento de fatura (e similares) não pertencem a um final específico */
-const isTxOperacional = (tx: TransacoesList): boolean => {
-    if (tx.tipo === 'payment') return true
-    if (tx.origem_compra === 'PAGAMENTO_FATURA') return true
-    const nome = (tx.estabelecimento_nome ?? tx.estabelecimento ?? '')
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .toUpperCase()
-    return nome.includes('PAGAMENTO DE FATURA') || nome.includes('PAGAMENTO FATURA')
-}
-
 const getTxUltimosDigitos = (tx: TransacoesList): string | null => {
     const digitos = tx.ultimos_digitos
         ?? tx.cartao_numero?.ultimos_digitos
@@ -82,7 +72,7 @@ const getTxUltimosDigitos = (tx: TransacoesList): string | null => {
 }
 
 const getTxNumeroKey = (tx: TransacoesList): string => {
-    if (isTxOperacional(tx)) return OPERACIONAIS_KEY
+    if (isTransacaoOperacional(tx)) return OPERACIONAIS_KEY
     if (tx.cartao_numero_id != null) return `numero_${tx.cartao_numero_id}`
     if (tx.cartao_numero?.id != null) return `numero_${tx.cartao_numero.id}`
     const digitos = getTxUltimosDigitos(tx)
@@ -97,7 +87,7 @@ const getTxNomeNoCartao = (tx: TransacoesList): string | null => {
 }
 
 const getTxNumeroLabel = (tx: TransacoesList): string => {
-    if (isTxOperacional(tx)) return 'Operacionais'
+    if (isTransacaoOperacional(tx)) return 'Operacionais'
     const digitos = getTxUltimosDigitos(tx)
     if (!digitos) return 'Sem cartão identificado'
     const nomeNoCartao = getTxNomeNoCartao(tx)

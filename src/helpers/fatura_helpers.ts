@@ -20,6 +20,7 @@ export const tipoTransacaoLabel: Record<string, string> = {
   payment: 'Pagamento',
   refund: 'Estorno',
   advance: 'Antecipação',
+  fee: 'Encargo',
 }
 
 export const tipoTransacaoColor: Record<string, string> = {
@@ -27,6 +28,53 @@ export const tipoTransacaoColor: Record<string, string> = {
   payment: 'success',
   refund: 'info',
   advance: 'warning',
+  fee: 'dark',
+}
+
+/** Tipos que não são compra — vão na seção Operacionais do detalhe da fatura */
+export const TIPOS_TRANSACAO_OPERACIONAIS = ['payment', 'refund', 'advance', 'fee'] as const
+
+/**
+ * Normaliza nome do estabelecimento para matching (sem acento, maiúsculas).
+ */
+export const normalizeEstabelecimentoNome = (value?: string | null): string =>
+  (value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+
+/**
+ * Pagamentos, estornos, antecipações e encargos (juros, multa, IOF…)
+ * ficam em Operacionais — não são compras.
+ */
+export const isTransacaoOperacional = (tx: {
+  tipo?: string | null
+  origem_compra?: string | null
+  estabelecimento_nome?: string | null
+  estabelecimento?: string | null
+}): boolean => {
+  const tipo = (tx.tipo ?? '').toLowerCase()
+  if ((TIPOS_TRANSACAO_OPERACIONAIS as readonly string[]).includes(tipo)) return true
+  if (tx.origem_compra === 'PAGAMENTO_FATURA') return true
+
+  const nome = normalizeEstabelecimentoNome(tx.estabelecimento_nome ?? tx.estabelecimento)
+  if (!nome) return false
+
+  if (nome.includes('PAGAMENTO DE FATURA') || nome.includes('PAGAMENTO FATURA')) return true
+
+  // Encargos comuns no extrato (fallback se o backend ainda marcar como purchase)
+  const keywords = [
+    'JUROS',
+    'MULTA',
+    'IOF',
+    'ENCARGO',
+    'ENCARGOS',
+    'TARIFA',
+    'ANUIDADE',
+    'MORA',
+    'ATRASO',
+  ]
+  return keywords.some((kw) => nome.includes(kw))
 }
 
 /** Fallback quando lookups.origens_compra ainda não carregou */
