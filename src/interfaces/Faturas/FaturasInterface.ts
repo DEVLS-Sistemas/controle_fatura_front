@@ -140,6 +140,8 @@ export interface FaturasModel {
     status?: string | null
     senha_pdf?: string | null
     salvar_senha_pdf?: boolean
+    /** Regra selecionada no modal de senha — grava no cartão no cadastro inline */
+    senha_pdf_regra?: string | null
 }
 
 export interface ProcessarPdfParams {

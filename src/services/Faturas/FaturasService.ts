@@ -157,6 +157,7 @@ export class FaturasService implements FaturasInterface {
         processar_automatico?: boolean
         senha_pdf?: string
         salvar_senha_pdf?: boolean
+        senha_pdf_regra?: string | null
         cartao_bandeira_id?: number | string | null
         bandeira?: string | null
         cartao_numero_id?: number | string | null
@@ -173,6 +174,9 @@ export class FaturasService implements FaturasInterface {
         }
         if (params.salvar_senha_pdf !== undefined) {
             form.append('salvar_senha_pdf', params.salvar_senha_pdf ? '1' : '0')
+        }
+        if (params.senha_pdf_regra != null && params.senha_pdf_regra !== '') {
+            form.append('senha_pdf_regra', params.senha_pdf_regra)
         }
         if (params.cartao_bandeira_id != null && params.cartao_bandeira_id !== '') {
             form.append('cartao_bandeira_id', String(params.cartao_bandeira_id))

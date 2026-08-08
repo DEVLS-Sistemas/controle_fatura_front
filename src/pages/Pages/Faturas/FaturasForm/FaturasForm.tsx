@@ -43,6 +43,7 @@ import { ValidationError } from 'libs/api/exceptions/ValidationError'
 type PendingSenhaPayload = {
     senha_pdf?: string
     salvar_senha_pdf?: boolean
+    senha_pdf_regra?: string | null
 }
 
 const FaturasForm = () => {
@@ -279,6 +280,7 @@ const FaturasForm = () => {
             ultimos_digitos: extra?.ultimos_digitos ?? pendingSelecaoRef.current.ultimos_digitos ?? undefined,
             senha_pdf: pendingSenhaRef.current.senha_pdf,
             salvar_senha_pdf: pendingSenhaRef.current.salvar_senha_pdf,
+            senha_pdf_regra: pendingSenhaRef.current.senha_pdf_regra ?? undefined,
             arquivo_pdf: arquivoFile,
         }
         return faturasService.createFaturas(payload)
@@ -431,6 +433,7 @@ const FaturasForm = () => {
         pendingSenhaRef.current = {
             senha_pdf: payload.senha_pdf,
             salvar_senha_pdf: payload.salvar_senha_pdf,
+            senha_pdf_regra: payload.senha_pdf_regra ?? null,
         }
         try {
             const result = await submitCreate()
