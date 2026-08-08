@@ -15,6 +15,17 @@ export interface TransacoesSearch {
     mes?: string | number | null
     ano?: string | number | null
     palavra_chave?: string | null | unknown
+    /** Usado em `/transacoes/estabelecimentos-do-filtro` */
+    apenas_sem_loja?: boolean | number | string | null
+}
+
+/** Item de `GET /transacoes/estabelecimentos-do-filtro` */
+export interface EstabelecimentoDoFiltro {
+    id: number
+    nome: string
+    loja_id?: number | null
+    loja_nome?: string | null
+    transacoes_count?: number
 }
 
 export interface TransacoesList {
@@ -173,6 +184,7 @@ export interface TransacoesInterface {
     getViewTransacoes(params: { id: number | string }): Promise<TransacoesView | undefined>
     listTransacoesPaginate(params: TransacoesSearch): Promise<any>
     AsyncListTransacoes(params: TransacoesSearch): Promise<TransacoesModel[] | undefined>
+    listEstabelecimentosDoFiltro(params: TransacoesSearch): Promise<EstabelecimentoDoFiltro[]>
     createTransacoes(params: TransacoesModel): Promise<any>
     editTransacoes(params: TransacoesModel): Promise<any>
     deleteTransacoes(id: number, options?: { excluir_grupo?: boolean }): Promise<any>

@@ -4,6 +4,7 @@ import { UnexpectedError } from "../../libs/api/exceptions/UnexpectedError"
 import { ValidationError } from "../../libs/api/exceptions/ValidationError"
 import { PaginateInterface } from "interfaces/SystemInterfaces/PaginateInterface"
 import {
+    EstabelecimentoDoFiltro,
     LookupsTransacoes,
     TransacoesInterface,
     TransacoesList,
@@ -11,6 +12,43 @@ import {
     TransacoesSearch,
     TransacoesView,
 } from "interfaces/Transacoes/TransacoesInterface"
+
+const cleanSearchParams = (params: TransacoesSearch): Record<string, unknown> => {
+    const clean: Record<string, unknown> = { ...params }
+    Object.keys(clean).reduce(
+        (acc, k) => (!clean[k] && clean[k] !== 0 && clean[k] !== false && delete acc[k], acc),
+        clean
+    )
+    delete clean.page
+    delete clean.perPage
+    return clean
+}
+
+const normalizeEstabelecimentosDoFiltro = (body: any): EstabelecimentoDoFiltro[] => {
+    const raw = Array.isArray(body)
+        ? body
+        : Array.isArray(body?.data)
+            ? body.data
+            : Array.isArray(body?.estabelecimentos)
+                ? body.estabelecimentos
+                : Array.isArray(body?.estabelecimentos?.data)
+                    ? body.estabelecimentos.data
+                    : []
+
+    return raw
+        .map((item: any) => {
+            const id = Number(item?.id ?? item?.estabelecimento_id)
+            if (!Number.isFinite(id)) return null
+            return {
+                id,
+                nome: String(item?.nome ?? item?.estabelecimento_nome ?? `#${id}`),
+                loja_id: item?.loja_id != null ? Number(item.loja_id) : null,
+                loja_nome: item?.loja_nome ?? null,
+                transacoes_count: Number(item?.transacoes_count ?? item?.total ?? 0) || 0,
+            } as EstabelecimentoDoFiltro
+        })
+        .filter(Boolean) as EstabelecimentoDoFiltro[]
+}
 
 export class TransacoesService implements TransacoesInterface {
     private readonly url: string
@@ -59,6 +97,30 @@ export class TransacoesService implements TransacoesInterface {
             case HttpStatusCode.ok: return response.body
             case HttpStatusCode.unauthorized: throw new AccessDeniedError()
             default: throw new UnexpectedError()
+        }
+    }
+
+    async listEstabelecimentosDoFiltro(params: TransacoesSearch): Promise<EstabelecimentoDoFiltro[]> {
+        const body = cleanSearchParams(params)
+        if (params.apenas_sem_loja) {
+            body.apenas_sem_loja = 1
+        } else {
+            delete body.apenas_sem_loja
+        }
+
+        const response = await this.httpClient.get<any>({
+            url: this.url + '/estabelecimentos-do-filtro',
+            body,
+        })
+        switch (response.statusCode) {
+            case HttpStatusCode.ok:
+                return normalizeEstabelecimentosDoFiltro(response.body)
+            case HttpStatusCode.unauthorized:
+                throw new AccessDeniedError()
+            case HttpStatusCode.invalidForm:
+                throw new ValidationError(response.body)
+            default:
+                throw new UnexpectedError(response.message)
         }
     }
 

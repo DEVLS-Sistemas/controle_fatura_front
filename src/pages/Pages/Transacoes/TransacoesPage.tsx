@@ -174,6 +174,7 @@ const TransacoesPage = () => {
                             tiposOptions={tiposOptions}
                             origensCompraOptions={origensCompraOptions}
                             filtersRef={transacoesContext}
+                            onAfterVincularLoja={() => getRemoteTransacoesList(transacoesContext)}
                         />
                         {display ? (
                             <TransacoesTable

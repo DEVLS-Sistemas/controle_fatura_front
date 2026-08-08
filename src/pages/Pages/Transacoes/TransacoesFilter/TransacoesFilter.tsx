@@ -17,6 +17,7 @@ import { TransacoesSearch } from "interfaces/Transacoes/TransacoesInterface"
 import { TransacoesService } from "services/Transacoes/TransacoesService"
 import { SubcategoriasService } from "services/Subcategorias/SubcategoriasService"
 import { EstabelecimentosService } from "services/Estabelecimentos/EstabelecimentosService"
+import VincularLojaModal from "../VincularLojaModal/VincularLojaModal"
 
 export interface TransacoesFilterProps {
     getRemoteTransacoesList: (data: any) => void
@@ -26,6 +27,7 @@ export interface TransacoesFilterProps {
     tiposOptions: SelectOptions[]
     origensCompraOptions: SelectOptions[]
     filtersRef: TransacoesSearch
+    onAfterVincularLoja?: () => void | Promise<void>
 }
 
 const TransacoesFilter = ({
@@ -36,12 +38,14 @@ const TransacoesFilter = ({
     tiposOptions,
     origensCompraOptions,
     filtersRef,
+    onAfterVincularLoja,
 }: TransacoesFilterProps) => {
     const { handleSubmit, control, register, getValues, setValue } = useForm<TransacoesSearch>({
         defaultValues: filtersRef,
     })
     const [showFilter, setShowFilter] = useState<boolean>(false)
     const [exporting, setExporting] = useState(false)
+    const [vincularLojaOpen, setVincularLojaOpen] = useState(false)
     const [subcategoriasOptions, setSubcategoriasOptions] = useState<SelectOptions[]>([{ value: '', label: 'Todos' }])
     const transacoesService = new TransacoesService()
     const subcategoriasService = new SubcategoriasService()
@@ -92,10 +96,16 @@ const TransacoesFilter = ({
         load()
     }, [categoriaId])
 
+    const syncFiltersToRef = () => {
+        const filters = getValues()
+        Object.assign(filtersRef, filters)
+        return filters
+    }
+
     const handleExportCsv = async () => {
         setExporting(true)
         try {
-            const filters = getValues()
+            const filters = syncFiltersToRef()
             Object.keys(filters).reduce(
                 (acc, k) => (!filters[k as keyof TransacoesSearch] && filters[k as keyof TransacoesSearch] !== 0 && delete acc[k], acc),
                 filters as Record<string, unknown>
@@ -114,6 +124,11 @@ const TransacoesFilter = ({
         } finally {
             setExporting(false)
         }
+    }
+
+    const handleOpenVincularLoja = () => {
+        syncFiltersToRef()
+        setVincularLojaOpen(true)
     }
 
     return (
@@ -139,7 +154,16 @@ const TransacoesFilter = ({
 
             <Row>
                 <Col xs={12}>
-                    <div className="d-flex flex-row justify-content-end align-items-center mb-4 gap-2">
+                    <div className="d-flex flex-row justify-content-end align-items-center mb-4 gap-2 flex-wrap">
+                        <Button
+                            type="button"
+                            color="info"
+                            outline
+                            onClick={handleOpenVincularLoja}
+                        >
+                            <i className="ri-store-2-line align-middle me-1"></i>
+                            Vincular com loja
+                        </Button>
                         <Link to="/transacoes/add" className="btn btn-primary">
                             <i className="ri-add-circle-line align-middle me-1"></i> Adicionar Transação
                         </Link>
@@ -333,6 +357,13 @@ const TransacoesFilter = ({
                     </Card>
                 </Col>
             </Row>
+
+            <VincularLojaModal
+                isOpen={vincularLojaOpen}
+                toggle={() => setVincularLojaOpen(false)}
+                filters={filtersRef}
+                onLinked={onAfterVincularLoja}
+            />
         </React.Fragment>
     )
 }

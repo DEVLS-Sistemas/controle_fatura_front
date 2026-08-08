@@ -55,12 +55,27 @@ export interface LojaRapidoResult {
     message: string
 }
 
+export interface VincularEstabelecimentosPayload {
+    loja_id?: number | null
+    nome?: string
+    estabelecimento_ids: number[]
+}
+
+export interface VincularEstabelecimentosResult {
+    data?: LojaRapidoData
+    status: boolean
+    criado?: boolean
+    vinculados?: number
+    message: string
+}
+
 export interface LojasInterface {
     getViewLojas(params: { id: number | string }): Promise<LojasView | undefined>
     listLojasPaginate(params: LojasSearch): Promise<any>
     AsyncListLojas(params: LojasSearch): Promise<LojaLookup[] | undefined>
     createLojas(params: LojasModel): Promise<any>
     createLojasRapido(params: LojaRapidoPayload): Promise<LojaRapidoResult>
+    vincularEstabelecimentos(params: VincularEstabelecimentosPayload): Promise<VincularEstabelecimentosResult>
     editLojas(params: LojasModel): Promise<any>
     deleteLojas(id: number): Promise<any>
 }

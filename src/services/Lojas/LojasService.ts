@@ -12,6 +12,8 @@ import {
     LojasModel,
     LojasSearch,
     LojasView,
+    VincularEstabelecimentosPayload,
+    VincularEstabelecimentosResult,
 } from "interfaces/Lojas/LojasInterface"
 
 export class LojasService implements LojasInterface {
@@ -100,6 +102,44 @@ export class LojasService implements LojasInterface {
                     status: Boolean(wrap?.status ?? true),
                     criado: Boolean(wrap?.criado),
                     message: String(wrap?.message ?? response.message ?? 'Loja salva'),
+                }
+            }
+            case HttpStatusCode.unauthorized: throw new AccessDeniedError()
+            case HttpStatusCode.invalidForm: throw new ValidationError(response.body)
+            default: throw new UnexpectedError(response.body?.message || response.message)
+        }
+    }
+
+    async vincularEstabelecimentos(params: VincularEstabelecimentosPayload): Promise<VincularEstabelecimentosResult> {
+        const response = await this.httpClient.post({
+            url: this.url + '/vincular-estabelecimentos',
+            body: params,
+        })
+
+        switch (response.statusCode) {
+            case HttpStatusCode.ok:
+            case HttpStatusCode.created: {
+                const wrap = response.body?.loja ?? response.body
+                const data = wrap?.data ?? wrap
+                return {
+                    data: data?.id
+                        ? {
+                            id: Number(data.id),
+                            nome: String(data.nome ?? params.nome ?? ''),
+                            ativo: data.ativo ?? true,
+                            estabelecimentos_count: data.estabelecimentos_count,
+                            estabelecimentos: data.estabelecimentos,
+                        }
+                        : undefined,
+                    status: Boolean(wrap?.status ?? true),
+                    criado: wrap?.criado != null ? Boolean(wrap.criado) : undefined,
+                    vinculados: Number(wrap?.vinculados ?? params.estabelecimento_ids.length) || params.estabelecimento_ids.length,
+                    message: String(
+                        wrap?.message
+                        ?? response.body?.message
+                        ?? response.message
+                        ?? 'Estabelecimentos vinculados com sucesso!'
+                    ),
                 }
             }
             case HttpStatusCode.unauthorized: throw new AccessDeniedError()
