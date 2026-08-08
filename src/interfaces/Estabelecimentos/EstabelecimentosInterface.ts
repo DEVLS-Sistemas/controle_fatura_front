@@ -4,6 +4,7 @@ export interface EstabelecimentosSearch {
     nome?: string | null
     ativo?: string | boolean | null
     categoria_padrao_id?: string | number | null
+    loja_id?: string | number | null
     palavra_chave?: string | null | unknown
 }
 
@@ -14,6 +15,8 @@ export interface EstabelecimentosList {
     categoria_padrao_nome?: string | null
     subcategoria_padrao_id?: number | null
     subcategoria_padrao_nome?: string | null
+    loja_id?: number | null
+    loja_nome?: string | null
     ativo?: boolean
 }
 
@@ -22,9 +25,11 @@ export interface EstabelecimentosView extends EstabelecimentosList {}
 export interface EstabelecimentosModel {
     id?: number | null
     estabelecimento_id?: number | null
-    nome: string | null
+    nome?: string | null
     categoria_padrao_id?: number | string | null
     subcategoria_padrao_id?: number | string | null
+    loja_id?: number | string | null
+    loja_nome?: string | null
     ativo?: boolean
 }
 
@@ -33,6 +38,8 @@ export interface EstabelecimentoLookup {
     nome?: string
     categoria_padrao_id?: number | null
     subcategoria_padrao_id?: number | null
+    loja_id?: number | null
+    loja_nome?: string | null
 }
 
 export interface LookupsEstabelecimentos {
@@ -44,6 +51,7 @@ export interface ExcluirTodosEstabelecimentosData {
     estabelecimentos_excluidos: number
     categorias_excluidas: number
     subcategorias_excluidas: number
+    lojas_excluidas?: number
 }
 
 export interface ExcluirTodosEstabelecimentosResponse {
@@ -71,5 +79,7 @@ export const EstabelecimentosDefaultValues: EstabelecimentosModel = {
     nome: null,
     categoria_padrao_id: null,
     subcategoria_padrao_id: null,
+    loja_id: null,
+    loja_nome: null,
     ativo: true,
 }

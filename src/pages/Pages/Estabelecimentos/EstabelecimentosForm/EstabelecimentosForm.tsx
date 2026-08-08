@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'react-toastify'
 import { setActiveMenu } from 'helpers/system_helpers'
 import { useNavegacao } from 'helpers/functions_helpers'
-import { Breadcrumb, BreadcrumbItem, Card, CardBody, Col, Container, Label, Row } from 'reactstrap'
+import { Breadcrumb, BreadcrumbItem, Button, Card, CardBody, Col, Container, Label, Row } from 'reactstrap'
 import { SubmitHandler, useForm } from 'react-hook-form'
 import { required } from 'Components/ComponentController/ValidatorForm/ValidatorForm'
 import { InputTextControlled } from 'Components/ComponentController/Inputs/Text/InputTextControlled'
@@ -16,6 +16,7 @@ import {
 import { EstabelecimentosService } from 'services/Estabelecimentos/EstabelecimentosService'
 import { CategoriasService } from 'services/Categorias/CategoriasService'
 import { SubcategoriasService } from 'services/Subcategorias/SubcategoriasService'
+import LojaModal, { LojaModalResult } from '../LojaModal/LojaModal'
 
 const buildRecordFromSource = (source: any): EstabelecimentosModel => ({
     ...EstabelecimentosDefaultValues,
@@ -50,8 +51,18 @@ const EstabelecimentosForm = () => {
 
     const [categoriasOptions, setCategoriasOptions] = useState<SelectOptions[]>([])
     const [subcategoriasOptions, setSubcategoriasOptions] = useState<SelectOptions[]>([])
+    const [lojaModalOpen, setLojaModalOpen] = useState(false)
 
     const isEditing = !!(record.estabelecimento_id || record.id || paramId)
+    const lojaId = watch('loja_id')
+    const lojaNome = watch('loja_nome')
+    const estabelecimentoId = record.estabelecimento_id ?? record.id ?? (paramId ? Number(paramId) : null)
+
+    const handleLojaConfirm = async (loja: LojaModalResult) => {
+        setValue('loja_id', loja.id, { shouldDirty: true })
+        setValue('loja_nome', loja.nome, { shouldDirty: true })
+        setRecord((prev) => ({ ...prev, loja_id: loja.id, loja_nome: loja.nome }))
+    }
 
     const loadCategorias = async () => {
         try {
@@ -180,10 +191,34 @@ const EstabelecimentosForm = () => {
                                                         control={control}
                                                         required={required}
                                                     />
+                                                    <small className="text-muted">
+                                                        Identificador da maquininha (ex.: atacadao152145)
+                                                    </small>
                                                 </div>
                                             </Col>
                                             <Col md={6}>
-                                                <div className="form-check mt-4">
+                                                <div className="mb-3">
+                                                    <Label className="form-label text-muted">Loja</Label>
+                                                    <div>
+                                                        <Button
+                                                            type="button"
+                                                            color="light"
+                                                            className="border w-100 text-start"
+                                                            onClick={() => setLojaModalOpen(true)}
+                                                            title={lojaNome ? `Loja: ${lojaNome}` : 'Definir loja'}
+                                                        >
+                                                            <i className="ri-store-2-line me-2"></i>
+                                                            {lojaNome || 'Definir loja'}
+                                                            <i className="ri-arrow-down-s-line float-end mt-1"></i>
+                                                        </Button>
+                                                        <small className="text-muted">
+                                                            Nome fantasia — agrupa várias máquinas do mesmo lugar
+                                                        </small>
+                                                    </div>
+                                                </div>
+                                            </Col>
+                                            <Col md={6}>
+                                                <div className="form-check mb-3">
                                                     <input
                                                         {...register('ativo')}
                                                         className="form-check-input"
@@ -233,6 +268,14 @@ const EstabelecimentosForm = () => {
                     </Row>
                 </Container>
             </div>
+            <LojaModal
+                isOpen={lojaModalOpen}
+                toggle={() => setLojaModalOpen(false)}
+                estabelecimentoId={isEditing ? estabelecimentoId : null}
+                currentLojaId={lojaId}
+                currentLojaNome={lojaNome}
+                onConfirm={handleLojaConfirm}
+            />
         </React.Fragment>
     )
 }

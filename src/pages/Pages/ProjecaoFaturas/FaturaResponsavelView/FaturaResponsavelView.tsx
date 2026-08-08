@@ -1173,7 +1173,12 @@ const FaturaResponsavelView = () => {
                                                                 return (
                                                                     <tr key={rowKey}>
                                                                         <td>{formatDateBr(tx.data)}</td>
-                                                                        <td>{tx.estabelecimento_nome ?? tx.estabelecimento ?? '-'}</td>
+                                                                        <td className="text-start">
+                                                                            <div>{tx.estabelecimento_nome ?? tx.estabelecimento ?? '-'}</div>
+                                                                            {tx.loja_nome && (
+                                                                                <div className="small text-muted">{tx.loja_nome}</div>
+                                                                            )}
+                                                                        </td>
                                                                         <td className={VALOR_TEXT_CLASS}>
                                                                             <Input
                                                                                 type="number"

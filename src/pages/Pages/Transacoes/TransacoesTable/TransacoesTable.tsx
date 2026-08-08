@@ -295,7 +295,12 @@ export const TransacoesTable = ({
                                                                 return (
                                                                     <tr key={row.id ?? index}>
                                                                         <td>{formatDateBr(row.data)}</td>
-                                                                        <td className="text-start">{estabelecimentoNome}</td>
+                                                                        <td className="text-start">
+                                                                            <div>{estabelecimentoNome}</div>
+                                                                            {row.loja_nome && (
+                                                                                <div className="small text-muted">{row.loja_nome}</div>
+                                                                            )}
+                                                                        </td>
                                                                         <td className={VALOR_TEXT_CLASS}>{formatCurrency(row.valor)}</td>
                                                                         <td>
                                                                             {row.origem_compra ? (

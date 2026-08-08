@@ -52,8 +52,15 @@ const EstabelecimentosFilter = ({ getRemoteEstabelecimentosList }: Estabelecimen
             const estabelecimentos = data?.estabelecimentos_excluidos ?? 0
             const categorias = data?.categorias_excluidas ?? 0
             const subcategorias = data?.subcategorias_excluidas ?? 0
+            const lojas = data?.lojas_excluidas
+            const contagens = [
+                `${estabelecimentos} estabelecimento(s)`,
+                `${categorias} categoria(s)`,
+                `${subcategorias} subcategoria(s)`,
+            ]
+            if (lojas != null) contagens.push(`${lojas} loja(s)`)
             toast.success(
-                `${result?.estabelecimento?.message ?? 'Limpeza concluída.'} (${estabelecimentos} estabelecimento(s), ${categorias} categoria(s), ${subcategorias} subcategoria(s))`
+                `${result?.estabelecimento?.message ?? 'Limpeza concluída.'} (${contagens.join(', ')})`
             )
             setLimparModalOpen(false)
             setConfirmado(false)

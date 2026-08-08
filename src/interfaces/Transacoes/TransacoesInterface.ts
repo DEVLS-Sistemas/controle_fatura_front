@@ -7,6 +7,7 @@ export interface TransacoesSearch {
     categoria_id?: string | number | null
     subcategoria_id?: string | number | null
     estabelecimento_id?: string | number | null
+    loja_id?: string | number | null
     responsavel_id?: string | number | null
     fatura_id?: string | number | null
     tipo?: string | null
@@ -23,6 +24,8 @@ export interface TransacoesList {
     estabelecimento?: string
     estabelecimento_id?: number | null
     estabelecimento_nome?: string
+    loja_id?: number | null
+    loja_nome?: string | null
     valor?: number
     valor_compra?: number | string | null
     parcelas_total?: number

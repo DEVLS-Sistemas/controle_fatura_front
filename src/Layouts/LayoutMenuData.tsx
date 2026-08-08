@@ -123,6 +123,17 @@ const Navdata = () => {
             },
         },
         {
+            id: "lojas",
+            label: "Lojas",
+            icon: "ri-building-line",
+            link: "/lojas",
+            click: function (e: any) {
+                e.preventDefault();
+                setIscurrentState("Lojas");
+                updateIconSidebar(e);
+            },
+        },
+        {
             id: "responsaveis",
             label: "Responsáveis",
             icon: "ri-user-shared-line",

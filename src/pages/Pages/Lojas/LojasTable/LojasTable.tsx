@@ -3,26 +3,25 @@ import React, { useEffect, useState } from "react"
 import { Link } from "react-router-dom"
 import { toast } from 'react-toastify'
 import {
-    Button, Card, CardBody, Col, DropdownItem, Label, Row
+    Card, CardBody, Col, DropdownItem, Label, Row
 } from "reactstrap"
 import { PaginateInterface, PaginateSearch, PerPageProps } from "interfaces/SystemInterfaces/PaginateInterface"
 import CustomModal from "Components/ComponentController/Modal/CustomModal"
 import TableActionsDropdown from "Components/Common/TableActionsDropdown"
-import { EstabelecimentosList, EstabelecimentosSearch } from "interfaces/Estabelecimentos/EstabelecimentosInterface"
-import { EstabelecimentosService } from "services/Estabelecimentos/EstabelecimentosService"
-import LojaModal, { LojaModalResult } from "../LojaModal/LojaModal"
+import { LojasList, LojasSearch } from "interfaces/Lojas/LojasInterface"
+import { LojasService } from "services/Lojas/LojasService"
 
-export interface EstabelecimentosTableProps {
-    data: PaginateInterface<EstabelecimentosList> | undefined
-    getData: (data: PaginateSearch & EstabelecimentosSearch) => void
+export interface LojasTableProps {
+    data: PaginateInterface<LojasList> | undefined
+    getData: (data: PaginateSearch & LojasSearch) => void
     setPerPage: (perPage: number) => void
     setPage: (page: number) => void
     page: number
     perPage: number
-    filters: EstabelecimentosSearch
+    filters: LojasSearch
 }
 
-export const EstabelecimentosTable = ({ data, getData, setPerPage, perPage, filters }: EstabelecimentosTableProps) => {
+export const LojasTable = ({ data, getData, setPerPage, perPage, filters }: LojasTableProps) => {
     const [optPerPage] = useState<PerPageProps[]>([
         { value: 5, label: "5" },
         { value: 10, label: "10" },
@@ -30,42 +29,21 @@ export const EstabelecimentosTable = ({ data, getData, setPerPage, perPage, filt
         { value: 50, label: "50" },
         { value: 100, label: "100" },
     ])
-    const estabelecimentosService = new EstabelecimentosService()
+    const lojasService = new LojasService()
     const [modalIsOpen, setModalIsOpen] = useState(false)
     const [selectedId, setSelectedId] = useState<number | null>(null)
-    const [lojaModalOpen, setLojaModalOpen] = useState(false)
-    const [lojaTarget, setLojaTarget] = useState<EstabelecimentosList | null>(null)
-    const [rows, setRows] = useState<EstabelecimentosList[]>(data?.data ?? [])
-
-    useEffect(() => {
-        setRows(data?.data ?? [])
-    }, [data])
 
     const toggleModal = () => setModalIsOpen(!modalIsOpen)
 
-    const openLojaModal = (row: EstabelecimentosList) => {
-        setLojaTarget(row)
-        setLojaModalOpen(true)
-    }
-
-    const handleLojaConfirm = async (loja: LojaModalResult) => {
-        if (!lojaTarget?.id) return
-        const updated = { ...lojaTarget, loja_id: loja.id, loja_nome: loja.nome }
-        setLojaTarget(updated)
-        setRows((prev) =>
-            prev.map((row) => (row.id === lojaTarget.id ? updated : row))
-        )
-    }
-
     const handleRemoteDelete = async (id: number) => {
         try {
-            await estabelecimentosService.deleteEstabelecimentos(id)
-            toast.success('Estabelecimento excluído com sucesso!')
+            await lojasService.deleteLojas(id)
+            toast.success('Loja excluída com sucesso!')
             if (data) await handleThisRoute(data.first_page_url)
             toggleModal()
         } catch (error) {
             console.error('Erro ao excluir:', error)
-            toast.error('Erro ao excluir estabelecimento.')
+            toast.error('Erro ao excluir loja.')
         }
     }
 
@@ -134,38 +112,16 @@ export const EstabelecimentosTable = ({ data, getData, setPerPage, perPage, filt
                                                         <thead className="table-light">
                                                             <tr>
                                                                 <th scope="col" className="text-start">Nome</th>
-                                                                <th scope="col" className="text-start">Loja</th>
-                                                                <th scope="col">Categoria padrão</th>
-                                                                <th scope="col">Subcategoria padrão</th>
+                                                                <th scope="col">Estabelecimentos</th>
                                                                 <th scope="col">Ativo</th>
                                                                 <th scope="col" style={{ width: "150px" }}>Ações</th>
                                                             </tr>
                                                         </thead>
                                                         <tbody>
-                                                            {rows.map((row, index) => (
+                                                            {data.data.map((row, index) => (
                                                                 <tr key={row.id ?? index}>
-                                                                    <td className="text-start">
-                                                                        <div>{row.nome}</div>
-                                                                    </td>
-                                                                    <td className="text-start">
-                                                                        <Button
-                                                                            type="button"
-                                                                            color="light"
-                                                                            size="sm"
-                                                                            className="border"
-                                                                            title={row.loja_nome ? `Loja: ${row.loja_nome}` : 'Definir loja'}
-                                                                            onClick={() => openLojaModal(row)}
-                                                                        >
-                                                                            <i className="ri-store-2-line me-1"></i>
-                                                                            {row.loja_nome ? (
-                                                                                <span className="small">{row.loja_nome}</span>
-                                                                            ) : (
-                                                                                <span className="small text-muted">Definir loja</span>
-                                                                            )}
-                                                                        </Button>
-                                                                    </td>
-                                                                    <td>{row.categoria_padrao_nome ?? '-'}</td>
-                                                                    <td>{row.subcategoria_padrao_nome ?? '-'}</td>
+                                                                    <td className="text-start">{row.nome}</td>
+                                                                    <td>{row.estabelecimentos_count ?? 0}</td>
                                                                     <td>
                                                                         <span className={`badge bg-${row.ativo ? 'success' : 'danger'}`}>
                                                                             {row.ativo ? 'Ativo' : 'Inativo'}
@@ -173,7 +129,7 @@ export const EstabelecimentosTable = ({ data, getData, setPerPage, perPage, filt
                                                                     </td>
                                                                     <td>
                                                                         <TableActionsDropdown>
-                                                                            <Link to={`/estabelecimentos/edit/${row.id}`} state={{ source: row }}>
+                                                                            <Link to={`/lojas/edit/${row.id}`} state={{ source: row }}>
                                                                                 <DropdownItem>Editar</DropdownItem>
                                                                             </Link>
                                                                             <DropdownItem
@@ -236,16 +192,8 @@ export const EstabelecimentosTable = ({ data, getData, setPerPage, perPage, filt
                 toggle={toggleModal}
                 title="Confirmação de Exclusão"
                 delete={true}
-                body="Deseja realmente excluir este estabelecimento?"
+                body="Deseja realmente excluir esta loja? Os estabelecimentos vinculados serão desvinculados."
                 onConfirmDelete={() => selectedId && handleRemoteDelete(selectedId)}
-            />
-            <LojaModal
-                isOpen={lojaModalOpen}
-                toggle={() => setLojaModalOpen(false)}
-                estabelecimentoId={lojaTarget?.id}
-                currentLojaId={lojaTarget?.loja_id}
-                currentLojaNome={lojaTarget?.loja_nome}
-                onConfirm={handleLojaConfirm}
             />
             <Row>
                 <Col md={12}>
@@ -258,4 +206,4 @@ export const EstabelecimentosTable = ({ data, getData, setPerPage, perPage, filt
     )
 }
 
-export default EstabelecimentosTable
+export default LojasTable
