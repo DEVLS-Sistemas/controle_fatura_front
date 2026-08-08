@@ -51,10 +51,24 @@ const formatOptionLabel = (
     </div>
 )
 
+const invalidControlStyles = {
+    control: (styles: any) => ({
+        ...styles,
+        borderColor: '#dc3545',
+        boxShadow: '0 0 0 0.2rem rgba(220, 53, 69, 0.25)',
+        '&:hover': {
+            borderColor: '#dc3545',
+        },
+    }),
+}
+
 export function SelectList(props: SelectProps) {
     const hasColorOptions = props.options.some(
         (option) => !!option.cor_fundo || !!option.cor
     )
+    const selectStyles = props.errors
+        ? { ...customStyles, ...invalidControlStyles }
+        : customStyles
 
     if (!props.isMulti) {
         const value = props.options.filter(
@@ -68,7 +82,7 @@ export function SelectList(props: SelectProps) {
             <>
                 <Select
                     placeholder="Selecione"
-                    styles={customStyles}
+                    styles={selectStyles}
                     options={props.options}
                     value={value}
                     onChange={(e: any) => props.onChange(e && e.value)}
@@ -109,7 +123,7 @@ export function SelectList(props: SelectProps) {
                 }}
                 name={props.name}
                 options={props.options}
-                styles={customStyles}
+                styles={selectStyles}
                 closeMenuOnSelect={props.closeMenuOnSelect ?? false}
                 menuPlacement={props.menuPlacement ?? 'auto'}
                 formatOptionLabel={hasColorOptions ? formatOptionLabel : undefined}

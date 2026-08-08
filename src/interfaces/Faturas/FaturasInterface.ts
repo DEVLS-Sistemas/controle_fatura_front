@@ -124,6 +124,8 @@ export interface FaturasModel {
     fatura_id?: number | null
     cartao_id: number | string | null
     cartao_bandeira_id?: number | string | null
+    /** Retry modal metadados: cria cartão no mesmo POST quando não há cartao_id */
+    cartao_nome?: string | null
     /** Retry modal: nome da bandeira (lookup) quando `criar: true` */
     bandeira?: string | null
     /** Retry modal CSV: final existente */
@@ -260,7 +262,8 @@ export const FaturasDefaultValues: FaturasModel = {
     cartao_id: null,
     cartao_bandeira_id: null,
     mes: null,
-    ano: new Date().getFullYear(),
+    // Sem default: evita enviar ano no fluxo só-com-anexo e pular o modal de metadados
+    ano: null,
     valor_total: null,
     arquivo_pdf: null,
     processar_automatico: true,

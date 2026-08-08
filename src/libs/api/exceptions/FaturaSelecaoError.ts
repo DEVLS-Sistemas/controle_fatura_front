@@ -66,6 +66,13 @@ export class FaturaSelecaoError extends Error {
     static isSelecaoBody(body?: Record<string, any> | null): boolean {
         if (!body) return false
         const codigo = body.codigo ?? body.erro_codigo
+        // Modal de metadados pode trazer precisa_selecionar_bandeira junto — não tratar aqui
+        if (
+            body.precisa_confirmar_metadados === true
+            || codigo === 'precisa_confirmar_metadados'
+        ) {
+            return false
+        }
         return (
             body.precisa_selecionar_bandeira === true
             || body.precisa_selecionar_final === true

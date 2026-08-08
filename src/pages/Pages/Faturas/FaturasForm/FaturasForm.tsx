@@ -21,15 +21,29 @@ import {
 } from 'interfaces/Faturas/FaturasInterface'
 import { FaturasService } from 'services/Faturas/FaturasService'
 import { CartoesService } from 'services/Cartoes/CartoesService'
-import FaturaSenhaPdfModal from 'Components/Faturas/FaturaSenhaPdfModal'
+import FaturaSenhaPdfModal, { FaturaSenhaUnlockPayload } from 'Components/Faturas/FaturaSenhaPdfModal'
 import FaturaSelecaoModal, { FaturaSelecaoStep } from 'Components/Faturas/FaturaSelecaoModal'
+import FaturaMetadadosModal from 'Components/Faturas/FaturaMetadadosModal'
 import {
     FaturaSelecaoBandeiraOption,
     FaturaSelecaoError,
     FaturaSelecaoNumeroOption,
     FaturaSelecaoRetryPayload,
 } from 'libs/api/exceptions/FaturaSelecaoError'
+import {
+    FaturaMetadadosCartaoOption,
+    FaturaMetadadosError,
+    FaturaMetadadosRetryPayload,
+    FaturaMetadadosSugestao,
+    isFalhaDeteccaoMetadados,
+} from 'libs/api/exceptions/FaturaMetadadosError'
 import { PdfSenhaError } from 'libs/api/exceptions/PdfSenhaError'
+import { ValidationError } from 'libs/api/exceptions/ValidationError'
+
+type PendingSenhaPayload = {
+    senha_pdf?: string
+    salvar_senha_pdf?: boolean
+}
 
 const FaturasForm = () => {
     const { state } = useLocation()
@@ -52,9 +66,12 @@ const FaturasForm = () => {
     const [showBandeiraSelect, setShowBandeiraSelect] = useState(false)
     const [bandeirasLoading, setBandeirasLoading] = useState(false)
     const [arquivoFile, setArquivoFile] = useState<File | null>(null)
+    /** Quando o back não detecta metadados no anexo, força cartão/mês/ano */
+    const [exigeMetadadosManuais, setExigeMetadadosManuais] = useState(false)
     const [senhaModalOpen, setSenhaModalOpen] = useState(false)
     const [senhaModalFaturaId, setSenhaModalFaturaId] = useState<number | string | null>(null)
     const [senhaModalMeta, setSenhaModalMeta] = useState<SenhaPdfMeta | null>(null)
+    const [senhaCadastroMode, setSenhaCadastroMode] = useState(false)
     const [selecaoModalOpen, setSelecaoModalOpen] = useState(false)
     const [selecaoStep, setSelecaoStep] = useState<FaturaSelecaoStep>('bandeira')
     const [selecaoBandeiras, setSelecaoBandeiras] = useState<FaturaSelecaoBandeiraOption[]>([])
@@ -62,7 +79,15 @@ const FaturasForm = () => {
     const [selecaoCartaoBandeiraId, setSelecaoCartaoBandeiraId] = useState<number | null>(null)
     const [selecaoBandeiraNome, setSelecaoBandeiraNome] = useState<string | null>(null)
     const [selecaoLoading, setSelecaoLoading] = useState(false)
+    const [metadadosModalOpen, setMetadadosModalOpen] = useState(false)
+    const [metadadosLoading, setMetadadosLoading] = useState(false)
+    const [metadadosSugestao, setMetadadosSugestao] = useState<FaturaMetadadosSugestao | null>(null)
+    const [metadadosCartoes, setMetadadosCartoes] = useState<FaturaMetadadosCartaoOption[]>([])
+    const [metadadosBandeiras, setMetadadosBandeiras] = useState<FaturaSelecaoBandeiraOption[]>([])
+    const [metadadosPrecisaBandeira, setMetadadosPrecisaBandeira] = useState(false)
     const pendingSelecaoRef = useRef<FaturaSelecaoRetryPayload>({})
+    const pendingSenhaRef = useRef<PendingSenhaPayload>({})
+    const pendingMetadadosRef = useRef<Partial<FaturaMetadadosRetryPayload>>({})
     const fileInputRef = useRef<HTMLInputElement>(null)
     const { voltarParaRotaAnterior } = useNavegacao()
     const navigate = useNavigate()
@@ -70,6 +95,8 @@ const FaturasForm = () => {
     const cartoesService = useRef(new CartoesService()).current
     const isEdit = Boolean(record.fatura_id)
     const cartaoId = watch('cartao_id')
+
+    const camposManualObrigatorios = isEdit || !arquivoFile || exigeMetadadosManuais
 
     const getLookups = async (): Promise<void> => {
         try {
@@ -120,7 +147,6 @@ const FaturasForm = () => {
                 setValue('cartao_bandeira_id', list[0].value ?? null)
             } else {
                 setShowBandeiraSelect(true)
-                // Troca de cartão exige nova escolha quando há 2+ bandeiras
                 setValue('cartao_bandeira_id', null)
             }
         } catch (error) {
@@ -133,8 +159,16 @@ const FaturasForm = () => {
         }
     }
 
-    const openSenhaModal = (faturaId: number | string, meta: SenhaPdfMeta | null) => {
+    const openSenhaModalPosCadastro = (faturaId: number | string, meta: SenhaPdfMeta | null) => {
+        setSenhaCadastroMode(false)
         setSenhaModalFaturaId(faturaId)
+        setSenhaModalMeta(meta)
+        setSenhaModalOpen(true)
+    }
+
+    const openSenhaModalCadastro = (meta: SenhaPdfMeta | null) => {
+        setSenhaCadastroMode(true)
+        setSenhaModalFaturaId(null)
         setSenhaModalMeta(meta)
         setSenhaModalOpen(true)
     }
@@ -161,6 +195,14 @@ const FaturasForm = () => {
         setSelecaoModalOpen(true)
     }
 
+    const openMetadadosModal = (error: FaturaMetadadosError) => {
+        setMetadadosSugestao(error.sugestao)
+        setMetadadosCartoes(error.cartoes)
+        setMetadadosBandeiras(error.bandeiras)
+        setMetadadosPrecisaBandeira(error.precisa_selecionar_bandeira)
+        setMetadadosModalOpen(true)
+    }
+
     const handleCreateSuccess = (result: unknown) => {
         const faturaData = extractFaturaPayload(result)
         const envelope = result as Record<string, any> | null
@@ -168,7 +210,7 @@ const FaturasForm = () => {
 
         if (faturaPrecisaSenhaPdf(faturaData, envelope) && newId) {
             toast.info('Fatura cadastrada. Informe a senha do PDF para continuar.')
-            openSenhaModal(newId, resolveSenhaPdfMeta(faturaData, envelope))
+            openSenhaModalPosCadastro(newId, resolveSenhaPdfMeta(faturaData, envelope))
             return
         }
 
@@ -180,26 +222,99 @@ const FaturasForm = () => {
         }
     }
 
-    const submitCreate = async (extra?: FaturaSelecaoRetryPayload) => {
+    const handleCreateError = (error: unknown): boolean => {
+        if (error instanceof FaturaMetadadosError) {
+            openMetadadosModal(error)
+            return true
+        }
+        if (error instanceof FaturaSelecaoError) {
+            openSelecaoModal(error)
+            return true
+        }
+        if (error instanceof PdfSenhaError) {
+            openSenhaModalCadastro(error.senha_pdf ?? null)
+            return true
+        }
+        if (error instanceof ValidationError && isFalhaDeteccaoMetadados(error.errors as any)) {
+            const body = error.errors as Record<string, any> | undefined
+            toast.warning(
+                body?.message
+                || 'Não foi possível identificar cartão, mês e ano pelo arquivo. Informe esses campos manualmente.'
+            )
+            setExigeMetadadosManuais(true)
+            return true
+        }
+        return false
+    }
+
+    const submitCreate = async (extra?: FaturaSelecaoRetryPayload & Partial<FaturaMetadadosRetryPayload>) => {
         const data = getValues()
+        const cartaoId =
+            extra?.cartao_id
+            ?? pendingMetadadosRef.current.cartao_id
+            ?? data.cartao_id
+        const cartaoNome =
+            extra?.cartao_nome
+            ?? pendingMetadadosRef.current.cartao_nome
+            ?? undefined
+
         const payload: FaturasModel = {
             ...data,
-            cartao_bandeira_id: extra?.cartao_bandeira_id ?? data.cartao_bandeira_id,
-            bandeira: extra?.bandeira ?? undefined,
-            cartao_numero_id: extra?.cartao_numero_id ?? undefined,
-            ultimos_digitos: extra?.ultimos_digitos ?? undefined,
+            // Novo cartão: envia nome sem cartao_id para o back criar no mesmo POST
+            cartao_id: cartaoNome ? null : (cartaoId ?? null),
+            cartao_nome: cartaoNome || undefined,
+            mes: extra?.mes ?? pendingMetadadosRef.current.mes ?? data.mes,
+            ano: extra?.ano ?? pendingMetadadosRef.current.ano ?? data.ano,
+            cartao_bandeira_id:
+                extra?.cartao_bandeira_id
+                ?? pendingMetadadosRef.current.cartao_bandeira_id
+                ?? pendingSelecaoRef.current.cartao_bandeira_id
+                ?? data.cartao_bandeira_id,
+            bandeira:
+                extra?.bandeira
+                ?? pendingMetadadosRef.current.bandeira
+                ?? pendingSelecaoRef.current.bandeira
+                ?? undefined,
+            cartao_numero_id: extra?.cartao_numero_id ?? pendingSelecaoRef.current.cartao_numero_id ?? undefined,
+            ultimos_digitos: extra?.ultimos_digitos ?? pendingSelecaoRef.current.ultimos_digitos ?? undefined,
+            senha_pdf: pendingSenhaRef.current.senha_pdf,
+            salvar_senha_pdf: pendingSenhaRef.current.salvar_senha_pdf,
             arquivo_pdf: arquivoFile,
         }
         return faturasService.createFaturas(payload)
     }
 
+    const validateCreateSubmit = (data: FaturasModel): boolean => {
+        if (!arquivoFile) {
+            if (!data.cartao_id) {
+                toast.warning('Informe o cartão, o mês e o ano — ou anexe a fatura (PDF/CSV).')
+                return false
+            }
+            if (data.mes == null || data.mes === '') {
+                toast.warning('Informe o mês da fatura')
+                return false
+            }
+            if (data.ano == null || data.ano === '') {
+                toast.warning('Informe o ano da fatura')
+                return false
+            }
+        } else if (exigeMetadadosManuais) {
+            if (!data.cartao_id || data.mes == null || data.mes === '' || data.ano == null || data.ano === '') {
+                toast.warning('Informe cartão, mês e ano para continuar com este arquivo.')
+                return false
+            }
+        }
+
+        if (showBandeiraSelect && !data.cartao_bandeira_id) {
+            toast.warning('Selecione a bandeira da fatura')
+            return false
+        }
+
+        return true
+    }
+
     const onSubmit: SubmitHandler<FaturasModel> = async (data) => {
         try {
-            if (!isEdit && showBandeiraSelect && !data.cartao_bandeira_id) {
-                toast.warning('Selecione a bandeira da fatura')
-                return
-            }
-
             if (isEdit) {
                 await faturasService.editFaturas({
                     ...data,
@@ -208,20 +323,15 @@ const FaturasForm = () => {
                 })
                 toast.success('Fatura atualizada com sucesso')
                 navigate(`/faturas/view/${record.fatura_id}`)
-            } else {
-                const result = await submitCreate()
-                handleCreateSuccess(result)
+                return
             }
+
+            if (!validateCreateSubmit(data)) return
+
+            const result = await submitCreate()
+            handleCreateSuccess(result)
         } catch (error: any) {
-            if (error instanceof FaturaSelecaoError) {
-                openSelecaoModal(error)
-                return
-            }
-            if (error instanceof PdfSenhaError) {
-                // Cadastro pode retornar 422 de senha antes de criar em alguns fluxos
-                toast.error(error.message || 'PDF protegido por senha')
-                return
-            }
+            if (handleCreateError(error)) return
             toast.error(error?.message || 'Erro ao salvar fatura')
             throw error
         }
@@ -264,14 +374,75 @@ const FaturasForm = () => {
                 openSelecaoModal(error)
                 return
             }
-            if (error instanceof PdfSenhaError) {
+            if (handleCreateError(error)) {
                 setSelecaoModalOpen(false)
-                toast.error(error.message || 'PDF protegido por senha')
                 return
             }
             toast.error((error as Error)?.message || 'Erro ao salvar fatura')
         } finally {
             setSelecaoLoading(false)
+        }
+    }
+
+    const handleMetadadosConfirm = async (selection: FaturaMetadadosRetryPayload) => {
+        pendingMetadadosRef.current = selection
+        setValue('mes', selection.mes)
+        setValue('ano', selection.ano)
+        if (selection.cartao_nome) {
+            setValue('cartao_id', null)
+            setValue('cartao_nome', selection.cartao_nome)
+        } else if (selection.cartao_id != null) {
+            setValue('cartao_id', selection.cartao_id)
+            setValue('cartao_nome', null)
+        }
+        if (selection.cartao_bandeira_id != null) {
+            setValue('cartao_bandeira_id', selection.cartao_bandeira_id)
+            pendingSelecaoRef.current = {
+                ...pendingSelecaoRef.current,
+                cartao_bandeira_id: selection.cartao_bandeira_id,
+                bandeira: undefined,
+            }
+        }
+        if (selection.bandeira) {
+            pendingSelecaoRef.current = {
+                ...pendingSelecaoRef.current,
+                bandeira: selection.bandeira,
+                cartao_bandeira_id: selection.cartao_bandeira_id ?? undefined,
+            }
+        }
+
+        setMetadadosLoading(true)
+        try {
+            const result = await submitCreate(selection)
+            setMetadadosModalOpen(false)
+            handleCreateSuccess(result)
+        } catch (error) {
+            if (handleCreateError(error)) {
+                setMetadadosModalOpen(false)
+                return
+            }
+            toast.error((error as Error)?.message || 'Erro ao salvar fatura')
+        } finally {
+            setMetadadosLoading(false)
+        }
+    }
+
+    const handleSenhaCadastroUnlock = async (payload: FaturaSenhaUnlockPayload) => {
+        pendingSenhaRef.current = {
+            senha_pdf: payload.senha_pdf,
+            salvar_senha_pdf: payload.salvar_senha_pdf,
+        }
+        try {
+            const result = await submitCreate()
+            handleCreateSuccess(result)
+        } catch (error) {
+            if (error instanceof PdfSenhaError) {
+                throw error
+            }
+            if (handleCreateError(error)) {
+                return
+            }
+            throw error
         }
     }
 
@@ -286,6 +457,9 @@ const FaturasForm = () => {
         }
         setArquivoFile(file)
         setValue('arquivo_pdf', file)
+        if (!file) {
+            setExigeMetadadosManuais(false)
+        }
     }
 
     useEffect(() => {
@@ -304,6 +478,7 @@ const FaturasForm = () => {
     }, [cartaoId, isEdit])
 
     const optAnos = AnosSelect()
+    const requiredManual = camposManualObrigatorios ? required : undefined
 
     return (
         <React.Fragment>
@@ -311,14 +486,16 @@ const FaturasForm = () => {
                 isOpen={senhaModalOpen}
                 faturaId={senhaModalFaturaId}
                 senhaMeta={senhaModalMeta}
+                onUnlock={senhaCadastroMode ? handleSenhaCadastroUnlock : undefined}
                 onClose={() => {
                     setSenhaModalOpen(false)
-                    if (senhaModalFaturaId) {
+                    setSenhaCadastroMode(false)
+                    if (!senhaCadastroMode && senhaModalFaturaId) {
                         navigate(`/faturas/view/${senhaModalFaturaId}`)
                     }
                 }}
                 onSuccess={async () => {
-                    if (senhaModalFaturaId) {
+                    if (!senhaCadastroMode && senhaModalFaturaId) {
                         navigate(`/faturas/view/${senhaModalFaturaId}`)
                     }
                 }}
@@ -333,6 +510,16 @@ const FaturasForm = () => {
                 loading={selecaoLoading}
                 onClose={() => setSelecaoModalOpen(false)}
                 onConfirm={handleSelecaoConfirm}
+            />
+            <FaturaMetadadosModal
+                isOpen={metadadosModalOpen}
+                sugestao={metadadosSugestao}
+                cartoes={metadadosCartoes}
+                bandeiras={metadadosBandeiras}
+                precisaSelecionarBandeira={metadadosPrecisaBandeira}
+                loading={metadadosLoading}
+                onClose={() => setMetadadosModalOpen(false)}
+                onConfirm={handleMetadadosConfirm}
             />
             <div className="page-content">
                 <Container fluid>
@@ -360,15 +547,66 @@ const FaturasForm = () => {
                             <Card>
                                 <CardBody>
                                     <form onSubmit={handleSubmit(onSubmit)}>
+                                        {!isEdit && (
+                                            <Row>
+                                                <Col md={6}>
+                                                    <div className="mb-3">
+                                                        <Label htmlFor="arquivo_fatura" className="form-label">
+                                                            Anexo da fatura (PDF ou CSV)
+                                                        </Label>
+                                                        <Input
+                                                            id="arquivo_fatura"
+                                                            innerRef={fileInputRef}
+                                                            type="file"
+                                                            accept={FATURA_FILE_ACCEPT}
+                                                            onChange={handleFileChange}
+                                                        />
+                                                        <small className="text-muted d-block">
+                                                            Formatos aceitos: PDF ou CSV (máx. 10MB).
+                                                            {!arquivoFile && (
+                                                                <> Sem anexo, informe cartão, mês e ano.</>
+                                                            )}
+                                                            {arquivoFile && !exigeMetadadosManuais && (
+                                                                <> Com anexo, cartão/mês/ano são opcionais — tentamos detectar automaticamente.</>
+                                                            )}
+                                                            {exigeMetadadosManuais && (
+                                                                <> Não foi possível detectar os dados: preencha cartão, mês e ano.</>
+                                                            )}
+                                                        </small>
+                                                        {arquivoFile && (
+                                                            <div className="mt-1 text-success">
+                                                                <i className="ri-file-line me-1"></i>
+                                                                {arquivoFile.name}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </Col>
+                                                <Col md={6} className="d-flex align-items-center">
+                                                    <div className="form-check form-switch form-switch-md mt-3">
+                                                        <Label className="me-3" htmlFor="processar_automatico">Processar automaticamente</Label>
+                                                        <InputCheckbox<FaturasModel>
+                                                            field="processar_automatico"
+                                                            register={register}
+                                                            role="switch"
+                                                        />
+                                                    </div>
+                                                </Col>
+                                            </Row>
+                                        )}
                                         <Row>
                                             <Col md={showBandeiraSelect ? 4 : 6}>
                                                 <div className="mb-3">
-                                                    <Label htmlFor="cartao_id" className="form-label">Cartão</Label>
+                                                    <Label htmlFor="cartao_id" className="form-label">
+                                                        Cartão
+                                                        {!camposManualObrigatorios && (
+                                                            <span className="text-muted fw-normal"> (opcional)</span>
+                                                        )}
+                                                    </Label>
                                                     <SelectListControlled<FaturasModel>
                                                         options={cartoesOptions}
                                                         field="cartao_id"
                                                         control={control}
-                                                        required={required}
+                                                        required={requiredManual}
                                                         disabled={isEdit}
                                                     />
                                                 </div>
@@ -391,64 +629,37 @@ const FaturasForm = () => {
                                             )}
                                             <Col md={3}>
                                                 <div className="mb-3">
-                                                    <Label htmlFor="mes" className="form-label">Mês</Label>
+                                                    <Label htmlFor="mes" className="form-label">
+                                                        Mês
+                                                        {!camposManualObrigatorios && (
+                                                            <span className="text-muted fw-normal"> (opcional)</span>
+                                                        )}
+                                                    </Label>
                                                     <SelectListControlled<FaturasModel>
                                                         options={mesesOptions}
                                                         field="mes"
                                                         control={control}
-                                                        required={required}
+                                                        required={requiredManual}
                                                     />
                                                 </div>
                                             </Col>
                                             <Col md={3}>
                                                 <div className="mb-3">
-                                                    <Label htmlFor="ano" className="form-label">Ano</Label>
+                                                    <Label htmlFor="ano" className="form-label">
+                                                        Ano
+                                                        {!camposManualObrigatorios && (
+                                                            <span className="text-muted fw-normal"> (opcional)</span>
+                                                        )}
+                                                    </Label>
                                                     <SelectListControlled<FaturasModel>
                                                         options={optAnos}
                                                         field="ano"
                                                         control={control}
-                                                        required={required}
+                                                        required={requiredManual}
                                                     />
                                                 </div>
                                             </Col>
                                         </Row>
-                                        {!isEdit && (
-                                            <Row>
-                                                <Col md={6}>
-                                                    <div className="mb-3">
-                                                        <Label htmlFor="arquivo_fatura" className="form-label">
-                                                            Anexo da fatura (PDF ou CSV)
-                                                        </Label>
-                                                        <Input
-                                                            id="arquivo_fatura"
-                                                            innerRef={fileInputRef}
-                                                            type="file"
-                                                            accept={FATURA_FILE_ACCEPT}
-                                                            onChange={handleFileChange}
-                                                        />
-                                                        <small className="text-muted">
-                                                            Formatos aceitos: PDF ou CSV (máx. 10MB)
-                                                        </small>
-                                                        {arquivoFile && (
-                                                            <div className="mt-1 text-success">
-                                                                <i className="ri-file-line me-1"></i>
-                                                                {arquivoFile.name}
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </Col>
-                                                <Col md={6} className="d-flex align-items-center">
-                                                    <div className="form-check form-switch form-switch-md mt-3">
-                                                        <Label className="me-3" htmlFor="processar_automatico">Processar automaticamente</Label>
-                                                        <InputCheckbox<FaturasModel>
-                                                            field="processar_automatico"
-                                                            register={register}
-                                                            role="switch"
-                                                        />
-                                                    </div>
-                                                </Col>
-                                            </Row>
-                                        )}
                                         <hr />
                                         <Row className="mt-3">
                                             <Col md={12}>
@@ -458,7 +669,7 @@ const FaturasForm = () => {
                                                         className="btn btn-primary"
                                                         disabled={!isEdit && bandeirasLoading}
                                                     >
-                                                        Salvar
+                                                        {isEdit ? 'Salvar' : 'Cadastrar'}
                                                     </button>
                                                     <button type="button" className="btn btn-soft-success" onClick={voltarParaRotaAnterior}>Voltar</button>
                                                 </div>

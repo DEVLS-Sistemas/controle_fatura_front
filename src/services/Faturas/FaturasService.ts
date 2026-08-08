@@ -15,6 +15,7 @@ import {
 } from "interfaces/Faturas/FaturasInterface"
 import { PdfSenhaError } from "../../libs/api/exceptions/PdfSenhaError"
 import { FaturaSelecaoError } from "../../libs/api/exceptions/FaturaSelecaoError"
+import { FaturaMetadadosError } from "../../libs/api/exceptions/FaturaMetadadosError"
 
 export class FaturasService implements FaturasInterface {
     private readonly url: string
@@ -95,6 +96,10 @@ export class FaturasService implements FaturasInterface {
             case HttpStatusCode.unauthorized: throw new AccessDeniedError()
             case HttpStatusCode.invalidForm: {
                 const body = response.body as Record<string, any> | undefined
+                // Metadados tem prioridade: a resposta pode vir com precisa_selecionar_bandeira junto
+                if (FaturaMetadadosError.isMetadadosBody(body)) {
+                    throw new FaturaMetadadosError(body)
+                }
                 if (FaturaSelecaoError.isSelecaoBody(body)) {
                     throw new FaturaSelecaoError(body)
                 }

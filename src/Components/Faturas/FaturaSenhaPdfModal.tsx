@@ -23,6 +23,12 @@ import { PdfSenhaError } from 'libs/api/exceptions/PdfSenhaError'
 import { CartoesService } from 'services/Cartoes/CartoesService'
 import { FaturasService } from 'services/Faturas/FaturasService'
 
+export type FaturaSenhaUnlockPayload = {
+    senha_pdf: string
+    salvar_senha_pdf: boolean
+    senha_pdf_regra?: string | null
+}
+
 export type FaturaSenhaPdfModalProps = {
     isOpen: boolean
     faturaId: number | string | null
@@ -30,6 +36,11 @@ export type FaturaSenhaPdfModalProps = {
     onClose: () => void
     /** Chamado após desbloqueio/processamento com sucesso */
     onSuccess?: () => void | Promise<void>
+    /**
+     * Fluxo de cadastro (ainda sem fatura_id): reenvia o multipart com a senha.
+     * Quando informado, substitui a chamada a `processarPdf`.
+     */
+    onUnlock?: (payload: FaturaSenhaUnlockPayload) => void | Promise<void>
 }
 
 const MSG_SENHA_OU_REGRA_INCORRETA =
@@ -60,6 +71,7 @@ const FaturaSenhaPdfModal = ({
     senhaMeta,
     onClose,
     onSuccess,
+    onUnlock,
 }: FaturaSenhaPdfModalProps) => {
     const [senha, setSenha] = useState('')
     const [salvarSenha, setSalvarSenha] = useState(true)
@@ -129,7 +141,7 @@ const FaturaSenhaPdfModal = ({
     }
 
     const handleSubmit = async () => {
-        if (!faturaId) return
+        if (!onUnlock && !faturaId) return
         const senhaLimpa = onlyDigits(senha, digitosEsperados)
         if (!senhaLimpa) {
             setError('Informe a senha do PDF')
@@ -143,6 +155,17 @@ const FaturaSenhaPdfModal = ({
         setLoading(true)
         setError(null)
         try {
+            if (onUnlock) {
+                await onUnlock({
+                    senha_pdf: senhaLimpa,
+                    salvar_senha_pdf: salvarSenha,
+                    senha_pdf_regra: regraSelecionada || undefined,
+                })
+                onClose()
+                await onSuccess?.()
+                return
+            }
+
             await faturasService.processarPdf(Number(faturaId), {
                 senha_pdf: senhaLimpa,
                 salvar_senha_pdf: salvarSenha,
@@ -276,7 +299,7 @@ const FaturaSenhaPdfModal = ({
                 </Button>
                 <Button type="button" color="primary" onClick={handleSubmit} disabled={loading}>
                     {loading && <Spinner size="sm" className="me-2" />}
-                    Desbloquear e processar
+                    {onUnlock ? 'Continuar cadastro' : 'Desbloquear e processar'}
                 </Button>
             </ModalFooter>
         </Modal>
