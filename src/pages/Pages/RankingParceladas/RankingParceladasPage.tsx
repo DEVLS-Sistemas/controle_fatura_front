@@ -17,7 +17,7 @@ import {
   enriquecerRankingView,
   estaVisivelNoRanking,
   isApenasAbertas,
-  ordenarRankingParceladas,
+  ordenarPorMenorPercentual,
   persistVisualizacaoRanking,
   readVisualizacaoRanking,
 } from 'helpers/ranking_parceladas_helpers'
@@ -70,7 +70,7 @@ const RankingParceladasPage = () => {
     responsavel_id: null,
     categoria_id: null,
     apenas_abertas: true,
-    ordenar: 'restantes_desc',
+    ordenar: 'percentual_asc',
     palavra_chave: null,
   }
 
@@ -99,7 +99,7 @@ const RankingParceladasPage = () => {
       itens = itens.filter((item) => estaVisivelNoRanking(item, mes, ano))
     }
 
-    itens = ordenarRankingParceladas(itens, filters.ordenar || 'restantes_desc')
+    itens = ordenarPorMenorPercentual(itens)
 
     return {
       ...enriched,
@@ -118,7 +118,7 @@ const RankingParceladasPage = () => {
         responsavel_id: data.responsavel_id || null,
         categoria_id: data.categoria_id || null,
         apenas_abertas: data.apenas_abertas,
-        ordenar: data.ordenar || 'restantes_desc',
+        ordenar: 'percentual_asc',
         palavra_chave: data.palavra_chave,
       }
       const result = await rankingService.getRankingParceladas(filters)

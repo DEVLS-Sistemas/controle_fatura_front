@@ -26,13 +26,15 @@ No backend, uma compra parcelada são N linhas em `transacoes` com o mesmo `comp
 - À vista não entra
 - Ativa na referência enquanto `ultima_parcela` ≥ mês filtrado (última no mês atual **aparece**; no mês anterior **some**)
 
-### Ordenação (sempre)
+### Ordenação (fixa)
 
-1. Compras **não quitadas** primeiro; **`quitada: true` (100%) sempre no final**
-2. Depois, no default (`restantes_desc`):
-   - mais `parcelas_restantes`
-   - maior `valor_aberto`
-   - menor `percentual_pago`
+**Menor percentual de conclusão no topo.** O % é o mesmo do card (`percentual_pago`).
+
+Exemplo: `NUV*VOOLT3D` **1/10 · 10%** fica **acima** de `MP *ALIEXPRESS` **3/12 · 25%**.
+
+- O front **reordena** `itens` por `percentual_pago` crescente **antes de renderizar** (lista e competências)
+- Sem select de ordenação na tela — a ordem do ranking é sempre essa
+- `100%` fica no final (maior percentual)
 
 ---
 
@@ -50,24 +52,24 @@ Authorization: Bearer {token}
 | `mes` / `ano` | atual | Competência de referência (**centro** da janela de 13 meses) |
 | `cartao_id`, `responsavel_id`, `categoria_id` | — | Filtros |
 | `apenas_abertas` | `1` | Ativas na ref (última ≥ mês); `0` inclui encerradas antes |
-| `ordenar` | `restantes_desc` | Ver tabela |
+| `ordenar` | `percentual_asc` | Só `percentual_asc` (default) ou `percentual_desc`. Outros valores são ignorados |
 | `palavra_chave` | — | Observação / estabelecimento |
 
-### Ordenações
+### Ordenações aceitas
 
-| Valor | Comportamento (após empurrar `quitada` para o fim) |
-|-------|-----------------------------------------------------|
-| `restantes_desc` | **Default.** restantes ↓ → valor aberto ↓ → % pago ↑ |
-| `restantes_asc` | restantes ↑ |
-| `percentual_asc` / `percentual_desc` | por % |
-| `valor_aberto_desc` | maior aberto |
-| `data_compra_desc` | compra mais recente |
+| Valor | Comportamento |
+|-------|----------------|
+| `percentual_asc` | **Default (forçado).** Menor % de conclusão no topo |
+| `percentual_desc` | Maior % no topo (quitadas ainda no fim) |
+
+Qualquer outro valor (ex.: `restantes_desc`) é **ignorado** e a API aplica `percentual_asc`.
 
 ### Resposta (`data`) — campos novos importantes
 
 ```json
 {
   "referencia": { "mes": 8, "ano": 2026 },
+  "ordenar_aplicada": "percentual_asc",
   "colunas": [
     { "mes": 2, "ano": 2026, "chave": "2026-02", "label": "Fev/2026", "centro": false, "indice": 0 },
     { "mes": 8, "ano": 2026, "chave": "2026-08", "label": "Ago/2026", "centro": true, "indice": 6 },
@@ -155,13 +157,11 @@ Rota: `/parceladas` ou `/dashboard/parceladas`
 1. Título: “Compras parceladas”
 2. Filtros: cartão, responsável, categoria, busca, ordenação
 3. Resumo: qtd, pago, aberto, % global
-4. **Toggle de visualização** no cabeçalho (obrigatório):
-   - **Lista** (padrão) — cards de ranking
-   - **Por competências** — grade de 13 meses + barra início/fim
+4. **Toggle de visualização** (obrigatório):
+   - **Lista** (padrão) — tela atual / cards
+   - **Por competências** — grade de meses + barra início/fim
 
-Persistir a escolha em `localStorage` (`ranking_parceladas_view = lista | competencias`).
-
-O front **reaplica** a ordenação localmente: qualquer item `quitada` / `percentual_pago >= 100` vai **para o final**, em qualquer `ordenar`.
+Persistir a escolha em `localStorage` (ex.: `ranking_parceladas_view = lista | competencias`).
 
 ---
 
@@ -190,10 +190,9 @@ Ao clicar no botão **“Por competências”**:
 
 - Cabeçalho com as **13 colunas** de `data.colunas` (`label`)
 - Coluna central (`centro: true`) destacada (borda/fundo leve)
-- **← Anterior** = referência − 1 mês → atualiza `mes`/`ano` e **refaz o GET**
-- **→ Próximo** = referência + 1 mês → `GET`
-- **Hoje** volta para o mês/ano atuais
-- Coluna central (`centro: true`) destacada (fundo azul claro)
+- **←** = referência − 1 mês → `GET` com novo `mes`/`ano`
+- **→** = referência + 1 mês → `GET`
+- Opcional: botão “Hoje” volta para mês/ano atuais
 
 Não tentar scroll infinito de dezenas de meses: sempre só os 13 da API.
 
@@ -243,7 +242,7 @@ Botão **“Lista”** no mesmo toggle — esconde a grade e volta aos cards, **
 - [ ] Texto de estimativa de término (`estimativa_termino`)
 - [ ] Itens com `quitada: true` / 100% **sempre no final** do ranking
 - [ ] Última parcela no mês atual aparece; no mês anterior some
-- [ ] Ordenação default: restantes → valor aberto → % (após quitadas no fim)
+- [ ] Ordenação: menor `percentual_pago` no topo (10% acima de 25%); o front reordena ao exibir
 - [ ] Título via observação ou estabelecimento
 - [ ] Empty / loading / erro / responsivo
 

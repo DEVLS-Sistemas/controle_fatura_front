@@ -16,6 +16,7 @@ import {
   estaQuitada,
   faturaDestinoRanking,
   isUltimaParcelaNoMesAtual,
+  ordenarPorMenorPercentual,
 } from 'helpers/ranking_parceladas_helpers'
 import RankingParceladasResumo from '../RankingParceladasResumo'
 
@@ -88,7 +89,7 @@ const RankingParceladasSkeleton = () => (
 const RankingParceladasList = ({ data, loading }: RankingParceladasListProps) => {
   const navigate = useNavigate()
   const totais = data?.totais
-  const itens = data?.itens ?? []
+  const itens = ordenarPorMenorPercentual(data?.itens ?? [])
   const mesRef = data?.referencia?.mes
   const anoRef = data?.referencia?.ano
 

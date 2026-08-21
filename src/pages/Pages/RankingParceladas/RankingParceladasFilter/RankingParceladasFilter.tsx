@@ -30,15 +30,6 @@ export const MESES_NOMES: SelectOptions[] = [
   { value: 12, label: 'Dezembro' },
 ]
 
-export const RankingParceladasOrdenarOptions: SelectOptions[] = [
-  { value: 'restantes_desc', label: 'Ranking: parcelas, valor e %' },
-  { value: 'restantes_asc', label: 'Quase no fim' },
-  { value: 'percentual_asc', label: 'Menor % pago' },
-  { value: 'percentual_desc', label: 'Maior % pago' },
-  { value: 'valor_aberto_desc', label: 'Maior valor em aberto' },
-  { value: 'data_compra_desc', label: 'Compra mais recente' },
-]
-
 export interface RankingParceladasFilterHandle {
   shiftCompetencia: (delta: number) => void
   goToday: () => void
@@ -72,7 +63,6 @@ const RankingParceladasFilter = forwardRef<RankingParceladasFilterHandle, Rankin
   const cartaoWatch = watch('cartao_id')
   const responsavelWatch = watch('responsavel_id')
   const categoriaWatch = watch('categoria_id')
-  const ordenarWatch = watch('ordenar')
   const apenasAbertasWatch = watch('apenas_abertas')
 
   useImperativeHandle(ref, () => ({
@@ -95,7 +85,7 @@ const RankingParceladasFilter = forwardRef<RankingParceladasFilterHandle, Rankin
       handleSubmit(getRemoteRankingParceladas)()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mesWatch, anoWatch, cartaoWatch, responsavelWatch, categoriaWatch, ordenarWatch, apenasAbertasWatch])
+  }, [mesWatch, anoWatch, cartaoWatch, responsavelWatch, categoriaWatch, apenasAbertasWatch])
 
   const optAnos = AnosSelect({ anosFuturos: 4 })
 
@@ -113,7 +103,7 @@ const RankingParceladasFilter = forwardRef<RankingParceladasFilterHandle, Rankin
               <div>
                 <h4 className="mb-0">Compras parceladas</h4>
                 <p className="text-muted mb-0 fs-13">
-                  No topo: mais parcelas em aberto, maior valor e menor % pago. 100% sempre no final.
+                  Menor % de conclusão no topo — 10% acima de 25%
                 </p>
               </div>
             </div>
@@ -182,7 +172,7 @@ const RankingParceladasFilter = forwardRef<RankingParceladasFilterHandle, Rankin
                       />
                     </div>
                   </Col>
-                  <Col lg={3} md={4} sm={6}>
+                  <Col lg={4} md={4} sm={6}>
                     <div className="mb-0">
                       <Label htmlFor="palavra_chave" className="form-label">
                         Busca
@@ -191,18 +181,6 @@ const RankingParceladasFilter = forwardRef<RankingParceladasFilterHandle, Rankin
                         field="palavra_chave"
                         control={control}
                         placeholder="Observação ou estabelecimento"
-                      />
-                    </div>
-                  </Col>
-                  <Col lg={3} md={4} sm={6}>
-                    <div className="mb-0">
-                      <Label htmlFor="ordenar" className="form-label">
-                        Ordenar
-                      </Label>
-                      <SelectListControlled<RankingParceladasSearch>
-                        field="ordenar"
-                        control={control}
-                        options={RankingParceladasOrdenarOptions}
                       />
                     </div>
                   </Col>

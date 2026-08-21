@@ -24,7 +24,7 @@ const cleanParams = (params: RankingParceladasSearch): Record<string, unknown> =
   const categoriaId = Number(params.categoria_id)
   if (Number.isFinite(categoriaId) && categoriaId > 0) clean.categoria_id = categoriaId
 
-  if (params.ordenar) clean.ordenar = params.ordenar
+  clean.ordenar = 'percentual_asc'
 
   const palavra = typeof params.palavra_chave === 'string' ? params.palavra_chave.trim() : ''
   if (palavra) clean.palavra_chave = palavra

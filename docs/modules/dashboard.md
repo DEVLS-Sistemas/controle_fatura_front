@@ -33,7 +33,7 @@ GET /api/v1/dashboard/ranking-parceladas?mes=8&ano=2026
 - `mes` / `ano`: competência de referência (default: atual) — **centro** da janela de 13 meses
 - Lista compras com `compra_grupo_id` e `parcelas_total > 1`, agrupadas por compra
 - Default: só compras **ativas na referência** (`apenas_abertas=1`): competência da última parcela **≥** mês/ano da query (última parcela no mês atual ainda aparece; no mês anterior some)
-- Ordenação: compras **`quitada` (100%) sempre no final**; default `restantes_desc` — mais parcelas em aberto → maior valor em aberto → menor % pago
+- Ordenação: **menor `percentual_pago` no topo** (o % do card). Ex.: 1/10 a 10% acima de 3/12 a 25%. O front reordena por esse % ao exibir.
 - Filtros opcionais: `cartao_id`, `responsavel_id`, `categoria_id`, `palavra_chave`, `ordenar`, `apenas_abertas`
 - Título: `observacoes` se preenchida; senão nome do estabelecimento
 - Pago / aberto / % calculados pela competência da fatura de cada parcela vs referência

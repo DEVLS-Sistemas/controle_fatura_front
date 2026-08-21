@@ -116,7 +116,7 @@ export const RankingParceladasDefaultValues: RankingParceladasSearch = {
   responsavel_id: null,
   categoria_id: null,
   apenas_abertas: true,
-  ordenar: 'restantes_desc',
+  ordenar: 'percentual_asc',
   palavra_chave: null,
 }
 

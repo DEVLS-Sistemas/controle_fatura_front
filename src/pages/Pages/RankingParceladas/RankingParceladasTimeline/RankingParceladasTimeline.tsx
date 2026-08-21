@@ -12,6 +12,7 @@ import {
   estaQuitada,
   faturaDestinoRanking,
   MESES_JANELA,
+  ordenarPorMenorPercentual,
 } from 'helpers/ranking_parceladas_helpers'
 import RankingParceladasResumo from '../RankingParceladasResumo'
 
@@ -38,7 +39,7 @@ const RankingParceladasTimeline = ({
 }: RankingParceladasTimelineProps) => {
   const navigate = useNavigate()
   const colunas = data?.colunas ?? []
-  const itens = data?.itens ?? []
+  const itens = ordenarPorMenorPercentual(data?.itens ?? [])
   const centro = colunas.find((col) => col.centro)
 
   const handleOpenItem = (item: RankingParceladaItem) => {

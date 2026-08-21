@@ -155,80 +155,42 @@ export const barraTimelineStyle = (
   }
 }
 
-const compareChain = (
-  a: RankingParceladaItem,
-  b: RankingParceladaItem,
-  chain: Array<[keyof RankingParceladaItem | 'titulo', 'asc' | 'desc']>
-): number => {
-  for (const [field, dir] of chain) {
-    if (field === 'titulo' || field === 'data_compra' || field === 'estimativa_termino') {
-      const av = String(a[field] ?? '')
-      const bv = String(b[field] ?? '')
-      const cmp = av.localeCompare(bv, 'pt-BR')
-      if (cmp !== 0) return dir === 'desc' ? -cmp : cmp
-      continue
-    }
-    const av = num(a[field as keyof RankingParceladaItem])
-    const bv = num(b[field as keyof RankingParceladaItem])
-    if (av !== bv) return dir === 'desc' ? bv - av : av - bv
+const parsePercentual = (value: unknown): number | null => {
+  if (value == null || value === '') return null
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  const raw = String(value).replace('%', '').trim()
+  if (!raw) return null
+  const normalized = raw.includes(',') ? raw.replace(/\./g, '').replace(',', '.') : raw
+  const n = Number(normalized)
+  return Number.isFinite(n) ? n : null
+}
+
+/** % de conclusão exibido no card (`percentual_pago`, senão parcela_atual / parcelas_total). */
+export const percentualConclusao = (item: RankingParceladaItem): number => {
+  const pago = parsePercentual(item.percentual_pago)
+  if (pago != null) return pago
+  const total = num(item.parcelas_total)
+  if (total > 0 && item.parcela_atual != null) {
+    return (num(item.parcela_atual) / total) * 100
   }
   return 0
 }
 
+/** Ranking fixo: menor % de conclusão no topo (10% acima de 25%). */
+export const ordenarPorMenorPercentual = (
+  itens: RankingParceladaItem[]
+): RankingParceladaItem[] =>
+  [...itens].sort((a, b) => {
+    const pa = percentualConclusao(a)
+    const pb = percentualConclusao(b)
+    if (pa !== pb) return pa - pb
+    return String(a.titulo ?? '').localeCompare(String(b.titulo ?? ''), 'pt-BR')
+  })
+
 export const ordenarRankingParceladas = (
   itens: RankingParceladaItem[],
-  ordenar: RankingParceladasOrdenar | string | null | undefined
-): RankingParceladaItem[] => {
-  const copy = [...itens]
-  const chain: Array<[keyof RankingParceladaItem | 'titulo', 'asc' | 'desc']> =
-    ordenar === 'restantes_asc'
-      ? [
-          ['parcelas_restantes', 'asc'],
-          ['valor_aberto', 'desc'],
-          ['percentual_pago', 'asc'],
-          ['titulo', 'asc'],
-        ]
-      : ordenar === 'percentual_asc'
-        ? [
-            ['percentual_pago', 'asc'],
-            ['parcelas_restantes', 'desc'],
-            ['valor_aberto', 'desc'],
-            ['titulo', 'asc'],
-          ]
-        : ordenar === 'percentual_desc'
-          ? [
-              ['percentual_pago', 'desc'],
-              ['parcelas_restantes', 'desc'],
-              ['valor_aberto', 'desc'],
-              ['titulo', 'asc'],
-            ]
-          : ordenar === 'valor_aberto_desc'
-            ? [
-                ['valor_aberto', 'desc'],
-                ['parcelas_restantes', 'desc'],
-                ['percentual_pago', 'asc'],
-                ['titulo', 'asc'],
-              ]
-            : ordenar === 'data_compra_desc'
-              ? [
-                  ['data_compra', 'desc'],
-                  ['titulo', 'asc'],
-                ]
-              : [
-                  ['parcelas_restantes', 'desc'],
-                  ['valor_aberto', 'desc'],
-                  ['percentual_pago', 'asc'],
-                  ['titulo', 'asc'],
-                ]
-
-  copy.sort((a, b) => {
-    const aQuitada = estaQuitada(a)
-    const bQuitada = estaQuitada(b)
-    if (aQuitada !== bQuitada) return aQuitada ? 1 : -1
-    return compareChain(a, b, chain)
-  })
-  return copy
-}
+  _ordenar?: RankingParceladasOrdenar | string | null
+): RankingParceladaItem[] => ordenarPorMenorPercentual(itens)
 
 export const buildTotaisRanking = (itens: RankingParceladaItem[]): RankingParceladasTotais => {
   const valorTotal = itens.reduce((acc, item) => acc + num(item.valor_total), 0)
@@ -277,7 +239,7 @@ export const enriquecerRankingView = (
     ...result,
     referencia: { mes, ano },
     colunas,
-    itens,
+    itens: ordenarPorMenorPercentual(itens),
   }
 }
 
