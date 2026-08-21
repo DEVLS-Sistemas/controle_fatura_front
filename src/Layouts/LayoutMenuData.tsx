@@ -57,6 +57,17 @@ const Navdata = () => {
             },
         },
         {
+            id: "parceladas",
+            label: "Parceladas",
+            icon: "ri-list-ordered",
+            link: "/parceladas",
+            click: function (e: any) {
+                e.preventDefault();
+                setIscurrentState("Parceladas");
+                updateIconSidebar(e);
+            },
+        },
+        {
             id: "cartoes",
             label: "Cartões",
             icon: "ri-bank-card-line",

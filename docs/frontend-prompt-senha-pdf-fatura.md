@@ -146,8 +146,8 @@ Na seção do grupo (junto de nome/banco/ciclo):
 | Campo | Tipo |
 |-------|------|
 | `senha_pdf` | string |
-| `salvar_senha_pdf` | bool (`true`/`1`/`false`) — grava no cartão **após** desbloqueio ok |
-| `senha_pdf_regra` | string opcional — regra escolhida no modal; o front também sincroniza via `PUT /cartoes/editar` após sucesso se `salvar_senha_pdf` (o processar pode gravar só a senha) |
+| `senha_pdf_regra` | string opcional — regra selecionada no modal; grava no cartão (create inline ou ao salvar senha) |
+| `salvar_senha_pdf` | bool (`true`/`1`/`false`) — grava a senha no cartão **após** desbloqueio ok |
 
 O cadastro **não falha** se o PDF precisar de senha: a fatura fica `status=erro` com metadados para o modal.
 
@@ -189,8 +189,8 @@ Content-Type: application/json
 
 {
   "senha_pdf": "123456",
-  "salvar_senha_pdf": true,
-  "senha_pdf_regra": "cpf_cnpj_6_digitos"
+  "senha_pdf_regra": "cpf_cnpj_6_digitos",
+  "salvar_senha_pdf": true
 }
 ```
 
@@ -249,16 +249,16 @@ Também oferecer ação “Informar senha” / “Desbloquear PDF” na listagem
 
 1. **Título:** “PDF protegido por senha”
 2. **Texto explicativo** conforme `motivo`:
-   - `ausente`: “Esta fatura está em um PDF com senha. Informe a senha para importar os lançamentos. Se a orientação abaixo não bater com a fatura, selecione a regra correta.”
-   - `incorreta`: “A senha informada não desbloqueou o PDF. Ela pode não seguir o padrão da regra cadastrada ou estar incorreta.”  
-     Se `tem_senha_cadastrada`: acrescentar que a senha/regra salva no cartão pode estar desatualizada. Pedir para verificar a regra na fatura.
-3. **Select de regra** (`senhas_pdf_regras`): permite corrigir a regra no mesmo modal (ex.: cartão com 5 dígitos cadastrados, fatura C6 exige 6).
-4. **Orientação da regra** (da regra selecionada ou `senha_pdf.orientacao` / `label_regra`): destaque visual (alerta/info).
-5. **Campo senha** — `type="password"` + ícone de olho; **somente números**; `maxLength` = `digitos` da regra; validar quantidade exata no submit.
-6. **Checkbox:** “Salvar senha neste cartão para próximas faturas” → `salvar_senha_pdf` (+ `senha_pdf_regra` se a regra foi ajustada).
-   - Default sugerido: marcado se `tem_senha_cadastrada === false`; desmarcado (ou marcado) se já havia senha e falhou — UX livre, mas o texto deve deixar claro que atualiza a senha (e a regra) do cartão.
-7. **Ações:**
-   - Primária: “Desbloquear e processar” → `POST /faturas/processar/{id}` com `senha_pdf` + `salvar_senha_pdf` + `senha_pdf_regra?`
+   - `ausente`: “Esta fatura está em um PDF com senha. Informe a senha para importar os lançamentos.”
+   - `incorreta`: “A senha usada não desbloqueou o PDF. Verifique e tente novamente.”  
+     Se `tem_senha_cadastrada`: acrescentar “A senha salva neste cartão pode estar desatualizada.”
+3. **Orientação da regra** (`senha_pdf.orientacao` ou `label_regra`): destaque visual (alerta/info).  
+   Ex. C6: “Use os 6 primeiros dígitos do CPF ou CNPJ do titular.”
+4. **Campo senha** — `type="password"` + ícone de olho (mesmo padrão do login / cadastro do cartão).
+5. **Checkbox:** “Salvar senha neste cartão para próximas faturas” → `salvar_senha_pdf`.
+   - Default sugerido: marcado se `tem_senha_cadastrada === false`; desmarcado (ou marcado) se já havia senha e falhou — UX livre, mas o texto deve deixar claro que atualiza a senha do cartão.
+6. **Ações:**
+   - Primária: “Desbloquear e processar” → `POST /faturas/processar/{id}` com `senha_pdf` + `salvar_senha_pdf`
    - Secundária: “Agora não” / fechar (fatura permanece com erro; usuário pode voltar depois)
 
 ### Após sucesso
@@ -270,8 +270,8 @@ Também oferecer ação “Informar senha” / “Desbloquear PDF” na listagem
 ### Após 422 no modal
 
 - Manter modal aberto
-- Alertar que **a senha ou a regra** estão incorretas; pedir para verificar na fatura
-- Limpar o campo senha; manter select de regra editável para nova tentativa
+- Mostrar `message` / nova `orientacao`
+- Limpar ou selecionar o campo senha para nova tentativa
 
 ---
 
@@ -294,10 +294,9 @@ Também oferecer ação “Informar senha” / “Desbloquear PDF” na listagem
 - [ ] Não enviar `senha_pdf` no edit se o campo não foi alterado
 - [ ] `limpar_senha_pdf` para remover senha salva
 - [ ] Detectar `precisa_senha_pdf` / `erro_codigo` após upload/cadastro
-- [ ] Modal com orientação, **select de regra**, senha + olho (máx. dígitos da regra), checkbox salvar, submit em `processar/{id}` (+ `senha_pdf_regra`)
-- [ ] Tratar 422 do processar sem fechar o modal (alerta senha **ou** regra incorreta)
+- [ ] Modal com orientação, senha + olho, checkbox salvar, submit em `processar/{id}`
+- [ ] Tratar 422 do processar sem fechar o modal
 - [ ] Ação manual “Informar senha” na fatura com erro de senha
-- [ ] Campo senha do cartão e do modal respeitam `digitos` da regra (`maxLength` + só números)
 
 ---
 

@@ -71,10 +71,13 @@ const RelatoriosPage = () => {
                         <Col md={4}>
                             <Card className="card-animate">
                                 <CardBody>
-                                    <h5 className="card-title">Por compra</h5>
-                                    <p className="text-muted mb-0">
-                                        Detalhamento por compra/grupo de parcelas. Em breve.
+                                    <h5 className="card-title">Compras parceladas</h5>
+                                    <p className="text-muted mb-3">
+                                        Ranking das compras ainda parceladas: parcelas restantes, pago vs aberto e progresso.
                                     </p>
+                                    <Link to="/parceladas" className="btn btn-soft-primary btn-sm">
+                                        Abrir ranking
+                                    </Link>
                                 </CardBody>
                             </Card>
                         </Col>

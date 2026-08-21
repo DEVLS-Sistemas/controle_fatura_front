@@ -62,7 +62,11 @@ const DashboardsHome = () => {
                   <h4 className="fs-16 mb-1">Dashboard</h4>
                   <p className="text-muted mb-0">Resumo das faturas e gastos do período</p>
                 </div>
-                <div className="d-flex gap-2">
+                <div className="d-flex gap-2 flex-wrap align-items-end">
+                  <Link to="/parceladas" className="btn btn-soft-primary mb-1">
+                    <i className="ri-list-ordered align-middle me-1"></i>
+                    Parceladas
+                  </Link>
                   <div>
                     <Label className="form-label mb-1">Ano</Label>
                     <input

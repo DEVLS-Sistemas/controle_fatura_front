@@ -25,6 +25,8 @@ Cartão (grupo) ………… ex.: "Sofisa"
 4. A **fatura** pertence à **bandeira** (`cartao_bandeira_id`), não ao número.
 5. A **transação** pode apontar para o **número** (`cartao_numero_id`) para agrupar por final na view da fatura.
 6. Finais detectados na fatura (PDF) são sempre vinculados à **mesma bandeira** da fatura (`cartao_bandeira_id`) — nunca cruzam para outra bandeira do grupo.
+7. Se a fatura for processada **sem bandeira** no cartão: o job cria a bandeira (detectada no PDF ou `"Outra"`), vincula à fatura e só então cria/vincula o final às transações.
+8. Cadastro/upload de fatura com PDF/CSV em cartão **sem finais** exige seleção via modal (`precisa_selecionar_bandeira`; no CSV também `precisa_selecionar_final` se não houver PDF vinculado). Ver [`faturas.md`](faturas.md).
 
 ---
 
@@ -42,6 +44,8 @@ Cartão (grupo) ………… ex.: "Sofisa"
 | cor_fundo | string nullable | Hex do chip |
 | cor_texto | string nullable | Hex do texto |
 | ativo | boolean | default true |
+| senha_pdf | text nullable | Criptografada (`encrypted` cast). Usada ao extrair texto de PDF protegido. **Nunca** retornada na API. |
+| senha_pdf_regra | string nullable | Código da regra (`cpf_cnpj_4/5/6/8_digitos`, `cpf_11_digitos`, `cnpj_14_digitos`). Ver `PdfSenhaRegra`. |
 
 SoftDeletes + timestamps.
 
@@ -129,6 +133,7 @@ CRUD padrão no **grupo**, com bandeiras e números aninhados no payload.
 - `tipos_numero` — fisico, virtual, adicional
 - `cores_fundo` / `cores_texto` / `pares_cores`
 - `dias` (1..31)
+- `senhas_pdf_regras` — regras de senha de PDF (`value`, `label`, `orientacao`, `digitos`, `bancos_sugeridos`)
 
 ### Payload create/edit
 
@@ -141,6 +146,8 @@ CRUD padrão no **grupo**, com bandeiras e números aninhados no payload.
   "cor_fundo": "#8b5cf6",
   "cor_texto": "#ffffff",
   "ativo": true,
+  "senha_pdf": "123456",
+  "senha_pdf_regra": "cpf_cnpj_6_digitos",
   "bandeiras": [
     {
       "id": 1,
@@ -165,7 +172,12 @@ CRUD padrão no **grupo**, com bandeiras e números aninhados no payload.
 ```
 
 **Create:** `nome`, `dia_limite_fatura`, `dia_vencimento_fatura` obrigatórios.  
-`bandeiras` e `numeros` (finais) são **opcionais** — o grupo pode ser cadastrado sem bandeiras/finais e preenchido depois. Cada bandeira também pode existir com `numeros: []`.
+`bandeiras` e `numeros` (finais) são **opcionais** — o grupo pode ser cadastrado sem bandeiras/finais e preenchido depois. Cada bandeira também pode existir com `numeros: []`.  
+`senha_pdf` / `senha_pdf_regra` opcionais. Se `senha_pdf_regra` omitida e `banco` for C6, o back sugere `cpf_cnpj_6_digitos`.
+
+**Delete:** soft-delete do grupo + bandeiras + números. **Bloqueado (422)** se existir fatura vinculada ao cartão — mensagem: `"Não é possível excluir cartão com fatura anexada vinculada"`. Exclua as faturas antes.
+
+**Resposta do grupo** inclui `tem_senha_pdf`, `senha_pdf_regra`, `senha_pdf_orientacao`, `senha_pdf_regra_label` (nunca a senha em claro). No edit: enviar `limpar_senha_pdf=true` para apagar; só enviar `senha_pdf` se o usuário digitou um valor novo.
 
 **Edit (sincronização aninhada):**
 
@@ -180,7 +192,7 @@ Cada grupo retorna `bandeiras[]` com `numeros[]`, `qtd_bandeiras`, `qtd_numeros`
 
 ### Async select (`cartoes-list`)
 
-Continua listando o **grupo**. Para selects que precisam da bandeira (fatura/compra), usar:
+Continua listando o **grupo**. Cada item inclui `qtd_numeros` e `tem_numeros` (para o front abrir o modal de bandeira/final no cadastro de fatura quando `tem_numeros === false`). Para selects que precisam da bandeira (fatura/compra), usar:
 
 ```http
 GET /api/v1/cartoes/bandeiras-list?cartao_id=1
@@ -251,4 +263,5 @@ Para cada `cartoes` antigo:
 
 ## Prompt do front
 
-[`docs/frontend-prompt-cartoes.md`](../frontend-prompt-cartoes.md)
+[`docs/frontend-prompt-cartoes.md`](../frontend-prompt-cartoes.md)  
+Senha de PDF + modal: [`docs/frontend-prompt-senha-pdf-fatura.md`](../frontend-prompt-senha-pdf-fatura.md)

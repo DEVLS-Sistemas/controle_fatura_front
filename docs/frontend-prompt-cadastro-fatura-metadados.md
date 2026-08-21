@@ -11,12 +11,11 @@ Complementa [`frontend-prompt-faturas.md`](frontend-prompt-faturas.md) e o modal
 Simplificar o cadastro:
 
 1. **Nada é obrigatório de cara** (nem cartão, mês, ano, nem anexo).
-2. **Sem anexo** → cartão + mês + ano passam a ser **obrigatórios** (validação no front e no back).
+2. **Sem anexo** → cartão + mês + ano passam a ser **obrigatórios**.
 3. **Com anexo (PDF/CSV)** → cartão + mês + ano **não** são obrigatórios no formulário inicial.
-4. Se o back **conseguir ler** cartão/mês/ano do arquivo → abrir **modal de confirmação** com os valores sugeridos.
-5. No mesmo modal, se o cartão **não tiver bandeira cadastrada** (ou tiver mais de uma), **pedir a bandeira**.
-6. Se o cartão **não foi encontrado** (`cartao_id` null), o modal oferece **cadastrar o cartão ali mesmo** (nome + bandeira) — sem sair da tela nem reanexar o arquivo.
-7. Após confirmar, reenviar o `POST /cadastrar` (multipart) com os campos escolhidos + o mesmo arquivo.
+4. Se o back ler dados do arquivo → abrir **modal na mesma tela** (nunca mandar o usuário para outra rota cadastrar cartão e voltar).
+5. Se o cartão **não** foi identificado na conta → o modal deixa **explícito** que dá para **cadastrar o cartão ali** (nome + bandeira), junto com mês/ano.
+6. Após confirmar, reenviar o `POST /cadastrar` (multipart) e concluir tudo de uma vez.
 
 ---
 
@@ -28,12 +27,12 @@ Simplificar o cadastro:
 | Submit **sem** anexo | **obrigatório** | **obrigatório** | **obrigatório** | — |
 | Submit **com** anexo | opcional* | opcional* | opcional* | obrigatório para este fluxo |
 
-\* Se o back não conseguir detectar, ele devolve 422 pedindo preenchimento manual — aí o front exige os três campos.
+\* Se o back não conseguir detectar, 422 pedindo preenchimento manual.
 
-UI sugerida:
+UI sugerida do formulário:
 
 1. Dropzone / input de arquivo em destaque (PDF ou CSV).
-2. Abaixo (ou colapsado): selects de cartão, mês e ano — úteis quando não há anexo ou para ajuste manual.
+2. Abaixo (ou colapsado): selects de cartão, mês e ano — úteis sem anexo.
 3. Botão “Cadastrar”.
 
 ---
@@ -43,26 +42,25 @@ UI sugerida:
 ```
 [Usuário escolhe PDF/CSV] ──► POST /api/v1/faturas/cadastrar
                                       │
-                    ┌─────────────────┼─────────────────┐
-                    ▼                 ▼                 ▼
-            422 senha PDF    422 metadados      200 sucesso
-            (precisa_senha)  (confirmar)        (ou outros 422)
-                    │                 │
-                    ▼                 ▼
-            Modal senha         Modal confirmação
-            (senha_pdf)         (cartão/mês/ano/bandeira)
-                    │                 │
-                    └────────┬────────┘
-                             ▼
-                    Reenviar multipart completo
+          ┌───────────────────────────┼───────────────────────────┐
+          ▼                           ▼                           ▼
+   422 senha PDF              422 metadados                 200 sucesso
+   (precisa_senha)            (confirmar / cadastrar)
+          │                           │
+          ▼                           ▼
+   Modal senha                 Modal na MESMA tela
+          │                    (ver modos abaixo)
+          └────────────┬──────────────┘
+                       ▼
+              Reenviar multipart completo
 ```
 
-Ordem de prioridade dos modais (se vierem em sequência):
+Ordem dos modais:
 
-1. **Senha do PDF** (`precisa_senha_pdf`) — sem texto não há detecção.
-2. **Confirmar metadados** (`precisa_confirmar_metadados`).
-3. Modais já existentes: `precisa_selecionar_bandeira` / `precisa_selecionar_final` (cartão sem finais).
-4. Sucesso.
+1. **Senha do PDF** (`precisa_senha_pdf`)
+2. **Metadados** (`precisa_confirmar_metadados`) — modo `confirmar_cartao` **ou** `cadastrar_cartao`
+3. Legados (só se ainda faltar algo): `precisa_selecionar_bandeira` / `precisa_selecionar_final`
+4. Sucesso
 
 ---
 
@@ -74,7 +72,7 @@ Authorization: Bearer {token}
 Content-Type: multipart/form-data
 ```
 
-### Request — só anexo (fluxo novo)
+### Request — só anexo
 
 | Campo | Tipo | Obrigatório |
 |-------|------|-------------|
@@ -83,124 +81,161 @@ Content-Type: multipart/form-data
 | `senha_pdf` | string | se PDF protegido |
 | `salvar_senha_pdf` | bool | não |
 
-### Request — sem anexo (igual ao legado)
-
-| Campo | Tipo | Obrigatório |
-|-------|------|-------------|
-| `cartao_id` | int | **sim** |
-| `mes` | int 1–12 | **sim** |
-| `ano` | int | **sim** |
-| `cartao_bandeira_id` | int | se cartão tem 2+ bandeiras |
-
-### Request — retry do modal de metadados
-
-Reenviar **tudo** do formulário + arquivo + campos confirmados:
+### Request — retry modo `confirmar_cartao` (cartão já existe)
 
 | Campo | Tipo | Notas |
 |-------|------|-------|
-| `arquivo_pdf` | file | **mesmo arquivo** (input file de novo) |
-| `cartao_id` | int | do select (pré-preenchido com `sugestao.cartao_id`) — omitir se for criar cartão novo |
-| `cartao_nome` | string | **cria o cartão no mesmo POST** quando não há `cartao_id` (ex.: `"C6"`) |
-| `mes` | int | pré-preenchido com `sugestao.mes` |
-| `ano` | int | pré-preenchido com `sugestao.ano` |
-| `cartao_bandeira_id` | int | se item de `bandeiras[]` tem `value` numérico |
-| `bandeira` | string | se item tem `criar: true` (ex.: `"Visa"`) — **obrigatório** junto com `cartao_nome` |
-| `senha_pdf` | string | se já pediu senha antes |
-| `salvar_senha_pdf` | bool | se marcou no modal de senha |
+| `arquivo_pdf` | file | mesmo arquivo |
+| `cartao_id` | int | cartão existente |
+| `mes` / `ano` | int | confirmados |
+| `cartao_bandeira_id` | int | se bandeira já existe |
+| `bandeira` | string | se precisa criar bandeira no cartão (`criar: true`) |
+| `senha_pdf` | string | se já desbloqueou |
 
-Quando vier `cartao_nome` + `bandeira` (sem `cartao_id`), o back deve criar o grupo de cartão + bandeira e cadastrar a fatura no mesmo request.
+### Request — retry modo `cadastrar_cartao` (cartão ainda não existe)
+
+**Não envie `cartao_id`.** Cadastre o cartão **nesta mesma request**:
+
+| Campo | Tipo | Obrigatório | Notas |
+|-------|------|-------------|-------|
+| `arquivo_pdf` | file | sim | mesmo arquivo |
+| `cadastrar_cartao` | bool | recomendado (`true`) | deixa explícito o fluxo inline (opcional se `cartao_nome` + `bandeira` vierem) |
+| `cartao_nome` | string | **sim** | nome do grupo (ex.: `Inter`, `C6`) |
+| `bandeira` | string | **sim** | label do lookup (`Visa`, `Mastercard`, …) |
+| `mes` / `ano` | int | **sim** | da sugestão (editáveis) |
+| `banco` | string | não | default = `cartao_nome` |
+| `dia_limite_fatura` | int | não | default `5` (`sugestao.dia_limite_fatura_padrao`) |
+| `dia_vencimento_fatura` | int | não | default `10` |
+| `senha_pdf_regra` | string | se selecionada | grava a regra no cartão novo (ex.: `cpf_cnpj_6_digitos`) |
+| `senha_pdf` / `salvar_senha_pdf` | — | se PDF com senha | senha pode ser gravada no cartão novo |
+
+O back cria o cartão + bandeira e em seguida a fatura com o PDF — **tudo numa request**. O usuário **não** precisa ir para a tela de cartões.
 
 ---
 
 ## Modal — confirmar metadados
 
-Dispara em **422** com:
+Dispara em **422** com `codigo = precisa_confirmar_metadados`.
+
+Leia **`modo`** (ou `pode_cadastrar_cartao`) para montar a UI correta.
+
+### Modo A — `cadastrar_cartao` (cartão não está na conta)
+
+Use quando `modo === "cadastrar_cartao"` ou `pode_cadastrar_cartao === true` (em geral `sugestao.cartao_id === null`).
+
+**Não** mostre um select vazio de cartões como ação principal — isso parece que a pessoa precisa sair, cadastrar e voltar.
+
+#### UI obrigatória
+
+1. **Título:** algo como “Concluir cadastro da fatura”
+2. **Texto de orientação** (use `orientacao` / `message` da API), deixando claro:
+   - Identificamos **mês** e **ano** da fatura
+   - Este cartão **ainda não está cadastrado**
+   - Você pode **cadastrar o cartão aqui neste modal** (nome + bandeira) e finalizar — **sem sair desta tela**
+3. Campos:
+   - **Mês** / **Ano** — pré-preenchidos com `sugestao.mes` / `sugestao.ano` (editáveis)
+   - **Nome do cartão** — input texto; pré-preencher com `sugestao.cartao_nome_sugerido` (ex.: `Inter`, `C6`, `Sofisa`)
+   - **Bandeira** — select com `bandeiras[]` (itens `criar: true`); pré-selecionar `sugestao.bandeira_sugerida` se houver
+4. Opcional informativo: finais detectados, valor da fatura, parser
+5. Se `sugestao.conferencia` existir e `bate === false`, avisar que o total do PDF diverge da soma das transações (o back já usa a soma). Exibir `valor_cabecalho` vs `soma_transacoes`.
+6. Botão primário: **“Cadastrar cartão e fatura”** (não só “Confirmar”)
+6. **Atalho secundário (opcional, colapsado):** “Já tenho este cartão” → aí sim mostra `cartoes[]` para vincular a um existente (`modo` passa a se comportar como confirmar: envia `cartao_id` em vez de `cadastrar_cartao`)
+
+#### Exemplo de resposta (modo cadastrar)
 
 ```json
 {
   "error": true,
-  "message": "Confirme o cartão, mês e ano identificados na fatura",
+  "message": "Identificamos mês e ano da fatura. Cadastre o cartão nesta mesma tela (nome e bandeira) para concluir — não é preciso sair desta tela.",
   "codigo": "precisa_confirmar_metadados",
   "precisa_confirmar_metadados": true,
+  "modo": "cadastrar_cartao",
+  "pode_cadastrar_cartao": true,
   "precisa_selecionar_bandeira": true,
+  "orientacao": "O cartão desta fatura ainda não está na sua conta. Informe o nome e a bandeira aqui no modal; o cadastro do cartão e da fatura são concluídos juntos, sem ir para outra tela.",
   "sugestao": {
-    "cartao_id": 17,
-    "cartao_nome": "C62",
+    "cartao_id": null,
+    "cartao_nome": "Inter",
+    "cartao_nome_sugerido": "Inter",
     "mes": 7,
     "ano": 2026,
-    "parser": "c6",
-    "ultimos_digitos": ["0264", "2399"],
+    "parser": "inter",
+    "ultimos_digitos": ["1668"],
     "bandeira_sugerida": "Mastercard",
-    "cartao_bandeira_id": 21,
-    "valor_fatura": 157.92,
-    "confianca": "alta"
+    "cartao_bandeira_id": null,
+    "valor_fatura": 6137.69,
+    "conferencia": {
+      "valor_cabecalho": 6137.69,
+      "soma_transacoes": 6137.69,
+      "bate": true,
+      "diferenca": 0
+    },
+    "confianca": "baixa",
+    "dia_limite_fatura_padrao": 5,
+    "dia_vencimento_fatura_padrao": 10
   },
   "cartoes": [
-    { "value": 17, "label": "C62", "banco": "XP2", "sugerido": true },
     { "value": 12, "label": "SOFISA", "banco": null }
   ],
   "bandeiras": [
     { "value": null, "label": "Visa", "criar": true },
     { "value": null, "label": "Mastercard", "criar": true }
   ],
-  "candidatos_cartao": [
-    {
-      "id": 17,
-      "nome": "C62",
-      "banco": "XP2",
-      "match": "ultimos_digitos",
-      "ultimos_digitos": ["0264", "2399"]
-    }
-  ]
+  "candidatos_cartao": []
 }
 ```
 
-### Campos do modal
+#### Retry (cadastrar)
 
-#### Quando há cartão sugerido (`sugestao.cartao_id` preenchido)
+```http
+POST /api/v1/faturas/cadastrar
+Content-Type: multipart/form-data
+```
 
-1. **Cartão** (select) — opções em `cartoes[]`; pré-selecionar `sugestao.cartao_id`. Itens com `sugerido: true` podem ter destaque. Incluir opção “Cadastrar novo cartão nesta tela”.
-2. **Mês** / **Ano** — pré-preencher com `sugestao.mes` / `sugestao.ano` (editáveis).
-3. **Bandeira** — exibir quando `precisa_selecionar_bandeira === true`:
-   - `bandeiras[].value` numérico → enviar `cartao_bandeira_id`
-   - `bandeiras[].criar === true` → enviar `bandeira` = `label`
-   - Pré-selecionar por `sugestao.cartao_bandeira_id` ou `sugestao.bandeira_sugerida` (match no `label`)
-4. Opcional: chip com finais detectados (`sugestao.ultimos_digitos`) e valor (`sugestao.valor_fatura`) só informativo.
-5. Botões: **Cancelar** / **Confirmar e cadastrar**.
+- `arquivo_pdf` = arquivo
+- `cadastrar_cartao` = `true`
+- `cartao_nome` = `"Inter"`
+- `bandeira` = `"Mastercard"`
+- `mes` = `7`
+- `ano` = `2026`
+- (+ `senha_pdf` se necessário)
 
-#### Quando **não** há cartão (`sugestao.cartao_id` null ou `confianca: baixa`)
+---
 
-Deixar **explícito** que o usuário pode cadastrar o cartão **no próprio modal** — sem sair da tela, sem cadastrar em outro lugar e sem reanexar o arquivo.
+### Modo B — `confirmar_cartao` (cartão já existe)
 
-1. Texto claro: mês/ano foram lidos da fatura; o cartão ainda não está vinculado; dá para cadastrar aqui.
-2. Alert de reforço: “Não precisa sair para cadastrar o cartão nem anexar o arquivo de novo.”
-3. Campos visíveis:
-   - **Mês** / **Ano** (pré-preenchidos)
-   - **Nome do cartão** (texto; pré-preencher com `sugestao.cartao_nome` ou nome derivado do `parser`)
-   - **Bandeira** (obrigatória; opções de `bandeiras[]` da resposta ou lookup de cartões)
-4. Link secundário: “Já tenho este cartão cadastrado — escolher da lista” (volta ao select de `cartoes[]`).
-5. Botão: **Cadastrar cartão e fatura** → envia `cartao_nome` + `bandeira` + `mes` + `ano` + arquivo (sem `cartao_id`).
+Use quando `modo === "confirmar_cartao"` (`sugestao.cartao_id` preenchido).
 
-### `confianca`
+1. Select **Cartão** com `cartoes[]` (pré-selecionar `sugestao.cartao_id`)
+2. **Mês** / **Ano**
+3. **Bandeira** se `precisa_selecionar_bandeira`
+4. Botão: **“Confirmar e cadastrar fatura”**
 
-| Valor | Uso no UI |
-|-------|-----------|
-| `alta` | Match por final do cartão — pode destacar “identificado automaticamente” |
-| `media` | Match por nome do banco/parser |
-| `ambigua` | Vários cartões candidatos — obrigar escolha no select |
-| `informado` | Usuário já tinha mandado `cartao_id` |
-| `baixa` | Sem match de cartão — abrir modo **cadastrar novo cartão** (nome + bandeira) |
+```json
+{
+  "codigo": "precisa_confirmar_metadados",
+  "modo": "confirmar_cartao",
+  "pode_cadastrar_cartao": false,
+  "sugestao": {
+    "cartao_id": 17,
+    "cartao_nome": "C62",
+    "mes": 7,
+    "ano": 2026,
+    "confianca": "alta"
+  }
+}
+```
 
-Se `sugestao.cartao_id` for `null`, **não** empurrar o usuário a sair do fluxo: abrir o formulário de novo cartão no modal.
+Retry: `cartao_id` + `mes` + `ano` + arquivo (+ bandeira se preciso). **Não** envie `cadastrar_cartao`.
 
-### Troca de cartão no modal
+---
 
-Se o usuário mudar o cartão no select, o front pode:
+## Anti-padrões (não fazer)
 
-- Recarregar bandeiras com `GET /api/v1/cartoes/bandeiras-list?cartao_id=`, **ou**
-- Manter só as `bandeiras` da resposta e, ao trocar, buscar a lista de bandeiras do novo cartão.
-
-Regra: se o cartão escolhido tiver **0 bandeiras** ou **2+**, o select de bandeira permanece obrigatório.
+- ❌ Select de cartão vazio como único caminho quando `modo = cadastrar_cartao`
+- ❌ Texto/link “cadastre o cartão em Cartões e volte”
+- ❌ Fechar o modal e redirecionar para `/cartoes` no meio do fluxo de upload
+- ❌ Exigir que o usuário anexe o PDF de novo depois de cadastrar o cartão em outra tela
 
 ---
 
@@ -213,57 +248,38 @@ Regra: se o cartão escolhido tiver **0 bandeiras** ou **2+**, o select de bande
 }
 ```
 
-Ação no front:
-
-1. Mostrar toast/alerta com a mensagem.
-2. Tornar **obrigatórios** cartão, mês e ano no formulário (mesmo com anexo).
-3. Manter o arquivo selecionado.
-4. Usuário preenche e reenvia.
+1. Toast com a mensagem  
+2. Exigir cartão/mês/ano no formulário (ou permitir o mesmo bloco “cadastrar cartão” no formulário)  
+3. Manter o arquivo selecionado  
 
 ---
 
-## Senha de PDF (antes da detecção)
+## Senha de PDF
 
-Se o PDF estiver protegido e a senha faltar/errar, o `POST /cadastrar` também pode devolver o mesmo contrato de senha do processamento:
+Mesmo contrato de [`frontend-prompt-senha-pdf-fatura.md`](frontend-prompt-senha-pdf-fatura.md). Ordem: senha → metadados → sucesso.
 
-```json
-{
-  "error": true,
-  "codigo": "pdf_senha_necessaria",
-  "precisa_senha_pdf": true,
-  "senha_pdf": { "necessaria": true, "motivo": "ausente", "orientacao": "...", "...": "..." }
-}
-```
-
-Fluxo:
-
-1. Abrir modal de senha (ver prompt de senha).
-2. Reenviar `arquivo_pdf` + `senha_pdf` (+ `salvar_senha_pdf` se marcado).
-3. Em seguida pode vir o 422 de metadados — aí abrir o modal de confirmação.
+No modo `cadastrar_cartao`, envie `senha_pdf_regra` se o usuário escolheu a regra. Se marcar “salvar senha”, envie também `senha_pdf` + `salvar_senha_pdf=true` — senha e regra ficam no cartão **novo**.
 
 ---
 
 ## Checklist de aceite
 
-- [ ] Formulário inicial: cartão/mês/ano/anexo **não** obrigatórios visualmente
-- [ ] Submit sem anexo e sem cartão/mês/ano → validação front (e 422 do back)
-- [ ] Submit só com PDF → pode abrir modal de metadados com sugestões
-- [ ] Modal pré-preenche cartão, mês e ano; permite editar
-- [ ] Sem cartão correspondente: modal mostra mês/ano + cadastro de cartão (nome + bandeira) na mesma tela
-- [ ] Copy deixa claro que não precisa sair nem reanexar o arquivo
-- [ ] Retry com cartão novo envia `cartao_nome` + `bandeira` (sem `cartao_id`)
-- [ ] Se `precisa_selecionar_bandeira`, select de bandeira obrigatório no modal
-- [ ] Bandeira com `criar: true` envia `bandeira` (label); com `value` envia `cartao_bandeira_id`
-- [ ] Retry reenvia o **arquivo** + campos confirmados (multipart)
-- [ ] PDF com senha: modal de senha **antes**; depois metadados se necessário
-- [ ] Falha de detecção: mensagem clara + campos manuais obrigatórios, arquivo preservado
-- [ ] Após sucesso: refetch da listagem de faturas
-- [ ] Fluxos antigos (cartão/mês/ano já preenchidos + PDF) continuam funcionando sem abrir o modal de metadados
+- [ ] Formulário inicial sem obrigatoriedade de cartão/mês/ano/anexo
+- [ ] Submit só com PDF abre modal de metadados quando o back detecta dados
+- [ ] Se `modo = cadastrar_cartao`: UI mostra mês/ano + **nome do cartão** + **bandeira**, com texto explícito de que o cadastro é **neste modal**
+- [ ] Botão primário deixa claro: “Cadastrar cartão e fatura”
+- [ ] Retry com `cadastrar_cartao=true` + `cartao_nome` + `bandeira` + `mes` + `ano` + arquivo → 200 sem ir a outra tela
+- [ ] Se `modo = confirmar_cartao`: select de cartão existente + mês/ano (+ bandeira se preciso)
+- [ ] Não há CTA que mande o usuário sair para cadastrar cartão e voltar anexar
+- [ ] PDF com senha: modal de senha antes; depois metadados
+- [ ] Após sucesso: refetch da listagem
+- [ ] Fluxo antigo (já com `cartao_id`/`mes`/`ano`) continua sem abrir o modal
 
 ---
 
 ## Notas
 
-- A competência sugerida vem do **fechamento/vencimento** do extrato (não recalcula `dia_limite_fatura`). O usuário pode ajustar mês/ano no modal.
-- Match de cartão: prioriza **últimos 4 dígitos** já cadastrados; senão tenta nome/banco do parser (`c6`, `sofisa`, `nubank`…).
-- Modais de bandeira/final para cartão **sem finais** (`precisa_selecionar_bandeira` / `precisa_selecionar_final`) continuam valendo no retry se ainda faltarem dados — idealmente o modal de metadados já envia a bandeira e evita o segundo passo.
+- Competência sugerida = fechamento/vencimento do extrato; usuário pode ajustar.
+- Match de cartão existente: finais `••••` cadastrados, senão nome/banco do parser.
+- Defaults de ciclo no cartão novo: fechamento dia 5, vencimento dia 10 (ajustáveis depois na tela de cartões).
+- Finais detectados no PDF são criados na bandeira da fatura no processamento automático.

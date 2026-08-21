@@ -269,4 +269,3 @@ Sem cartão identificado
 - [ ] Remover uso dos campos flat `bandeira` / `ultimos_digitos` / `limite_credito` no root
 - [ ] Lookups: `bandeiras`, `tipos_numero`, cores, dias
 - [ ] Integrar regra de bandeira no cadastro de fatura e agrupamento por final na view
-- [x] Bloquear exclusão de cartão com fatura anexada (exibir 422 e orientar a excluir faturas antes)

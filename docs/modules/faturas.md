@@ -13,6 +13,7 @@
 | arquivo_pdf | string nullable | path em `storage/app/faturas/{user_id}` |
 | status | enum | pendente, processando, processada, erro |
 | erro_mensagem | text nullable | |
+| erro_codigo | string nullable | Ex.: `pdf_senha_necessaria`, `pdf_senha_incorreta` |
 | processado_em | timestamp nullable | |
 
 SoftDeletes + timestamps. Índice único lógico `(user_id, cartao_bandeira_id, mes, ano)`.
@@ -31,9 +32,9 @@ Ao cadastrar transação com `cartao_id` / `cartao_numero_id` / `cartao_bandeira
 
 No processamento de PDF, compras parceladas também disparam `findOrCreateByCartaoPeriodo` para as competências futuras das parcelas restantes — faturas criadas **sem** `arquivo_pdf`, apenas com a transação da parcela. Transações importadas podem receber `cartao_numero_id` quando o parser identificar o final.
 
-`POST /cadastrar` exige `cartao_id` + `cartao_bandeira_id`. Com PDF: se já existir fatura da bandeira/período, o endpoint anexa/substitui o arquivo e processa (não retorna 422). Sem arquivo no request, continua bloqueando com “Já existe fatura…”.
+`POST /cadastrar` exige `cartao_id` + `cartao_bandeira_id` (quando o cartão já tem finais). Com PDF/CSV: se já existir fatura da bandeira/período, o endpoint anexa/substitui o arquivo e processa (não retorna 422). Sem arquivo no request, continua bloqueando com “Já existe fatura…”.
 
-No front: só exibir select de bandeira quando o cartão tiver **mais de uma** bandeira cadastrada.
+Quando o cartão **não tem finais** (`cartao_numeros`) e o request traz PDF/CSV, o backend exige seleção via modal (422 estruturado) — ver seção abaixo.
 
 ## Listagem (`GET /listar`) — agrupada por cartão
 
@@ -52,6 +53,8 @@ Filtros: `cartao_id`, `mes`, `ano`, `status`, `palavra_chave`, `page`, `perPage`
 ## Quitação da fatura (pagamentos)
 
 Transações `tipo = payment` na fatura **N** abatem primeiro o `valor_total` da fatura **N-1** (mesma bandeira, competência contígua). O excedente antecipa o ciclo atual (já refletido no `valor_total` de N).
+
+Residual da fatura anterior no `valor_total` só entra se a anterior estiver **`processada`**. Faturas `pendente` criadas por materialização de parcelas **não** geram residual — evita inflar o total e impedir a marcação de paga.
 
 Portanto, a fatura **F** é considerada paga pelos pagamentos da competência **seguinte** (F+1):
 
@@ -82,7 +85,45 @@ DELETE /api/v1/faturas/excluir-todas
 Soft-delete de **todas** as faturas e transações do usuário autenticado; remove arquivos PDF do storage. Não apaga cartões nem cadastros auxiliares. Exige `confirmar=true` (body ou query). Ver prompt: [`frontend-prompt-limpar-faturas.md`](../frontend-prompt-limpar-faturas.md).
 
 Prompt do front: [`docs/frontend-prompt-faturas.md`](../frontend-prompt-faturas.md).  
-Melhorias (anexos PDF/CSV, quitação, navegação): [`docs/frontend-prompt-melhorias-faturas.md`](../frontend-prompt-melhorias-faturas.md).
+Melhorias (anexos PDF/CSV, quitação, navegação): [`docs/frontend-prompt-melhorias-faturas.md`](../frontend-prompt-melhorias-faturas.md).  
+Cadastro com detecção de cartão/mês/ano pelo anexo: [`docs/frontend-prompt-cadastro-fatura-metadados.md`](../frontend-prompt-cadastro-fatura-metadados.md).
+
+## Cadastro (`POST /cadastrar`)
+
+| Situação | `cartao_id` / `mes` / `ano` | Anexo |
+|----------|-----------------------------|-------|
+| Sem arquivo | **obrigatórios** | opcional |
+| Com PDF/CSV e período completo | usados como hoje | processa |
+| Com PDF/CSV **sem** período completo | opcionais | back tenta detectar → **422** `precisa_confirmar_metadados` |
+
+Resposta de confirmação (resumo):
+
+- `modo = confirmar_cartao` — cartão já existe; confirmar `cartao_id` + mês/ano (+ bandeira).
+- `modo = cadastrar_cartao` — cartão **não** está na conta; UI cadastra **nome + bandeira na mesma tela** (não redirecionar para /cartoes).
+
+```json
+{
+  "error": true,
+  "codigo": "precisa_confirmar_metadados",
+  "modo": "cadastrar_cartao",
+  "pode_cadastrar_cartao": true,
+  "precisa_selecionar_bandeira": true,
+  "orientacao": "O cartão desta fatura ainda não está na sua conta. Informe o nome e a bandeira aqui no modal...",
+  "sugestao": {
+    "cartao_id": null,
+    "cartao_nome_sugerido": "Inter",
+    "mes": 7,
+    "ano": 2026,
+    "bandeira_sugerida": "Mastercard",
+    "confianca": "baixa"
+  },
+  "bandeiras": [{ "value": null, "label": "Visa", "criar": true }]
+}
+```
+
+Retry confirmar: `cartao_id` + `mes` + `ano` + arquivo (+ bandeira).  
+Retry cadastrar: `cartao_nome` + `bandeira` + `mes` + `ano` + arquivo (cria cartão inline e a fatura). Preferir também `cadastrar_cartao=true`.  
+Se o arquivo não permitir detecção → 422 pedindo preenchimento manual.
 
 ## Detalhe (`GET /listar/{id}`)
 
@@ -93,17 +134,76 @@ Transações devem ser buscadas em `GET /api/v1/transacoes/listar?fatura_id=`.
 
 CRUD padrão + extras:
 
-- `POST /upload-pdf` — `id`, `arquivo_pdf` (multipart PDF/CSV), `processar_automatico` (bool)
-- `POST /processar/{id}` — dispara `ProcessInvoicePdfJob`
+- `POST /upload-pdf` — `id`, `arquivo_pdf` (multipart PDF/CSV), `processar_automatico` (bool), opcional `senha_pdf`, `salvar_senha_pdf`, e campos do modal (`cartao_bandeira_id` / `bandeira`, `cartao_numero_id` / `ultimos_digitos`)
+- `POST /processar/{id}` — dispara `ProcessInvoicePdfJob`; body opcional `{ "senha_pdf", "salvar_senha_pdf" }`. Em erro de senha retorna **422** com `codigo` + objeto `senha_pdf`.
 - `GET /pdf/{id}` — visualiza/baixa o anexo (PDF ou CSV) (Bearer)
 
 Ao excluir uma fatura (`DELETE /excluir/{id}`), as transações vinculadas também são soft-deleted.
+
+## Modal bandeira / final (cartão sem finais)
+
+Dispara em `POST /cadastrar` e `POST /upload-pdf` quando o cartão **não tem nenhum `cartao_numeros` ativo** e há arquivo PDF ou CSV.
+
+### PDF
+
+Sem `cartao_bandeira_id` / `bandeira` → **422**:
+
+```json
+{
+  "error": true,
+  "message": "Selecione a bandeira da fatura",
+  "codigo": "precisa_selecionar_bandeira",
+  "precisa_selecionar_bandeira": true,
+  "bandeiras": [
+    { "value": 1, "label": "Mastercard", "qtd_numeros": 0 }
+  ]
+}
+```
+
+- Cartão com bandeiras → lista existentes (`value` = id).
+- Cartão sem bandeiras → lookups (`Visa`, `Mastercard`, …) com `criar: true` e `value: null`.
+- Retry: `cartao_bandeira_id` **ou** `bandeira` (nome do lookup; cria/reusa no cartão).
+- Finais detectados no PDF são criados na bandeira escolhida.
+
+### CSV
+
+1. Mesma exigência de bandeira.
+2. Se a fatura **não tem** `arquivo_pdf` e o request **não traz** `cartao_numero_id` nem `ultimos_digitos` → **422**:
+
+```json
+{
+  "error": true,
+  "message": "Selecione o final do cartão",
+  "codigo": "precisa_selecionar_final",
+  "precisa_selecionar_final": true,
+  "cartao_bandeira_id": 1,
+  "numeros": []
+}
+```
+
+- Retry: `cartao_numero_id` **ou** `ultimos_digitos` (4 dígitos; cria o final na bandeira).
+- Se a fatura já tem PDF vinculado, o final **não** é exigido no CSV.
+- O job aplica o final padrão a todas as linhas importadas sem `ultimos_digitos`.
+
+## Senha de PDF
+
+A senha fica no **cartão** (`cartoes.senha_pdf`, criptografada). O job usa, nesta ordem: senha do request → senha do cartão.
+
+Se o PDF estiver protegido e a senha faltar ou estiver errada:
+
+- `status=erro`
+- `erro_codigo` = `pdf_senha_necessaria` | `pdf_senha_incorreta`
+- Respostas incluem `precisa_senha_pdf` e `senha_pdf` (orientação da regra, sem a senha em claro)
+
+`salvar_senha_pdf=true` grava a senha no cartão **após** desbloqueio bem-sucedido.
+
+Prompt do front: [`frontend-prompt-senha-pdf-fatura.md`](../frontend-prompt-senha-pdf-fatura.md).
 
 ## Parsing PDF
 
 Arquitetura em `App\Services\Pdf`:
 
-1. `InvoicePdfParserService` extrai texto via Spatie PDF-to-Text
+1. `InvoicePdfParserService` extrai texto via Spatie PDF-to-Text (`-upw` quando há senha)
 2. Seleciona parser (`Nubank`, `Itau`, `Inter`, `C6`, `PicPay`, `Sofisa`, `Generico`)
 3. Job cria `transacoes` e atualiza `valor_total` / `status`
 

@@ -70,7 +70,7 @@ Sobre a **compra** (grupo):
 5. Trocar `responsavel_id` da compra: repasses permanecem na parcela (ainda fazem sentido); a matriz filtra pelo responsável atual.
 6. Não alterar `tipo=payment` da bandeira.
 
-## API (`/api/v1/repasses`)
+## API (`/api/v1/repasses`) — **implementada**
 
 Prefixo + `routerFiles/repassesRouter.php`. CRUD padrão + endpoints de matriz.
 

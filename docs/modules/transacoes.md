@@ -14,7 +14,7 @@
 | parcela_atual | int nullable | 1..N |
 | valor_parcela | decimal nullable | em geral = `valor` |
 | compra_grupo_id | uuid nullable | liga as N parcelas da mesma compra; null se à vista |
-| tipo | enum | purchase, payment, refund, advance (tipo contábil) |
+| tipo | enum | purchase, payment, refund, advance, fee (tipo contábil; `fee` = encargos: juros/multa/IOF) |
 | origem_compra | enum nullable | COMPRAS_ONLINE, COMPRAS_PRESENCIAL, PAGAMENTO_SERVICOS, PAGAMENTO_FATURA — origem/canal da compra; **obrigatório no create** |
 | categoria_id | FK nullable | categoria **da compra** |
 | subcategoria_id | FK nullable | exige categoria + vínculo N:N |
@@ -23,14 +23,34 @@
 
 ## Rotas (`/api/v1/transacoes`)
 
-CRUD padrão + `transacoes-list` + export:
+CRUD padrão + `transacoes-list` + export + estabelecimentos do filtro:
 
 ```http
 GET /api/v1/transacoes/exportar
+GET /api/v1/transacoes/estabelecimentos-do-filtro
 DELETE /api/v1/transacoes/excluir/{id}?excluir_grupo=1
 ```
 
 CSV UTF-8 (BOM) com separador `;`, mesmos filtros da listagem.
+
+### Estabelecimentos do filtro
+
+```http
+GET /api/v1/transacoes/estabelecimentos-do-filtro?palavra_chave=atacad&apenas_sem_loja=1
+```
+
+Mesmos filtros de `/listar`. Retorna **uma linha por estabelecimento** distinto (não por transação), com:
+
+| Campo | Obs |
+|-------|-----|
+| `id` | estabelecimento_id |
+| `nome` | nome da maquininha |
+| `loja_id` / `loja_nome` | vínculo atual (se houver) |
+| `transacoes_count` | qtd de transações desse estabelecimento **no filtro** |
+
+Query extra: `apenas_sem_loja=true` — só estabelecimentos sem loja.
+
+Usado no botão **Vincular com loja** da listagem de compras. Ver [`frontend-prompt-loja-estabelecimento.md`](../frontend-prompt-loja-estabelecimento.md).
 
 Lookups: `tipos`, `origens_compra`, `categorias`, `subcategorias`, `responsaveis`, `default_responsavel_id`, `cartoes`, `faturas`.
 
@@ -135,8 +155,8 @@ Também aceita `valor` no lugar de `valor_compra` quando `parcelas_total` é 1.
 ## Edit
 
 - Por linha (ajuste fino de valor/parcela/fatura/`cartao_numero_id`).
-- `observacoes`: ao editar, sincroniza automaticamente em todas as parcelas do mesmo `compra_grupo_id` (sem precisar de flag).
-- Flag `propagar_grupo: true`: propaga estabelecimento, categoria, subcategoria, responsável, `origem_compra` e `cartao_numero_id` para as irmãs do mesmo `compra_grupo_id` (não propaga valor/fatura/parcela_*).
+- `observacoes` e `responsavel_id`: ao editar, sincronizam automaticamente em todas as parcelas do mesmo `compra_grupo_id` (sem precisar de flag). Toda a compra parcelada fica com o mesmo responsável.
+- Flag `propagar_grupo: true`: propaga estabelecimento, categoria, subcategoria, `origem_compra` e `cartao_numero_id` para as irmãs do mesmo `compra_grupo_id` (não propaga valor/fatura/parcela_*).
 - Ao definir `categoria_id` numa transação cujo estabelecimento ainda **não** tem `categoria_padrao_id`:
   1. grava categoria/subcategoria como padrão do estabelecimento;
   2. aplica nas demais transações do mesmo estabelecimento com `categoria_id` nulo;
