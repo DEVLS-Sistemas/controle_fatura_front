@@ -14,7 +14,7 @@ import {
     faturaQuitacaoLabel, faturaQuitacaoColor, VALOR_TEXT_CLASS,
     resolveFaturaAnexo, downloadFaturaAnexo, FaturaAnexoDownloadTipo, FaturaAnexoDownloadMeta,
 } from "helpers/fatura_helpers"
-import { CartaoChip } from "helpers/cartao_helpers"
+import { CartaoChip, resolveCartaoCores } from "helpers/cartao_helpers"
 import {
     faturaPrecisaSenhaPdf,
     FaturaResumo,
@@ -271,29 +271,25 @@ export const FaturasTable = ({ data, getData, setPerPage, perPage, filters }: Fa
                                                                     const anexo = resolveFaturaAnexo(row)
                                                                     const multiBandeira = row.cartao_id != null
                                                                         && (bandeirasPorCartao.get(row.cartao_id)?.size ?? 0) > 1
+                                                                    const cores = resolveCartaoCores({
+                                                                        nome: row.cartao_nome,
+                                                                        cor_fundo: row.cartao_cor_fundo,
+                                                                        cor_texto: row.cartao_cor_texto,
+                                                                    })
                                                                     return (
                                                                     <tr key={row.id ?? index}>
                                                                         <td className="text-start">
                                                                             <div className="d-flex align-items-center gap-2">
-                                                                                {row.cartao_cor_fundo && (
-                                                                                    <CartaoChip
-                                                                                        cor_fundo={row.cartao_cor_fundo}
-                                                                                        cor_texto={row.cartao_cor_texto}
-                                                                                        label={row.cartao_nome
-                                                                                            ? String(row.cartao_nome).slice(0, 1)
-                                                                                            : '•'}
-                                                                                    />
-                                                                                )}
-                                                                                <div>
-                                                                                    <span>{row.cartao_nome ?? '-'}</span>
-                                                                                    {multiBandeira && row.bandeira && (
-                                                                                        <div>
-                                                                                            <span className="badge bg-light text-muted border mt-1" style={{ fontSize: '0.7rem', fontWeight: 500 }}>
-                                                                                                {row.bandeira}
-                                                                                            </span>
-                                                                                        </div>
-                                                                                    )}
-                                                                                </div>
+                                                                                <CartaoChip
+                                                                                    cor_fundo={cores.cor_fundo}
+                                                                                    cor_texto={cores.cor_texto}
+                                                                                    label={row.cartao_nome || 'Cartão'}
+                                                                                />
+                                                                                {multiBandeira && row.bandeira ? (
+                                                                                    <span className="badge bg-light text-muted border" style={{ fontSize: '0.7rem', fontWeight: 500 }}>
+                                                                                        {row.bandeira}
+                                                                                    </span>
+                                                                                ) : null}
                                                                             </div>
                                                                         </td>
                                                                         <td>

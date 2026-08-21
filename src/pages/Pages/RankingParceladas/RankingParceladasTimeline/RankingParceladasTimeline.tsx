@@ -9,8 +9,8 @@ import {
 } from 'interfaces/RankingParceladas/RankingParceladasInterface'
 import {
   barraTimelineStyle,
+  compraDestinoRanking,
   estaQuitada,
-  faturaDestinoRanking,
   MESES_JANELA,
   ordenarPorMenorPercentual,
 } from 'helpers/ranking_parceladas_helpers'
@@ -43,8 +43,19 @@ const RankingParceladasTimeline = ({
   const centro = colunas.find((col) => col.centro)
 
   const handleOpenItem = (item: RankingParceladaItem) => {
-    const to = faturaDestinoRanking(item)
-    if (to) navigate(to)
+    const to = compraDestinoRanking(
+      item,
+      data?.referencia?.mes,
+      data?.referencia?.ano
+    )
+    if (to) {
+      navigate(to, {
+        state: {
+          fromRanking: true,
+          from: `/parceladas?mes=${data?.referencia?.mes}&ano=${data?.referencia?.ano}`,
+        },
+      })
+    }
   }
 
   if (loading) {
@@ -86,7 +97,10 @@ const RankingParceladasTimeline = ({
                   type="button"
                   color="light"
                   size="sm"
-                  onClick={() => onShiftCompetencia(-1)}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onShiftCompetencia(-1)
+                  }}
                   title="Mês anterior"
                 >
                   <i className="ri-arrow-left-s-line align-middle"></i>
@@ -96,13 +110,24 @@ const RankingParceladasTimeline = ({
                   type="button"
                   color="light"
                   size="sm"
-                  onClick={() => onShiftCompetencia(1)}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onShiftCompetencia(1)
+                  }}
                   title="Próximo mês"
                 >
                   Próximo
                   <i className="ri-arrow-right-s-line align-middle"></i>
                 </Button>
-                <Button type="button" color="soft-primary" size="sm" onClick={onGoToday}>
+                <Button
+                  type="button"
+                  color="soft-primary"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onGoToday()
+                  }}
+                >
                   Hoje
                 </Button>
               </div>
@@ -132,7 +157,11 @@ const RankingParceladasTimeline = ({
               </div>
 
               {itens.map((item, index) => {
-                const destino = faturaDestinoRanking(item)
+                const destino = compraDestinoRanking(
+                  item,
+                  data?.referencia?.mes,
+                  data?.referencia?.ano
+                )
                 const quitada = estaQuitada(item)
                 const timeline = item.timeline
                 const fora = Boolean(timeline?.fora_da_janela)
@@ -152,6 +181,7 @@ const RankingParceladasTimeline = ({
                     className={`ranking-timeline__row ${destino ? 'is-clickable' : ''}`}
                     role={destino ? 'button' : undefined}
                     tabIndex={destino ? 0 : undefined}
+                    title={destino ? 'Ver detalhes da compra' : undefined}
                     onClick={() => handleOpenItem(item)}
                     onKeyDown={(e) => {
                       if (destino && (e.key === 'Enter' || e.key === ' ')) {
@@ -163,7 +193,7 @@ const RankingParceladasTimeline = ({
                     <div className="ranking-timeline__info">
                       <div className="d-flex align-items-start gap-2">
                         <span className="badge bg-primary-subtle text-primary">{index + 1}º</span>
-                        <div style={{ minWidth: 0 }}>
+                        <div style={{ minWidth: 0 }} className="flex-grow-1">
                           <div className="fw-semibold text-truncate">{item.titulo}</div>
                           {tituloEstabelecimento ? (
                             <div className="text-muted fs-12 text-truncate">{tituloEstabelecimento}</div>
@@ -199,6 +229,9 @@ const RankingParceladasTimeline = ({
                             </div>
                           ) : null}
                         </div>
+                        {destino ? (
+                          <i className="ri-arrow-right-s-line text-muted fs-18 flex-shrink-0 mt-1" aria-hidden="true"></i>
+                        ) : null}
                       </div>
                     </div>
                     <div className="ranking-timeline__months">

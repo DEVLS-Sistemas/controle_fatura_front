@@ -17,6 +17,7 @@ import {
     FATURA_FILE_ACCEPT, isValidFaturaFile, resolveFaturaAnexo, downloadFaturaAnexo,
     getCategoriaFieldStyle, VALOR_TEXT_CLASS,
 } from 'helpers/fatura_helpers'
+import { CartaoChip, resolveCartaoCores } from 'helpers/cartao_helpers'
 import { SelectOptions } from 'interfaces/SystemInterfaces/SelectInterface'
 import {
     extractFaturaPayload,
@@ -65,6 +66,19 @@ const statusLabel: Record<string, string> = {
 const formatParcelas = (atual?: number, total?: number) => {
     if (!total || total <= 1) return 'À vista'
     return `${atual ?? 1}/${total}`
+}
+
+const compraDestinoDaFatura = (
+    tx: TransacoesList,
+    mes?: number | null,
+    ano?: number | null
+): string | null => {
+    if (!tx.id || isTransacaoOperacional(tx)) return null
+    const params = new URLSearchParams()
+    if (mes) params.set('mes', String(mes))
+    if (ano) params.set('ano', String(ano))
+    const qs = params.toString()
+    return qs ? `/compras/${tx.id}?${qs}` : `/compras/${tx.id}`
 }
 
 const OPERACIONAIS_KEY = '__operacionais__'
@@ -1171,6 +1185,11 @@ const FaturasViewPage = () => {
     const anexo = resolveFaturaAnexo(fatura)
     const competenciaAtual = fatura.competencia ?? formatPeriodo(fatura.mes, fatura.ano)
     const bandeiraLabel = fatura.bandeira || fatura.cartao_bandeira
+    const coresCartao = resolveCartaoCores({
+        nome: fatura.cartao_nome,
+        cor_fundo: fatura.cartao_cor_fundo,
+        cor_texto: fatura.cartao_cor_texto,
+    })
 
     return (
         <React.Fragment>
@@ -1262,33 +1281,15 @@ const FaturasViewPage = () => {
                                 className="d-flex flex-wrap align-items-center justify-content-between gap-3"
                             >
                                 <div className="d-flex align-items-center gap-3 min-w-0">
-                                    {fatura.cartao_cor_fundo && (
-                                        <span
-                                            className="d-inline-flex align-items-center justify-content-center rounded-3 flex-shrink-0 fw-bold"
-                                            style={{
-                                                width: 56,
-                                                height: 56,
-                                                fontSize: '1.5rem',
-                                                backgroundColor: fatura.cartao_cor_fundo,
-                                                color: fatura.cartao_cor_texto || '#ffffff',
-                                                boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
-                                            }}
-                                            title={fatura.cartao_nome || undefined}
-                                        >
-                                            {fatura.cartao_nome
-                                                ? String(fatura.cartao_nome).slice(0, 1).toUpperCase()
-                                                : '•'}
-                                        </span>
-                                    )}
+                                    <CartaoChip
+                                        cor_fundo={coresCartao.cor_fundo}
+                                        cor_texto={coresCartao.cor_texto}
+                                        label={fatura.cartao_nome || 'Cartão'}
+                                        className="fs-5 px-3 py-2"
+                                    />
                                     <div className="min-w-0">
-                                        <div
-                                            className="fw-bold text-truncate"
-                                            style={{ fontSize: '1.75rem', lineHeight: 1.2 }}
-                                        >
-                                            {fatura.cartao_nome || 'Cartão'}
-                                        </div>
                                         {(fatura.bandeira || fatura.cartao_bandeira) && (
-                                            <div className="mt-1">
+                                            <div>
                                                 <span
                                                     className="badge bg-primary-subtle text-primary-emphasis"
                                                     style={{ fontSize: '0.95rem', fontWeight: 600 }}
@@ -1664,13 +1665,14 @@ const FaturasViewPage = () => {
                                                 <th style={{ minWidth: 160 }}>Subcategoria</th>
                                                 <th style={{ minWidth: 250 }}>Observação</th>
                                                 <th style={{ width: 90 }} title="Responsável">Resp.</th>
+                                                <th style={{ width: 90 }}>Compra</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             {gruposVisiveis.map((grupo) => (
                                                 <React.Fragment key={grupo.key}>
                                                     <tr className="table-secondary">
-                                                        <td colSpan={10} className="py-2">
+                                                        <td colSpan={11} className="py-2">
                                                             <div className="d-flex flex-wrap align-items-center justify-content-between gap-2">
                                                                 <span className="fw-semibold">
                                                                     {grupo.label}
@@ -1699,11 +1701,12 @@ const FaturasViewPage = () => {
                                                             : (tx.cartao_numero_id ?? tx.cartao_numero?.id ?? null)
                                                         const selectFinalValue = finalSalvo ?? ''
                                                         const rowKey = tx.id ?? `${grupo.key}_${idx}`
+                                                        const compraTo = compraDestinoDaFatura(tx, fatura.mes, fatura.ano)
                                                         return (
                                                         <React.Fragment key={rowKey}>
                                                         {isSemCartaoGrupo && (
                                                             <tr className="table-warning">
-                                                                <td colSpan={10} className="py-2">
+                                                                <td colSpan={11} className="py-2">
                                                                     <div className="d-flex flex-wrap align-items-center gap-2">
                                                                         <span className="text-muted small text-nowrap">
                                                                             <i className="ri-bank-card-line me-1"></i>
@@ -1898,6 +1901,21 @@ const FaturasViewPage = () => {
                                                                         <span className="small text-muted">Eu</span>
                                                                     )}
                                                                 </Button>
+                                                            </td>
+                                                            <td className="text-center">
+                                                                {compraTo ? (
+                                                                    <Link
+                                                                        to={compraTo}
+                                                                        state={{ from: `/faturas/view/${fatura.id}` }}
+                                                                        className="btn btn-sm btn-soft-primary"
+                                                                        title="Ver detalhes da compra"
+                                                                    >
+                                                                        <i className="ri-eye-line me-1"></i>
+                                                                        Ver
+                                                                    </Link>
+                                                                ) : (
+                                                                    <span className="text-muted">—</span>
+                                                                )}
                                                             </td>
                                                         </tr>
                                                         </React.Fragment>

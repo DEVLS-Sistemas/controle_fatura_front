@@ -25,12 +25,17 @@ export class CartoesService implements CartoesInterface {
     }
 
     async getViewCartoes(params: { id: number | string }): Promise<CartoesView | undefined> {
-        const response = await this.httpClient.get<CartoesView>({
+        const response = await this.httpClient.get<any>({
             url: `${this.url}/listar/${params.id}`
         })
 
         switch (response.statusCode) {
-            case HttpStatusCode.ok: return response.body
+            case HttpStatusCode.ok: {
+                const body = response.body
+                if (!body) return undefined
+                if (body.nome != null || body.cor_fundo || body.bandeiras) return body
+                return body.data ?? body.cartao?.data ?? body.cartao ?? body
+            }
             case HttpStatusCode.unauthorized: throw new AccessDeniedError()
             default: throw new UnexpectedError()
         }
@@ -91,11 +96,15 @@ export class CartoesService implements CartoesInterface {
     }
 
     async getLookupsCartoes(): Promise<LookupsCartoes | undefined> {
-        const response = await this.httpClient.get<LookupsCartoes>({
+        const response = await this.httpClient.get<any>({
             url: this.url + '/lookups'
         })
         switch (response.statusCode) {
-            case HttpStatusCode.ok: return response.body
+            case HttpStatusCode.ok: {
+                const body = response.body
+                const data = body?.data && !Array.isArray(body.data) ? body.data : body
+                return data
+            }
             case HttpStatusCode.unauthorized: throw new AccessDeniedError()
             default: throw new UnexpectedError()
         }

@@ -1,11 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Container } from 'reactstrap'
 import { SubmitHandler } from 'react-hook-form'
 import { toast } from 'react-toastify'
 import { setActiveMenu } from 'helpers/system_helpers'
 import { SelectOptions } from 'interfaces/SystemInterfaces/SelectInterface'
 import {
-  RankingParceladasDefaultValues,
   RankingParceladasSearch,
   RankingParceladasView,
   RankingParceladasVisualizacao,
@@ -18,8 +18,10 @@ import {
   estaVisivelNoRanking,
   isApenasAbertas,
   ordenarPorMenorPercentual,
+  persistRankingSearch,
   persistVisualizacaoRanking,
   readVisualizacaoRanking,
+  resolveRankingSearchDefaults,
 } from 'helpers/ranking_parceladas_helpers'
 import RankingParceladasFilter, {
   RankingParceladasFilterHandle,
@@ -55,6 +57,7 @@ const buildSelectOptions = (
 }
 
 const RankingParceladasPage = () => {
+  const [searchParams] = useSearchParams()
   const [loading, setLoading] = useState<boolean>(true)
   const [rankingData, setRankingData] = useState<RankingParceladasView>()
   const [visualizacao, setVisualizacao] = useState<RankingParceladasVisualizacao>('lista')
@@ -62,17 +65,7 @@ const RankingParceladasPage = () => {
   const rankingService = new RankingParceladasService()
   const transacoesService = new TransacoesService()
 
-  const now = new Date()
-  const defaultValues: RankingParceladasSearch = {
-    mes: RankingParceladasDefaultValues.mes ?? now.getMonth() + 1,
-    ano: RankingParceladasDefaultValues.ano ?? now.getFullYear(),
-    cartao_id: null,
-    responsavel_id: null,
-    categoria_id: null,
-    apenas_abertas: true,
-    ordenar: 'percentual_asc',
-    palavra_chave: null,
-  }
+  const defaultValues: RankingParceladasSearch = resolveRankingSearchDefaults(searchParams)
 
   const [cartoesOptions, setCartoesOptions] = useState<SelectOptions[]>([
     { value: '', label: 'Todos' },
@@ -90,8 +83,8 @@ const RankingParceladasPage = () => {
   ): RankingParceladasView | undefined => {
     if (!result) return result
 
-    const mes = Number(filters.mes) || now.getMonth() + 1
-    const ano = Number(filters.ano) || now.getFullYear()
+    const mes = Number(filters.mes) || new Date().getMonth() + 1
+    const ano = Number(filters.ano) || new Date().getFullYear()
     const enriched = enriquecerRankingView(result, mes, ano)
     let itens = [...(enriched.itens ?? [])]
 
@@ -112,8 +105,8 @@ const RankingParceladasPage = () => {
     setLoading(true)
     try {
       const filters: RankingParceladasSearch = {
-        mes: Number(data.mes) || now.getMonth() + 1,
-        ano: Number(data.ano) || now.getFullYear(),
+        mes: Number(data.mes) || new Date().getMonth() + 1,
+        ano: Number(data.ano) || new Date().getFullYear(),
         cartao_id: data.cartao_id || null,
         responsavel_id: data.responsavel_id || null,
         categoria_id: data.categoria_id || null,
@@ -121,6 +114,7 @@ const RankingParceladasPage = () => {
         ordenar: 'percentual_asc',
         palavra_chave: data.palavra_chave,
       }
+      persistRankingSearch(filters)
       const result = await rankingService.getRankingParceladas(filters)
       setRankingData(applyRankingView(result, filters))
     } catch (error: any) {

@@ -28,14 +28,19 @@ import { SelectListControlled } from 'Components/ComponentController/Selects/Sel
 import { SelectOptions } from 'interfaces/SystemInterfaces/SelectInterface'
 import {
     buildDiasOptions,
+    CARTAO_COR_PADRAO,
     CARTAO_CORES_FUNDO_PADRAO,
     CARTAO_CORES_TEXTO_PADRAO,
     CARTAO_PARES_CORES_PADRAO,
+    CARTAO_PRESETS_CORES_PADRAO,
     CartaoBandeira,
     CartaoNumero,
     CartoesDefaultValues,
     CartoesModel,
     findSenhaPdfRegraByBanco,
+    matchPresetCorCartao,
+    normalizeHexCor,
+    PresetCorLookup,
     resolveSenhaPdfRegraDigitos,
     ParCorLookup,
     SenhaPdfRegraLookup,
@@ -91,10 +96,6 @@ const buildRecordFromSource = (source: any): CartoesModel => ({
     numeros_remover: [],
 })
 
-const CORES_UNIFICADAS_PADRAO = Array.from(
-    new Set([...CARTAO_CORES_FUNDO_PADRAO, ...CARTAO_CORES_TEXTO_PADRAO])
-)
-
 const ColorSwatch = ({
     hex,
     selected,
@@ -114,7 +115,7 @@ const ColorSwatch = ({
             height: 28,
             borderRadius: '50%',
             backgroundColor: hex,
-            border: '1.5px solid #000000',
+            border: hex.toLowerCase() === '#e5e7eb' ? '1.5px solid #9ca3af' : '1.5px solid #000000',
             outline: selected ? '2px solid #405189' : 'none',
             outlineOffset: 2,
             boxShadow: selected ? '0 0 0 2px rgba(64,81,137,0.2)' : undefined,
@@ -184,9 +185,17 @@ const CartoesForm = () => {
     const [diasOptions, setDiasOptions] = useState<SelectOptions[]>(
         buildDiasOptions().map((d) => ({ value: d.value, label: d.label }))
     )
-    const [coresFundo, setCoresFundo] = useState<string[]>(CORES_UNIFICADAS_PADRAO)
-    const [coresTexto, setCoresTexto] = useState<string[]>(CORES_UNIFICADAS_PADRAO)
+    const [coresFundo, setCoresFundo] = useState<string[]>(CARTAO_CORES_FUNDO_PADRAO)
+    const [coresTexto, setCoresTexto] = useState<string[]>(CARTAO_CORES_TEXTO_PADRAO)
     const [paresCores, setParesCores] = useState<ParCorLookup[]>(CARTAO_PARES_CORES_PADRAO)
+    const [presetsCores, setPresetsCores] = useState<PresetCorLookup[]>(CARTAO_PRESETS_CORES_PADRAO)
+    const [corPadrao, setCorPadrao] = useState<ParCorLookup>(CARTAO_COR_PADRAO)
+    const [coresManuais, setCoresManuais] = useState(
+        () => !!(paramId || state?.source)
+    )
+    const [selectedChave, setSelectedChave] = useState<string | null>(
+        paramId || state?.source ? null : 'padrao'
+    )
     const [senhaPdfRegraOptions, setSenhaPdfRegraOptions] = useState<SelectOptions[]>([])
 
     const regraSelecionada = senhasPdfRegras.find(
@@ -199,9 +208,17 @@ const CartoesForm = () => {
         (b) => b.bandeira.toLowerCase() === novoCartao.bandeira.trim().toLowerCase()
     )
 
-    const applyParCor = (par: ParCorLookup) => {
-        setValue('cor_fundo', par.cor_fundo, { shouldDirty: true })
-        setValue('cor_texto', par.cor_texto, { shouldDirty: true })
+    const applyParCor = (par: ParCorLookup, manual = true) => {
+        setValue('cor_fundo', par.cor_fundo, { shouldDirty: manual })
+        setValue('cor_texto', par.cor_texto, { shouldDirty: manual })
+        setSelectedChave(par.chave ?? null)
+        if (manual) setCoresManuais(true)
+    }
+
+    const applyHexManual = (campo: 'cor_fundo' | 'cor_texto', hex: string) => {
+        setValue(campo, hex, { shouldDirty: true })
+        setCoresManuais(true)
+        setSelectedChave(null)
     }
 
     const getLookups = async (): Promise<void> => {
@@ -232,11 +249,16 @@ const CartoesForm = () => {
             const pares = lookups?.pares_cores?.length
                 ? lookups.pares_cores
                 : CARTAO_PARES_CORES_PADRAO
+            const presets = lookups?.presets_cores?.length
+                ? lookups.presets_cores
+                : CARTAO_PRESETS_CORES_PADRAO
+            const padrao = lookups?.cor_padrao ?? CARTAO_COR_PADRAO
 
-            const coresUnificadas = Array.from(new Set([...fundo, ...texto]))
-            setCoresFundo(coresUnificadas)
-            setCoresTexto(coresUnificadas)
+            setCoresFundo(fundo)
+            setCoresTexto(texto)
             setParesCores(pares)
+            setPresetsCores(presets)
+            setCorPadrao(padrao)
 
             const regras = lookups?.senhas_pdf_regras ?? []
             setSenhasPdfRegras(regras)
@@ -244,18 +266,20 @@ const CartoesForm = () => {
                 regras.map((r) => ({ value: r.value, label: r.label }))
             )
 
-            if (!record.cor_fundo || !record.cor_texto) {
-                const fallback = pares[0] ?? {
-                    cor_fundo: coresUnificadas[0],
-                    cor_texto: '#ffffff',
-                }
-                if (!record.cor_fundo) setValue('cor_fundo', fallback.cor_fundo)
-                if (!record.cor_texto) setValue('cor_texto', fallback.cor_texto)
+            if (!isEditing && !coresManuais) {
+                const matched = matchPresetCorCartao(
+                    getValues('nome'),
+                    getValues('banco'),
+                    presets,
+                    padrao
+                )
+                applyParCor(matched, false)
             }
         } catch (error) {
             console.error('Erro ao carregar lookups de cartões:', error)
-            if (!record.cor_fundo) setValue('cor_fundo', CARTAO_PARES_CORES_PADRAO[0].cor_fundo)
-            if (!record.cor_texto) setValue('cor_texto', CARTAO_PARES_CORES_PADRAO[0].cor_texto)
+            if (!isEditing && !getValues('cor_fundo')) {
+                applyParCor(CARTAO_COR_PADRAO, false)
+            }
         }
     }
 
@@ -272,6 +296,8 @@ const CartoesForm = () => {
                 setLimparSenhaPdf(false)
                 setSenhaPdfDigitada('')
                 reset(loaded)
+                setCoresManuais(true)
+                setSelectedChave(null)
             }
         } catch (error) {
             console.error('Erro ao carregar cartão:', error)
@@ -619,6 +645,14 @@ const CartoesForm = () => {
         }
     }, [bancoWatch, senhasPdfRegras, getValues, setValue])
 
+    // Aplica a cor oficial do banco enquanto o usuário não escolheu na mão
+    useEffect(() => {
+        if (coresManuais) return
+        const matched = matchPresetCorCartao(nomePreview, bancoWatch, presetsCores, corPadrao)
+        applyParCor(matched, false)
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [nomePreview, bancoWatch, coresManuais, presetsCores, corPadrao])
+
     // Limita a senha digitada ao máximo de dígitos da regra selecionada
     useEffect(() => {
         if (senhaPdfDigitos == null || senhaPdfDigitos <= 0) return
@@ -856,33 +890,52 @@ const CartoesForm = () => {
                                         <Row>
                                             <Col md={12}>
                                                 <div className="mb-3">
-                                                    <Label className="form-label">Cores do cartão</Label>
-                                                    <div className="d-flex flex-wrap align-items-center gap-2 mb-3">
-                                                        <span className="text-muted small me-1">Sugestões:</span>
+                                                    <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+                                                        <Label className="form-label mb-0">Cores do cartão</Label>
+                                                        {coresManuais ? (
+                                                            <button
+                                                                type="button"
+                                                                className="btn btn-sm btn-soft-primary"
+                                                                onClick={() => setCoresManuais(false)}
+                                                            >
+                                                                Usar cor do banco
+                                                            </button>
+                                                        ) : (
+                                                            <small className="text-muted">
+                                                                A cor acompanha o nome/banco até você escolher um chip
+                                                            </small>
+                                                        )}
+                                                    </div>
+
+                                                    <div className="cartao-cores-grid mb-3">
                                                         {paresCores.map((par) => {
-                                                            const selected =
-                                                                corFundo === par.cor_fundo &&
-                                                                corTexto === par.cor_texto
+                                                            const chaveMatch = selectedChave
+                                                                ? par.chave === selectedChave
+                                                                : false
+                                                            const corMatch =
+                                                                normalizeHexCor(corFundo) === normalizeHexCor(par.cor_fundo) &&
+                                                                normalizeHexCor(corTexto) === normalizeHexCor(par.cor_texto)
+                                                            const selected = selectedChave ? chaveMatch : corMatch
                                                             return (
                                                                 <button
-                                                                    key={`${par.cor_fundo}-${par.cor_texto}-${par.label}`}
+                                                                    key={`${par.chave || par.label}-${par.cor_fundo}`}
                                                                     type="button"
-                                                                    className="btn btn-sm p-0 border-0"
+                                                                    className={`cartao-cores-grid__item ${selected ? 'is-selected' : ''}`}
                                                                     onClick={() => applyParCor(par)}
                                                                     title={par.label || `${par.cor_fundo} / ${par.cor_texto}`}
-                                                                    style={{
-                                                                        outline: selected
-                                                                            ? '2px solid #405189'
-                                                                            : '1px solid transparent',
-                                                                        outlineOffset: 2,
-                                                                        borderRadius: 4,
-                                                                    }}
                                                                 >
-                                                                    <CartaoChip
-                                                                        cor_fundo={par.cor_fundo}
-                                                                        cor_texto={par.cor_texto}
-                                                                        label={par.label || 'Aa'}
-                                                                    />
+                                                                    <span
+                                                                        className="cartao-cores-grid__chip"
+                                                                        style={{
+                                                                            backgroundColor: par.cor_fundo,
+                                                                            color: par.cor_texto,
+                                                                        }}
+                                                                    >
+                                                                        Aa
+                                                                    </span>
+                                                                    <span className="cartao-cores-grid__label">
+                                                                        {par.label || 'Cor'}
+                                                                    </span>
                                                                 </button>
                                                             )
                                                         })}
@@ -890,7 +943,7 @@ const CartoesForm = () => {
 
                                                     <Row>
                                                         <Col md={6}>
-                                                            <Label className="form-label small text-muted">Cor de fundo</Label>
+                                                            <Label className="form-label small text-muted">Ajuste fino — fundo</Label>
                                                             <div
                                                                 className="d-flex flex-wrap gap-2 mb-2 p-2 rounded"
                                                                 style={{
@@ -902,16 +955,14 @@ const CartoesForm = () => {
                                                                     <ColorSwatch
                                                                         key={`fundo-${hex}`}
                                                                         hex={hex}
-                                                                        selected={corFundo === hex}
-                                                                        onClick={() =>
-                                                                            setValue('cor_fundo', hex, { shouldDirty: true })
-                                                                        }
+                                                                        selected={normalizeHexCor(corFundo) === normalizeHexCor(hex)}
+                                                                        onClick={() => applyHexManual('cor_fundo', hex)}
                                                                     />
                                                                 ))}
                                                             </div>
                                                         </Col>
                                                         <Col md={6}>
-                                                            <Label className="form-label small text-muted">Cor do texto</Label>
+                                                            <Label className="form-label small text-muted">Ajuste fino — texto</Label>
                                                             <div
                                                                 className="d-flex flex-wrap gap-2 mb-2 p-2 rounded"
                                                                 style={{
@@ -923,10 +974,8 @@ const CartoesForm = () => {
                                                                     <ColorSwatch
                                                                         key={`texto-${hex}`}
                                                                         hex={hex}
-                                                                        selected={corTexto === hex}
-                                                                        onClick={() =>
-                                                                            setValue('cor_texto', hex, { shouldDirty: true })
-                                                                        }
+                                                                        selected={normalizeHexCor(corTexto) === normalizeHexCor(hex)}
+                                                                        onClick={() => applyHexManual('cor_texto', hex)}
                                                                     />
                                                                 ))}
                                                             </div>
@@ -938,7 +987,7 @@ const CartoesForm = () => {
                                                         <CartaoChip
                                                             cor_fundo={corFundo}
                                                             cor_texto={corTexto}
-                                                            label={nomePreview || 'Cartão'}
+                                                            label={nomePreview || 'Novo cartão'}
                                                         />
                                                         {(corFundo || corTexto) && (
                                                             <small className="text-muted">

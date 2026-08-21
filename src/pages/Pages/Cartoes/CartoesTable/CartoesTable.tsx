@@ -10,7 +10,7 @@ import CustomModal from "Components/ComponentController/Modal/CustomModal"
 import TableActionsDropdown from "Components/Common/TableActionsDropdown"
 import { CartoesList, CartoesSearch } from "interfaces/Cartoes/CartoesInterface"
 import { CartoesService } from "services/Cartoes/CartoesService"
-import { CartaoChip, extractCartaoErrorMessage } from "helpers/cartao_helpers"
+import { CartaoChip, extractCartaoErrorMessage, resolveCartaoCores } from "helpers/cartao_helpers"
 import { formatCurrency, VALOR_TEXT_CLASS } from "helpers/fatura_helpers"
 
 export interface CartoesTableProps {
@@ -168,20 +168,16 @@ export const CartoesTable = ({ data, getData, setPerPage, perPage, filters }: Ca
                                                                     )
                                                                     ?? 0
                                                                 const limites = formatLimitesResumo(row)
+                                                                const cores = resolveCartaoCores(row)
 
                                                                 return (
                                                                     <tr key={row.id ?? index}>
                                                                         <td className="text-start">
-                                                                            <div className="d-flex align-items-center gap-2">
-                                                                                {row.cor_fundo && (
-                                                                                    <CartaoChip
-                                                                                        cor_fundo={row.cor_fundo}
-                                                                                        cor_texto={row.cor_texto}
-                                                                                        label={row.nome ? String(row.nome).slice(0, 1) : '•'}
-                                                                                    />
-                                                                                )}
-                                                                                <span>{row.nome}</span>
-                                                                            </div>
+                                                                            <CartaoChip
+                                                                                cor_fundo={cores.cor_fundo}
+                                                                                cor_texto={cores.cor_texto}
+                                                                                label={row.nome || 'Cartão'}
+                                                                            />
                                                                         </td>
                                                                         <td>{row.banco || '-'}</td>
                                                                         <td>

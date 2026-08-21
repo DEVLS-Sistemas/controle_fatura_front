@@ -121,3 +121,4 @@ export const RankingParceladasDefaultValues: RankingParceladasSearch = {
 }
 
 export const RANKING_VIEW_STORAGE_KEY = 'ranking_parceladas_view'
+export const RANKING_SEARCH_STORAGE_KEY = 'ranking_parceladas_search'

@@ -3,7 +3,7 @@ import { Link, useLocation, useParams } from 'react-router-dom'
 import { toast } from 'react-toastify'
 import { setActiveMenu } from 'helpers/system_helpers'
 import { useNavegacao } from 'helpers/functions_helpers'
-import { CartaoChip } from 'helpers/cartao_helpers'
+import { CartaoChip, resolveCartaoCores } from 'helpers/cartao_helpers'
 import { formatCurrency, VALOR_TEXT_CLASS } from 'helpers/fatura_helpers'
 import { Breadcrumb, BreadcrumbItem, Card, CardBody, Col, Container, Label, Row } from 'reactstrap'
 import { CartoesView, TIPOS_NUMERO_PADRAO } from 'interfaces/Cartoes/CartoesInterface'
@@ -54,6 +54,7 @@ const CartoesViewPage = () => {
     const qtdNumeros = record.qtd_numeros
         ?? record.bandeiras?.reduce((acc, b) => acc + (b.numeros?.length ?? 0), 0)
         ?? 0
+    const cores = resolveCartaoCores(record)
 
     return (
         <React.Fragment>
@@ -81,15 +82,12 @@ const CartoesViewPage = () => {
                                     <Row>
                                         <Col md={6} className="mb-3">
                                             <Label className="form-label fw-semibold">Nome</Label>
-                                            <p className="text-muted mb-0 d-flex align-items-center gap-2">
-                                                {record.cor_fundo && (
-                                                    <CartaoChip
-                                                        cor_fundo={record.cor_fundo}
-                                                        cor_texto={record.cor_texto}
-                                                        label={record.nome ? String(record.nome).slice(0, 1) : '•'}
-                                                    />
-                                                )}
-                                                {record.nome}
+                                            <p className="mb-0">
+                                                <CartaoChip
+                                                    cor_fundo={cores.cor_fundo}
+                                                    cor_texto={cores.cor_texto}
+                                                    label={record.nome || 'Cartão'}
+                                                />
                                             </p>
                                         </Col>
                                         <Col md={6} className="mb-3">
@@ -121,20 +119,14 @@ const CartoesViewPage = () => {
                                         <Col md={6} className="mb-3">
                                             <Label className="form-label fw-semibold">Cores</Label>
                                             <p className="mb-0 d-flex align-items-center gap-2">
-                                                {record.cor_fundo ? (
-                                                    <>
-                                                        <CartaoChip
-                                                            cor_fundo={record.cor_fundo}
-                                                            cor_texto={record.cor_texto}
-                                                            label={record.nome || 'Cartão'}
-                                                        />
-                                                        <span className="text-muted small">
-                                                            {record.cor_fundo} / {record.cor_texto || '-'}
-                                                        </span>
-                                                    </>
-                                                ) : (
-                                                    <span className="text-muted">-</span>
-                                                )}
+                                                <CartaoChip
+                                                    cor_fundo={cores.cor_fundo}
+                                                    cor_texto={cores.cor_texto}
+                                                    label={record.nome || 'Cartão'}
+                                                />
+                                                <span className="text-muted small">
+                                                    {cores.cor_fundo} / {cores.cor_texto}
+                                                </span>
                                             </p>
                                         </Col>
                                         <Col md={6} className="mb-3">

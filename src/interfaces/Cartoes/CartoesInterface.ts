@@ -116,9 +116,19 @@ export interface DiaLookup {
 }
 
 export interface ParCorLookup {
+    chave?: string
+    label?: string
     cor_fundo: string
     cor_texto: string
-    label?: string
+    padrao?: boolean
+}
+
+export interface PresetCorLookup {
+    chave: string
+    label: string
+    aliases?: string[]
+    cor_fundo: string
+    cor_texto: string
 }
 
 export interface TipoNumeroLookup {
@@ -160,6 +170,8 @@ export interface LookupsCartoes {
     cores_fundo?: string[]
     cores_texto?: string[]
     pares_cores?: ParCorLookup[]
+    presets_cores?: PresetCorLookup[]
+    cor_padrao?: ParCorLookup
     dias?: DiaLookup[]
     senhas_pdf_regras?: SenhaPdfRegraLookup[]
 }
@@ -185,8 +197,8 @@ export const CartoesDefaultValues: CartoesModel = {
     banco: null,
     dia_limite_fatura: null,
     dia_vencimento_fatura: null,
-    cor_fundo: null,
-    cor_texto: null,
+    cor_fundo: '#e5e7eb',
+    cor_texto: '#111827',
     ativo: true,
     senha_pdf: null,
     senha_pdf_regra: null,
@@ -218,34 +230,116 @@ export const TIPOS_NUMERO_PADRAO: TipoNumeroLookup[] = [
     { value: 'adicional', label: 'Adicional' },
 ]
 
-export const CARTAO_CORES_FUNDO_PADRAO = [
-    '#ef4444',
-    '#f59e0b',
-    '#22c55e',
-    '#3b82f6',
-    '#8b5cf6',
-    '#ec4899',
-    '#6b7280',
-    '#14b8a6',
-]
+export const CARTAO_COR_PADRAO: ParCorLookup = {
+    chave: 'padrao',
+    label: 'Padrão',
+    cor_fundo: '#e5e7eb',
+    cor_texto: '#111827',
+    padrao: true,
+}
 
-export const CARTAO_CORES_TEXTO_PADRAO = [
-    '#ffffff',
-    '#f8fafc',
-    '#0f172a',
-    '#111827',
+export const CARTAO_PRESETS_CORES_PADRAO: PresetCorLookup[] = [
+    { chave: 'nubank', label: 'Nubank', aliases: ['nubank', 'nu bank', 'nu pagamentos', 'roxinho'], cor_fundo: '#820ad1', cor_texto: '#ffffff' },
+    { chave: 'inter', label: 'Inter', aliases: ['inter', 'banco inter', 'inter medium'], cor_fundo: '#ff7a00', cor_texto: '#ffffff' },
+    { chave: 'c6', label: 'C6 Bank', aliases: ['c6 bank', 'c6bank', 'c6'], cor_fundo: '#111111', cor_texto: '#ffffff' },
+    { chave: 'sofisa', label: 'Sofisa', aliases: ['sofisa', 'banco sofisa'], cor_fundo: '#008f5a', cor_texto: '#ffffff' },
+    { chave: 'itau', label: 'Itaú', aliases: ['itau', 'banco itau', 'itau unibanco'], cor_fundo: '#003b70', cor_texto: '#ffffff' },
+    { chave: 'santander', label: 'Santander', aliases: ['santander'], cor_fundo: '#ec0000', cor_texto: '#ffffff' },
+    { chave: 'bradesco', label: 'Bradesco', aliases: ['bradesco'], cor_fundo: '#cc092f', cor_texto: '#ffffff' },
+    { chave: 'bb', label: 'Banco do Brasil', aliases: ['banco do brasil', 'banco brasil', 'bb'], cor_fundo: '#f8d117', cor_texto: '#003da5' },
+    { chave: 'caixa', label: 'Caixa', aliases: ['caixa economica', 'caixa'], cor_fundo: '#005ca9', cor_texto: '#ffffff' },
+    { chave: 'picpay', label: 'PicPay', aliases: ['picpay', 'pic pay'], cor_fundo: '#21c25e', cor_texto: '#000000' },
+    { chave: 'mercadopago', label: 'Mercado Pago', aliases: ['mercado pago', 'mercadopago', 'mercado livre'], cor_fundo: '#009ee3', cor_texto: '#ffffff' },
+    { chave: 'neon', label: 'Neon', aliases: ['neon'], cor_fundo: '#00e676', cor_texto: '#000000' },
+    { chave: 'btg', label: 'BTG Pactual', aliases: ['btg pactual', 'pactual', 'btg'], cor_fundo: '#001e62', cor_texto: '#ffffff' },
+    { chave: 'xp', label: 'XP', aliases: ['xp investimentos', 'xp'], cor_fundo: '#111111', cor_texto: '#ffffff' },
+    { chave: 'pagbank', label: 'PagBank', aliases: ['pagbank', 'pag bank', 'pagseguro'], cor_fundo: '#ffb800', cor_texto: '#000000' },
+    { chave: 'pan', label: 'PAN', aliases: ['banco pan', 'pan'], cor_fundo: '#00aeef', cor_texto: '#ffffff' },
+    { chave: 'will', label: 'Will Bank', aliases: ['will bank', 'willbank', 'will'], cor_fundo: '#6c2bd9', cor_texto: '#ffffff' },
+    { chave: 'original', label: 'Original', aliases: ['banco original', 'original'], cor_fundo: '#00a859', cor_texto: '#ffffff' },
+    { chave: 'next', label: 'Next', aliases: ['next bradesco', 'next'], cor_fundo: '#00a859', cor_texto: '#ffffff' },
+    { chave: 'amazon', label: 'Amazon Card', aliases: ['amazon card', 'amazon'], cor_fundo: '#146eb4', cor_texto: '#ffffff' },
+    { chave: 'samsclub', label: "Sam's Club", aliases: ['sams club', "sam's club", 'samsclub'], cor_fundo: '#0067a0', cor_texto: '#ffffff' },
+    { chave: 'paodeacucar', label: 'Pão de Açúcar', aliases: ['pao de acucar', 'pao de açucar'], cor_fundo: '#00843d', cor_texto: '#ffffff' },
+    { chave: 'carrefour', label: 'Carrefour', aliases: ['carrefour'], cor_fundo: '#004b93', cor_texto: '#ffffff' },
+    { chave: 'magalu', label: 'Magalu', aliases: ['magazine luiza', 'magalu'], cor_fundo: '#0086ff', cor_texto: '#ffffff' },
+    { chave: 'renner', label: 'Renner', aliases: ['cartao renner', 'renner', 'realize'], cor_fundo: '#d71920', cor_texto: '#ffffff' },
+    { chave: 'riachuelo', label: 'Riachuelo', aliases: ['riachuelo', 'midway'], cor_fundo: '#e30613', cor_texto: '#ffffff' },
+    { chave: 'americanas', label: 'Americanas', aliases: ['americanas'], cor_fundo: '#e60012', cor_texto: '#ffffff' },
+    { chave: 'shopee', label: 'Shopee', aliases: ['shopee'], cor_fundo: '#ee4d2d', cor_texto: '#ffffff' },
 ]
 
 export const CARTAO_PARES_CORES_PADRAO: ParCorLookup[] = [
-    { cor_fundo: '#8b5cf6', cor_texto: '#ffffff', label: 'Roxo' },
-    { cor_fundo: '#22c55e', cor_texto: '#052e16', label: 'Verde' },
-    { cor_fundo: '#3b82f6', cor_texto: '#ffffff', label: 'Azul' },
-    { cor_fundo: '#ef4444', cor_texto: '#ffffff', label: 'Vermelho' },
-    { cor_fundo: '#f59e0b', cor_texto: '#111827', label: 'Âmbar' },
-    { cor_fundo: '#ec4899', cor_texto: '#ffffff', label: 'Rosa' },
-    { cor_fundo: '#6b7280', cor_texto: '#ffffff', label: 'Cinza' },
-    { cor_fundo: '#14b8a6', cor_texto: '#042f2e', label: 'Teal' },
+    CARTAO_COR_PADRAO,
+    ...CARTAO_PRESETS_CORES_PADRAO.map((preset) => ({
+        chave: preset.chave,
+        label: preset.label,
+        cor_fundo: preset.cor_fundo,
+        cor_texto: preset.cor_texto,
+        padrao: false,
+    })),
 ]
+
+export const CARTAO_CORES_FUNDO_PADRAO = Array.from(
+    new Set(CARTAO_PARES_CORES_PADRAO.map((par) => par.cor_fundo))
+)
+
+export const CARTAO_CORES_TEXTO_PADRAO = Array.from(
+    new Set(CARTAO_PARES_CORES_PADRAO.map((par) => par.cor_texto))
+)
+
+const normalizeCorBusca = (value?: string | null): string =>
+    String(value ?? '')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim()
+
+export const normalizeHexCor = (value?: string | null): string =>
+    String(value ?? '').trim().toLowerCase()
+
+/** Encontra o preset cujo alias/label casa com nome ou banco (alias mais longo vence). */
+export const matchPresetCorCartao = (
+    nome?: string | null,
+    banco?: string | null,
+    presets: PresetCorLookup[] = CARTAO_PRESETS_CORES_PADRAO,
+    fallback: ParCorLookup = CARTAO_COR_PADRAO
+): ParCorLookup => {
+    const haystack = normalizeCorBusca(`${nome ?? ''} ${banco ?? ''}`)
+    if (!haystack) return fallback
+
+    const words = haystack.split(/[^a-z0-9]+/).filter(Boolean)
+    let best: PresetCorLookup | null = null
+    let bestLen = -1
+
+    for (const preset of presets) {
+        const aliases = [preset.label, preset.chave, ...(preset.aliases ?? [])]
+        for (const alias of aliases) {
+            const normalized = normalizeCorBusca(alias)
+            if (!normalized) continue
+            const compact = normalized.replace(/\s+/g, '')
+            const isShort = compact.length <= 3
+            const matched = isShort
+                ? words.includes(compact) || words.includes(normalized)
+                : haystack.includes(normalized)
+            if (matched && compact.length > bestLen) {
+                best = preset
+                bestLen = compact.length
+            }
+        }
+    }
+
+    if (!best) return fallback
+    const matchedPreset = best
+    return {
+        chave: matchedPreset.chave,
+        label: matchedPreset.label,
+        cor_fundo: matchedPreset.cor_fundo,
+        cor_texto: matchedPreset.cor_texto,
+        padrao: false,
+    }
+}
 
 export const buildDiasOptions = (): DiaLookup[] =>
     Array.from({ length: 31 }, (_, i) => {

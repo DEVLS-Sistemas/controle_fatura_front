@@ -1,5 +1,9 @@
 import React, { CSSProperties } from 'react'
 import { ValidationError } from 'libs/api/exceptions/ValidationError'
+import {
+    CARTAO_COR_PADRAO,
+    matchPresetCorCartao,
+} from 'interfaces/Cartoes/CartoesInterface'
 
 export type CartaoCores = {
     cor_fundo?: string | null
@@ -28,6 +32,25 @@ export const cartaoChipStyle = (
     return {
         backgroundColor: corFundo,
         color: corTexto || '#ffffff',
+    }
+}
+
+export const resolveCartaoCores = (cartao?: {
+    nome?: string | null
+    banco?: string | null
+    cor_fundo?: string | null
+    cor_texto?: string | null
+} | null): { cor_fundo: string; cor_texto: string } => {
+    if (cartao?.cor_fundo) {
+        return {
+            cor_fundo: cartao.cor_fundo,
+            cor_texto: cartao.cor_texto || '#ffffff',
+        }
+    }
+    const matched = matchPresetCorCartao(cartao?.nome, cartao?.banco, undefined, CARTAO_COR_PADRAO)
+    return {
+        cor_fundo: matched.cor_fundo,
+        cor_texto: matched.cor_texto,
     }
 }
 

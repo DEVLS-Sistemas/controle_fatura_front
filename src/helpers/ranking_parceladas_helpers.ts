@@ -4,9 +4,11 @@ import {
   RankingParceladaParcelaResumo,
   RankingParceladaTimeline,
   RankingParceladasOrdenar,
+  RankingParceladasSearch,
   RankingParceladasTotais,
   RankingParceladasView,
   RankingParceladasVisualizacao,
+  RANKING_SEARCH_STORAGE_KEY,
   RANKING_VIEW_STORAGE_KEY,
 } from 'interfaces/RankingParceladas/RankingParceladasInterface'
 
@@ -243,13 +245,60 @@ export const enriquecerRankingView = (
   }
 }
 
-export const faturaDestinoRanking = (item: RankingParceladaItem): string | null => {
-  const faturaId =
-    item.proxima_parcela?.fatura_id ??
-    item.competencia_atual?.fatura_id ??
-    item.ultima_parcela?.fatura_id ??
-    null
-  return faturaId ? `/faturas/view/${faturaId}` : null
+export const compraDestinoRanking = (
+  item: RankingParceladaItem,
+  mes?: number | null,
+  ano?: number | null
+): string | null => {
+  const id = item.compra_grupo_id
+  if (!id) return null
+  const params = new URLSearchParams()
+  if (mes) params.set('mes', String(mes))
+  if (ano) params.set('ano', String(ano))
+  const qs = params.toString()
+  return qs
+    ? `/compras/${encodeURIComponent(String(id))}?${qs}`
+    : `/compras/${encodeURIComponent(String(id))}`
+}
+
+export const readRankingSearch = (): Partial<RankingParceladasSearch> | null => {
+  try {
+    const raw = sessionStorage.getItem(RANKING_SEARCH_STORAGE_KEY)
+    if (!raw) return null
+    return JSON.parse(raw)
+  } catch {
+    return null
+  }
+}
+
+export const persistRankingSearch = (search: RankingParceladasSearch) => {
+  try {
+    sessionStorage.setItem(RANKING_SEARCH_STORAGE_KEY, JSON.stringify(search))
+  } catch {
+    // ignore
+  }
+}
+
+export const resolveRankingSearchDefaults = (
+  urlParams?: URLSearchParams | null
+): RankingParceladasSearch => {
+  const now = new Date()
+  const stored = readRankingSearch()
+  const mesUrl = Number(urlParams?.get('mes'))
+  const anoUrl = Number(urlParams?.get('ano'))
+  const mesValido = Number.isFinite(mesUrl) && mesUrl >= 1 && mesUrl <= 12
+  const anoValido = Number.isFinite(anoUrl) && anoUrl > 2000
+
+  return {
+    mes: mesValido ? mesUrl : stored?.mes ?? now.getMonth() + 1,
+    ano: anoValido ? anoUrl : stored?.ano ?? now.getFullYear(),
+    cartao_id: stored?.cartao_id ?? null,
+    responsavel_id: stored?.responsavel_id ?? null,
+    categoria_id: stored?.categoria_id ?? null,
+    apenas_abertas: stored?.apenas_abertas ?? true,
+    ordenar: 'percentual_asc',
+    palavra_chave: stored?.palavra_chave ?? null,
+  }
 }
 
 export const readVisualizacaoRanking = (): RankingParceladasVisualizacao => {

@@ -13,8 +13,8 @@ import {
   RankingParceladasView,
 } from 'interfaces/RankingParceladas/RankingParceladasInterface'
 import {
+  compraDestinoRanking,
   estaQuitada,
-  faturaDestinoRanking,
   isUltimaParcelaNoMesAtual,
   ordenarPorMenorPercentual,
 } from 'helpers/ranking_parceladas_helpers'
@@ -98,8 +98,15 @@ const RankingParceladasList = ({ data, loading }: RankingParceladasListProps) =>
   }
 
   const handleOpenItem = (item: RankingParceladaItem) => {
-    const to = faturaDestinoRanking(item)
-    if (to) navigate(to)
+    const to = compraDestinoRanking(item, mesRef, anoRef)
+    if (to) {
+      navigate(to, {
+        state: {
+          fromRanking: true,
+          from: `/parceladas?mes=${mesRef}&ano=${anoRef}`,
+        },
+      })
+    }
   }
 
   return (
@@ -133,7 +140,7 @@ const RankingParceladasList = ({ data, loading }: RankingParceladasListProps) =>
           const posicao = index + 1
           const pct = Math.min(100, Math.max(0, Number(item.percentual_pago ?? 0)))
           const barColor = item.cartao_cor_fundo || undefined
-          const destino = faturaDestinoRanking(item)
+          const destino = compraDestinoRanking(item, mesRef, anoRef)
           const quitada = estaQuitada(item)
           const ultimaNesteMes =
             mesRef != null && anoRef != null && isUltimaParcelaNoMesAtual(item, mesRef, anoRef)
@@ -149,6 +156,7 @@ const RankingParceladasList = ({ data, loading }: RankingParceladasListProps) =>
               className={`mb-3 ${destino ? 'card-animate' : ''}`}
               role={destino ? 'button' : undefined}
               tabIndex={destino ? 0 : undefined}
+              title={destino ? 'Ver detalhes da compra' : undefined}
               onClick={() => handleOpenItem(item)}
               onKeyDown={(e) => {
                 if (destino && (e.key === 'Enter' || e.key === ' ')) {
@@ -262,6 +270,11 @@ const RankingParceladasList = ({ data, loading }: RankingParceladasListProps) =>
                       ) : null}
                     </div>
                   </div>
+                  {destino ? (
+                    <div className="flex-shrink-0 align-self-center text-muted">
+                      <i className="ri-arrow-right-s-line fs-22" aria-hidden="true"></i>
+                    </div>
+                  ) : null}
                 </div>
               </CardBody>
             </Card>
