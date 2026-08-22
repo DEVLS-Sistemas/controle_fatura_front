@@ -10,6 +10,7 @@ import { InputCheckbox } from 'Components/ComponentController/Inputs/Checkbox/In
 import { SelectListControlled } from 'Components/ComponentController/Selects/Select/SelectListControlled'
 import { SelectOptions } from 'interfaces/SystemInterfaces/SelectInterface'
 import { FATURA_FILE_ACCEPT, isValidFaturaFile, mesesOptions } from 'helpers/fatura_helpers'
+import { toBandeiraSelectOption } from 'helpers/cartao_helpers'
 import {
     extractFaturaId,
     extractFaturaPayload,
@@ -137,10 +138,7 @@ const FaturasForm = () => {
             }
 
             setBandeirasOptions(
-                list.map((b) => ({
-                    value: b.value,
-                    label: b.label,
-                }))
+                list.map((b) => toBandeiraSelectOption(b.value, b.label, b))
             )
 
             if (list.length === 1) {

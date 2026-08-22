@@ -18,6 +18,7 @@ import { SelectList } from 'Components/ComponentController/Selects/Select/Select
 import { AnosSelect } from 'helpers/functions_helpers'
 import { formatCurrency, mesesOptions } from 'helpers/fatura_helpers'
 import { SelectOptions } from 'interfaces/SystemInterfaces/SelectInterface'
+import { buildBandeiraSelectOptions, toBandeiraSelectOption } from 'helpers/cartao_helpers'
 import {
     FaturaMetadadosCartaoOption,
     FaturaMetadadosRetryPayload,
@@ -126,10 +127,9 @@ const FaturaMetadadosModal = ({
 
     const bandeiraOptions: SelectOptions[] = useMemo(
         () =>
-            bandeiras.map((b) => ({
-                value: toBandeiraSelectValue(b),
-                label: b.label,
-            })),
+            bandeiras.map((b) =>
+                toBandeiraSelectOption(toBandeiraSelectValue(b), b.label, b)
+            ),
         [bandeiras]
     )
 
@@ -231,10 +231,12 @@ const FaturaMetadadosModal = ({
             try {
                 const lookups = await cartoesService.getLookupsCartoes()
                 if (cancelled) return
-                const list = (lookups?.bandeiras ?? []).map((b) => ({
+                const list = buildBandeiraSelectOptions(lookups?.bandeiras).map((opt) => ({
                     value: null,
-                    label: b,
+                    label: String(opt.label ?? ''),
                     criar: true,
+                    cor_principal: opt.cor_principal,
+                    cor_secundaria: opt.cor_secundaria,
                 }))
                 setBandeirasLookup(list)
             } catch {
@@ -280,7 +282,12 @@ const FaturaMetadadosModal = ({
         try {
             const list = (await cartoesService.AsyncListBandeiras({ cartao_id: id })) ?? []
             applyBandeiras(
-                list.map((b) => ({ value: b.value, label: b.label })),
+                list.map((b) => ({
+                    value: b.value,
+                    label: b.label,
+                    cor_principal: b.cor_principal,
+                    cor_secundaria: b.cor_secundaria,
+                })),
                 false,
                 { preferLabel: sugestao?.bandeira_sugerida ?? null }
             )

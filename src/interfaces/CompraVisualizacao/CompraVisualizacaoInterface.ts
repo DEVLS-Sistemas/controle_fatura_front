@@ -47,6 +47,8 @@ export interface CompraCartaoRef {
 export interface CompraBandeiraRef {
   id: number
   nome: string
+  cor_principal?: string | null
+  cor_secundaria?: string | null
 }
 
 export interface CompraCartaoNumeroRef {

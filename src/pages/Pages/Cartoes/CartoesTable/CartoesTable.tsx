@@ -10,7 +10,7 @@ import CustomModal from "Components/ComponentController/Modal/CustomModal"
 import TableActionsDropdown from "Components/Common/TableActionsDropdown"
 import { CartoesList, CartoesSearch } from "interfaces/Cartoes/CartoesInterface"
 import { CartoesService } from "services/Cartoes/CartoesService"
-import { CartaoChip, extractCartaoErrorMessage, resolveCartaoCores } from "helpers/cartao_helpers"
+import { CartaoChip, BandeiraChip, extractCartaoErrorMessage, resolveCartaoCores } from "helpers/cartao_helpers"
 import { formatCurrency, VALOR_TEXT_CLASS } from "helpers/fatura_helpers"
 
 export interface CartoesTableProps {
@@ -41,7 +41,12 @@ const formatLimitesResumo = (row: CartoesList) => {
 
                 return (
                     <div key={key} className="d-flex justify-content-between gap-3">
-                        <span>{b.bandeira}</span>
+                        <BandeiraChip
+                            cor_principal={b.cor_principal}
+                            cor_secundaria={b.cor_secundaria}
+                            bandeira={b.bandeira}
+                            label={b.bandeira}
+                        />
                         <span className={VALOR_TEXT_CLASS}>{formatCurrency(limite)}</span>
                     </div>
                 )

@@ -17,7 +17,7 @@ import {
 import { toast } from 'react-toastify'
 import { setActiveMenu } from 'helpers/system_helpers'
 import { useNavegacao } from 'helpers/functions_helpers'
-import { CartaoChip } from 'helpers/cartao_helpers'
+import { CartaoChip, BandeiraChip } from 'helpers/cartao_helpers'
 import {
     formatCurrency,
     formatDateBr,
@@ -1120,9 +1120,10 @@ const FaturaResponsavelView = () => {
                                                                     )}
                                                                     <span>{cartao.cartaoNome}</span>
                                                                     {cartao.bandeira && (
-                                                                        <span className="badge bg-light text-muted fw-normal">
-                                                                            {cartao.bandeira}
-                                                                        </span>
+                                                                        <BandeiraChip
+                                                                            bandeira={cartao.bandeira}
+                                                                            label={cartao.bandeira}
+                                                                        />
                                                                     )}
                                                                     <span className="text-muted fw-normal small">
                                                                         {cartao.items.length} lançamento{cartao.items.length === 1 ? '' : 's'}

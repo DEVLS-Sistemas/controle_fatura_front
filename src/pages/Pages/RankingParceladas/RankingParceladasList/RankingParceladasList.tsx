@@ -2,7 +2,7 @@ import React from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Badge, Card, CardBody, Col, Progress, Row } from 'reactstrap'
 import { CurrencyValue } from 'Components/Common/CurrencyValue'
-import { CartaoChip } from 'helpers/cartao_helpers'
+import { CartaoChip, BandeiraChip } from 'helpers/cartao_helpers'
 import {
   formatCurrency,
   formatDateBr,
@@ -236,11 +236,15 @@ const RankingParceladasList = ({ data, loading }: RankingParceladasListProps) =>
                         <CartaoChip
                           cor_fundo={item.cartao_cor_fundo}
                           cor_texto={item.cartao_cor_texto}
-                          label={
-                            item.bandeira_nome
-                              ? `${item.cartao_nome} · ${item.bandeira_nome}`
-                              : item.cartao_nome
-                          }
+                          label={item.cartao_nome}
+                        />
+                      ) : null}
+                      {item.bandeira_nome ? (
+                        <BandeiraChip
+                          cor_principal={item.bandeira_cor_principal}
+                          cor_secundaria={item.bandeira_cor_secundaria}
+                          bandeira={item.bandeira_nome}
+                          label={item.bandeira_nome}
                         />
                       ) : null}
                       {item.categoria_nome ? (

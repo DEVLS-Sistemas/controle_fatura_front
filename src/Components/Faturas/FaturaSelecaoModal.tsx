@@ -13,6 +13,7 @@ import {
 } from 'reactstrap'
 import { SelectList } from 'Components/ComponentController/Selects/Select/SelectList'
 import { SelectOptions } from 'interfaces/SystemInterfaces/SelectInterface'
+import { BandeiraChip, toBandeiraSelectOption } from 'helpers/cartao_helpers'
 import {
     FaturaSelecaoBandeiraOption,
     FaturaSelecaoNumeroOption,
@@ -61,10 +62,9 @@ const FaturaSelecaoModal = ({
 
     const bandeiraOptions: SelectOptions[] = useMemo(
         () =>
-            bandeiras.map((b) => ({
-                value: toBandeiraSelectValue(b),
-                label: b.label,
-            })),
+            bandeiras.map((b) =>
+                toBandeiraSelectOption(toBandeiraSelectValue(b), b.label, b)
+            ),
         [bandeiras]
     )
 
@@ -154,7 +154,12 @@ const FaturaSelecaoModal = ({
                 {step === 'final' && (bandeiraNome || cartaoBandeiraId) && (
                     <Alert color="info" className="mb-3">
                         <i className="ri-information-line me-1 align-middle"></i>
-                        Bandeira: {bandeiraNome || `ID ${cartaoBandeiraId}`}
+                        Bandeira:{' '}
+                        {bandeiraNome ? (
+                            <BandeiraChip bandeira={bandeiraNome} label={bandeiraNome} />
+                        ) : (
+                            `ID ${cartaoBandeiraId}`
+                        )}
                     </Alert>
                 )}
 

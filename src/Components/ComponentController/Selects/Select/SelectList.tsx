@@ -1,6 +1,6 @@
 import { SelectOptions, SelectProps } from 'interfaces/SystemInterfaces/SelectInterface';
 import Select, { FormatOptionLabelMeta } from 'react-select'
-import { CartaoChip } from 'helpers/cartao_helpers'
+import { BandeiraChip, CartaoChip } from 'helpers/cartao_helpers'
 
 const customStyles = {
     multiValue: (styles: any) => {
@@ -30,7 +30,12 @@ const formatOptionLabel = (
     _meta: FormatOptionLabelMeta<SelectOptions>
 ) => (
     <div className="d-flex align-items-center gap-2">
-        {option.cor_fundo ? (
+        {option.cor_principal ? (
+            <BandeiraChip
+                cor_principal={option.cor_principal}
+                cor_secundaria={option.cor_secundaria}
+            />
+        ) : option.cor_fundo ? (
             <CartaoChip
                 cor_fundo={option.cor_fundo}
                 cor_texto={option.cor_texto}
@@ -64,7 +69,7 @@ const invalidControlStyles = {
 
 export function SelectList(props: SelectProps) {
     const hasColorOptions = props.options.some(
-        (option) => !!option.cor_fundo || !!option.cor
+        (option) => !!option.cor_principal || !!option.cor_fundo || !!option.cor
     )
     const selectStyles = props.errors
         ? { ...customStyles, ...invalidControlStyles }

@@ -1,10 +1,10 @@
 import React from 'react'
 import { Card, CardBody, CardHeader, Col, Row } from 'reactstrap'
 import {
-  bandeiraVisual,
   isResponsavelEu,
   ultimosDigitosCartao,
 } from 'helpers/compra_visualizacao_helpers'
+import { BandeiraChip } from 'helpers/cartao_helpers'
 import {
   formatDateBr,
   getCategoriaFieldStyle,
@@ -52,7 +52,6 @@ const CompraVisualizacaoDados = ({ compra }: CompraVisualizacaoDadosProps) => {
   const estabelecimentoNome = compra.estabelecimento?.nome
   const lojaNome = compra.estabelecimento?.loja_nome
   const digitos = ultimosDigitosCartao(compra)
-  const bandeira = bandeiraVisual(compra.bandeira?.nome)
   const categoriaStyle = getCategoriaFieldStyle(compra.categoria?.cor)
   const origemLabel = compra.origem_compra_label || compra.origem_compra
   const origemTone = origemCompraColor[compra.origem_compra || ''] || 'secondary'
@@ -87,11 +86,13 @@ const CompraVisualizacaoDados = ({ compra }: CompraVisualizacaoDadosProps) => {
                 ) : null}
               </div>
               {compra.bandeira?.nome ? (
-                <span
-                  className="compra-dados-cartao__bandeira"
-                  style={{ backgroundColor: bandeira.bg, color: bandeira.fg }}
-                >
-                  {compra.bandeira.nome}
+                <span className="compra-dados-cartao__bandeira">
+                  <BandeiraChip
+                    cor_principal={compra.bandeira.cor_principal}
+                    cor_secundaria={compra.bandeira.cor_secundaria}
+                    nome={compra.bandeira.nome}
+                    label={compra.bandeira.nome}
+                  />
                 </span>
               ) : null}
             </div>

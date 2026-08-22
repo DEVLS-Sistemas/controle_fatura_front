@@ -4,6 +4,8 @@ export type FaturaSelecaoBandeiraOption = {
     label: string
     qtd_numeros?: number
     criar?: boolean
+    cor_principal?: string | null
+    cor_secundaria?: string | null
 }
 
 /** Opção de final no modal 422 `precisa_selecionar_final` */

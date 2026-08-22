@@ -3,7 +3,7 @@ import { Link, useLocation, useParams } from 'react-router-dom'
 import { toast } from 'react-toastify'
 import { setActiveMenu } from 'helpers/system_helpers'
 import { useNavegacao } from 'helpers/functions_helpers'
-import { CartaoChip, resolveCartaoCores } from 'helpers/cartao_helpers'
+import { CartaoChip, BandeiraChip, resolveCartaoCores } from 'helpers/cartao_helpers'
 import { formatCurrency, VALOR_TEXT_CLASS } from 'helpers/fatura_helpers'
 import { Breadcrumb, BreadcrumbItem, Card, CardBody, Col, Container, Label, Row } from 'reactstrap'
 import { CartoesView, TIPOS_NUMERO_PADRAO } from 'interfaces/Cartoes/CartoesInterface'
@@ -174,7 +174,12 @@ const CartoesViewPage = () => {
                                         (record.bandeiras ?? []).map((bandeira) => (
                                             <div key={bandeira.id ?? bandeira.bandeira} className="border rounded mb-3 overflow-hidden">
                                                 <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 px-3 py-2 bg-light">
-                                                    <strong>{bandeira.bandeira}</strong>
+                                                    <BandeiraChip
+                                                        cor_principal={bandeira.cor_principal}
+                                                        cor_secundaria={bandeira.cor_secundaria}
+                                                        bandeira={bandeira.bandeira}
+                                                        label={bandeira.bandeira}
+                                                    />
                                                     <span className={`text-muted ${VALOR_TEXT_CLASS}`}>
                                                         Limite{' '}
                                                         {bandeira.limite_credito != null && Number(bandeira.limite_credito) > 0

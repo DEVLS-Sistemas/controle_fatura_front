@@ -14,7 +14,7 @@ import {
     faturaQuitacaoLabel, faturaQuitacaoColor, VALOR_TEXT_CLASS,
     resolveFaturaAnexo, downloadFaturaAnexo, FaturaAnexoDownloadTipo, FaturaAnexoDownloadMeta,
 } from "helpers/fatura_helpers"
-import { CartaoChip, resolveCartaoCores } from "helpers/cartao_helpers"
+import { CartaoChip, BandeiraChip, resolveCartaoCores } from "helpers/cartao_helpers"
 import {
     faturaPrecisaSenhaPdf,
     FaturaResumo,
@@ -286,9 +286,12 @@ export const FaturasTable = ({ data, getData, setPerPage, perPage, filters }: Fa
                                                                                     label={row.cartao_nome || 'Cartão'}
                                                                                 />
                                                                                 {multiBandeira && row.bandeira ? (
-                                                                                    <span className="badge bg-light text-muted border" style={{ fontSize: '0.7rem', fontWeight: 500 }}>
-                                                                                        {row.bandeira}
-                                                                                    </span>
+                                                                                    <BandeiraChip
+                                                                                        cor_principal={row.bandeira_cor_principal}
+                                                                                        cor_secundaria={row.bandeira_cor_secundaria}
+                                                                                        bandeira={row.bandeira}
+                                                                                        label={row.bandeira}
+                                                                                    />
                                                                                 ) : null}
                                                                             </div>
                                                                         </td>

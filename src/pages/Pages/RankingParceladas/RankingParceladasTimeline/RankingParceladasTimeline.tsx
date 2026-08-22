@@ -1,7 +1,7 @@
 import React from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Badge, Button, Card, CardBody, CardHeader } from 'reactstrap'
-import { CartaoChip } from 'helpers/cartao_helpers'
+import { CartaoChip, BandeiraChip } from 'helpers/cartao_helpers'
 import { formatCurrency } from 'helpers/fatura_helpers'
 import {
   RankingParceladaItem,
@@ -220,12 +220,20 @@ const RankingParceladasTimeline = ({
                             {formatCurrency(item.valor_aberto)} em aberto
                           </div>
                           {item.cartao_nome ? (
-                            <div className="mt-1">
+                            <div className="mt-1 d-flex flex-wrap align-items-center gap-2">
                               <CartaoChip
                                 cor_fundo={item.cartao_cor_fundo}
                                 cor_texto={item.cartao_cor_texto}
                                 label={item.cartao_nome}
                               />
+                              {item.bandeira_nome ? (
+                                <BandeiraChip
+                                  cor_principal={item.bandeira_cor_principal}
+                                  cor_secundaria={item.bandeira_cor_secundaria}
+                                  bandeira={item.bandeira_nome}
+                                  label={item.bandeira_nome}
+                                />
+                              ) : null}
                             </div>
                           ) : null}
                         </div>

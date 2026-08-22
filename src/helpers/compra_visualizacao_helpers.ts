@@ -61,17 +61,5 @@ export const formatCartaoNumeroLabel = (compra?: CompraVisualizacaoView | null):
   return extras.length ? `**** ${digitos} · ${extras.join(' · ')}` : `**** ${digitos}`
 }
 
-export const bandeiraVisual = (
-  nome?: string | null
-): { bg: string; fg: string; accent: string } => {
-  const n = String(nome ?? '').toLowerCase()
-  if (n.includes('visa')) return { bg: '#1a1f71', fg: '#ffffff', accent: '#f7b600' }
-  if (n.includes('master')) return { bg: '#1f2937', fg: '#ffffff', accent: '#eb001b' }
-  if (n.includes('elo')) return { bg: '#111827', fg: '#ffcb05', accent: '#00a4e0' }
-  if (n.includes('amex') || n.includes('american')) return { bg: '#006fcf', fg: '#ffffff', accent: '#ffffff' }
-  if (n.includes('hiper')) return { bg: '#b3131b', fg: '#ffffff', accent: '#ffffff' }
-  return { bg: '#334155', fg: '#ffffff', accent: '#94a3b8' }
-}
-
 export const faturaDestinoParcela = (parcela: CompraParcelaItem): string | null =>
   parcela.fatura_id ? `/faturas/view/${parcela.fatura_id}` : null

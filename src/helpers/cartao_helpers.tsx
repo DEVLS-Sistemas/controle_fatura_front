@@ -1,9 +1,16 @@
 import React, { CSSProperties } from 'react'
 import { ValidationError } from 'libs/api/exceptions/ValidationError'
 import {
+    BANDEIRA_COR_PADRAO,
+    BANDEIRA_PRESETS_CORES_PADRAO,
+    bandeirasSelectLabels,
     CARTAO_COR_PADRAO,
+    matchPresetCorBandeira,
     matchPresetCorCartao,
+    PresetBandeiraLookup,
+    ParCorBandeiraLookup,
 } from 'interfaces/Cartoes/CartoesInterface'
+import { SelectOptions } from 'interfaces/SystemInterfaces/SelectInterface'
 
 export type CartaoCores = {
     cor_fundo?: string | null
@@ -94,6 +101,123 @@ export const CartaoChip = ({
             title={title || undefined}
         >
             {label}
+        </span>
+    )
+}
+
+export type BandeiraCoresInput = {
+    bandeira?: string | null
+    nome?: string | null
+    label?: string | null
+    cor_principal?: string | null
+    cor_secundaria?: string | null
+}
+
+export const resolveBandeiraCores = (
+    bandeira?: BandeiraCoresInput | null
+): { cor_principal: string; cor_secundaria: string } => {
+    if (bandeira?.cor_principal) {
+        return {
+            cor_principal: bandeira.cor_principal,
+            cor_secundaria: bandeira.cor_secundaria || BANDEIRA_COR_PADRAO.cor_secundaria,
+        }
+    }
+    const matched = matchPresetCorBandeira(
+        bandeira?.bandeira ?? bandeira?.nome ?? bandeira?.label
+    )
+    return {
+        cor_principal: matched.cor_principal,
+        cor_secundaria: matched.cor_secundaria,
+    }
+}
+
+export const toBandeiraSelectOption = (
+    value: string | number | null | undefined,
+    label: string,
+    cores?: { cor_principal?: string | null; cor_secundaria?: string | null }
+): SelectOptions => {
+    const resolved = resolveBandeiraCores({
+        label,
+        cor_principal: cores?.cor_principal,
+        cor_secundaria: cores?.cor_secundaria,
+    })
+    return {
+        value,
+        label,
+        cor_principal: resolved.cor_principal,
+        cor_secundaria: resolved.cor_secundaria,
+    }
+}
+
+export const buildBandeiraSelectOptions = (
+    labels?: string[] | null,
+    presets: PresetBandeiraLookup[] = BANDEIRA_PRESETS_CORES_PADRAO,
+    fallback: ParCorBandeiraLookup = BANDEIRA_COR_PADRAO
+): SelectOptions[] =>
+    bandeirasSelectLabels(labels).map((label) => {
+        const cores = matchPresetCorBandeira(label, presets, fallback)
+        return {
+            value: label,
+            label,
+            cor_principal: cores.cor_principal,
+            cor_secundaria: cores.cor_secundaria,
+        }
+    })
+
+export const BandeiraChip = ({
+    cor_principal,
+    cor_secundaria,
+    bandeira,
+    nome,
+    label,
+    title,
+    className = '',
+}: BandeiraCoresInput & {
+    label?: React.ReactNode
+    title?: string
+    className?: string
+}) => {
+    const cores = resolveBandeiraCores({
+        cor_principal,
+        cor_secundaria,
+        bandeira,
+        nome,
+        label: typeof label === 'string' ? label : undefined,
+    })
+    const nomeBandeira = typeof label === 'string'
+        ? label
+        : (bandeira || nome || undefined)
+    const circles = (
+        <span className="bandeira-chip__circles" aria-hidden="true">
+            <span
+                className="bandeira-chip__circle bandeira-chip__circle--primary"
+                style={{ backgroundColor: cores.cor_principal }}
+            />
+            <span
+                className="bandeira-chip__circle bandeira-chip__circle--secondary"
+                style={{ backgroundColor: cores.cor_secundaria }}
+            />
+        </span>
+    )
+
+    if (label == null) {
+        return (
+            <span
+                className={`bandeira-chip ${className}`.trim()}
+                title={title || nomeBandeira}
+            >
+                {circles}
+            </span>
+        )
+    }
+
+    return (
+        <span
+            className={`bandeira-chip ${className}`.trim()}
+            title={title || nomeBandeira}
+        >
+            {circles}
+            <span className="bandeira-chip__label">{label}</span>
         </span>
     )
 }

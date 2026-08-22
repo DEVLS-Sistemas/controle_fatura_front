@@ -82,6 +82,8 @@ export interface RankingParceladaItem {
   cartao_cor_texto?: string | null
   cartao_bandeira_id?: number | null
   bandeira_nome?: string | null
+  bandeira_cor_principal?: string | null
+  bandeira_cor_secundaria?: string | null
   origem_compra?: string | null
   proxima_parcela?: RankingParceladaParcelaResumo | null
   primeira_parcela?: RankingParceladaParcelaResumo | null

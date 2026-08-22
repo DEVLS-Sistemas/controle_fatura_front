@@ -31,6 +31,10 @@ export interface CartaoBandeira {
     /** Dígitos-centavos no form; string BR ou number na API */
     limite_credito?: number | string | null
     ativo?: boolean
+    cor_principal?: string | null
+    cor_secundaria?: string | null
+    bandeira_chave?: string | null
+    bandeira_padrao?: boolean
     numeros?: CartaoNumero[]
 }
 
@@ -142,6 +146,10 @@ export interface BandeiraListItem {
     label: string
     limite_credito?: number | string | null
     qtd_numeros?: number
+    cor_principal?: string | null
+    cor_secundaria?: string | null
+    bandeira_chave?: string | null
+    bandeira_padrao?: boolean
 }
 
 /** Item de `GET /cartoes/numeros-list` (formato select) */
@@ -164,6 +172,22 @@ export interface NumerosListParams {
     fatura_id?: number | string
 }
 
+export interface ParCorBandeiraLookup {
+    chave?: string
+    label?: string
+    cor_principal: string
+    cor_secundaria: string
+    padrao?: boolean
+}
+
+export interface PresetBandeiraLookup {
+    chave: string
+    label: string
+    aliases?: string[]
+    cor_principal: string
+    cor_secundaria: string
+}
+
 export interface LookupsCartoes {
     bandeiras?: string[]
     tipos_numero?: TipoNumeroLookup[]
@@ -172,6 +196,9 @@ export interface LookupsCartoes {
     pares_cores?: ParCorLookup[]
     presets_cores?: PresetCorLookup[]
     cor_padrao?: ParCorLookup
+    presets_bandeiras?: PresetBandeiraLookup[]
+    pares_cores_bandeiras?: ParCorBandeiraLookup[]
+    cor_padrao_bandeira?: ParCorBandeiraLookup
     dias?: DiaLookup[]
     senhas_pdf_regras?: SenhaPdfRegraLookup[]
 }
@@ -338,6 +365,109 @@ export const matchPresetCorCartao = (
         cor_fundo: matchedPreset.cor_fundo,
         cor_texto: matchedPreset.cor_texto,
         padrao: false,
+    }
+}
+
+export const BANDEIRA_COR_PADRAO: ParCorBandeiraLookup = {
+    chave: 'outra',
+    label: 'Outra',
+    cor_principal: '#e5e7eb',
+    cor_secundaria: '#9ca3af',
+    padrao: true,
+}
+
+export const BANDEIRAS_SELECT_PADRAO = [
+    'Visa',
+    'Mastercard',
+    'Elo',
+    'American Express',
+    'Hipercard',
+    'Diners Club',
+    'Discover',
+    'JCB',
+    'UnionPay',
+    'Maestro',
+    'Banricompras',
+    'Aura',
+    'Cabal',
+    'Sorocred',
+    'Outra',
+]
+
+export const BANDEIRA_PRESETS_CORES_PADRAO: PresetBandeiraLookup[] = [
+    { chave: 'visa', label: 'Visa', aliases: ['visa'], cor_principal: '#1a1f71', cor_secundaria: '#f7b600' },
+    { chave: 'mastercard', label: 'Mastercard', aliases: ['mastercard', 'master card', 'master'], cor_principal: '#eb001b', cor_secundaria: '#ff5f00' },
+    { chave: 'elo', label: 'Elo', aliases: ['elo'], cor_principal: '#000000', cor_secundaria: '#ffcb05' },
+    { chave: 'amex', label: 'American Express', aliases: ['american express', 'amex'], cor_principal: '#006fcf', cor_secundaria: '#ffffff' },
+    { chave: 'hipercard', label: 'Hipercard', aliases: ['hipercard', 'hiper card', 'hiper'], cor_principal: '#e31837', cor_secundaria: '#ffffff' },
+    { chave: 'diners', label: 'Diners Club', aliases: ['diners club', 'diners'], cor_principal: '#0079be', cor_secundaria: '#ffffff' },
+    { chave: 'discover', label: 'Discover', aliases: ['discover'], cor_principal: '#ff6000', cor_secundaria: '#000000' },
+    { chave: 'jcb', label: 'JCB', aliases: ['jcb'], cor_principal: '#00a94f', cor_secundaria: '#e31837' },
+    { chave: 'unionpay', label: 'UnionPay', aliases: ['unionpay', 'union pay'], cor_principal: '#d50000', cor_secundaria: '#004a99' },
+    { chave: 'maestro', label: 'Maestro', aliases: ['maestro'], cor_principal: '#ed1c24', cor_secundaria: '#0099df' },
+    { chave: 'banricompras', label: 'Banricompras', aliases: ['banricompras', 'banri compras'], cor_principal: '#0054a6', cor_secundaria: '#e31b23' },
+    { chave: 'aura', label: 'Aura', aliases: ['aura'], cor_principal: '#0066b3', cor_secundaria: '#ffffff' },
+    { chave: 'cabal', label: 'Cabal', aliases: ['cabal'], cor_principal: '#0066a1', cor_secundaria: '#e21e2b' },
+    { chave: 'sorocred', label: 'Sorocred', aliases: ['sorocred'], cor_principal: '#0057a8', cor_secundaria: '#e30613' },
+    { chave: 'outra', label: 'Outra', aliases: ['outra', 'other'], cor_principal: '#e5e7eb', cor_secundaria: '#9ca3af' },
+]
+
+export const BANDEIRA_PARES_CORES_PADRAO: ParCorBandeiraLookup[] = [
+    ...BANDEIRA_PRESETS_CORES_PADRAO.filter((preset) => preset.chave !== 'outra').map((preset) => ({
+        chave: preset.chave,
+        label: preset.label,
+        cor_principal: preset.cor_principal,
+        cor_secundaria: preset.cor_secundaria,
+        padrao: false,
+    })),
+    BANDEIRA_COR_PADRAO,
+]
+
+export const isAmexLegadoLabel = (label?: string | null): boolean =>
+    /^amex$/i.test(String(label ?? '').trim())
+
+export const bandeirasSelectLabels = (labels?: string[] | null): string[] => {
+    const source = labels?.length ? labels : BANDEIRAS_SELECT_PADRAO
+    return source.filter((label) => !isAmexLegadoLabel(label))
+}
+
+export const matchPresetCorBandeira = (
+    nome?: string | null,
+    presets: PresetBandeiraLookup[] = BANDEIRA_PRESETS_CORES_PADRAO,
+    fallback: ParCorBandeiraLookup = BANDEIRA_COR_PADRAO
+): ParCorBandeiraLookup => {
+    const haystack = normalizeCorBusca(nome)
+    if (!haystack) return fallback
+
+    const words = haystack.split(/[^a-z0-9]+/).filter(Boolean)
+    let best: PresetBandeiraLookup | null = null
+    let bestLen = -1
+
+    for (const preset of presets) {
+        const aliases = [preset.label, preset.chave, ...(preset.aliases ?? [])]
+        for (const alias of aliases) {
+            const normalized = normalizeCorBusca(alias)
+            if (!normalized) continue
+            const compact = normalized.replace(/\s+/g, '')
+            const isShort = compact.length <= 3
+            const matched = isShort
+                ? words.includes(compact) || words.includes(normalized)
+                : haystack.includes(normalized)
+            if (matched && compact.length > bestLen) {
+                best = preset
+                bestLen = compact.length
+            }
+        }
+    }
+
+    if (!best) return fallback
+    const matchedPreset = best
+    return {
+        chave: matchedPreset.chave,
+        label: matchedPreset.label,
+        cor_principal: matchedPreset.cor_principal,
+        cor_secundaria: matchedPreset.cor_secundaria,
+        padrao: matchedPreset.chave === 'outra',
     }
 }
 

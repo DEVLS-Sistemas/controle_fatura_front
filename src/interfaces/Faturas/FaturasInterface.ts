@@ -31,6 +31,8 @@ export interface FaturaResumo {
     id?: number
     cartao_bandeira_id?: number | null
     bandeira?: string | null
+    bandeira_cor_principal?: string | null
+    bandeira_cor_secundaria?: string | null
     mes?: number
     ano?: number
     competencia?: string

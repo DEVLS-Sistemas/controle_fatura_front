@@ -9,6 +9,9 @@ export type SelectOptions = {
     /** Par de cores do cartão */
     cor_fundo?: string | null;
     cor_texto?: string | null;
+    /** Par de cores da bandeira (principal + secundária) */
+    cor_principal?: string | null;
+    cor_secundaria?: string | null;
 };
 
 export type SelectProps = {

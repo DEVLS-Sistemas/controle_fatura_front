@@ -17,7 +17,7 @@ import {
     FATURA_FILE_ACCEPT, isValidFaturaFile, resolveFaturaAnexo, downloadFaturaAnexo,
     getCategoriaFieldStyle, VALOR_TEXT_CLASS,
 } from 'helpers/fatura_helpers'
-import { CartaoChip, resolveCartaoCores } from 'helpers/cartao_helpers'
+import { CartaoChip, BandeiraChip, resolveCartaoCores } from 'helpers/cartao_helpers'
 import { SelectOptions } from 'interfaces/SystemInterfaces/SelectInterface'
 import {
     extractFaturaPayload,
@@ -1290,12 +1290,13 @@ const FaturasViewPage = () => {
                                     <div className="min-w-0">
                                         {(fatura.bandeira || fatura.cartao_bandeira) && (
                                             <div>
-                                                <span
-                                                    className="badge bg-primary-subtle text-primary-emphasis"
-                                                    style={{ fontSize: '0.95rem', fontWeight: 600 }}
-                                                >
-                                                    {fatura.bandeira || fatura.cartao_bandeira}
-                                                </span>
+                                                <BandeiraChip
+                                                    cor_principal={fatura.bandeira_cor_principal}
+                                                    cor_secundaria={fatura.bandeira_cor_secundaria}
+                                                    bandeira={bandeiraLabel}
+                                                    label={bandeiraLabel}
+                                                    className="fs-6"
+                                                />
                                             </div>
                                         )}
                                     </div>

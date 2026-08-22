@@ -4,7 +4,7 @@ import { toast } from 'react-toastify'
 import { setActiveMenu } from 'helpers/system_helpers'
 import { useNavegacao } from 'helpers/functions_helpers'
 import { centavosToBr, formatCurrency, toCentavos, VALOR_TEXT_CLASS } from 'helpers/fatura_helpers'
-import { CartaoChip, extractCartaoErrorMessage } from 'helpers/cartao_helpers'
+import { CartaoChip, BandeiraChip, buildBandeiraSelectOptions, extractCartaoErrorMessage } from 'helpers/cartao_helpers'
 import {
     Breadcrumb,
     BreadcrumbItem,
@@ -24,9 +24,12 @@ import {
 import { SubmitHandler, useForm } from 'react-hook-form'
 import { required } from 'Components/ComponentController/ValidatorForm/ValidatorForm'
 import { InputTextControlled } from 'Components/ComponentController/Inputs/Text/InputTextControlled'
+import { SelectList } from 'Components/ComponentController/Selects/Select/SelectList'
 import { SelectListControlled } from 'Components/ComponentController/Selects/Select/SelectListControlled'
 import { SelectOptions } from 'interfaces/SystemInterfaces/SelectInterface'
 import {
+    BANDEIRA_COR_PADRAO,
+    BANDEIRA_PRESETS_CORES_PADRAO,
     buildDiasOptions,
     CARTAO_COR_PADRAO,
     CARTAO_CORES_FUNDO_PADRAO,
@@ -38,8 +41,11 @@ import {
     CartoesDefaultValues,
     CartoesModel,
     findSenhaPdfRegraByBanco,
+    matchPresetCorBandeira,
     matchPresetCorCartao,
     normalizeHexCor,
+    ParCorBandeiraLookup,
+    PresetBandeiraLookup,
     PresetCorLookup,
     resolveSenhaPdfRegraDigitos,
     ParCorLookup,
@@ -178,7 +184,9 @@ const CartoesForm = () => {
     const navigate = useNavigate()
     const cartoesService = new CartoesService()
 
-    const [bandeirasOptions, setBandeirasOptions] = useState<SelectOptions[]>([])
+    const [bandeirasOptions, setBandeirasOptions] = useState<SelectOptions[]>(
+        () => buildBandeiraSelectOptions()
+    )
     const [tiposOptions, setTiposOptions] = useState<SelectOptions[]>(
         TIPOS_NUMERO_PADRAO.map((t) => ({ value: t.value, label: t.label }))
     )
@@ -190,6 +198,8 @@ const CartoesForm = () => {
     const [paresCores, setParesCores] = useState<ParCorLookup[]>(CARTAO_PARES_CORES_PADRAO)
     const [presetsCores, setPresetsCores] = useState<PresetCorLookup[]>(CARTAO_PRESETS_CORES_PADRAO)
     const [corPadrao, setCorPadrao] = useState<ParCorLookup>(CARTAO_COR_PADRAO)
+    const [presetsBandeiras, setPresetsBandeiras] = useState<PresetBandeiraLookup[]>(BANDEIRA_PRESETS_CORES_PADRAO)
+    const [corPadraoBandeira, setCorPadraoBandeira] = useState<ParCorBandeiraLookup>(BANDEIRA_COR_PADRAO)
     const [coresManuais, setCoresManuais] = useState(
         () => !!(paramId || state?.source)
     )
@@ -224,11 +234,19 @@ const CartoesForm = () => {
     const getLookups = async (): Promise<void> => {
         try {
             const lookups = await cartoesService.getLookupsCartoes()
-            if (lookups?.bandeiras?.length) {
-                setBandeirasOptions(
-                    lookups.bandeiras.map((b) => ({ value: b, label: b }))
+            const presetsBandeiraApi = lookups?.presets_bandeiras?.length
+                ? lookups.presets_bandeiras
+                : BANDEIRA_PRESETS_CORES_PADRAO
+            const padraoBandeira = lookups?.cor_padrao_bandeira ?? BANDEIRA_COR_PADRAO
+            setPresetsBandeiras(presetsBandeiraApi)
+            setCorPadraoBandeira(padraoBandeira)
+            setBandeirasOptions(
+                buildBandeiraSelectOptions(
+                    lookups?.bandeiras,
+                    presetsBandeiraApi,
+                    padraoBandeira
                 )
-            }
+            )
             if (lookups?.tipos_numero?.length) {
                 setTiposOptions(
                     lookups.tipos_numero.map((t) => ({ value: t.value, label: t.label }))
@@ -328,11 +346,16 @@ const CartoesForm = () => {
                 return
             }
             const limiteCents = toCentavos(novoCartao.limite_credito)
+            const coresBandeira = matchPresetCorBandeira(bandeiraNome, presetsBandeiras, corPadraoBandeira)
             const novaBandeira: CartaoBandeira = {
                 _key: newLocalKey(),
                 bandeira: bandeiraNome,
                 limite_credito: limiteCents > 0 ? String(limiteCents) : null,
                 ativo: true,
+                cor_principal: coresBandeira.cor_principal,
+                cor_secundaria: coresBandeira.cor_secundaria,
+                bandeira_chave: coresBandeira.chave ?? null,
+                bandeira_padrao: coresBandeira.padrao,
                 numeros: [],
             }
             setBandeiras((prev) => [...prev, novaBandeira])
@@ -364,11 +387,16 @@ const CartoesForm = () => {
             )
         } else {
             const limiteCents = toCentavos(novoCartao.limite_credito)
+            const coresBandeira = matchPresetCorBandeira(bandeiraNome, presetsBandeiras, corPadraoBandeira)
             const novaBandeira: CartaoBandeira = {
                 _key: newLocalKey(),
                 bandeira: bandeiraNome,
                 limite_credito: limiteCents > 0 ? String(limiteCents) : null,
                 ativo: true,
+                cor_principal: coresBandeira.cor_principal,
+                cor_secundaria: coresBandeira.cor_secundaria,
+                bandeira_chave: coresBandeira.chave ?? null,
+                bandeira_padrao: coresBandeira.padrao,
                 numeros: [numero],
             }
             setBandeiras((prev) => [...prev, novaBandeira])
@@ -522,6 +550,8 @@ const CartoesForm = () => {
                 return {
                     ...(b.id ? { id: b.id } : {}),
                     bandeira: b.bandeira,
+                    cor_principal: b.cor_principal ?? null,
+                    cor_secundaria: b.cor_secundaria ?? null,
                     limite_credito: limiteCents > 0 ? centavosToBr(limiteCents) : null,
                     ativo: b.ativo !== false,
                     numeros: (b.numeros ?? []).map((n) => ({
@@ -693,7 +723,12 @@ const CartoesForm = () => {
                                 className="list-group-item d-flex justify-content-between align-items-center"
                             >
                                 <span>
-                                    <strong>{item.bandeiraNome}</strong>
+                                    <BandeiraChip
+                                        bandeira={item.bandeiraNome}
+                                        cor_principal={item.bandeira.cor_principal}
+                                        cor_secundaria={item.bandeira.cor_secundaria}
+                                        label={item.bandeiraNome}
+                                    />
                                 </span>
                                 <span className={VALOR_TEXT_CLASS}>{item.valorLabel}</span>
                             </li>
@@ -1013,39 +1048,19 @@ const CartoesForm = () => {
                                         </p>
 
                                         <Row className="align-items-end g-2 mb-3">
-                                            <Col md={2}>
+                                            <Col md={3}>
                                                 <Label className="form-label">Bandeira</Label>
-                                                {bandeirasOptions.length > 0 ? (
-                                                    <Input
-                                                        type="select"
-                                                        value={novoCartao.bandeira}
-                                                        onChange={(e) =>
-                                                            setNovoCartao((prev) => ({
-                                                                ...prev,
-                                                                bandeira: e.target.value,
-                                                            }))
-                                                        }
-                                                    >
-                                                        <option value="">Selecionar...</option>
-                                                        {bandeirasOptions.map((opt) => (
-                                                            <option key={String(opt.value)} value={opt.value}>
-                                                                {opt.label}
-                                                            </option>
-                                                        ))}
-                                                    </Input>
-                                                ) : (
-                                                    <Input
-                                                        type="text"
-                                                        value={novoCartao.bandeira}
-                                                        placeholder="Ex.: Mastercard"
-                                                        onChange={(e) =>
-                                                            setNovoCartao((prev) => ({
-                                                                ...prev,
-                                                                bandeira: e.target.value,
-                                                            }))
-                                                        }
-                                                    />
-                                                )}
+                                                <SelectList
+                                                    options={bandeirasOptions}
+                                                    value={novoCartao.bandeira || null}
+                                                    placeholder="Selecionar..."
+                                                    onChange={(val) =>
+                                                        setNovoCartao((prev) => ({
+                                                            ...prev,
+                                                            bandeira: val ? String(val) : '',
+                                                        }))
+                                                    }
+                                                />
                                             </Col>
                                             <Col md={2}>
                                                 <Label className="form-label">Final <span className="text-muted fw-normal">(opcional)</span></Label>
@@ -1161,7 +1176,12 @@ const CartoesForm = () => {
                                                         >
                                                             <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 px-3 py-2 bg-light">
                                                                 <div className="d-flex align-items-center gap-2">
-                                                                    <strong>{bandeira.bandeira}</strong>
+                                                                    <BandeiraChip
+                                                                        cor_principal={bandeira.cor_principal}
+                                                                        cor_secundaria={bandeira.cor_secundaria}
+                                                                        bandeira={bandeira.bandeira}
+                                                                        label={bandeira.bandeira}
+                                                                    />
                                                                     <span className="text-muted">·</span>
                                                                     {isEditingLimite ? (
                                                                         <div className="d-flex align-items-center gap-2">
