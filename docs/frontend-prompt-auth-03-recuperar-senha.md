@@ -166,11 +166,11 @@ Rotas públicas: **não** exigir Bearer. O interceptor só manda token se existi
 
 ## Checklist
 
-- [ ] Passo 1: mensagem genérica; nunca “e-mail não encontrado”
-- [ ] Sempre vai ao passo 2 após 200 (e-mail exista ou não)
-- [ ] Passo 2: 6 inputs, foco automático, suporte a colar
-- [ ] Reenviar código sem quebrar o fluxo (mesma mensagem)
-- [ ] Passo 3 redefine e **já autentica** com o token da resposta
-- [ ] Senha do passo 3 **sem** ícone de olho
-- [ ] Erros de código inválido/expirado sem vazar existência do e-mail
-- [ ] Login tem “Esqueci a senha”
+- [x] Passo 1: mensagem genérica; nunca “e-mail não encontrado”
+- [x] Sempre vai ao passo 2 após 200 (e-mail exista ou não)
+- [x] Passo 2: 6 inputs, foco automático, suporte a colar
+- [x] Reenviar código sem quebrar o fluxo (mesma mensagem)
+- [x] Passo 3 redefine e **já autentica** com o token da resposta
+- [x] Senha do passo 3 **sem** ícone de olho
+- [x] Erros de código inválido/expirado sem vazar existência do e-mail
+- [x] Login tem “Esqueci a senha”

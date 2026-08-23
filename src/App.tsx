@@ -11,11 +11,9 @@ import "react-toastify/dist/ReactToastify.css";
 // Import Firebase Configuration file
 // import { initFirebaseBackend } from "./helpers/firebase_helper";
 
-// Fake Backend 
-import fakeBackend from "./helpers/AuthType/fakeBackend";
-
-// Activating fake backend
-fakeBackend();
+// Fake backend do template Velzon desligado: engolia XHR e confundia o Network.
+// import fakeBackend from "./helpers/AuthType/fakeBackend";
+// fakeBackend();
 
 // const firebaseConfig = {
 //   apiKey: process.env.REACT_APP_APIKEY,

@@ -93,6 +93,9 @@ const Login = (props: any) => {
                         </div>
 
                         <div className="mb-3">
+                          <div className="float-end">
+                            <Link to="/recuperar-senha" className="text-muted">Esqueci a senha</Link>
+                          </div>
                           <Label className="form-label" htmlFor="password-input">Senha</Label>
                           <div className="position-relative auth-pass-inputgroup mb-3">
                             <Input

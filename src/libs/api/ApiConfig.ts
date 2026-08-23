@@ -33,6 +33,8 @@ export const ApiConfig = axios.create({
 });
 
 ApiConfig.interceptors.request.use((config) => {
+  // Recalcula a base a cada request (LAN / localhost) e evita adapter do axios-mock.
+  config.baseURL = getApiBaseUrl();
   const token = getAuthToken();
   if (token) {
     config.headers = config.headers || {};
