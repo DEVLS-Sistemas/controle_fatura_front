@@ -86,6 +86,8 @@ export interface FaturasCartaoGroup {
 /** @deprecated Use FaturasCartaoGroup — mantido só para compatibilidade de imports */
 export type FaturasList = FaturasCartaoGroup
 
+export type FaturaGrupoChave = 'cartao' | 'pagamentos_financiamentos'
+
 /** Grupo de transações por final do cartão — `GET /faturas/listar/{id}` */
 export interface FaturaGrupoPorCartao {
     cartao_numero_id?: number | null
@@ -93,6 +95,8 @@ export interface FaturaGrupoPorCartao {
     tipo?: string | null
     apelido?: string | null
     nome_no_cartao?: string | null
+    /** `"cartao"` ou `"pagamentos_financiamentos"` — chave estável (não comparar o label) */
+    grupo_chave?: FaturaGrupoChave | string | null
     label?: string
     total_transacoes?: number
     valor_total?: number | string

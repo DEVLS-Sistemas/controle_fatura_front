@@ -21,6 +21,7 @@ export const tipoTransacaoLabel: Record<string, string> = {
   refund: 'Estorno',
   advance: 'Antecipação',
   fee: 'Encargo',
+  carryover: 'Saldo anterior',
 }
 
 export const tipoTransacaoColor: Record<string, string> = {
@@ -29,10 +30,20 @@ export const tipoTransacaoColor: Record<string, string> = {
   refund: 'info',
   advance: 'warning',
   fee: 'dark',
+  carryover: 'secondary',
+}
+
+export const resolveTipoTransacaoLabel = (
+  tipo?: string | null,
+  tipoLabel?: string | null,
+): string => {
+  if (tipoLabel) return tipoLabel
+  if (!tipo) return '-'
+  return tipoTransacaoLabel[tipo] ?? tipo
 }
 
 /** Tipos que não são compra — vão na seção Operacionais do detalhe da fatura */
-export const TIPOS_TRANSACAO_OPERACIONAIS = ['payment', 'refund', 'advance', 'fee'] as const
+export const TIPOS_TRANSACAO_OPERACIONAIS = ['payment', 'refund', 'advance', 'fee', 'carryover'] as const
 
 /**
  * Normaliza nome do estabelecimento para matching (sem acento, maiúsculas).
@@ -43,24 +54,39 @@ export const normalizeEstabelecimentoNome = (value?: string | null): string =>
     .replace(/[\u0300-\u036f]/g, '')
     .toUpperCase()
 
+const isSaldoFaturaAnteriorNome = (nome: string): boolean => {
+  if (!nome) return false
+  if (nome.includes('SALDO RESTANTE') && nome.includes('FATURA ANTERIOR')) return true
+  if (nome.includes('SALDO RESTANTE DA FATURA')) return true
+  return nome === 'SALDO ANTERIOR'
+}
+
 /**
- * Pagamentos, estornos, antecipações e encargos (juros, multa, IOF…)
+ * Pagamentos, estornos, antecipações, encargos e saldo da fatura anterior
  * ficam em Operacionais — não são compras.
+ * Nome próprio na lista (ex.: Thaís Araújo da Silva) é estabelecimento (`purchase`).
  */
 export const isTransacaoOperacional = (tx: {
   tipo?: string | null
+  operacional?: boolean | null
   origem_compra?: string | null
   estabelecimento_nome?: string | null
   estabelecimento?: string | null
 }): boolean => {
   const tipo = (tx.tipo ?? '').toLowerCase()
   if ((TIPOS_TRANSACAO_OPERACIONAIS as readonly string[]).includes(tipo)) return true
-  if (tx.origem_compra === 'PAGAMENTO_FATURA') return true
 
   const nome = normalizeEstabelecimentoNome(tx.estabelecimento_nome ?? tx.estabelecimento)
+  if (isSaldoFaturaAnteriorNome(nome)) return true
+
+  if (tx.operacional === true) return true
+  if (tx.operacional === false) return false
+
+  if (tx.origem_compra === 'PAGAMENTO_FATURA') return true
   if (!nome) return false
 
   if (nome.includes('PAGAMENTO DE FATURA') || nome.includes('PAGAMENTO FATURA')) return true
+  if (nome.startsWith('PAGAMENTO EM ')) return true
 
   // Encargos comuns no extrato (fallback se o backend ainda marcar como purchase)
   const keywords = [

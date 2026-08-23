@@ -11,7 +11,8 @@ import { toast } from 'react-toastify'
 import {
     formatCurrency, formatDateBr, faturaStatusColor,
     faturaQuitacaoLabel, faturaQuitacaoColor,
-    tipoTransacaoColor, tipoTransacaoLabel,
+    tipoTransacaoColor,
+    resolveTipoTransacaoLabel,
     origemCompraLabel,
     isTransacaoOperacional,
     FATURA_FILE_ACCEPT, isValidFaturaFile, resolveFaturaAnexo, downloadFaturaAnexo,
@@ -81,8 +82,21 @@ const compraDestinoDaFatura = (
     return qs ? `/compras/${tx.id}?${qs}` : `/compras/${tx.id}`
 }
 
-const OPERACIONAIS_KEY = '__operacionais__'
-const SEM_CARTAO_KEY = '__sem_cartao__'
+const PAGAMENTOS_FINANCIAMENTOS_KEY = 'pagamentos_financiamentos'
+const PAGAMENTOS_FINANCIAMENTOS_LABEL = 'Pagamentos e Financiamentos'
+
+const isPagamentosFinanciamentosMeta = (meta: FaturaGrupoPorCartao): boolean => {
+    if (meta.grupo_chave === 'pagamentos_financiamentos') return true
+    if (meta.grupo_chave === 'cartao') return false
+    return meta.cartao_numero_id == null && !meta.ultimos_digitos
+}
+
+const getMetaGrupoKey = (meta: FaturaGrupoPorCartao): string => {
+    if (isPagamentosFinanciamentosMeta(meta)) return PAGAMENTOS_FINANCIAMENTOS_KEY
+    if (meta.cartao_numero_id != null) return `numero_${meta.cartao_numero_id}`
+    const digitos = String(meta.ultimos_digitos ?? '').replace(/\D/g, '').slice(-4)
+    return digitos ? `digitos_${digitos}` : PAGAMENTOS_FINANCIAMENTOS_KEY
+}
 
 const getTxUltimosDigitos = (tx: TransacoesList): string | null => {
     const digitos = tx.ultimos_digitos
@@ -92,12 +106,12 @@ const getTxUltimosDigitos = (tx: TransacoesList): string | null => {
     return String(digitos).replace(/\D/g, '').slice(-4) || null
 }
 
-const getTxNumeroKey = (tx: TransacoesList): string => {
-    if (isTransacaoOperacional(tx)) return OPERACIONAIS_KEY
+const getTxGrupoKey = (tx: TransacoesList): string => {
+    if (tx.grupo_chave === 'pagamentos_financiamentos') return PAGAMENTOS_FINANCIAMENTOS_KEY
     if (tx.cartao_numero_id != null) return `numero_${tx.cartao_numero_id}`
     if (tx.cartao_numero?.id != null) return `numero_${tx.cartao_numero.id}`
     const digitos = getTxUltimosDigitos(tx)
-    return digitos ? `digitos_${digitos}` : SEM_CARTAO_KEY
+    return digitos ? `digitos_${digitos}` : PAGAMENTOS_FINANCIAMENTOS_KEY
 }
 
 const getTxNomeNoCartao = (tx: TransacoesList): string | null => {
@@ -108,9 +122,8 @@ const getTxNomeNoCartao = (tx: TransacoesList): string | null => {
 }
 
 const getTxNumeroLabel = (tx: TransacoesList): string => {
-    if (isTransacaoOperacional(tx)) return 'Operacionais'
     const digitos = getTxUltimosDigitos(tx)
-    if (!digitos) return 'Sem cartão identificado'
+    if (!digitos) return PAGAMENTOS_FINANCIAMENTOS_LABEL
     const nomeNoCartao = getTxNomeNoCartao(tx)
     if (nomeNoCartao) return `•••• ${digitos} · ${nomeNoCartao}`
     const tipo = tx.cartao_numero?.tipo ?? tx.cartao_numero_tipo
@@ -120,8 +133,13 @@ const getTxNumeroLabel = (tx: TransacoesList): string => {
 }
 
 const formatGrupoLabel = (meta: FaturaGrupoPorCartao): string => {
+    if (isPagamentosFinanciamentosMeta(meta)) {
+        const label = meta.label?.trim()
+        if (label && label !== 'Sem cartão identificado') return label
+        return PAGAMENTOS_FINANCIAMENTOS_LABEL
+    }
     if (meta.label) return meta.label
-    if (!meta.ultimos_digitos) return 'Sem cartão identificado'
+    if (!meta.ultimos_digitos) return PAGAMENTOS_FINANCIAMENTOS_LABEL
     const digitos = String(meta.ultimos_digitos).replace(/\D/g, '').slice(-4)
     if (meta.nome_no_cartao?.trim()) return `•••• ${digitos} · ${meta.nome_no_cartao.trim()}`
     return `•••• ${digitos}`
@@ -129,43 +147,44 @@ const formatGrupoLabel = (meta: FaturaGrupoPorCartao): string => {
 
 type TransacaoGrupo = {
     key: string
+    grupoChave: 'cartao' | 'pagamentos_financiamentos'
     cartaoNumeroId: number | null
     digitos: string | null
     label: string
+    ordem: number
     items: TransacoesList[]
+    compras: TransacoesList[]
+    operacionais: TransacoesList[]
     subtotal: number
 }
 
-const grupoSortOrder = (g: TransacaoGrupo): number => {
-    if (g.key === OPERACIONAIS_KEY) return 2
-    if (g.key === SEM_CARTAO_KEY) return 1
-    return 0
+const splitComprasOperacionais = (items: TransacoesList[]) => {
+    const compras: TransacoesList[] = []
+    const operacionais: TransacoesList[] = []
+    items.forEach((tx) => {
+        if (isTransacaoOperacional(tx)) operacionais.push(tx)
+        else compras.push(tx)
+    })
+    return { compras, operacionais }
 }
 
 const groupTransacoesPorFinal = (
     rows: TransacoesList[],
     metaGrupos?: FaturaGrupoPorCartao[] | null
 ): TransacaoGrupo[] => {
-    const metaByKey = new Map<string, FaturaGrupoPorCartao>()
-    ;(metaGrupos ?? []).forEach((g) => {
-        const key = g.cartao_numero_id != null
-            ? `numero_${g.cartao_numero_id}`
-            : (g.ultimos_digitos
-                ? `digitos_${String(g.ultimos_digitos).replace(/\D/g, '').slice(-4)}`
-                : SEM_CARTAO_KEY)
-        metaByKey.set(key, g)
+    const metaByKey = new Map<string, { meta: FaturaGrupoPorCartao; ordem: number }>()
+    ;(metaGrupos ?? []).forEach((g, index) => {
+        metaByKey.set(getMetaGrupoKey(g), { meta: g, ordem: index })
     })
 
     const map = new Map<string, TransacaoGrupo>()
 
     rows.forEach((tx) => {
-        const key = getTxNumeroKey(tx)
-        const isOperacional = key === OPERACIONAIS_KEY
-        const digitos = isOperacional ? null : getTxUltimosDigitos(tx)
-        const cartaoNumeroId = isOperacional
-            ? null
-            : (tx.cartao_numero_id ?? tx.cartao_numero?.id ?? null)
-        const meta = isOperacional ? undefined : metaByKey.get(key)
+        const key = getTxGrupoKey(tx)
+        const found = metaByKey.get(key)
+        const isPagamentos = key === PAGAMENTOS_FINANCIAMENTOS_KEY
+            || tx.grupo_chave === 'pagamentos_financiamentos'
+            || (found ? isPagamentosFinanciamentosMeta(found.meta) : false)
         const current = map.get(key)
         if (current) {
             current.items.push(tx)
@@ -174,36 +193,52 @@ const groupTransacoesPorFinal = (
         }
         map.set(key, {
             key,
-            cartaoNumeroId,
-            digitos,
-            label: isOperacional
-                ? 'Operacionais'
-                : ((meta ? formatGrupoLabel(meta) : null) || getTxNumeroLabel(tx)),
+            grupoChave: isPagamentos ? 'pagamentos_financiamentos' : 'cartao',
+            cartaoNumeroId: isPagamentos
+                ? null
+                : (tx.cartao_numero_id ?? tx.cartao_numero?.id ?? null),
+            digitos: isPagamentos ? null : getTxUltimosDigitos(tx),
+            label: isPagamentos
+                ? ((found ? formatGrupoLabel(found.meta) : null) || PAGAMENTOS_FINANCIAMENTOS_LABEL)
+                : ((found ? formatGrupoLabel(found.meta) : null) || getTxNumeroLabel(tx)),
+            ordem: found?.ordem ?? (isPagamentos ? 1000 : 0),
             items: [tx],
+            compras: [],
+            operacionais: [],
             subtotal: Number(tx.valor ?? 0),
         })
     })
 
-    // Inclui grupos da API sem linhas (ex.: após filtro local)
-    metaByKey.forEach((meta, key) => {
-        if (map.has(key) || key === OPERACIONAIS_KEY) return
+    metaByKey.forEach(({ meta, ordem }, key) => {
+        if (map.has(key)) return
+        const isPagamentos = isPagamentosFinanciamentosMeta(meta)
         map.set(key, {
             key,
+            grupoChave: isPagamentos ? 'pagamentos_financiamentos' : 'cartao',
             cartaoNumeroId: meta.cartao_numero_id ?? null,
             digitos: meta.ultimos_digitos
                 ? String(meta.ultimos_digitos).replace(/\D/g, '').slice(-4) || null
                 : null,
             label: formatGrupoLabel(meta),
+            ordem,
             items: [],
+            compras: [],
+            operacionais: [],
             subtotal: Number(meta.valor_total ?? 0),
         })
     })
 
     return Array.from(map.values())
+        .map((g) => {
+            const { compras, operacionais } = splitComprasOperacionais(g.items)
+            return { ...g, compras, operacionais }
+        })
         .filter((g) => g.items.length > 0)
         .sort((a, b) => {
-            const orderDiff = grupoSortOrder(a) - grupoSortOrder(b)
-            if (orderDiff !== 0) return orderDiff
+            if (a.ordem !== b.ordem) return a.ordem - b.ordem
+            if (a.grupoChave !== b.grupoChave) {
+                return a.grupoChave === 'pagamentos_financiamentos' ? 1 : -1
+            }
             if (a.digitos == null) return 1
             if (b.digitos == null) return -1
             return a.digitos.localeCompare(b.digitos, 'pt-BR')
@@ -260,10 +295,10 @@ const FaturasViewPage = () => {
     const [savingIds, setSavingIds] = useState<Record<number, boolean>>({})
     const [valorDrafts, setValorDrafts] = useState<Record<number, string>>({})
     const [observacaoDrafts, setObservacaoDrafts] = useState<Record<number, string>>({})
-    /** Finais salvos na sessão “Sem cartão identificado” — não redistribui até atualizar a tela */
+    /** Finais salvos na sessão “Pagamentos e Financiamentos” — não redistribui até atualizar a tela */
     const [finalSelecionados, setFinalSelecionados] = useState<Record<number, number | null>>({})
     const [exporting, setExporting] = useState(false)
-    /** null = todos; '__sem_cartao__' ou chave do grupo */
+    /** null = todos; chave do grupo (final do cartão ou pagamentos_financiamentos) */
     const [filtroFinalKey, setFiltroFinalKey] = useState<string | null>(null)
     /** Navegação anterior/próxima (fallback se a API não enviar os ids) */
     const [navVizinhos, setNavVizinhos] = useState<{
@@ -925,7 +960,7 @@ const FaturasViewPage = () => {
                 propagar_grupo: propagarGrupo,
             })
 
-            // Mantém a linha em “Sem cartão identificado”; redistribui só ao atualizar a tela
+            // Mantém a linha em “Pagamentos e Financiamentos”; redistribui só ao atualizar a tela
             setFinalSelecionados((prev) => {
                 const next = { ...prev, [tx.id!]: parsed }
                 if (propagarGrupo && tx.compra_grupo_id) {
@@ -1582,7 +1617,7 @@ const FaturasViewPage = () => {
                                 <div>
                                     <h5 className="card-title mb-1">Transações</h5>
                                     <small className="text-muted">
-                                        Agrupadas por final do cartão. Em “Sem cartão identificado”, escolha o final na linha de cima da transação.
+                                        Agrupadas por final do cartão. Em “Pagamentos e Financiamentos”, o final é opcional — defina na linha de cima se souber o cartão.
                                     </small>
                                 </div>
                                 <div className="d-flex flex-wrap gap-2">
@@ -1670,7 +1705,14 @@ const FaturasViewPage = () => {
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {gruposVisiveis.map((grupo) => (
+                                            {gruposVisiveis.map((grupo) => {
+                                                const secoes = [
+                                                    { key: 'compras', titulo: 'Compras', items: grupo.compras },
+                                                    { key: 'operacionais', titulo: 'Operacionais', items: grupo.operacionais },
+                                                ].filter((secao) => secao.items.length > 0)
+                                                const isPagamentosGrupo = grupo.grupoChave === 'pagamentos_financiamentos'
+                                                    || grupo.key === PAGAMENTOS_FINANCIAMENTOS_KEY
+                                                return (
                                                 <React.Fragment key={grupo.key}>
                                                     <tr className="table-secondary">
                                                         <td colSpan={11} className="py-2">
@@ -1687,7 +1729,16 @@ const FaturasViewPage = () => {
                                                             </div>
                                                         </td>
                                                     </tr>
-                                                    {grupo.items.map((tx, idx) => {
+                                                    {secoes.map((secao) => (
+                                                <React.Fragment key={`${grupo.key}_${secao.key}`}>
+                                                    <tr className="table-light">
+                                                        <td colSpan={11} className="py-1">
+                                                            <span className="small fw-semibold text-uppercase text-muted">
+                                                                {secao.titulo}
+                                                            </span>
+                                                        </td>
+                                                    </tr>
+                                                    {secao.items.map((tx, idx) => {
                                                         const subOptions = tx.categoria_id
                                                             ? (subcategoriasByCategoria[tx.categoria_id] ?? [])
                                                             : []
@@ -1696,16 +1747,15 @@ const FaturasViewPage = () => {
                                                             tx.responsavel_nome
                                                             ?? responsaveisLookup.find((r) => Number(r.id) === Number(tx.responsavel_id))?.nome
                                                             ?? responsaveisOptions.find((o) => Number(o.value) === Number(tx.responsavel_id))?.label
-                                                        const isSemCartaoGrupo = grupo.key === SEM_CARTAO_KEY
                                                         const finalSalvo = tx.id != null && finalSelecionados[tx.id] !== undefined
                                                             ? finalSelecionados[tx.id]
                                                             : (tx.cartao_numero_id ?? tx.cartao_numero?.id ?? null)
                                                         const selectFinalValue = finalSalvo ?? ''
-                                                        const rowKey = tx.id ?? `${grupo.key}_${idx}`
+                                                        const rowKey = tx.id ?? `${grupo.key}_${secao.key}_${idx}`
                                                         const compraTo = compraDestinoDaFatura(tx, fatura.mes, fatura.ano)
                                                         return (
                                                         <React.Fragment key={rowKey}>
-                                                        {isSemCartaoGrupo && (
+                                                        {isPagamentosGrupo && (
                                                             <tr className="table-warning">
                                                                 <td colSpan={11} className="py-2">
                                                                     <div className="d-flex flex-wrap align-items-center gap-2">
@@ -1782,7 +1832,7 @@ const FaturasViewPage = () => {
                                                             </td>
                                                             <td>
                                                                 <Badge color={tipoTransacaoColor[tx.tipo ?? ''] ?? 'secondary'}>
-                                                                    {tipoTransacaoLabel[tx.tipo ?? ''] ?? tx.tipo}
+                                                                    {resolveTipoTransacaoLabel(tx.tipo, tx.tipo_label)}
                                                                 </Badge>
                                                             </td>
                                                             <td style={{ minWidth: 170 }}>
@@ -1923,7 +1973,10 @@ const FaturasViewPage = () => {
                                                         )
                                                     })}
                                                 </React.Fragment>
-                                            ))}
+                                                    ))}
+                                                </React.Fragment>
+                                                )
+                                            })}
                                         </tbody>
                                     </Table>
                                 </div>

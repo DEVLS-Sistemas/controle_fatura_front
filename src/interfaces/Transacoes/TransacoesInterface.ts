@@ -43,6 +43,10 @@ export interface TransacoesList {
     parcela_atual?: number
     compra_grupo_id?: string | number | null
     tipo?: string
+    tipo_label?: string | null
+    /** true se não for compra (`purchase`) */
+    operacional?: boolean | null
+    grupo_chave?: 'cartao' | 'pagamentos_financiamentos' | string | null
     origem_compra?: string | null
     origem_compra_label?: string | null
     categoria_id?: number | null
@@ -162,6 +166,7 @@ export interface FaturaLookup {
 export interface TipoLookup {
     value?: string
     label?: string
+    operacional?: boolean
 }
 
 export interface OrigemCompraLookup {
