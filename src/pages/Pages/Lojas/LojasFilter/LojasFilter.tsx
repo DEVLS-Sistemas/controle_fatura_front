@@ -6,6 +6,7 @@ import {
     Breadcrumb, BreadcrumbItem, Button, Card, CardHeader, Col, Collapse, Label, Row
 } from "reactstrap"
 import { InputTextControlled } from "Components/ComponentController/Inputs/Text/InputTextControlled"
+import PeriodoFiltroCampos from "Components/Estatisticas/PeriodoFiltroCampos"
 import { LojasSearch } from "interfaces/Lojas/LojasInterface"
 
 export interface LojasFilterProps {
@@ -13,7 +14,9 @@ export interface LojasFilterProps {
 }
 
 const LojasFilter = ({ getRemoteLojasList }: LojasFilterProps) => {
-    const { handleSubmit, control, register } = useForm<LojasSearch>({ defaultValues: {} })
+    const { handleSubmit, control, register, watch, setValue } = useForm<LojasSearch>({
+        defaultValues: { periodo_modo: 'historico' },
+    })
     const [showFilter, setShowFilter] = useState<boolean>(false)
 
     return (
@@ -102,6 +105,17 @@ const LojasFilter = ({ getRemoteLojasList }: LojasFilterProps) => {
                                                             <option value="false">Inativo</option>
                                                         </select>
                                                     </div>
+                                                </Col>
+                                            </Row>
+                                            <Row>
+                                                <Col md={8}>
+                                                    <PeriodoFiltroCampos
+                                                        control={control}
+                                                        register={register}
+                                                        watch={watch}
+                                                        setValue={setValue}
+                                                        idPrefix="lojas-periodo"
+                                                    />
                                                 </Col>
                                             </Row>
                                             <Row className="mt-5">

@@ -1,4 +1,10 @@
-export interface LojasSearch {
+import {
+    EstatisticasCompra,
+    EstatisticasFrequencia,
+    PeriodoFiltro,
+} from 'interfaces/Estatisticas/EstatisticasCompraInterface'
+
+export interface LojasSearch extends PeriodoFiltro {
     id?: string | null
     loja_id?: string | null
     nome?: string | null
@@ -10,6 +16,12 @@ export interface LojaEstabelecimentoVinculo {
     id?: number
     nome?: string
     ativo?: boolean
+    compras?: number
+    ocorrencias?: number
+    valor_total?: number
+    ticket_medio?: number | null
+    frequencia?: EstatisticasFrequencia
+    estatisticas?: EstatisticasCompra
 }
 
 export interface LojasList {
@@ -17,10 +29,19 @@ export interface LojasList {
     nome?: string
     ativo?: boolean
     estabelecimentos_count?: number
+    estatisticas?: EstatisticasCompra
+    compras?: number
+    valor_total?: number
+    frequencia?: EstatisticasFrequencia
 }
 
 export interface LojasView extends LojasList {
     estabelecimentos?: LojaEstabelecimentoVinculo[]
+    ocorrencias?: number
+    ticket_medio?: number | null
+    primeira_compra?: string | null
+    ultima_compra?: string | null
+    dias_desde_ultima?: number | null
 }
 
 export interface LojasModel {
@@ -70,7 +91,8 @@ export interface VincularEstabelecimentosResult {
 }
 
 export interface LojasInterface {
-    getViewLojas(params: { id: number | string }): Promise<LojasView | undefined>
+    getViewLojas(params: { id: number | string } & PeriodoFiltro): Promise<LojasView | undefined>
+    getEstatisticasLoja(id: number | string, periodo?: PeriodoFiltro): Promise<LojasView>
     listLojasPaginate(params: LojasSearch): Promise<any>
     AsyncListLojas(params: LojasSearch): Promise<LojaLookup[] | undefined>
     createLojas(params: LojasModel): Promise<any>

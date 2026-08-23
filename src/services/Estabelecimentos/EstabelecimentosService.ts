@@ -13,6 +13,13 @@ import {
     ExcluirTodosEstabelecimentosResponse,
     LookupsEstabelecimentos,
 } from "interfaces/Estabelecimentos/EstabelecimentosInterface"
+import {
+    EstatisticasCompra,
+    PeriodoFiltro,
+    pickEstatisticas,
+    unwrapApiData,
+    withPeriodoQuery,
+} from "interfaces/Estatisticas/EstatisticasCompraInterface"
 
 export class EstabelecimentosService implements EstabelecimentosInterface {
     private readonly url: string
@@ -23,12 +30,28 @@ export class EstabelecimentosService implements EstabelecimentosInterface {
         this.httpClient = new AxiosHttpClient()
     }
 
-    async getViewEstabelecimentos(params: { id: number | string }): Promise<EstabelecimentosView | undefined> {
+    async getViewEstabelecimentos(params: { id: number | string } & PeriodoFiltro): Promise<EstabelecimentosView | undefined> {
+        const { id, ...periodo } = params
         const response = await this.httpClient.get<EstabelecimentosView>({
-            url: `${this.url}/listar/${params.id}`
+            url: `${this.url}/listar/${id}`,
+            body: withPeriodoQuery(periodo),
         })
         switch (response.statusCode) {
-            case HttpStatusCode.ok: return response.body
+            case HttpStatusCode.ok:
+                return unwrapApiData<EstabelecimentosView>(response.body, ['estabelecimento'])
+            case HttpStatusCode.unauthorized: throw new AccessDeniedError()
+            default: throw new UnexpectedError()
+        }
+    }
+
+    async getEstatisticasEstabelecimento(id: number | string, periodo?: PeriodoFiltro): Promise<EstatisticasCompra> {
+        const response = await this.httpClient.get({
+            url: `${this.url}/estatisticas/${id}`,
+            body: withPeriodoQuery(periodo ?? {}),
+        })
+        switch (response.statusCode) {
+            case HttpStatusCode.ok:
+                return pickEstatisticas(unwrapApiData(response.body, ['estabelecimento']))
             case HttpStatusCode.unauthorized: throw new AccessDeniedError()
             default: throw new UnexpectedError()
         }
@@ -38,7 +61,7 @@ export class EstabelecimentosService implements EstabelecimentosInterface {
         try {
             const response = await this.httpClient.get<PaginateInterface<EstabelecimentosList>>({
                 url: this.url + '/listar',
-                body: params
+                body: withPeriodoQuery(params),
             })
             if (!response || !response.statusCode) throw new UnexpectedError()
             switch (response.statusCode) {

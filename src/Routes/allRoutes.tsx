@@ -36,9 +36,11 @@ import TransacoesForm from "pages/Pages/Transacoes/TransacoesForm/TransacoesForm
 
 import EstabelecimentosPage from "pages/Pages/Estabelecimentos/EstabelecimentosPage";
 import EstabelecimentosForm from "pages/Pages/Estabelecimentos/EstabelecimentosForm/EstabelecimentosForm";
+import EstabelecimentosViewPage from "pages/Pages/Estabelecimentos/EstabelecimentosView/EstabelecimentosView";
 
 import LojasPage from "pages/Pages/Lojas/LojasPage";
 import LojasForm from "pages/Pages/Lojas/LojasForm/LojasForm";
+import LojasViewPage from "pages/Pages/Lojas/LojasView/LojasView";
 
 import SubcategoriasPage from "pages/Pages/Subcategorias/SubcategoriasPage";
 import SubcategoriasForm from "pages/Pages/Subcategorias/SubcategoriasForm/SubcategoriasForm";
@@ -86,10 +88,12 @@ const authProtectedRoutes = [
   { path: "/estabelecimentos", component: <EstabelecimentosPage /> },
   { path: "/estabelecimentos/add", component: <EstabelecimentosForm /> },
   { path: "/estabelecimentos/edit/:id", component: <EstabelecimentosForm /> },
+  { path: "/estabelecimentos/view/:id", component: <EstabelecimentosViewPage /> },
 
   { path: "/lojas", component: <LojasPage /> },
   { path: "/lojas/add", component: <LojasForm /> },
   { path: "/lojas/edit/:id", component: <LojasForm /> },
+  { path: "/lojas/view/:id", component: <LojasViewPage /> },
 
   { path: "/subcategorias", component: <SubcategoriasPage /> },
   { path: "/subcategorias/add", component: <SubcategoriasForm /> },

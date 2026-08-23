@@ -22,6 +22,11 @@ const EstabelecimentosPage = () => {
         ativo: null,
         categoria_padrao_id: null,
         palavra_chave: null,
+        periodo_modo: 'historico',
+        mes: null,
+        ano: null,
+        data_inicio: null,
+        data_fim: null,
         page: 1,
         perPage: 5,
         firstEntry: false,
@@ -42,6 +47,11 @@ const EstabelecimentosPage = () => {
         estabelecimentosContext.palavra_chave = data.palavra_chave
         estabelecimentosContext.nome = data.nome
         estabelecimentosContext.ativo = data.ativo
+        estabelecimentosContext.periodo_modo = data.periodo_modo ?? 'historico'
+        estabelecimentosContext.mes = data.mes
+        estabelecimentosContext.ano = data.ano
+        estabelecimentosContext.data_inicio = data.data_inicio
+        estabelecimentosContext.data_fim = data.data_fim
         estabelecimentosContext.page = data.page
         estabelecimentosContext.firstEntry = true
         if (list) setEstabelecimentosList(list)

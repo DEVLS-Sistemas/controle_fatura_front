@@ -8,6 +8,9 @@ import {
 import { PaginateInterface, PaginateSearch, PerPageProps } from "interfaces/SystemInterfaces/PaginateInterface"
 import CustomModal from "Components/ComponentController/Modal/CustomModal"
 import TableActionsDropdown from "Components/Common/TableActionsDropdown"
+import { formatCurrency, VALOR_TEXT_CLASS } from "helpers/fatura_helpers"
+import { frequenciaLabel } from "helpers/estatisticas_helpers"
+import { pickEstatisticas, pickPeriodoFiltro } from "interfaces/Estatisticas/EstatisticasCompraInterface"
 import { LojasList, LojasSearch } from "interfaces/Lojas/LojasInterface"
 import { LojasService } from "services/Lojas/LojasService"
 
@@ -56,6 +59,7 @@ export const LojasTable = ({ data, getData, setPerPage, perPage, filters }: Loja
                 palavra_chave: new_url.searchParams.get('palavra_chave') ?? filters.palavra_chave,
                 nome: new_url.searchParams.get('nome') ?? filters.nome,
                 ativo: new_url.searchParams.get('ativo') ?? filters.ativo,
+                ...pickPeriodoFiltro(filters),
             })
         } catch (error) {
             console.error(error)
@@ -113,15 +117,24 @@ export const LojasTable = ({ data, getData, setPerPage, perPage, filters }: Loja
                                                             <tr>
                                                                 <th scope="col" className="text-start">Nome</th>
                                                                 <th scope="col">Estabelecimentos</th>
+                                                                <th scope="col">Compras</th>
+                                                                <th scope="col">Gasto</th>
+                                                                <th scope="col" className="text-start">Frequência</th>
                                                                 <th scope="col">Ativo</th>
                                                                 <th scope="col" style={{ width: "150px" }}>Ações</th>
                                                             </tr>
                                                         </thead>
                                                         <tbody>
-                                                            {data.data.map((row, index) => (
+                                                            {data.data.map((row, index) => {
+                                                                const stats = pickEstatisticas(row)
+                                                                const periodo = pickPeriodoFiltro(filters)
+                                                                return (
                                                                 <tr key={row.id ?? index}>
                                                                     <td className="text-start">{row.nome}</td>
                                                                     <td>{row.estabelecimentos_count ?? 0}</td>
+                                                                    <td>{stats.compras ?? 0}</td>
+                                                                    <td className={VALOR_TEXT_CLASS}>{formatCurrency(stats.valor_total)}</td>
+                                                                    <td className="text-start fw-medium">{frequenciaLabel(stats)}</td>
                                                                     <td>
                                                                         <span className={`badge bg-${row.ativo ? 'success' : 'danger'}`}>
                                                                             {row.ativo ? 'Ativo' : 'Inativo'}
@@ -129,6 +142,12 @@ export const LojasTable = ({ data, getData, setPerPage, perPage, filters }: Loja
                                                                     </td>
                                                                     <td>
                                                                         <TableActionsDropdown>
+                                                                            <Link
+                                                                                to={`/lojas/view/${row.id}`}
+                                                                                state={{ source: row, periodo }}
+                                                                            >
+                                                                                <DropdownItem>Visualizar</DropdownItem>
+                                                                            </Link>
                                                                             <Link to={`/lojas/edit/${row.id}`} state={{ source: row }}>
                                                                                 <DropdownItem>Editar</DropdownItem>
                                                                             </Link>
@@ -143,7 +162,8 @@ export const LojasTable = ({ data, getData, setPerPage, perPage, filters }: Loja
                                                                         </TableActionsDropdown>
                                                                     </td>
                                                                 </tr>
-                                                            ))}
+                                                                )
+                                                            })}
                                                         </tbody>
                                                     </table>
                                                 </div>

@@ -8,6 +8,9 @@ import {
 import { PaginateInterface, PaginateSearch, PerPageProps } from "interfaces/SystemInterfaces/PaginateInterface"
 import CustomModal from "Components/ComponentController/Modal/CustomModal"
 import TableActionsDropdown from "Components/Common/TableActionsDropdown"
+import { formatCurrency, VALOR_TEXT_CLASS } from "helpers/fatura_helpers"
+import { extraEstatisticasLinha, frequenciaLabel } from "helpers/estatisticas_helpers"
+import { pickEstatisticas, pickPeriodoFiltro } from "interfaces/Estatisticas/EstatisticasCompraInterface"
 import { EstabelecimentosList, EstabelecimentosSearch } from "interfaces/Estabelecimentos/EstabelecimentosInterface"
 import { EstabelecimentosService } from "services/Estabelecimentos/EstabelecimentosService"
 import LojaModal, { LojaModalResult } from "../LojaModal/LojaModal"
@@ -78,6 +81,7 @@ export const EstabelecimentosTable = ({ data, getData, setPerPage, perPage, filt
                 palavra_chave: new_url.searchParams.get('palavra_chave') ?? filters.palavra_chave,
                 nome: new_url.searchParams.get('nome') ?? filters.nome,
                 ativo: new_url.searchParams.get('ativo') ?? filters.ativo,
+                ...pickPeriodoFiltro(filters),
             })
         } catch (error) {
             console.error(error)
@@ -135,6 +139,9 @@ export const EstabelecimentosTable = ({ data, getData, setPerPage, perPage, filt
                                                             <tr>
                                                                 <th scope="col" className="text-start">Nome</th>
                                                                 <th scope="col" className="text-start">Loja</th>
+                                                                <th scope="col">Compras</th>
+                                                                <th scope="col">Gasto</th>
+                                                                <th scope="col" className="text-start">Frequência</th>
                                                                 <th scope="col">Categoria padrão</th>
                                                                 <th scope="col">Subcategoria padrão</th>
                                                                 <th scope="col">Ativo</th>
@@ -142,7 +149,11 @@ export const EstabelecimentosTable = ({ data, getData, setPerPage, perPage, filt
                                                             </tr>
                                                         </thead>
                                                         <tbody>
-                                                            {rows.map((row, index) => (
+                                                            {rows.map((row, index) => {
+                                                                const stats = pickEstatisticas(row)
+                                                                const extra = extraEstatisticasLinha(row)
+                                                                const periodo = pickPeriodoFiltro(filters)
+                                                                return (
                                                                 <tr key={row.id ?? index}>
                                                                     <td className="text-start">
                                                                         <div>{row.nome}</div>
@@ -164,6 +175,12 @@ export const EstabelecimentosTable = ({ data, getData, setPerPage, perPage, filt
                                                                             )}
                                                                         </Button>
                                                                     </td>
+                                                                    <td title={extra || undefined}>
+                                                                        <div>{stats.compras ?? 0}</div>
+                                                                        {extra && <div className="text-muted small">{extra}</div>}
+                                                                    </td>
+                                                                    <td className={VALOR_TEXT_CLASS}>{formatCurrency(stats.valor_total)}</td>
+                                                                    <td className="text-start fw-medium">{frequenciaLabel(stats)}</td>
                                                                     <td>{row.categoria_padrao_nome ?? '-'}</td>
                                                                     <td>{row.subcategoria_padrao_nome ?? '-'}</td>
                                                                     <td>
@@ -173,6 +190,12 @@ export const EstabelecimentosTable = ({ data, getData, setPerPage, perPage, filt
                                                                     </td>
                                                                     <td>
                                                                         <TableActionsDropdown>
+                                                                            <Link
+                                                                                to={`/estabelecimentos/view/${row.id}`}
+                                                                                state={{ source: row, periodo }}
+                                                                            >
+                                                                                <DropdownItem>Visualizar</DropdownItem>
+                                                                            </Link>
                                                                             <Link to={`/estabelecimentos/edit/${row.id}`} state={{ source: row }}>
                                                                                 <DropdownItem>Editar</DropdownItem>
                                                                             </Link>
@@ -187,7 +210,8 @@ export const EstabelecimentosTable = ({ data, getData, setPerPage, perPage, filt
                                                                         </TableActionsDropdown>
                                                                     </td>
                                                                 </tr>
-                                                            ))}
+                                                                )
+                                                            })}
                                                         </tbody>
                                                     </table>
                                                 </div>

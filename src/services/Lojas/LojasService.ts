@@ -15,6 +15,11 @@ import {
     VincularEstabelecimentosPayload,
     VincularEstabelecimentosResult,
 } from "interfaces/Lojas/LojasInterface"
+import {
+    PeriodoFiltro,
+    unwrapApiData,
+    withPeriodoQuery,
+} from "interfaces/Estatisticas/EstatisticasCompraInterface"
 
 export class LojasService implements LojasInterface {
     private readonly url: string
@@ -25,12 +30,28 @@ export class LojasService implements LojasInterface {
         this.httpClient = new AxiosHttpClient()
     }
 
-    async getViewLojas(params: { id: number | string }): Promise<LojasView | undefined> {
+    async getViewLojas(params: { id: number | string } & PeriodoFiltro): Promise<LojasView | undefined> {
+        const { id, ...periodo } = params
         const response = await this.httpClient.get<LojasView>({
-            url: `${this.url}/listar/${params.id}`
+            url: `${this.url}/listar/${id}`,
+            body: withPeriodoQuery(periodo),
         })
         switch (response.statusCode) {
-            case HttpStatusCode.ok: return response.body
+            case HttpStatusCode.ok:
+                return unwrapApiData<LojasView>(response.body, ['loja'])
+            case HttpStatusCode.unauthorized: throw new AccessDeniedError()
+            default: throw new UnexpectedError()
+        }
+    }
+
+    async getEstatisticasLoja(id: number | string, periodo?: PeriodoFiltro): Promise<LojasView> {
+        const response = await this.httpClient.get({
+            url: `${this.url}/estatisticas/${id}`,
+            body: withPeriodoQuery(periodo ?? {}),
+        })
+        switch (response.statusCode) {
+            case HttpStatusCode.ok:
+                return unwrapApiData<LojasView>(response.body, ['loja'])
             case HttpStatusCode.unauthorized: throw new AccessDeniedError()
             default: throw new UnexpectedError()
         }
@@ -40,7 +61,7 @@ export class LojasService implements LojasInterface {
         try {
             const response = await this.httpClient.get<PaginateInterface<LojasList>>({
                 url: this.url + '/listar',
-                body: params
+                body: withPeriodoQuery(params),
             })
             if (!response || !response.statusCode) throw new UnexpectedError()
             switch (response.statusCode) {

@@ -1,4 +1,9 @@
-export interface EstabelecimentosSearch {
+import {
+    EstatisticasCompra,
+    PeriodoFiltro,
+} from 'interfaces/Estatisticas/EstatisticasCompraInterface'
+
+export interface EstabelecimentosSearch extends PeriodoFiltro {
     id?: string | null
     estabelecimento_id?: string | null
     nome?: string | null
@@ -18,6 +23,7 @@ export interface EstabelecimentosList {
     loja_id?: number | null
     loja_nome?: string | null
     ativo?: boolean
+    estatisticas?: EstatisticasCompra
 }
 
 export interface EstabelecimentosView extends EstabelecimentosList {}
@@ -63,7 +69,8 @@ export interface ExcluirTodosEstabelecimentosResponse {
 }
 
 export interface EstabelecimentosInterface {
-    getViewEstabelecimentos(params: { id: number | string }): Promise<EstabelecimentosView | undefined>
+    getViewEstabelecimentos(params: { id: number | string } & PeriodoFiltro): Promise<EstabelecimentosView | undefined>
+    getEstatisticasEstabelecimento(id: number | string, periodo?: PeriodoFiltro): Promise<EstatisticasCompra>
     listEstabelecimentosPaginate(params: EstabelecimentosSearch): Promise<any>
     AsyncListEstabelecimentos(params: EstabelecimentosSearch): Promise<EstabelecimentoLookup[] | undefined>
     createEstabelecimentos(params: EstabelecimentosModel): Promise<any>

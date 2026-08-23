@@ -256,6 +256,14 @@ const EstabelecimentosForm = () => {
                                         <Row className="mt-5">
                                             <Col md={12}>
                                                 <div className="hstack gap-2 justify-content-end">
+                                                    {isEditing && (record.id || record.estabelecimento_id || paramId) && (
+                                                        <Link
+                                                            to={`/estabelecimentos/view/${record.id ?? record.estabelecimento_id ?? paramId}`}
+                                                            className="btn btn-soft-info"
+                                                        >
+                                                            Ver estatísticas
+                                                        </Link>
+                                                    )}
                                                     <button type="submit" className="btn btn-primary">Salvar</button>
                                                     <button type="button" className="btn btn-soft-success" onClick={voltarParaRotaAnterior}>Voltar</button>
                                                 </div>

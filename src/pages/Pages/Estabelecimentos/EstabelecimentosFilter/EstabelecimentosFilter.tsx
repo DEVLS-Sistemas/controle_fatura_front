@@ -8,6 +8,7 @@ import {
 } from "reactstrap"
 import { toast } from "react-toastify"
 import { InputTextControlled } from "Components/ComponentController/Inputs/Text/InputTextControlled"
+import PeriodoFiltroCampos from "Components/Estatisticas/PeriodoFiltroCampos"
 import { EstabelecimentosSearch } from "interfaces/Estabelecimentos/EstabelecimentosInterface"
 import { EstabelecimentosService } from "services/Estabelecimentos/EstabelecimentosService"
 import { ValidationError } from "libs/api/exceptions/ValidationError"
@@ -30,7 +31,9 @@ const extractErrorMessage = (error: unknown): string => {
 }
 
 const EstabelecimentosFilter = ({ getRemoteEstabelecimentosList }: EstabelecimentosFilterProps) => {
-    const { handleSubmit, control, register } = useForm<EstabelecimentosSearch>({ defaultValues: {} })
+    const { handleSubmit, control, register, watch, setValue } = useForm<EstabelecimentosSearch>({
+        defaultValues: { periodo_modo: 'historico' },
+    })
     const [showFilter, setShowFilter] = useState<boolean>(false)
     const [limparModalOpen, setLimparModalOpen] = useState(false)
     const [confirmado, setConfirmado] = useState(false)
@@ -170,6 +173,17 @@ const EstabelecimentosFilter = ({ getRemoteEstabelecimentosList }: Estabelecimen
                                                             <option value="false">Inativo</option>
                                                         </select>
                                                     </div>
+                                                </Col>
+                                            </Row>
+                                            <Row>
+                                                <Col md={8}>
+                                                    <PeriodoFiltroCampos
+                                                        control={control}
+                                                        register={register}
+                                                        watch={watch}
+                                                        setValue={setValue}
+                                                        idPrefix="estabelecimentos-periodo"
+                                                    />
                                                 </Col>
                                             </Row>
                                             <Row className="mt-5">

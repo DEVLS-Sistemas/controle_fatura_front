@@ -21,6 +21,11 @@ const LojasPage = () => {
         nome: null,
         ativo: null,
         palavra_chave: null,
+        periodo_modo: 'historico',
+        mes: null,
+        ano: null,
+        data_inicio: null,
+        data_fim: null,
         page: 1,
         perPage: 5,
         firstEntry: false,
@@ -41,6 +46,11 @@ const LojasPage = () => {
         lojasContext.palavra_chave = data.palavra_chave
         lojasContext.nome = data.nome
         lojasContext.ativo = data.ativo
+        lojasContext.periodo_modo = data.periodo_modo ?? 'historico'
+        lojasContext.mes = data.mes
+        lojasContext.ano = data.ano
+        lojasContext.data_inicio = data.data_inicio
+        lojasContext.data_fim = data.data_fim
         lojasContext.page = data.page
         lojasContext.firstEntry = true
         if (list) setLojasList(list)
