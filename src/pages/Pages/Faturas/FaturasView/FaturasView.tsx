@@ -82,12 +82,15 @@ const compraDestinoDaFatura = (
     return qs ? `/compras/${tx.id}?${qs}` : `/compras/${tx.id}`
 }
 
+const OPERACIONAIS_KEY = 'operacionais'
 const PAGAMENTOS_FINANCIAMENTOS_KEY = 'pagamentos_financiamentos'
 const PAGAMENTOS_FINANCIAMENTOS_LABEL = 'Pagamentos e Financiamentos'
 
+type GrupoChaveUi = 'cartao' | 'pagamentos_financiamentos' | 'operacionais'
+
 const isPagamentosFinanciamentosMeta = (meta: FaturaGrupoPorCartao): boolean => {
     if (meta.grupo_chave === 'pagamentos_financiamentos') return true
-    if (meta.grupo_chave === 'cartao') return false
+    if (meta.grupo_chave === 'cartao' || meta.grupo_chave === 'operacionais') return false
     return meta.cartao_numero_id == null && !meta.ultimos_digitos
 }
 
@@ -106,12 +109,24 @@ const getTxUltimosDigitos = (tx: TransacoesList): string | null => {
     return String(digitos).replace(/\D/g, '').slice(-4) || null
 }
 
-const getTxGrupoKey = (tx: TransacoesList): string => {
-    if (tx.grupo_chave === 'pagamentos_financiamentos') return PAGAMENTOS_FINANCIAMENTOS_KEY
+const getTxCartaoGrupoKey = (tx: TransacoesList): string | null => {
     if (tx.cartao_numero_id != null) return `numero_${tx.cartao_numero_id}`
     if (tx.cartao_numero?.id != null) return `numero_${tx.cartao_numero.id}`
     const digitos = getTxUltimosDigitos(tx)
-    return digitos ? `digitos_${digitos}` : PAGAMENTOS_FINANCIAMENTOS_KEY
+    return digitos ? `digitos_${digitos}` : null
+}
+
+const getTxGrupoKey = (tx: TransacoesList): string => {
+    const cartaoKey = getTxCartaoGrupoKey(tx)
+    if (cartaoKey) return cartaoKey
+    if (tx.grupo_chave === 'operacionais' || isTransacaoOperacional(tx)) return OPERACIONAIS_KEY
+    return PAGAMENTOS_FINANCIAMENTOS_KEY
+}
+
+const resolveGrupoChave = (key: string): GrupoChaveUi => {
+    if (key === OPERACIONAIS_KEY) return 'operacionais'
+    if (key === PAGAMENTOS_FINANCIAMENTOS_KEY) return 'pagamentos_financiamentos'
+    return 'cartao'
 }
 
 const getTxNomeNoCartao = (tx: TransacoesList): string | null => {
@@ -122,6 +137,7 @@ const getTxNomeNoCartao = (tx: TransacoesList): string | null => {
 }
 
 const getTxNumeroLabel = (tx: TransacoesList): string => {
+    if (isTransacaoOperacional(tx) && !getTxCartaoGrupoKey(tx)) return 'Operacionais'
     const digitos = getTxUltimosDigitos(tx)
     if (!digitos) return PAGAMENTOS_FINANCIAMENTOS_LABEL
     const nomeNoCartao = getTxNomeNoCartao(tx)
@@ -138,16 +154,22 @@ const formatGrupoLabel = (meta: FaturaGrupoPorCartao): string => {
         if (label && label !== 'Sem cartão identificado') return label
         return PAGAMENTOS_FINANCIAMENTOS_LABEL
     }
-    if (meta.label) return meta.label
+    if (meta.label && meta.label !== 'Sem cartão identificado') return meta.label
     if (!meta.ultimos_digitos) return PAGAMENTOS_FINANCIAMENTOS_LABEL
     const digitos = String(meta.ultimos_digitos).replace(/\D/g, '').slice(-4)
     if (meta.nome_no_cartao?.trim()) return `•••• ${digitos} · ${meta.nome_no_cartao.trim()}`
     return `•••• ${digitos}`
 }
 
+const faixaGrupo = (grupoChave: GrupoChaveUi): number => {
+    if (grupoChave === 'operacionais') return 2
+    if (grupoChave === 'pagamentos_financiamentos') return 1
+    return 0
+}
+
 type TransacaoGrupo = {
     key: string
-    grupoChave: 'cartao' | 'pagamentos_financiamentos'
+    grupoChave: GrupoChaveUi
     cartaoNumeroId: number | null
     digitos: string | null
     label: string
@@ -174,56 +196,71 @@ const groupTransacoesPorFinal = (
 ): TransacaoGrupo[] => {
     const metaByKey = new Map<string, { meta: FaturaGrupoPorCartao; ordem: number }>()
     ;(metaGrupos ?? []).forEach((g, index) => {
-        metaByKey.set(getMetaGrupoKey(g), { meta: g, ordem: index })
+        const key = getMetaGrupoKey(g)
+        if (key === OPERACIONAIS_KEY) return
+        metaByKey.set(key, { meta: g, ordem: index })
     })
 
     const map = new Map<string, TransacaoGrupo>()
 
+    const makeGrupo = (
+        key: string,
+        grupoChave: GrupoChaveUi,
+        tx: TransacoesList | null,
+        found?: { meta: FaturaGrupoPorCartao; ordem: number },
+    ): TransacaoGrupo => {
+        const isPagamentos = grupoChave === 'pagamentos_financiamentos'
+        const isOperacionais = grupoChave === 'operacionais'
+        return {
+            key,
+            grupoChave,
+            cartaoNumeroId: isPagamentos || isOperacionais
+                ? null
+                : (tx?.cartao_numero_id ?? tx?.cartao_numero?.id ?? found?.meta.cartao_numero_id ?? null),
+            digitos: isPagamentos || isOperacionais
+                ? null
+                : (tx ? getTxUltimosDigitos(tx) : null),
+            label: isOperacionais
+                ? 'Operacionais'
+                : isPagamentos
+                    ? ((found ? formatGrupoLabel(found.meta) : null) || PAGAMENTOS_FINANCIAMENTOS_LABEL)
+                    : ((found ? formatGrupoLabel(found.meta) : null) || (tx ? getTxNumeroLabel(tx) : 'Cartão')),
+            ordem: found?.ordem ?? (isOperacionais ? 2000 : isPagamentos ? 1000 : 0),
+            items: [],
+            compras: [],
+            operacionais: [],
+            subtotal: 0,
+        }
+    }
+
     rows.forEach((tx) => {
         const key = getTxGrupoKey(tx)
         const found = metaByKey.get(key)
-        const isPagamentos = key === PAGAMENTOS_FINANCIAMENTOS_KEY
-            || tx.grupo_chave === 'pagamentos_financiamentos'
-            || (found ? isPagamentosFinanciamentosMeta(found.meta) : false)
+        const grupoChave = resolveGrupoChave(key)
         const current = map.get(key)
         if (current) {
             current.items.push(tx)
             current.subtotal += Number(tx.valor ?? 0)
             return
         }
-        map.set(key, {
-            key,
-            grupoChave: isPagamentos ? 'pagamentos_financiamentos' : 'cartao',
-            cartaoNumeroId: isPagamentos
-                ? null
-                : (tx.cartao_numero_id ?? tx.cartao_numero?.id ?? null),
-            digitos: isPagamentos ? null : getTxUltimosDigitos(tx),
-            label: isPagamentos
-                ? ((found ? formatGrupoLabel(found.meta) : null) || PAGAMENTOS_FINANCIAMENTOS_LABEL)
-                : ((found ? formatGrupoLabel(found.meta) : null) || getTxNumeroLabel(tx)),
-            ordem: found?.ordem ?? (isPagamentos ? 1000 : 0),
-            items: [tx],
-            compras: [],
-            operacionais: [],
-            subtotal: Number(tx.valor ?? 0),
-        })
+        const created = makeGrupo(key, grupoChave, tx, found)
+        created.items.push(tx)
+        created.subtotal = Number(tx.valor ?? 0)
+        map.set(key, created)
     })
 
     metaByKey.forEach(({ meta, ordem }, key) => {
         if (map.has(key)) return
-        const isPagamentos = isPagamentosFinanciamentosMeta(meta)
+        const grupoChave: GrupoChaveUi = isPagamentosFinanciamentosMeta(meta)
+            ? 'pagamentos_financiamentos'
+            : 'cartao'
         map.set(key, {
-            key,
-            grupoChave: isPagamentos ? 'pagamentos_financiamentos' : 'cartao',
+            ...makeGrupo(key, grupoChave, null, { meta, ordem }),
             cartaoNumeroId: meta.cartao_numero_id ?? null,
             digitos: meta.ultimos_digitos
                 ? String(meta.ultimos_digitos).replace(/\D/g, '').slice(-4) || null
                 : null,
             label: formatGrupoLabel(meta),
-            ordem,
-            items: [],
-            compras: [],
-            operacionais: [],
             subtotal: Number(meta.valor_total ?? 0),
         })
     })
@@ -235,10 +272,9 @@ const groupTransacoesPorFinal = (
         })
         .filter((g) => g.items.length > 0)
         .sort((a, b) => {
+            const faixaDiff = faixaGrupo(a.grupoChave) - faixaGrupo(b.grupoChave)
+            if (faixaDiff !== 0) return faixaDiff
             if (a.ordem !== b.ordem) return a.ordem - b.ordem
-            if (a.grupoChave !== b.grupoChave) {
-                return a.grupoChave === 'pagamentos_financiamentos' ? 1 : -1
-            }
             if (a.digitos == null) return 1
             if (b.digitos == null) return -1
             return a.digitos.localeCompare(b.digitos, 'pt-BR')
@@ -1617,7 +1653,7 @@ const FaturasViewPage = () => {
                                 <div>
                                     <h5 className="card-title mb-1">Transações</h5>
                                     <small className="text-muted">
-                                        Agrupadas por final do cartão. Em “Pagamentos e Financiamentos”, o final é opcional — defina na linha de cima se souber o cartão.
+                                        Agrupadas por final do cartão. Compras sem final ficam em “Pagamentos e Financiamentos”; pagamentos e saldo anterior ficam em “Operacionais”.
                                     </small>
                                 </div>
                                 <div className="d-flex flex-wrap gap-2">
@@ -1706,12 +1742,15 @@ const FaturasViewPage = () => {
                                         </thead>
                                         <tbody>
                                             {gruposVisiveis.map((grupo) => {
-                                                const secoes = [
-                                                    { key: 'compras', titulo: 'Compras', items: grupo.compras },
-                                                    { key: 'operacionais', titulo: 'Operacionais', items: grupo.operacionais },
-                                                ].filter((secao) => secao.items.length > 0)
                                                 const isPagamentosGrupo = grupo.grupoChave === 'pagamentos_financiamentos'
-                                                    || grupo.key === PAGAMENTOS_FINANCIAMENTOS_KEY
+                                                const isCartaoGrupo = grupo.grupoChave === 'cartao'
+                                                const secoes = isCartaoGrupo
+                                                    ? [
+                                                        { key: 'compras', titulo: 'Compras', items: grupo.compras },
+                                                        { key: 'operacionais', titulo: 'Operacionais', items: grupo.operacionais },
+                                                    ].filter((secao) => secao.items.length > 0)
+                                                    : [{ key: 'all', titulo: null as string | null, items: grupo.items }]
+                                                const showSecaoTitulo = isCartaoGrupo && secoes.length > 1
                                                 return (
                                                 <React.Fragment key={grupo.key}>
                                                     <tr className="table-secondary">
@@ -1731,6 +1770,7 @@ const FaturasViewPage = () => {
                                                     </tr>
                                                     {secoes.map((secao) => (
                                                 <React.Fragment key={`${grupo.key}_${secao.key}`}>
+                                                    {showSecaoTitulo && secao.titulo && (
                                                     <tr className="table-light">
                                                         <td colSpan={11} className="py-1">
                                                             <span className="small fw-semibold text-uppercase text-muted">
@@ -1738,6 +1778,7 @@ const FaturasViewPage = () => {
                                                             </span>
                                                         </td>
                                                     </tr>
+                                                    )}
                                                     {secao.items.map((tx, idx) => {
                                                         const subOptions = tx.categoria_id
                                                             ? (subcategoriasByCategoria[tx.categoria_id] ?? [])

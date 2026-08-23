@@ -46,7 +46,7 @@ export interface TransacoesList {
     tipo_label?: string | null
     /** true se não for compra (`purchase`) */
     operacional?: boolean | null
-    grupo_chave?: 'cartao' | 'pagamentos_financiamentos' | string | null
+    grupo_chave?: 'cartao' | 'pagamentos_financiamentos' | 'operacionais' | string | null
     origem_compra?: string | null
     origem_compra_label?: string | null
     categoria_id?: number | null
