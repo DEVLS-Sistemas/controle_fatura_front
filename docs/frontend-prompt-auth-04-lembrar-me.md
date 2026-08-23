@@ -126,9 +126,9 @@ A persistência pode ficar no `AuthService.login` ou na tela. Preferir a **tela*
 
 ## Checklist
 
-- [ ] Checkbox visível no login
-- [ ] E-mail preenchido automaticamente se o usuário marcou antes
-- [ ] Senha nunca persistida
-- [ ] Desmarcar e logar de novo esquece o e-mail
-- [ ] Logout não apaga o e-mail lembrado
-- [ ] Fechar o browser: token some (`sessionStorage`); e-mail lembrado permanece (`localStorage`)
+- [x] Checkbox visível no login
+- [x] E-mail preenchido automaticamente se o usuário marcou antes
+- [x] Senha nunca persistida
+- [x] Desmarcar e logar de novo esquece o e-mail
+- [x] Logout não apaga o e-mail lembrado
+- [x] Fechar o browser: token some (`sessionStorage`); e-mail lembrado permanece (`localStorage`)

@@ -9,6 +9,7 @@ const Logout = () => {
   useEffect(() => {
     const run = async () => {
       const authService = new AuthService();
+      // Logout só zera a sessão (token). O e-mail de “lembrar-me” fica no localStorage.
       await authService.logout();
       setDone(true);
     };

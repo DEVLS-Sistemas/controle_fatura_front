@@ -18,6 +18,7 @@ export interface AuthUser {
 export interface AuthLoginPayload {
   email: string
   password: string
+  lembrar_me?: boolean
 }
 
 export interface AuthRegisterPayload {

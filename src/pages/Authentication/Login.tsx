@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Card, CardBody, Col, Container, Input, Label, Row, Button, Form, FormFeedback, Alert, Spinner
 } from 'reactstrap';
@@ -9,19 +9,42 @@ import * as Yup from 'yup';
 import { useFormik } from 'formik';
 import logoLight from '../../assets/images/logo-light.png';
 import { AuthService } from 'services/Auth';
+import { AUTH_LEMBRAR_EMAIL_KEY } from 'helpers/auth_session';
 import { toast } from 'react-toastify';
+
+const readLembrarEmail = (): string => {
+  try {
+    return localStorage.getItem(AUTH_LEMBRAR_EMAIL_KEY)?.trim() || '';
+  } catch {
+    return '';
+  }
+};
+
+const persistLembrarEmail = (email: string, lembrar: boolean): void => {
+  try {
+    if (lembrar && email) {
+      localStorage.setItem(AUTH_LEMBRAR_EMAIL_KEY, email);
+      return;
+    }
+    localStorage.removeItem(AUTH_LEMBRAR_EMAIL_KEY);
+  } catch {
+    // ignore quota / private mode
+  }
+};
 
 const Login = (props: any) => {
   const [passwordShow, setPasswordShow] = useState(false);
   const [loader, setLoader] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const authService = new AuthService();
+  const rememberedEmail = useMemo(() => readLembrarEmail(), []);
 
   const validation = useFormik({
-    enableReinitialize: true,
+    enableReinitialize: false,
     initialValues: {
-      email: 'demo@demo.com',
-      password: '123456',
+      email: rememberedEmail,
+      password: '',
+      lembrar_me: Boolean(rememberedEmail),
     },
     validationSchema: Yup.object({
       email: Yup.string().email('E-mail inválido').required('Informe o e-mail'),
@@ -31,7 +54,13 @@ const Login = (props: any) => {
       setLoader(true);
       setError(null);
       try {
-        await authService.login(values);
+        const email = values.email.trim();
+        await authService.login({
+          email,
+          password: values.password,
+          lembrar_me: Boolean(values.lembrar_me),
+        });
+        persistLembrarEmail(email, Boolean(values.lembrar_me));
         toast.success('Login realizado com sucesso!');
         props.router.navigate('/dashboard');
       } catch (e: any) {
@@ -119,6 +148,20 @@ const Login = (props: any) => {
                               <i className="ri-eye-fill align-middle"></i>
                             </button>
                           </div>
+                        </div>
+
+                        <div className="form-check mb-3">
+                          <Input
+                            className="form-check-input"
+                            type="checkbox"
+                            id="lembrar_me"
+                            name="lembrar_me"
+                            checked={Boolean(validation.values.lembrar_me)}
+                            onChange={validation.handleChange}
+                          />
+                          <Label className="form-check-label" htmlFor="lembrar_me">
+                            Lembrar-me
+                          </Label>
                         </div>
 
                         <div className="mt-4">
