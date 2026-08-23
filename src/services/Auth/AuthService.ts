@@ -2,7 +2,7 @@ import { AxiosHttpClient, getApiBaseUrl, HttpStatusCode } from '../../libs/api/A
 import { AccessDeniedError } from '../../libs/api/exceptions/AccessDeniedError'
 import { UnexpectedError } from '../../libs/api/exceptions/UnexpectedError'
 import { ValidationError } from '../../libs/api/exceptions/ValidationError'
-import { clearAuthSession, persistAuthSession } from '../../helpers/auth_session'
+import { clearAuthSession, persistAuthSession, persistAuthUser } from '../../helpers/auth_session'
 
 const joinApiUrl = (path: string): string => {
   const base = getApiBaseUrl().replace(/\/?$/, '/')
@@ -13,6 +13,8 @@ export interface AuthUser {
   id: number
   name: string
   email: string
+  sobrenome?: string | null
+  cpf_cnpj?: string | null
 }
 
 export interface AuthLoginPayload {
@@ -49,6 +51,18 @@ export interface AuthRedefinirSenhaPayload {
   codigo: string
   password: string
   password_confirmation: string
+}
+
+export interface AuthPerfilPayload {
+  name: string
+  sobrenome?: string
+  cpf_cnpj?: string
+  email: string
+}
+
+export interface AuthPerfilResult {
+  user: AuthUser
+  message: string
 }
 
 export class AuthService {
@@ -121,12 +135,40 @@ export class AuthService {
     switch (response.statusCode) {
       case HttpStatusCode.ok: {
         const user = response.body?.auth?.data?.user ?? response.body?.data?.user
+        if (user) persistAuthUser(user)
         return user
       }
       case HttpStatusCode.unauthorized:
         throw new AccessDeniedError()
       default:
         throw new UnexpectedError()
+    }
+  }
+
+  async updatePerfil(params: AuthPerfilPayload): Promise<AuthPerfilResult> {
+    const response = await this.httpClient.put({
+      url: `${this.url}/perfil`,
+      body: params,
+    })
+
+    switch (response.statusCode) {
+      case HttpStatusCode.ok: {
+        const user = response.body?.auth?.data?.user
+        if (!user) {
+          throw new UnexpectedError('Resposta de perfil inválida')
+        }
+        persistAuthUser(user)
+        return {
+          user,
+          message: response.body?.auth?.message || 'Perfil atualizado com sucesso!',
+        }
+      }
+      case HttpStatusCode.unauthorized:
+        throw new AccessDeniedError()
+      case HttpStatusCode.invalidForm:
+        throw new ValidationError(response.body)
+      default:
+        throw new UnexpectedError(response.body?.message || response.message)
     }
   }
 

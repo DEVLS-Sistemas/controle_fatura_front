@@ -1,10 +1,12 @@
 import axios from 'axios'
 import { RANKING_SEARCH_STORAGE_KEY } from 'interfaces/RankingParceladas/RankingParceladasInterface'
 
-type SessionUser = {
+export interface SessionUser {
   id: number
   name: string
   email: string
+  sobrenome?: string | null
+  cpf_cnpj?: string | null
 }
 
 type SessionPayload = {
@@ -13,6 +15,7 @@ type SessionPayload = {
 }
 
 export const AUTH_SESSION_KEY = 'authUser'
+export const AUTH_SESSION_UPDATED_EVENT = 'auth-session-updated'
 
 /** Chave da etapa 4. Logout / 401 não apagam o e-mail lembrado. */
 export const AUTH_LEMBRAR_EMAIL_KEY = 'auth.lembrar_email'
@@ -81,6 +84,86 @@ export const getAuthToken = (): string | null => {
   return getAuthSession()?.token ?? null
 }
 
+const emitAuthSessionUpdated = (): void => {
+  if (typeof window === 'undefined') return
+  window.dispatchEvent(new Event(AUTH_SESSION_UPDATED_EVENT))
+}
+
+export const normalizeAuthUser = (
+  user: Partial<SessionUser> & { id: number; name: string; email: string }
+): SessionUser => ({
+  id: user.id,
+  name: user.name,
+  email: user.email,
+  sobrenome: user.sobrenome ?? null,
+  cpf_cnpj: user.cpf_cnpj ?? null,
+})
+
+export const getUserDisplayName = (
+  user?: Pick<SessionUser, 'name' | 'sobrenome'> | null
+): string => {
+  if (!user) return ''
+  return [user.name, user.sobrenome]
+    .map((part) => (typeof part === 'string' ? part.trim() : ''))
+    .filter(Boolean)
+    .join(' ')
+}
+
+export const getUserInitials = (
+  user?: Pick<SessionUser, 'name' | 'sobrenome'> | null
+): string => {
+  const name = user?.name?.trim() || ''
+  const last = user?.sobrenome?.trim() || ''
+  if (name && last) return `${name[0]}${last[0]}`.toUpperCase()
+  const letters = name.replace(/\s+/g, '').slice(0, 2)
+  return (letters || '?').toUpperCase()
+}
+
+export const getAuthUser = (): SessionUser | null => {
+  const session = getAuthSession()
+  if (session?.user?.id && session.user.name && session.user.email) {
+    return normalizeAuthUser(session.user)
+  }
+  if (session?.data?.id && session.email) {
+    return normalizeAuthUser({
+      id: session.data.id,
+      name: session.first_name || session.username || '',
+      email: session.email,
+      sobrenome: session.last_name || null,
+    })
+  }
+  return null
+}
+
+const buildStoredSession = (token: string, user: SessionUser): StoredAuthSession => {
+  const normalized = normalizeAuthUser(user)
+  const displayName = getUserDisplayName(normalized)
+  return {
+    token,
+    email: normalized.email,
+    username: displayName || normalized.name,
+    first_name: normalized.name,
+    last_name: normalized.sobrenome ?? '',
+    data: {
+      id: normalized.id,
+      first_name: normalized.name,
+      last_name: normalized.sobrenome ?? '',
+      email: normalized.email,
+    },
+    user: normalized,
+  }
+}
+
+/** Atualiza só o `user` (ex.: GET /me, PUT /perfil). Não troca o token nem limpa caches. */
+export const persistAuthUser = (user: SessionUser): StoredAuthSession | null => {
+  const current = getAuthSession()
+  if (!current?.token) return null
+  const stored = buildStoredSession(current.token, user)
+  sessionStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(stored))
+  emitAuthSessionUpdated()
+  return stored
+}
+
 export const clearUserScopedStorage = (): void => {
   USER_SCOPED_SESSION_KEYS.forEach((key) => {
     try {
@@ -101,23 +184,11 @@ const clearAxiosAuthorization = (): void => {
 
 export const persistAuthSession = (payload: SessionPayload): StoredAuthSession => {
   clearUserScopedStorage()
-  const stored: StoredAuthSession = {
-    token: payload.token,
-    email: payload.user.email,
-    username: payload.user.name,
-    first_name: payload.user.name,
-    last_name: '',
-    data: {
-      id: payload.user.id,
-      first_name: payload.user.name,
-      last_name: '',
-      email: payload.user.email,
-    },
-    user: payload.user,
-  }
+  const stored = buildStoredSession(payload.token, payload.user)
   sessionStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(stored))
   handlingUnauthorized = false
   validatedToken = null
+  emitAuthSessionUpdated()
   return stored
 }
 

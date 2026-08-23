@@ -3,8 +3,8 @@ import { Navigate } from "react-router-dom";
 import DashboardNFT from "../pages/DashboardNFT";
 import DashboardJob from "../pages/DashboardJob/";
 
-import SimplePage from "../pages/Pages/Profile/SimplePage/SimplePage";
 import Settings from "../pages/Pages/Profile/Settings/Settings";
+import SimplePage from "../pages/Pages/Profile/SimplePage/SimplePage";
 
 import Login from "../pages/Authentication/Login";
 import ForgetPasswordPage from "../pages/Authentication/ForgetPassword";
@@ -107,7 +107,8 @@ const authProtectedRoutes = [
   { path: "/projecao-faturas/responsaveis/:responsavelId/repasses", component: <RepassesResponsavelView /> },
   { path: "/projecao-faturas", component: <ProjecaoFaturasPage /> },
 
-  { path: "/profile", component: <SimplePage /> },
+  { path: "/perfil", component: <SimplePage /> },
+  { path: "/profile", component: <Navigate to="/perfil" /> },
   { path: "/pages-profile-settings", component: <Settings /> },
 
   {
