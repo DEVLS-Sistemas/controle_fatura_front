@@ -9,6 +9,18 @@ import { Link, useNavigate } from 'react-router-dom';
 import logoLight from '../../assets/images/logo-light.png';
 import ParticlesAuth from '../AuthenticationInner/ParticlesAuth';
 import { AuthService } from 'services/Auth';
+import { ValidationError } from 'libs/api/exceptions/ValidationError';
+
+type RegisterField = 'email' | 'name' | 'password' | 'confirm_password';
+
+const fieldFromApiMessage = (message: string): RegisterField | null => {
+  const normalized = message.toLowerCase();
+  if (normalized.includes('e-mail') || normalized.includes('email')) return 'email';
+  if (normalized.includes('confirmação')) return 'confirm_password';
+  if (normalized.includes('senha')) return 'password';
+  if (normalized.includes('nome')) return 'name';
+  return null;
+};
 
 const Register = () => {
   const history = useNavigate();
@@ -40,13 +52,22 @@ const Register = () => {
           name: values.name,
           email: values.email,
           password: values.password,
+          password_confirmation: values.confirm_password,
         });
         toast.success('Conta criada com sucesso!');
         history('/dashboard');
-      } catch (e: any) {
-        const message = e?.message || 'Falha ao cadastrar';
+      } catch (e: unknown) {
+        const message =
+          e instanceof Error && e.message ? e.message : 'Falha ao cadastrar';
         setError(message);
         toast.error(message);
+        if (e instanceof ValidationError) {
+          const field = fieldFromApiMessage(message);
+          if (field) {
+            validation.setFieldError(field, message);
+            validation.setFieldTouched(field, true, false);
+          }
+        }
       } finally {
         setLoader(false);
       }
