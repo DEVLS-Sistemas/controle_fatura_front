@@ -36,6 +36,8 @@ const RecuperarSenha = () => {
   const [codigo, setCodigo] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [passwordShow, setPasswordShow] = useState(false)
+  const [confirmPasswordShow, setConfirmPasswordShow] = useState(false)
   const [info, setInfo] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [fieldError, setFieldError] = useState<string | null>(null)
@@ -343,34 +345,56 @@ const RecuperarSenha = () => {
                         <div className="p-2 mt-4">
                           <div className="mb-3">
                             <Label className="form-label" htmlFor="nova-senha">Senha</Label>
-                            <Input
-                              id="nova-senha"
-                              name="password"
-                              type="password"
-                              placeholder="Mínimo 6 caracteres"
-                              value={password}
-                              invalid={!!fieldError && password.length < 6}
-                              onChange={(e) => {
-                                setPassword(e.target.value)
-                                setFieldError(null)
-                              }}
-                            />
+                            <div className="position-relative auth-pass-inputgroup">
+                              <Input
+                                id="nova-senha"
+                                name="password"
+                                type={passwordShow ? 'text' : 'password'}
+                                className="form-control pe-5"
+                                placeholder="Mínimo 6 caracteres"
+                                value={password}
+                                invalid={!!fieldError && password.length < 6}
+                                onChange={(e) => {
+                                  setPassword(e.target.value)
+                                  setFieldError(null)
+                                }}
+                              />
+                              <button
+                                className="btn btn-link position-absolute end-0 top-0 text-decoration-none text-muted"
+                                type="button"
+                                aria-label={passwordShow ? 'Ocultar senha' : 'Mostrar senha'}
+                                onClick={() => setPasswordShow(!passwordShow)}
+                              >
+                                <i className="ri-eye-fill align-middle"></i>
+                              </button>
+                            </div>
                           </div>
                           <div className="mb-3">
                             <Label className="form-label" htmlFor="confirmar-nova-senha">Confirmar senha</Label>
-                            <Input
-                              id="confirmar-nova-senha"
-                              name="confirm_password"
-                              type="password"
-                              placeholder="Repita a senha"
-                              value={confirmPassword}
-                              invalid={!!fieldError}
-                              onChange={(e) => {
-                                setConfirmPassword(e.target.value)
-                                setFieldError(null)
-                              }}
-                            />
-                            {fieldError ? <FormFeedback type="invalid">{fieldError}</FormFeedback> : null}
+                            <div className="position-relative auth-pass-inputgroup">
+                              <Input
+                                id="confirmar-nova-senha"
+                                name="confirm_password"
+                                type={confirmPasswordShow ? 'text' : 'password'}
+                                className="form-control pe-5"
+                                placeholder="Repita a senha"
+                                value={confirmPassword}
+                                invalid={!!fieldError}
+                                onChange={(e) => {
+                                  setConfirmPassword(e.target.value)
+                                  setFieldError(null)
+                                }}
+                              />
+                              {fieldError ? <FormFeedback type="invalid">{fieldError}</FormFeedback> : null}
+                              <button
+                                className="btn btn-link position-absolute end-0 top-0 text-decoration-none text-muted"
+                                type="button"
+                                aria-label={confirmPasswordShow ? 'Ocultar senha' : 'Mostrar senha'}
+                                onClick={() => setConfirmPasswordShow(!confirmPasswordShow)}
+                              >
+                                <i className="ri-eye-fill align-middle"></i>
+                              </button>
+                            </div>
                           </div>
                           <div className="mt-4">
                             <Button

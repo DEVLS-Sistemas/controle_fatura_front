@@ -26,6 +26,8 @@ const Register = () => {
   const history = useNavigate();
   const [loader, setLoader] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [passwordShow, setPasswordShow] = useState(false);
+  const [confirmPasswordShow, setConfirmPasswordShow] = useState(false);
   const authService = new AuthService();
 
   const validation = useFormik({
@@ -139,35 +141,59 @@ const Register = () => {
                         </div>
 
                         <div className="mb-3">
-                          <Label className="form-label">Senha</Label>
-                          <Input
-                            name="password"
-                            type="password"
-                            placeholder="Mínimo 6 caracteres"
-                            onChange={validation.handleChange}
-                            onBlur={validation.handleBlur}
-                            value={validation.values.password}
-                            invalid={!!(validation.touched.password && validation.errors.password)}
-                          />
-                          {validation.touched.password && validation.errors.password ? (
-                            <FormFeedback type="invalid">{validation.errors.password}</FormFeedback>
-                          ) : null}
+                          <Label className="form-label" htmlFor="register-password">Senha</Label>
+                          <div className="position-relative auth-pass-inputgroup">
+                            <Input
+                              id="register-password"
+                              name="password"
+                              type={passwordShow ? 'text' : 'password'}
+                              className="form-control pe-5"
+                              placeholder="Mínimo 6 caracteres"
+                              onChange={validation.handleChange}
+                              onBlur={validation.handleBlur}
+                              value={validation.values.password}
+                              invalid={!!(validation.touched.password && validation.errors.password)}
+                            />
+                            {validation.touched.password && validation.errors.password ? (
+                              <FormFeedback type="invalid">{validation.errors.password}</FormFeedback>
+                            ) : null}
+                            <button
+                              className="btn btn-link position-absolute end-0 top-0 text-decoration-none text-muted"
+                              type="button"
+                              aria-label={passwordShow ? 'Ocultar senha' : 'Mostrar senha'}
+                              onClick={() => setPasswordShow(!passwordShow)}
+                            >
+                              <i className="ri-eye-fill align-middle"></i>
+                            </button>
+                          </div>
                         </div>
 
                         <div className="mb-3">
-                          <Label className="form-label">Confirmar senha</Label>
-                          <Input
-                            name="confirm_password"
-                            type="password"
-                            placeholder="Repita a senha"
-                            onChange={validation.handleChange}
-                            onBlur={validation.handleBlur}
-                            value={validation.values.confirm_password}
-                            invalid={!!(validation.touched.confirm_password && validation.errors.confirm_password)}
-                          />
-                          {validation.touched.confirm_password && validation.errors.confirm_password ? (
-                            <FormFeedback type="invalid">{validation.errors.confirm_password}</FormFeedback>
-                          ) : null}
+                          <Label className="form-label" htmlFor="register-confirm-password">Confirmar senha</Label>
+                          <div className="position-relative auth-pass-inputgroup">
+                            <Input
+                              id="register-confirm-password"
+                              name="confirm_password"
+                              type={confirmPasswordShow ? 'text' : 'password'}
+                              className="form-control pe-5"
+                              placeholder="Repita a senha"
+                              onChange={validation.handleChange}
+                              onBlur={validation.handleBlur}
+                              value={validation.values.confirm_password}
+                              invalid={!!(validation.touched.confirm_password && validation.errors.confirm_password)}
+                            />
+                            {validation.touched.confirm_password && validation.errors.confirm_password ? (
+                              <FormFeedback type="invalid">{validation.errors.confirm_password}</FormFeedback>
+                            ) : null}
+                            <button
+                              className="btn btn-link position-absolute end-0 top-0 text-decoration-none text-muted"
+                              type="button"
+                              aria-label={confirmPasswordShow ? 'Ocultar senha' : 'Mostrar senha'}
+                              onClick={() => setConfirmPasswordShow(!confirmPasswordShow)}
+                            >
+                              <i className="ri-eye-fill align-middle"></i>
+                            </button>
+                          </div>
                         </div>
 
                         <div className="mt-4">
