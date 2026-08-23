@@ -85,6 +85,8 @@ export interface CartoesList {
     senha_pdf_regra_label?: string | null
     qtd_bandeiras?: number
     qtd_numeros?: number
+    pessoa_id?: number | null
+    pessoa_nome?: string | null
     bandeiras?: CartaoBandeira[]
 }
 
@@ -100,6 +102,7 @@ export interface CartoesModel {
     cor_fundo?: string | null
     cor_texto?: string | null
     ativo?: boolean
+    pessoa_id?: number | string | null
     /** Write-only: só enviar se o usuário digitou um valor novo */
     senha_pdf?: string | null
     senha_pdf_regra?: string | null
@@ -227,6 +230,7 @@ export const CartoesDefaultValues: CartoesModel = {
     cor_fundo: '#e5e7eb',
     cor_texto: '#111827',
     ativo: true,
+    pessoa_id: null,
     senha_pdf: null,
     senha_pdf_regra: null,
     limpar_senha_pdf: false,

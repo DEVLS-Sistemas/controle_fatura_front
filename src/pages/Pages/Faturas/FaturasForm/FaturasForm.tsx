@@ -25,6 +25,8 @@ import { CartoesService } from 'services/Cartoes/CartoesService'
 import FaturaSenhaPdfModal, { FaturaSenhaUnlockPayload } from 'Components/Faturas/FaturaSenhaPdfModal'
 import FaturaSelecaoModal, { FaturaSelecaoStep } from 'Components/Faturas/FaturaSelecaoModal'
 import FaturaMetadadosModal from 'Components/Faturas/FaturaMetadadosModal'
+import FaturaTitularModal from 'Components/Faturas/FaturaTitularModal'
+import FaturaCartaoTitularModal from 'Components/Faturas/FaturaCartaoTitularModal'
 import {
     FaturaSelecaoBandeiraOption,
     FaturaSelecaoError,
@@ -40,6 +42,18 @@ import {
 } from 'libs/api/exceptions/FaturaMetadadosError'
 import { PdfSenhaError } from 'libs/api/exceptions/PdfSenhaError'
 import { ValidationError } from 'libs/api/exceptions/ValidationError'
+import {
+    FaturaTitularError,
+    FaturaTitularPessoaOption,
+    FaturaTitularRetryPayload,
+    FaturaTitularSugestao,
+} from 'libs/api/exceptions/FaturaTitularError'
+import {
+    FaturaCartaoTitularError,
+    FaturaCartaoTitularRetryPayload,
+} from 'libs/api/exceptions/FaturaCartaoTitularError'
+import { PessoasService } from 'services/Pessoas/PessoasService'
+import { toPessoaSelectOption } from 'interfaces/Pessoas/PessoasInterface'
 
 type PendingSenhaPayload = {
     senha_pdf?: string
@@ -87,9 +101,24 @@ const FaturasForm = () => {
     const [metadadosCartoes, setMetadadosCartoes] = useState<FaturaMetadadosCartaoOption[]>([])
     const [metadadosBandeiras, setMetadadosBandeiras] = useState<FaturaSelecaoBandeiraOption[]>([])
     const [metadadosPrecisaBandeira, setMetadadosPrecisaBandeira] = useState(false)
+    const [titularModalOpen, setTitularModalOpen] = useState(false)
+    const [titularLoading, setTitularLoading] = useState(false)
+    const [titularTitulares, setTitularTitulares] = useState<string[]>([])
+    const [titularNomeNoCartao, setTitularNomeNoCartao] = useState<string | null>(null)
+    const [titularPessoas, setTitularPessoas] = useState<FaturaTitularPessoaOption[]>([])
+    const [titularSugestao, setTitularSugestao] = useState<FaturaTitularSugestao | null>(null)
+    const [titularOrientacao, setTitularOrientacao] = useState<string | null>(null)
+    const [titularPerfilNome, setTitularPerfilNome] = useState<string | null>(null)
+    const [cartaoTitularModalOpen, setCartaoTitularModalOpen] = useState(false)
+    const [cartaoTitularLoading, setCartaoTitularLoading] = useState(false)
+    const [cartaoTitularError, setCartaoTitularError] = useState<FaturaCartaoTitularError | null>(null)
+    const [pessoasOptions, setPessoasOptions] = useState<SelectOptions[]>([])
     const pendingSelecaoRef = useRef<FaturaSelecaoRetryPayload>({})
     const pendingSenhaRef = useRef<PendingSenhaPayload>({})
     const pendingMetadadosRef = useRef<Partial<FaturaMetadadosRetryPayload>>({})
+    const pendingTitularRef = useRef<Partial<FaturaTitularRetryPayload>>({})
+    const pendingCartaoTitularRef = useRef<{ cadastrar_cartao?: boolean; substituir_fatura?: boolean }>({})
+    const pessoasService = useRef(new PessoasService()).current
     const fileInputRef = useRef<HTMLInputElement>(null)
     const { voltarParaRotaAnterior } = useNavegacao()
     const navigate = useNavigate()
@@ -112,6 +141,13 @@ const FaturasForm = () => {
                         cor_texto: c.cor_texto ?? null,
                     }))
                 )
+            }
+            const pessoas = await pessoasService.AsyncListPessoas()
+            if (pessoas) {
+                setPessoasOptions([
+                    { value: '', label: 'Não informado' },
+                    ...pessoas.map((p) => toPessoaSelectOption(p)),
+                ])
             }
         } catch (error) {
             console.error('Erro ao carregar lookups:', error)
@@ -194,6 +230,52 @@ const FaturasForm = () => {
         setSelecaoModalOpen(true)
     }
 
+    const openTitularModal = (error: FaturaTitularError) => {
+        setTitularTitulares(error.titulares)
+        setTitularNomeNoCartao(error.nome_no_cartao ?? null)
+        setTitularPessoas(error.pessoas)
+        setTitularSugestao(error.sugestao)
+        setTitularOrientacao(error.orientacao ?? error.message ?? null)
+        setTitularPerfilNome(error.perfil_nome ?? null)
+        setTitularModalOpen(true)
+    }
+
+    const openCartaoTitularModal = async (error: FaturaCartaoTitularError) => {
+        let enriched = error
+        if (error.bandeiras.length === 0) {
+            try {
+                const lookups = await cartoesService.getLookupsCartoes()
+                const bandeiras = (lookups?.bandeiras ?? []).map((b) => ({
+                    value: null as number | null,
+                    label: b,
+                    criar: true,
+                })).filter((b) => b.label)
+                if (bandeiras.length > 0) {
+                    enriched = new FaturaCartaoTitularError({
+                        ...error.body,
+                        codigo: error.codigo,
+                        precisa_cartao_do_titular: true,
+                        pode_cadastrar_cartao: error.pode_cadastrar_cartao,
+                        permitir_substituir: error.permitir_substituir,
+                        fatura_existente_id: error.fatura_existente_id,
+                        cartao_existente_id: error.cartao_existente_id,
+                        pessoa_existente_nome: error.pessoa_existente_nome,
+                        cartao_existente_nome: error.cartao_existente_nome,
+                        titulares_detectados: error.titulares_detectados,
+                        orientacao: error.orientacao,
+                        sugestao: error.sugestao,
+                        pessoas: error.pessoas,
+                        bandeiras,
+                    })
+                }
+            } catch {
+                // modal ainda funciona sem lista de bandeiras
+            }
+        }
+        setCartaoTitularError(enriched)
+        setCartaoTitularModalOpen(true)
+    }
+
     const openMetadadosModal = (error: FaturaMetadadosError) => {
         setMetadadosSugestao(error.sugestao)
         setMetadadosCartoes(error.cartoes)
@@ -226,6 +308,14 @@ const FaturasForm = () => {
             openMetadadosModal(error)
             return true
         }
+        if (error instanceof FaturaTitularError) {
+            openTitularModal(error)
+            return true
+        }
+        if (error instanceof FaturaCartaoTitularError) {
+            openCartaoTitularModal(error)
+            return true
+        }
         if (error instanceof FaturaSelecaoError) {
             openSelecaoModal(error)
             return true
@@ -246,7 +336,66 @@ const FaturasForm = () => {
         return false
     }
 
-    const submitCreate = async (extra?: FaturaSelecaoRetryPayload & Partial<FaturaMetadadosRetryPayload>) => {
+    const assertPeriodoLivre = async (params: {
+        cartao_id?: number | string | null
+        cartao_nome?: string | null
+        cadastrar_cartao?: boolean
+        substituir_fatura?: boolean
+        mes?: number | string | null
+        ano?: number | string | null
+    }) => {
+        if (params.cadastrar_cartao || params.cartao_nome || params.substituir_fatura) return
+        if (params.cartao_id == null || params.cartao_id === '') return
+        if (params.mes == null || params.mes === '' || params.ano == null || params.ano === '') return
+
+        const existing = await faturasService.findFaturaNoPeriodo({
+            cartao_id: params.cartao_id,
+            mes: params.mes,
+            ano: params.ano,
+        })
+        if (!existing) return
+
+        const pessoaIncoming = pendingTitularRef.current.pessoa_id ?? getValues('pessoa_id')
+        const outraPessoa =
+            existing.pessoa_id != null
+            && pessoaIncoming != null
+            && pessoaIncoming !== ''
+            && Number(existing.pessoa_id) !== Number(pessoaIncoming)
+
+        throw new FaturaCartaoTitularError({
+            codigo: 'precisa_cartao_do_titular',
+            precisa_cartao_do_titular: true,
+            pode_cadastrar_cartao: true,
+            permitir_substituir: !outraPessoa,
+            fatura_existente_id: existing.id,
+            cartao_existente_id: params.cartao_id,
+            pessoa_existente_nome: existing.pessoa_nome,
+            cartao_existente_nome: existing.cartao_nome,
+            titulares_detectados: pendingTitularRef.current.pessoa_nome
+                ? [[pendingTitularRef.current.pessoa_nome, pendingTitularRef.current.pessoa_sobrenome].filter(Boolean).join(' ')]
+                : [],
+            orientacao: existing.pessoa_nome
+                ? `Já existe fatura deste mês neste cartão (${existing.pessoa_nome}). Faturas de pessoas diferentes precisam de cartões separados — cadastre o cartão desta pessoa aqui para as duas coexistirem.`
+                : 'Já existe fatura deste mês neste cartão. Se o PDF for de outra pessoa, cadastre o cartão dela aqui. Não vamos descartar a fatura que já está lançada sem você confirmar.',
+            sugestao: {
+                cartao_id: null,
+                cartao_nome_sugerido: existing.cartao_nome,
+                mes: Number(params.mes),
+                ano: Number(params.ano),
+                pessoa_id: pessoaIncoming ? Number(pessoaIncoming) : null,
+            },
+            bandeiras: metadadosBandeiras,
+        })
+    }
+
+    type FaturaCreateExtra = FaturaSelecaoRetryPayload & Partial<FaturaMetadadosRetryPayload> & Partial<FaturaTitularRetryPayload> & {
+        cadastrar_cartao?: boolean
+        cartao_nome?: string | null
+        substituir_fatura?: boolean
+        pessoa_id?: number | string | null
+    }
+
+    const submitCreate = async (extra?: FaturaCreateExtra) => {
         const data = getValues()
         const cartaoId =
             extra?.cartao_id
@@ -256,12 +405,33 @@ const FaturasForm = () => {
             extra?.cartao_nome
             ?? pendingMetadadosRef.current.cartao_nome
             ?? undefined
+        const cadastrarCartao = Boolean(
+            extra?.cadastrar_cartao
+            ?? pendingMetadadosRef.current.cadastrar_cartao
+            ?? pendingCartaoTitularRef.current.cadastrar_cartao
+            ?? cartaoNome
+        )
+        const substituirFatura = Boolean(
+            extra?.substituir_fatura
+            ?? pendingCartaoTitularRef.current.substituir_fatura
+        )
+
+        await assertPeriodoLivre({
+            cartao_id: cartaoNome || cadastrarCartao ? null : cartaoId,
+            cartao_nome: cartaoNome,
+            cadastrar_cartao: cadastrarCartao,
+            substituir_fatura: substituirFatura,
+            mes: extra?.mes ?? pendingMetadadosRef.current.mes ?? data.mes,
+            ano: extra?.ano ?? pendingMetadadosRef.current.ano ?? data.ano,
+        })
 
         const payload: FaturasModel = {
             ...data,
             // Novo cartão: envia nome sem cartao_id para o back criar no mesmo POST
-            cartao_id: cartaoNome ? null : (cartaoId ?? null),
+            cartao_id: cartaoNome || cadastrarCartao ? null : (cartaoId ?? null),
             cartao_nome: cartaoNome || undefined,
+            cadastrar_cartao: cadastrarCartao || undefined,
+            substituir_fatura: substituirFatura || undefined,
             mes: extra?.mes ?? pendingMetadadosRef.current.mes ?? data.mes,
             ano: extra?.ano ?? pendingMetadadosRef.current.ano ?? data.ano,
             cartao_bandeira_id:
@@ -279,6 +449,14 @@ const FaturasForm = () => {
             senha_pdf: pendingSenhaRef.current.senha_pdf,
             salvar_senha_pdf: pendingSenhaRef.current.salvar_senha_pdf,
             senha_pdf_regra: pendingSenhaRef.current.senha_pdf_regra ?? undefined,
+            pessoa_id: (() => {
+                const raw = extra?.pessoa_id ?? pendingTitularRef.current.pessoa_id ?? data.pessoa_id
+                return raw === '' ? null : raw
+            })(),
+            cadastrar_pessoa: extra?.cadastrar_pessoa ?? pendingTitularRef.current.cadastrar_pessoa,
+            pessoa_nome: extra?.pessoa_nome ?? pendingTitularRef.current.pessoa_nome,
+            pessoa_sobrenome: extra?.pessoa_sobrenome ?? pendingTitularRef.current.pessoa_sobrenome,
+            confirmar_titular: extra?.confirmar_titular ?? pendingTitularRef.current.confirmar_titular,
             arquivo_pdf: arquivoFile,
         }
         return faturasService.createFaturas(payload)
@@ -385,7 +563,10 @@ const FaturasForm = () => {
     }
 
     const handleMetadadosConfirm = async (selection: FaturaMetadadosRetryPayload) => {
-        pendingMetadadosRef.current = selection
+        pendingMetadadosRef.current = {
+            ...selection,
+            cadastrar_cartao: Boolean(selection.cartao_nome) || selection.cadastrar_cartao,
+        }
         setValue('mes', selection.mes)
         setValue('ano', selection.ano)
         if (selection.cartao_nome) {
@@ -413,7 +594,10 @@ const FaturasForm = () => {
 
         setMetadadosLoading(true)
         try {
-            const result = await submitCreate(selection)
+            const result = await submitCreate({
+                ...selection,
+                cadastrar_cartao: Boolean(selection.cartao_nome) || selection.cadastrar_cartao,
+            })
             setMetadadosModalOpen(false)
             handleCreateSuccess(result)
         } catch (error) {
@@ -424,6 +608,81 @@ const FaturasForm = () => {
             toast.error((error as Error)?.message || 'Erro ao salvar fatura')
         } finally {
             setMetadadosLoading(false)
+        }
+    }
+
+    const handleTitularConfirm = async (selection: FaturaTitularRetryPayload) => {
+        pendingTitularRef.current = selection
+        if (selection.pessoa_id != null) {
+            setValue('pessoa_id', selection.pessoa_id)
+        }
+        setTitularLoading(true)
+        try {
+            const result = await submitCreate(selection)
+            setTitularModalOpen(false)
+            handleCreateSuccess(result)
+        } catch (error) {
+            if (handleCreateError(error)) {
+                setTitularModalOpen(false)
+                return
+            }
+            toast.error((error as Error)?.message || 'Erro ao salvar fatura')
+        } finally {
+            setTitularLoading(false)
+        }
+    }
+
+    const handleCartaoTitularConfirm = async (selection: FaturaCartaoTitularRetryPayload) => {
+        pendingCartaoTitularRef.current = { cadastrar_cartao: true }
+        pendingMetadadosRef.current = {
+            ...pendingMetadadosRef.current,
+            cartao_id: null,
+            cartao_nome: selection.cartao_nome,
+            cadastrar_cartao: true,
+            mes: selection.mes,
+            ano: selection.ano,
+            bandeira: selection.bandeira,
+            cartao_bandeira_id: selection.cartao_bandeira_id,
+        }
+        setValue('cartao_id', null)
+        setValue('cartao_nome', selection.cartao_nome)
+        setValue('mes', selection.mes)
+        setValue('ano', selection.ano)
+        if (selection.pessoa_id != null) {
+            setValue('pessoa_id', selection.pessoa_id)
+        }
+        setCartaoTitularLoading(true)
+        try {
+            const result = await submitCreate(selection)
+            setCartaoTitularModalOpen(false)
+            handleCreateSuccess(result)
+        } catch (error) {
+            if (handleCreateError(error)) {
+                setCartaoTitularModalOpen(false)
+                return
+            }
+            toast.error((error as Error)?.message || 'Erro ao salvar fatura')
+        } finally {
+            setCartaoTitularLoading(false)
+        }
+    }
+
+    const handleCartaoTitularSubstituir = async () => {
+        pendingCartaoTitularRef.current = { substituir_fatura: true }
+        setCartaoTitularLoading(true)
+        try {
+            const result = await submitCreate({ substituir_fatura: true })
+            setCartaoTitularModalOpen(false)
+            toast.info('A fatura deste mês neste cartão foi substituída pelo novo arquivo.')
+            handleCreateSuccess(result)
+        } catch (error) {
+            if (handleCreateError(error)) {
+                setCartaoTitularModalOpen(false)
+                return
+            }
+            toast.error((error as Error)?.message || 'Erro ao salvar fatura')
+        } finally {
+            setCartaoTitularLoading(false)
         }
     }
 
@@ -521,6 +780,26 @@ const FaturasForm = () => {
                 loading={metadadosLoading}
                 onClose={() => setMetadadosModalOpen(false)}
                 onConfirm={handleMetadadosConfirm}
+            />
+            <FaturaTitularModal
+                isOpen={titularModalOpen}
+                titulares={titularTitulares}
+                nomeNoCartao={titularNomeNoCartao}
+                pessoas={titularPessoas}
+                sugestao={titularSugestao}
+                perfilNome={titularPerfilNome}
+                orientacao={titularOrientacao}
+                loading={titularLoading}
+                onClose={() => setTitularModalOpen(false)}
+                onConfirm={handleTitularConfirm}
+            />
+            <FaturaCartaoTitularModal
+                isOpen={cartaoTitularModalOpen}
+                error={cartaoTitularError}
+                loading={cartaoTitularLoading}
+                onClose={() => setCartaoTitularModalOpen(false)}
+                onCadastrarCartao={handleCartaoTitularConfirm}
+                onSubstituir={cartaoTitularError?.permitir_substituir ? handleCartaoTitularSubstituir : undefined}
             />
             <div className="page-content">
                 <Container fluid>
@@ -660,6 +939,24 @@ const FaturasForm = () => {
                                                     />
                                                 </div>
                                             </Col>
+                                            {!isEdit && pessoasOptions.length > 1 && (
+                                                <Col md={6}>
+                                                    <div className="mb-3">
+                                                        <Label htmlFor="pessoa_id" className="form-label">
+                                                            Titular
+                                                            <span className="text-muted fw-normal"> (opcional)</span>
+                                                        </Label>
+                                                        <SelectListControlled<FaturasModel>
+                                                            options={pessoasOptions}
+                                                            field="pessoa_id"
+                                                            control={control}
+                                                        />
+                                                        <small className="text-muted">
+                                                            Pessoa dona desta fatura. Se o PDF for de outra pessoa, o sistema pede confirmação.
+                                                        </small>
+                                                    </div>
+                                                </Col>
+                                            )}
                                         </Row>
                                         <hr />
                                         <Row className="mt-3">

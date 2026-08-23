@@ -14,6 +14,8 @@ import { mesesOptions } from "helpers/fatura_helpers"
 import { AnosSelect } from "helpers/functions_helpers"
 import { FaturasSearch } from "interfaces/Faturas/FaturasInterface"
 import { FaturasService } from "services/Faturas/FaturasService"
+import { PessoasService } from "services/Pessoas/PessoasService"
+import { toPessoaSelectOption } from "interfaces/Pessoas/PessoasInterface"
 
 export interface FaturasFilterProps {
     getRemoteFaturasList: (data: any) => void
@@ -33,10 +35,12 @@ const FaturasFilter = ({ getRemoteFaturasList }: FaturasFilterProps) => {
     const { handleSubmit, control, register } = useForm<FaturasSearch>({ defaultValues: {} })
     const [showFilter, setShowFilter] = useState<boolean>(false)
     const [cartoesOptions, setCartoesOptions] = useState<SelectOptions[]>([{ value: '', label: 'Todos' }])
+    const [pessoasOptions, setPessoasOptions] = useState<SelectOptions[]>([{ value: '', label: 'Todas' }])
     const [limparModalOpen, setLimparModalOpen] = useState(false)
     const [confirmado, setConfirmado] = useState(false)
     const [excluindoTodas, setExcluindoTodas] = useState(false)
     const faturasService = new FaturasService()
+    const pessoasService = new PessoasService()
 
     useEffect(() => {
         const loadLookups = async () => {
@@ -53,6 +57,13 @@ const FaturasFilter = ({ getRemoteFaturasList }: FaturasFilterProps) => {
                         })
                     })
                     setCartoesOptions(opts)
+                }
+                const pessoas = await pessoasService.AsyncListPessoas()
+                if (pessoas) {
+                    setPessoasOptions([
+                        { value: '', label: 'Todas' },
+                        ...pessoas.map((p) => toPessoaSelectOption(p)),
+                    ])
                 }
             } catch (error) {
                 console.error('Erro ao carregar lookups:', error)
@@ -172,6 +183,16 @@ const FaturasFilter = ({ getRemoteFaturasList }: FaturasFilterProps) => {
                                             onSubmit={handleSubmit(getRemoteFaturasList)}
                                         >
                                             <Row>
+                                                <Col md={3}>
+                                                    <div className="mb-3">
+                                                        <Label htmlFor="pessoa_id" className="form-label">Titular</Label>
+                                                        <SelectListControlled<FaturasSearch>
+                                                            options={pessoasOptions}
+                                                            field="pessoa_id"
+                                                            control={control}
+                                                        />
+                                                    </div>
+                                                </Col>
                                                 <Col md={3}>
                                                     <div className="mb-3">
                                                         <Label htmlFor="cartao_id" className="form-label">Cartão</Label>

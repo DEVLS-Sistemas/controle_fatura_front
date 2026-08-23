@@ -145,6 +145,17 @@ const Navdata = () => {
             },
         },
         {
+            id: "pessoas",
+            label: "Pessoas",
+            icon: "ri-group-line",
+            link: "/pessoas",
+            click: function (e: any) {
+                e.preventDefault();
+                setIscurrentState("Pessoas");
+                updateIconSidebar(e);
+            },
+        },
+        {
             id: "responsaveis",
             label: "Responsáveis",
             icon: "ri-user-shared-line",

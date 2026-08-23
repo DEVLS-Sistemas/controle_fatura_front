@@ -72,6 +72,10 @@ export class FaturaSelecaoError extends Error {
         if (
             body.precisa_confirmar_metadados === true
             || codigo === 'precisa_confirmar_metadados'
+            || body.precisa_confirmar_titular === true
+            || codigo === 'precisa_confirmar_titular'
+            || body.precisa_cartao_do_titular === true
+            || codigo === 'precisa_cartao_do_titular'
         ) {
             return false
         }

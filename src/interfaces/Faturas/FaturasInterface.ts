@@ -8,6 +8,7 @@ export interface FaturasSearch {
     mes?: string | number | null
     ano?: string | number | null
     status?: string | null
+    pessoa_id?: string | number | null
     palavra_chave?: string | null | unknown
     page?: number
     perPage?: number
@@ -64,6 +65,8 @@ export interface FaturaResumo {
     processado_em?: string | null
     total_transacoes?: number
     transacoes_com_categoria?: number
+    pessoa_id?: number | null
+    pessoa_nome?: string | null
     created_at?: string
     updated_at?: string
 }
@@ -78,6 +81,8 @@ export interface FaturasCartaoGroup {
     cor_fundo?: string | null
     cor_texto?: string | null
     ativo?: boolean
+    pessoa_id?: number | null
+    pessoa_nome?: string | null
     total_faturas?: number
     valor_total?: number | string
     faturas?: FaturaResumo[]
@@ -122,6 +127,8 @@ export interface FaturasView extends FaturaResumo {
     fatura_proxima_id?: number | null
     fatura_anterior_competencia?: string | null
     fatura_proxima_competencia?: string | null
+    pessoa_id?: number | null
+    pessoa_nome?: string | null
     grupos_por_cartao?: FaturaGrupoPorCartao[]
 }
 
@@ -132,6 +139,9 @@ export interface FaturasModel {
     cartao_bandeira_id?: number | string | null
     /** Retry modal metadados: cria cartão no mesmo POST quando não há cartao_id */
     cartao_nome?: string | null
+    cadastrar_cartao?: boolean
+    /** Guard do front: confirma substituição no mesmo cartão+mês */
+    substituir_fatura?: boolean
     /** Retry modal: nome da bandeira (lookup) quando `criar: true` */
     bandeira?: string | null
     /** Retry modal CSV: final existente */
@@ -148,6 +158,11 @@ export interface FaturasModel {
     salvar_senha_pdf?: boolean
     /** Regra selecionada no modal de senha — grava no cartão no cadastro inline */
     senha_pdf_regra?: string | null
+    pessoa_id?: number | string | null
+    cadastrar_pessoa?: boolean
+    pessoa_nome?: string | null
+    pessoa_sobrenome?: string | null
+    confirmar_titular?: boolean
 }
 
 export interface ProcessarPdfParams {
@@ -209,6 +224,11 @@ export interface FaturasInterface {
         bandeira?: string | null
         cartao_numero_id?: number | string | null
         ultimos_digitos?: string | null
+        pessoa_id?: number | string | null
+        cadastrar_pessoa?: boolean
+        pessoa_nome?: string | null
+        pessoa_sobrenome?: string | null
+        confirmar_titular?: boolean
     }): Promise<any>
     processarPdf(id: number, params?: ProcessarPdfParams): Promise<any>
 }
@@ -275,4 +295,5 @@ export const FaturasDefaultValues: FaturasModel = {
     valor_total: null,
     arquivo_pdf: null,
     processar_automatico: true,
+    pessoa_id: null,
 }

@@ -23,6 +23,7 @@ const FaturasPage = () => {
         id: null,
         fatura_id: null,
         cartao_id: null,
+        pessoa_id: null,
         mes: null,
         ano: null,
         status: null,

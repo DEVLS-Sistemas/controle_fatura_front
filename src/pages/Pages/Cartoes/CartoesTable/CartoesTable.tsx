@@ -153,6 +153,7 @@ export const CartoesTable = ({ data, getData, setPerPage, perPage, filters }: Ca
                                                         <thead className="table-light">
                                                             <tr>
                                                                 <th scope="col" className="text-start">Nome</th>
+                                                                <th scope="col">Titular</th>
                                                                 <th scope="col">Banco</th>
                                                                 <th scope="col">Resumo</th>
                                                                 <th scope="col" className="text-start">Limites</th>
@@ -183,6 +184,16 @@ export const CartoesTable = ({ data, getData, setPerPage, perPage, filters }: Ca
                                                                                 cor_texto={cores.cor_texto}
                                                                                 label={row.nome || 'Cartão'}
                                                                             />
+                                                                        </td>
+                                                                        <td className="text-start">
+                                                                            {row.pessoa_nome
+                                                                                ? (
+                                                                                    <span>
+                                                                                        <i className="ri-user-line me-1 text-muted"></i>
+                                                                                        {row.pessoa_nome}
+                                                                                    </span>
+                                                                                )
+                                                                                : <span className="text-muted">-</span>}
                                                                         </td>
                                                                         <td>{row.banco || '-'}</td>
                                                                         <td>

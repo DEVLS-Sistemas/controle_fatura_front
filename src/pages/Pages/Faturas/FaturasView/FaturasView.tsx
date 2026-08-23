@@ -39,6 +39,7 @@ import CategoriaRapidoModal, { CategoriaRapidoConfirm } from 'pages/Pages/Transa
 import SubcategoriaRapidoModal, { SubcategoriaRapidoConfirm } from 'pages/Pages/Transacoes/SubcategoriaRapidoModal/SubcategoriaRapidoModal'
 import FaturaSenhaPdfModal from 'Components/Faturas/FaturaSenhaPdfModal'
 import FaturaSelecaoModal, { FaturaSelecaoStep } from 'Components/Faturas/FaturaSelecaoModal'
+import FaturaTitularModal from 'Components/Faturas/FaturaTitularModal'
 import { PdfSenhaError } from 'libs/api/exceptions/PdfSenhaError'
 import {
     FaturaSelecaoBandeiraOption,
@@ -46,6 +47,12 @@ import {
     FaturaSelecaoNumeroOption,
     FaturaSelecaoRetryPayload,
 } from 'libs/api/exceptions/FaturaSelecaoError'
+import {
+    FaturaTitularError,
+    FaturaTitularPessoaOption,
+    FaturaTitularRetryPayload,
+    FaturaTitularSugestao,
+} from 'libs/api/exceptions/FaturaTitularError'
 import { getApiBaseUrl } from 'libs/api/ApiConfig'
 import { getAuthToken, handleUnauthorizedSession } from 'helpers/auth_session'
 
@@ -311,7 +318,15 @@ const FaturasViewPage = () => {
     const [selecaoBandeiraNome, setSelecaoBandeiraNome] = useState<string | null>(null)
     const [selecaoLoading, setSelecaoLoading] = useState(false)
     const pendingSelecaoRef = useRef<FaturaSelecaoRetryPayload>({})
+    const pendingTitularRef = useRef<Partial<FaturaTitularRetryPayload>>({})
     const pendingUploadFileRef = useRef<File | null>(null)
+    const [titularModalOpen, setTitularModalOpen] = useState(false)
+    const [titularLoading, setTitularLoading] = useState(false)
+    const [titularTitulares, setTitularTitulares] = useState<string[]>([])
+    const [titularNomeNoCartao, setTitularNomeNoCartao] = useState<string | null>(null)
+    const [titularPessoas, setTitularPessoas] = useState<FaturaTitularPessoaOption[]>([])
+    const [titularSugestao, setTitularSugestao] = useState<FaturaTitularSugestao | null>(null)
+    const [titularOrientacao, setTitularOrientacao] = useState<string | null>(null)
     const [categoriasOptions, setCategoriasOptions] = useState<SelectOptions[]>([])
     const [categoriasLookup, setCategoriasLookup] = useState<CategoriaLookup[]>([])
     const [subcategoriasByCategoria, setSubcategoriasByCategoria] = useState<Record<number, SelectOptions[]>>({})
@@ -693,6 +708,15 @@ const FaturasViewPage = () => {
             })
             await handleUploadSuccess(result)
         } catch (error) {
+            if (error instanceof FaturaTitularError) {
+                setTitularTitulares(error.titulares)
+                setTitularNomeNoCartao(error.nome_no_cartao ?? null)
+                setTitularPessoas(error.pessoas)
+                setTitularSugestao(error.sugestao)
+                setTitularOrientacao(error.orientacao ?? error.message ?? null)
+                setTitularModalOpen(true)
+                return
+            }
             if (error instanceof FaturaSelecaoError) {
                 openSelecaoModal(error)
                 return
@@ -734,6 +758,7 @@ const FaturasViewPage = () => {
                 arquivo_pdf: file,
                 processar_automatico: processarAuto,
                 ...merged,
+                ...pendingTitularRef.current,
             })
             setSelecaoModalOpen(false)
             await handleUploadSuccess(result)
@@ -755,6 +780,16 @@ const FaturasViewPage = () => {
                 openSelecaoModal(error)
                 return
             }
+            if (error instanceof FaturaTitularError) {
+                setSelecaoModalOpen(false)
+                setTitularTitulares(error.titulares)
+                setTitularNomeNoCartao(error.nome_no_cartao ?? null)
+                setTitularPessoas(error.pessoas)
+                setTitularSugestao(error.sugestao)
+                setTitularOrientacao(error.orientacao ?? error.message ?? null)
+                setTitularModalOpen(true)
+                return
+            }
             if (error instanceof PdfSenhaError) {
                 setSelecaoModalOpen(false)
                 await loadFatura({ silent: true, openSenhaIfNeeded: false })
@@ -764,6 +799,51 @@ const FaturasViewPage = () => {
             toast.error('Erro ao enviar arquivo')
         } finally {
             setSelecaoLoading(false)
+        }
+    }
+
+    const handleTitularConfirm = async (selection: FaturaTitularRetryPayload) => {
+        const file = pendingUploadFileRef.current ?? fileInputRef.current?.files?.[0]
+        if (!file || !id) {
+            toast.warning('Selecione um arquivo PDF ou CSV')
+            setTitularModalOpen(false)
+            return
+        }
+        pendingTitularRef.current = selection
+        setTitularLoading(true)
+        try {
+            const result = await faturasService.uploadPdf({
+                id: Number(id),
+                arquivo_pdf: file,
+                processar_automatico: processarAuto,
+                ...pendingSelecaoRef.current,
+                ...selection,
+            })
+            setTitularModalOpen(false)
+            await handleUploadSuccess(result)
+        } catch (error) {
+            if (error instanceof FaturaSelecaoError) {
+                setTitularModalOpen(false)
+                openSelecaoModal(error)
+                return
+            }
+            if (error instanceof FaturaTitularError) {
+                setTitularTitulares(error.titulares)
+                setTitularNomeNoCartao(error.nome_no_cartao ?? null)
+                setTitularPessoas(error.pessoas)
+                setTitularSugestao(error.sugestao)
+                setTitularOrientacao(error.orientacao ?? error.message ?? null)
+                return
+            }
+            if (error instanceof PdfSenhaError) {
+                setTitularModalOpen(false)
+                await loadFatura({ silent: true, openSenhaIfNeeded: false })
+                openSenhaModal(error.senha_pdf ?? null)
+                return
+            }
+            toast.error((error as Error)?.message || 'Erro ao enviar arquivo')
+        } finally {
+            setTitularLoading(false)
         }
     }
 
@@ -1292,6 +1372,20 @@ const FaturasViewPage = () => {
                 }}
                 onConfirm={handleSelecaoConfirm}
             />
+            <FaturaTitularModal
+                isOpen={titularModalOpen}
+                titulares={titularTitulares}
+                nomeNoCartao={titularNomeNoCartao}
+                pessoas={titularPessoas}
+                sugestao={titularSugestao}
+                orientacao={titularOrientacao}
+                loading={titularLoading}
+                onClose={() => {
+                    setTitularModalOpen(false)
+                    pendingUploadFileRef.current = null
+                }}
+                onConfirm={handleTitularConfirm}
+            />
             <div className="page-content">
                 <Container fluid>
                     <Row>
@@ -1372,6 +1466,12 @@ const FaturasViewPage = () => {
                                                     label={bandeiraLabel}
                                                     className="fs-6"
                                                 />
+                                            </div>
+                                        )}
+                                        {fatura.pessoa_nome && (
+                                            <div className="small text-muted mt-1">
+                                                <i className="ri-user-line me-1"></i>
+                                                {fatura.pessoa_nome}
                                             </div>
                                         )}
                                     </div>

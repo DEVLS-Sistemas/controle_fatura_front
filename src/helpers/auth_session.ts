@@ -7,6 +7,8 @@ export interface SessionUser {
   email: string
   sobrenome?: string | null
   cpf_cnpj?: string | null
+  /** Pessoa principal da conta (titular do login) */
+  pessoa_id?: number | null
 }
 
 type SessionPayload = {
@@ -97,6 +99,7 @@ export const normalizeAuthUser = (
   email: user.email,
   sobrenome: user.sobrenome ?? null,
   cpf_cnpj: user.cpf_cnpj ?? null,
+  pessoa_id: user.pessoa_id ?? null,
 })
 
 export const getUserDisplayName = (

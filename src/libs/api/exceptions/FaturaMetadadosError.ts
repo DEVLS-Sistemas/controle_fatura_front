@@ -38,6 +38,7 @@ export type FaturaMetadadosRetryPayload = {
      * Back deve cadastrar o grupo + bandeira e vincular a fatura.
      */
     cartao_nome?: string | null
+    cadastrar_cartao?: boolean
     mes: number | string
     ano: number | string
     cartao_bandeira_id?: number | string | null
@@ -83,6 +84,14 @@ export class FaturaMetadadosError extends Error {
     static isMetadadosBody(body?: Record<string, any> | null): boolean {
         if (!body) return false
         const codigo = body.codigo ?? body.erro_codigo
+        if (
+            body.precisa_confirmar_titular === true
+            || codigo === 'precisa_confirmar_titular'
+            || body.precisa_cartao_do_titular === true
+            || codigo === 'precisa_cartao_do_titular'
+        ) {
+            return false
+        }
         return (
             body.precisa_confirmar_metadados === true
             || codigo === FATURA_METADADOS_CODIGO

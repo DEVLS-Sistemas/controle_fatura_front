@@ -16,6 +16,8 @@ import {
 import { PdfSenhaError } from "../../libs/api/exceptions/PdfSenhaError"
 import { FaturaSelecaoError } from "../../libs/api/exceptions/FaturaSelecaoError"
 import { FaturaMetadadosError } from "../../libs/api/exceptions/FaturaMetadadosError"
+import { FaturaTitularError } from "../../libs/api/exceptions/FaturaTitularError"
+import { FaturaCartaoTitularError } from "../../libs/api/exceptions/FaturaCartaoTitularError"
 
 export class FaturasService implements FaturasInterface {
     private readonly url: string
@@ -100,6 +102,12 @@ export class FaturasService implements FaturasInterface {
                 if (FaturaMetadadosError.isMetadadosBody(body)) {
                     throw new FaturaMetadadosError(body)
                 }
+                if (FaturaTitularError.isTitularBody(body)) {
+                    throw new FaturaTitularError(body)
+                }
+                if (FaturaCartaoTitularError.isCartaoTitularBody(body)) {
+                    throw new FaturaCartaoTitularError(body)
+                }
                 if (FaturaSelecaoError.isSelecaoBody(body)) {
                     throw new FaturaSelecaoError(body)
                 }
@@ -110,6 +118,44 @@ export class FaturasService implements FaturasInterface {
             }
             default: throw new UnexpectedError(response.message)
         }
+    }
+
+    async findFaturaNoPeriodo(params: {
+        cartao_id: number | string
+        mes: number | string
+        ano: number | string
+    }): Promise<{
+        id: number
+        pessoa_id?: number | null
+        pessoa_nome?: string | null
+        cartao_nome?: string | null
+        competencia?: string | null
+        valor_total?: number | string | null
+        tem_pdf?: boolean
+    } | null> {
+        const list = await this.listFaturasPaginate({
+            cartao_id: params.cartao_id,
+            mes: params.mes,
+            ano: params.ano,
+            perPage: 20,
+            page: 1,
+        })
+        const grupos = list?.data ?? []
+        for (const grupo of grupos) {
+            const fatura = (grupo.faturas ?? []).find((f) => f.id != null)
+            if (fatura?.id != null) {
+                return {
+                    id: fatura.id,
+                    pessoa_id: fatura.pessoa_id ?? grupo.pessoa_id ?? null,
+                    pessoa_nome: fatura.pessoa_nome ?? grupo.pessoa_nome ?? null,
+                    cartao_nome: grupo.nome ?? null,
+                    competencia: fatura.competencia ?? null,
+                    valor_total: fatura.valor_total,
+                    tem_pdf: fatura.tem_pdf,
+                }
+            }
+        }
+        return null
     }
 
     async editFaturas(params: FaturasModel) {
@@ -162,6 +208,11 @@ export class FaturasService implements FaturasInterface {
         bandeira?: string | null
         cartao_numero_id?: number | string | null
         ultimos_digitos?: string | null
+        pessoa_id?: number | string | null
+        cadastrar_pessoa?: boolean
+        pessoa_nome?: string | null
+        pessoa_sobrenome?: string | null
+        confirmar_titular?: boolean
     }) {
         const form = new FormData()
         form.append('id', String(params.id))
@@ -190,6 +241,21 @@ export class FaturasService implements FaturasInterface {
         if (params.ultimos_digitos != null && params.ultimos_digitos !== '') {
             form.append('ultimos_digitos', String(params.ultimos_digitos))
         }
+        if (params.pessoa_id != null && params.pessoa_id !== '') {
+            form.append('pessoa_id', String(params.pessoa_id))
+        }
+        if (params.cadastrar_pessoa !== undefined) {
+            form.append('cadastrar_pessoa', params.cadastrar_pessoa ? '1' : '0')
+        }
+        if (params.pessoa_nome != null && params.pessoa_nome !== '') {
+            form.append('pessoa_nome', params.pessoa_nome)
+        }
+        if (params.pessoa_sobrenome != null && params.pessoa_sobrenome !== '') {
+            form.append('pessoa_sobrenome', params.pessoa_sobrenome)
+        }
+        if (params.confirmar_titular !== undefined) {
+            form.append('confirmar_titular', params.confirmar_titular ? '1' : '0')
+        }
         const response = await this.httpClient.post({
             url: this.url + '/upload-pdf',
             body: form,
@@ -201,6 +267,12 @@ export class FaturasService implements FaturasInterface {
             case HttpStatusCode.unauthorized: throw new AccessDeniedError()
             case HttpStatusCode.invalidForm: {
                 const body = response.body as Record<string, any> | undefined
+                if (FaturaTitularError.isTitularBody(body)) {
+                    throw new FaturaTitularError(body)
+                }
+                if (FaturaCartaoTitularError.isCartaoTitularBody(body)) {
+                    throw new FaturaCartaoTitularError(body)
+                }
                 if (FaturaSelecaoError.isSelecaoBody(body)) {
                     throw new FaturaSelecaoError(body)
                 }

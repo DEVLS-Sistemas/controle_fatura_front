@@ -53,6 +53,8 @@ import {
     TIPOS_NUMERO_PADRAO,
 } from 'interfaces/Cartoes/CartoesInterface'
 import { CartoesService } from 'services/Cartoes/CartoesService'
+import { PessoasService } from 'services/Pessoas/PessoasService'
+import { toPessoaSelectOption } from 'interfaces/Pessoas/PessoasInterface'
 import PasswordRevealInput from 'Components/Common/PasswordRevealInput'
 
 const toPrecoDigits = (value: string | number | null | undefined): string | null => {
@@ -98,6 +100,7 @@ const buildRecordFromSource = (source: any): CartoesModel => ({
     senha_pdf_orientacao: source.senha_pdf_orientacao ?? null,
     senha_pdf_regra_label: source.senha_pdf_regra_label ?? null,
     bandeiras: normalizeBandeiras(source.bandeiras),
+    pessoa_id: source.pessoa_id ?? null,
     bandeiras_remover: [],
     numeros_remover: [],
 })
@@ -207,6 +210,10 @@ const CartoesForm = () => {
         paramId || state?.source ? null : 'padrao'
     )
     const [senhaPdfRegraOptions, setSenhaPdfRegraOptions] = useState<SelectOptions[]>([])
+    const [pessoasOptions, setPessoasOptions] = useState<SelectOptions[]>([
+        { value: '', label: 'Não informado' },
+    ])
+    const pessoasService = new PessoasService()
 
     const regraSelecionada = senhasPdfRegras.find(
         (r) => String(r.value) === String(senhaPdfRegraWatch ?? '')
@@ -283,6 +290,18 @@ const CartoesForm = () => {
             setSenhaPdfRegraOptions(
                 regras.map((r) => ({ value: r.value, label: r.label }))
             )
+
+            try {
+                const pessoas = await pessoasService.AsyncListPessoas()
+                if (pessoas) {
+                    setPessoasOptions([
+                        { value: '', label: 'Não informado' },
+                        ...pessoas.map((p) => toPessoaSelectOption(p)),
+                    ])
+                }
+            } catch (error) {
+                console.error('Erro ao carregar pessoas:', error)
+            }
 
             if (!isEditing && !coresManuais) {
                 const matched = matchPresetCorCartao(
@@ -588,6 +607,7 @@ const CartoesForm = () => {
                 cor_fundo: data.cor_fundo,
                 cor_texto: data.cor_texto,
                 ativo: data.ativo,
+                pessoa_id: data.pessoa_id || null,
                 senha_pdf_regra: regraValue || null,
                 bandeiras: bandeirasPayload as CartaoBandeira[],
                 bandeiras_remover: bandeirasRemover,
@@ -797,6 +817,19 @@ const CartoesForm = () => {
                                                         field={"banco"}
                                                         control={control}
                                                     />
+                                                </div>
+                                            </Col>
+                                            <Col md={6}>
+                                                <div className="mb-3">
+                                                    <Label htmlFor="pessoa_id" className="form-label">Titular</Label>
+                                                    <SelectListControlled<CartoesModel>
+                                                        field="pessoa_id"
+                                                        control={control}
+                                                        options={pessoasOptions}
+                                                    />
+                                                    <small className="text-muted">
+                                                        Pessoa dona deste cartão. Faturas importadas herdam este titular quando o nome bater.
+                                                    </small>
                                                 </div>
                                             </Col>
                                             <Col md={3}>

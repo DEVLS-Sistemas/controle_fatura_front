@@ -28,6 +28,9 @@ import CategoriasViewPage from "pages/Pages/Categorias/CategoriasView/Categorias
 import ResponsaveisPage from "pages/Pages/Responsaveis/ResponsaveisPage";
 import ResponsaveisForm from "pages/Pages/Responsaveis/ResponsaveisForm/ResponsaveisForm";
 
+import PessoasPage from "pages/Pages/Pessoas/PessoasPage";
+import PessoasForm from "pages/Pages/Pessoas/PessoasForm/PessoasForm";
+
 import FaturasPage from "pages/Pages/Faturas/FaturasPage";
 import FaturasForm from "pages/Pages/Faturas/FaturasForm/FaturasForm";
 import FaturasView from "pages/Pages/Faturas/FaturasView/FaturasView";
@@ -76,6 +79,11 @@ const authProtectedRoutes = [
   { path: "/responsaveis/add", component: <ResponsaveisForm /> },
   { path: "/responsaveis/edit/:id", component: <ResponsaveisForm /> },
   { path: "/responsaveis/view/:id", component: <ResponsaveisForm /> },
+
+  { path: "/pessoas", component: <PessoasPage /> },
+  { path: "/pessoas/add", component: <PessoasForm /> },
+  { path: "/pessoas/edit/:id", component: <PessoasForm /> },
+  { path: "/pessoas/view/:id", component: <PessoasForm /> },
 
   { path: "/faturas", component: <FaturasPage /> },
   { path: "/faturas/add", component: <FaturasForm /> },

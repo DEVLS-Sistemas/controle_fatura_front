@@ -95,6 +95,14 @@ const CartoesViewPage = () => {
                                             <p className="text-muted mb-0">{record.banco || '-'}</p>
                                         </Col>
                                         <Col md={6} className="mb-3">
+                                            <Label className="form-label fw-semibold">Titular</Label>
+                                            <p className="text-muted mb-0">
+                                                {record.pessoa_nome
+                                                    ? <><i className="ri-user-line me-1"></i>{record.pessoa_nome}</>
+                                                    : '-'}
+                                            </p>
+                                        </Col>
+                                        <Col md={6} className="mb-3">
                                             <Label className="form-label fw-semibold">Dia limite da fatura</Label>
                                             <p className="text-muted mb-0">
                                                 {record.dia_limite_fatura != null

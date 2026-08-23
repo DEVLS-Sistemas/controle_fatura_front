@@ -42,6 +42,7 @@ type FaturaRow = FaturaResumo & {
     cartao_nome?: string
     cartao_cor_fundo?: string | null
     cartao_cor_texto?: string | null
+    pessoa_nome?: string | null
 }
 
 const statusLabel: Record<string, string> = {
@@ -70,6 +71,7 @@ const flattenFaturas = (grupos: FaturasCartaoGroup[]): FaturaRow[] => {
             cartao_nome: grupo.nome,
             cartao_cor_fundo: grupo.cor_fundo,
             cartao_cor_texto: grupo.cor_texto,
+            pessoa_nome: fatura.pessoa_nome ?? grupo.pessoa_nome ?? null,
         }))
     )
 }
@@ -176,6 +178,7 @@ export const FaturasTable = ({ data, getData, setPerPage, perPage, filters }: Fa
                 page: Number(new_url.searchParams.get('page')),
                 palavra_chave: new_url.searchParams.get('palavra_chave') ?? filters.palavra_chave,
                 cartao_id: new_url.searchParams.get('cartao_id') ?? filters.cartao_id,
+                pessoa_id: new_url.searchParams.get('pessoa_id') ?? filters.pessoa_id,
                 mes: new_url.searchParams.get('mes') ?? filters.mes,
                 ano: new_url.searchParams.get('ano') ?? filters.ano,
                 status: new_url.searchParams.get('status') ?? filters.status,
@@ -294,6 +297,12 @@ export const FaturasTable = ({ data, getData, setPerPage, perPage, filters }: Fa
                                                                                     />
                                                                                 ) : null}
                                                                             </div>
+                                                                            {row.pessoa_nome && (
+                                                                                <div className="small text-muted mt-1">
+                                                                                    <i className="ri-user-line me-1"></i>
+                                                                                    {row.pessoa_nome}
+                                                                                </div>
+                                                                            )}
                                                                         </td>
                                                                         <td>
                                                                             {(anexo.temPdf || anexo.temCsv) ? (
