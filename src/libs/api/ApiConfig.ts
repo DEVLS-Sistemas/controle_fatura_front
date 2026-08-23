@@ -1,4 +1,5 @@
 import axios, { AxiosResponse } from 'axios';
+import { getAuthToken, handleUnauthorizedSession, isPublicAuthUrl } from 'helpers/auth_session';
 
 /** Resolve API base URL so LAN access uses the host IP, not 127.0.0.1. */
 export function getApiBaseUrl(): string {
@@ -32,21 +33,25 @@ export const ApiConfig = axios.create({
 });
 
 ApiConfig.interceptors.request.use((config) => {
-  try {
-    const raw = sessionStorage.getItem('authUser');
-    if (raw) {
-      const auth = JSON.parse(raw);
-      const token = auth?.token;
-      if (token) {
-        config.headers = config.headers || {};
-        config.headers.Authorization = `Bearer ${token}`;
-      }
-    }
-  } catch {
-    // ignore parse errors
+  const token = getAuthToken();
+  if (token) {
+    config.headers = config.headers || {};
+    config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
 });
+
+ApiConfig.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const status = error?.response?.status;
+    const url = String(error?.config?.url || '');
+    if (status === 401 && !isPublicAuthUrl(url)) {
+      handleUnauthorizedSession();
+    }
+    return Promise.reject(error);
+  }
+);
 
 type HttpRequest = {
   url: string

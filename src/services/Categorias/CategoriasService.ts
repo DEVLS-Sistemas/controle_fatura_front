@@ -105,7 +105,6 @@ export class CategoriasService implements CategoriasInterface {
                 return {
                     data: {
                         id: Number(data.id),
-                        user_id: data.user_id,
                         nome: String(data.nome ?? params.nome),
                         cor: data.cor ?? params.cor ?? null,
                         ativo: data.ativo ?? true,

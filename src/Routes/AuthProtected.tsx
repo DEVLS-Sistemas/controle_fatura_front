@@ -6,6 +6,8 @@ import { useDispatch } from "react-redux";
 import { useProfile } from "../Components/Hooks/UserHooks";
 
 import { logoutUser } from "../slices/auth/login/thunk";
+import { AuthService } from "services/Auth";
+import { shouldValidateSession } from "helpers/auth_session";
 
 const AuthProtected = (props : any) =>{
   const dispatch : any = useDispatch();
@@ -14,6 +16,12 @@ const AuthProtected = (props : any) =>{
   useEffect(() => {
     if (userProfile && !loading && token) {
       setAuthorization(token);
+      if (shouldValidateSession(token)) {
+        const authService = new AuthService();
+        authService.me().catch(() => {
+          // 401: interceptor limpa sessão e redireciona
+        });
+      }
     } else if (!userProfile && loading && !token) {
       dispatch(logoutUser());
     }

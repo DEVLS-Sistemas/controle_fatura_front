@@ -34,7 +34,6 @@ export interface CategoriaRapidoPayload {
 
 export interface CategoriaRapidoData {
     id: number
-    user_id?: number
     nome: string
     cor?: string | null
     ativo?: boolean

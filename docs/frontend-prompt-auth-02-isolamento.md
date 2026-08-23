@@ -98,8 +98,8 @@ Auditoria rápida: `rg "user_id" src/` — só aceitável em tipos de **resposta
 
 ## Checklist
 
-- [ ] Nenhum formulário/query envia `user_id`
-- [ ] 401 global → `/login` + sessão zerada
-- [ ] Troca de usuário não reaproveita listagens/IDs da conta anterior
-- [ ] Token só no storage de sessão combinado com o user atual
+- [x] Nenhum formulário/query envia `user_id`
+- [x] 401 global → `/login` + sessão zerada
+- [x] Troca de usuário não reaproveita listagens/IDs da conta anterior
+- [x] Token só no storage de sessão combinado com o user atual
 - [ ] Login na conta A, logout, login na conta B: dashboard/faturas/cartões só da B

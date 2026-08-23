@@ -1,5 +1,6 @@
 import axios, { AxiosResponse, AxiosRequestConfig } from 'axios';
 import config from "../config";
+import { getAuthSession } from './auth_session';
 
 const { api } = config;
 
@@ -97,12 +98,7 @@ class APIClient {
 }
 
 const getLoggedinUser = () => {
-  const user = sessionStorage.getItem("authUser");
-  if (!user) {
-    return null;
-  } else {
-    return JSON.parse(user);
-  }
+  return getAuthSession();
 };
 
 export { APIClient, setAuthorization, getLoggedinUser };

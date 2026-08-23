@@ -2,6 +2,7 @@ import { AxiosHttpClient, HttpStatusCode } from '../../libs/api/ApiConfig'
 import { AccessDeniedError } from '../../libs/api/exceptions/AccessDeniedError'
 import { UnexpectedError } from '../../libs/api/exceptions/UnexpectedError'
 import { ValidationError } from '../../libs/api/exceptions/ValidationError'
+import { clearAuthSession, persistAuthSession } from '../../helpers/auth_session'
 
 export interface AuthUser {
   id: number
@@ -27,8 +28,6 @@ export interface AuthSession {
   token_type?: string
 }
 
-const SESSION_KEY = 'authUser'
-
 export class AuthService {
   private readonly url: string
   private readonly httpClient: AxiosHttpClient
@@ -50,7 +49,7 @@ export class AuthService {
         if (!payload?.token || !payload?.user) {
           throw new UnexpectedError('Resposta de login inválida')
         }
-        this.persistSession(payload)
+        persistAuthSession(payload)
         return payload
       }
       case HttpStatusCode.unauthorized:
@@ -74,7 +73,7 @@ export class AuthService {
         if (!payload?.token || !payload?.user) {
           throw new UnexpectedError('Resposta de registro inválida')
         }
-        this.persistSession(payload)
+        persistAuthSession(payload)
         return payload
       }
       case HttpStatusCode.invalidForm:
@@ -90,37 +89,21 @@ export class AuthService {
     } catch {
       // limpa sessão mesmo se a API falhar
     } finally {
-      sessionStorage.removeItem(SESSION_KEY)
+      clearAuthSession()
     }
   }
 
   async me(): Promise<AuthUser | undefined> {
     const response = await this.httpClient.get({ url: `${this.url}/me` })
     switch (response.statusCode) {
-      case HttpStatusCode.ok:
-        return response.body?.data
+      case HttpStatusCode.ok: {
+        const user = response.body?.auth?.data?.user ?? response.body?.data?.user
+        return user
+      }
       case HttpStatusCode.unauthorized:
         throw new AccessDeniedError()
       default:
         throw new UnexpectedError()
     }
-  }
-
-  private persistSession(payload: AuthSession) {
-    const stored = {
-      token: payload.token,
-      email: payload.user.email,
-      username: payload.user.name,
-      first_name: payload.user.name,
-      last_name: '',
-      data: {
-        id: payload.user.id,
-        first_name: payload.user.name,
-        last_name: '',
-        email: payload.user.email,
-      },
-      user: payload.user,
-    }
-    sessionStorage.setItem(SESSION_KEY, JSON.stringify(stored))
   }
 }

@@ -47,6 +47,7 @@ import {
     FaturaSelecaoRetryPayload,
 } from 'libs/api/exceptions/FaturaSelecaoError'
 import { getApiBaseUrl } from 'libs/api/ApiConfig'
+import { getAuthToken, handleUnauthorizedSession } from 'helpers/auth_session'
 
 const formatNumeroOptionLabel = (n: NumeroListItem): string => {
     if (n.label) return n.label
@@ -367,12 +368,15 @@ const FaturasViewPage = () => {
     const loadPdf = useCallback(async (faturaId: string) => {
         setLoadingPdf(true)
         try {
-            const raw = sessionStorage.getItem('authUser')
-            const token = raw ? JSON.parse(raw).token : null
+            const token = getAuthToken()
             const base = getApiBaseUrl()
             const res = await fetch(`${base}faturas/pdf/${faturaId}`, {
                 headers: token ? { Authorization: `Bearer ${token}` } : {},
             })
+            if (res.status === 401) {
+                handleUnauthorizedSession()
+                return false
+            }
             if (!res.ok) {
                 toast.error('Erro ao carregar PDF')
                 return false

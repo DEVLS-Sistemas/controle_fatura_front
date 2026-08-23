@@ -1,4 +1,5 @@
 import { getApiBaseUrl } from 'libs/api/ApiConfig'
+import { getAuthToken, handleUnauthorizedSession } from 'helpers/auth_session'
 
 /** Classe CSS para alinhar valores monetários à direita */
 export const VALOR_TEXT_CLASS = 'text-valor'
@@ -277,12 +278,15 @@ export const downloadFaturaAnexo = async (
   tipo: FaturaAnexoDownloadTipo,
   meta?: FaturaAnexoDownloadMeta,
 ): Promise<void> => {
-  const raw = sessionStorage.getItem('authUser')
-  const token = raw ? JSON.parse(raw).token : null
+  const token = getAuthToken()
   const base = getApiBaseUrl()
   const res = await fetch(`${base}faturas/${tipo}/${id}`, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   })
+  if (res.status === 401) {
+    handleUnauthorizedSession()
+    throw new Error('Sessão expirada')
+  }
   if (!res.ok) {
     throw new Error(tipo === 'pdf' ? 'PDF não disponível' : 'CSV não disponível')
   }
