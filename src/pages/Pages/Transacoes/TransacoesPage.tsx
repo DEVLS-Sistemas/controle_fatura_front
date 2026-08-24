@@ -1,4 +1,5 @@
 import React, { createContext, useEffect, useRef, useState } from "react"
+import { useSearchParams } from "react-router-dom"
 import { Container, Spinner } from 'reactstrap'
 import { SubmitHandler } from 'react-hook-form'
 import { PaginateInterface, PaginateSearch } from 'interfaces/SystemInterfaces/PaginateInterface'
@@ -54,27 +55,38 @@ const buildSelectOptions = (
     return opts
 }
 
+const parseQueryNumber = (value: string | null): number | string | null => {
+    if (value == null || value === '') return null
+    const n = Number(value)
+    return Number.isFinite(n) ? n : value
+}
+
 const TransacoesPage = () => {
+    const [searchParams] = useSearchParams()
     const [display, setDisplay] = useState<boolean>(false)
     const transacoesContext = useRef<TransacoesFilterContextType>({
         id: null,
         transacao_id: null,
         data_inicio: null,
         data_fim: null,
-        cartao_id: null,
-        categoria_id: null,
+        cartao_id: parseQueryNumber(searchParams.get('cartao_id')),
+        categoria_id: parseQueryNumber(searchParams.get('categoria_id')),
         subcategoria_id: null,
         estabelecimento_id: null,
-        responsavel_id: null,
-        fatura_id: null,
-        tipo: null,
+        responsavel_id: parseQueryNumber(searchParams.get('responsavel_id')),
+        fatura_id: parseQueryNumber(searchParams.get('fatura_id')),
+        tipo: searchParams.get('tipo'),
         origem_compra: null,
-        mes: null,
-        ano: null,
+        mes: parseQueryNumber(searchParams.get('mes')),
+        ano: parseQueryNumber(searchParams.get('ano')),
         palavra_chave: null,
         page: 1,
         perPage: 5,
-        firstEntry: false,
+        firstEntry: Boolean(
+            searchParams.get('responsavel_id')
+            || searchParams.get('tipo')
+            || searchParams.get('categoria_id')
+        ),
     }).current
 
     const [transacoesList, setTransacoesList] = useState<PaginateInterface<TransacoesList>>()

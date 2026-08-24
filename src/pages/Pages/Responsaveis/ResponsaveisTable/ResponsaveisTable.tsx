@@ -130,7 +130,15 @@ export const ResponsaveisTable = ({ data, getData, setPerPage, perPage, filters 
                                                         <tbody>
                                                             {data.data.map((row, index) => (
                                                                 <tr key={rowId(row) ?? index}>
-                                                                    <td className="text-start">{row.nome}</td>
+                                                                    <td className="text-start">
+                                                                        <Link
+                                                                            to={`/responsaveis/view/${rowId(row)}`}
+                                                                            state={{ source: row }}
+                                                                            className="fw-medium"
+                                                                        >
+                                                                            {row.nome}
+                                                                        </Link>
+                                                                    </td>
                                                                     <td>
                                                                         <span className={`badge bg-${responsavelTipoColor[row.tipo ?? ''] ?? 'secondary'}`}>
                                                                             {tipoLabel[row.tipo ?? ''] ?? row.tipo}

@@ -27,6 +27,7 @@ import CategoriasViewPage from "pages/Pages/Categorias/CategoriasView/Categorias
 
 import ResponsaveisPage from "pages/Pages/Responsaveis/ResponsaveisPage";
 import ResponsaveisForm from "pages/Pages/Responsaveis/ResponsaveisForm/ResponsaveisForm";
+import ResponsaveisVisualizarPage from "pages/Pages/Responsaveis/ResponsaveisVisualizar/ResponsaveisVisualizarPage";
 
 import PessoasPage from "pages/Pages/Pessoas/PessoasPage";
 import PessoasForm from "pages/Pages/Pessoas/PessoasForm/PessoasForm";
@@ -78,7 +79,8 @@ const authProtectedRoutes = [
   { path: "/responsaveis", component: <ResponsaveisPage /> },
   { path: "/responsaveis/add", component: <ResponsaveisForm /> },
   { path: "/responsaveis/edit/:id", component: <ResponsaveisForm /> },
-  { path: "/responsaveis/view/:id", component: <ResponsaveisForm /> },
+  { path: "/responsaveis/view/:id", component: <ResponsaveisVisualizarPage /> },
+  { path: "/responsaveis/:id", component: <ResponsaveisVisualizarPage /> },
 
   { path: "/pessoas", component: <PessoasPage /> },
   { path: "/pessoas/add", component: <PessoasForm /> },

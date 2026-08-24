@@ -123,14 +123,23 @@ const ResponsaveisForm = () => {
                                             <Col md={12}>
                                                 <div className="hstack gap-2 justify-content-end flex-wrap">
                                                     {isEdit && record.responsavel_id != null && (
-                                                        <Link
-                                                            to={`/projecao-faturas/responsaveis/${record.responsavel_id}/fatura?mes=${new Date().getMonth() + 1}&ano=${new Date().getFullYear()}`}
-                                                            state={{ nome: record.nome, tipo: record.tipo }}
-                                                            className="btn btn-soft-info"
-                                                        >
-                                                            <i className="ri-file-list-3-line align-middle me-1"></i>
-                                                            Ver fatura
-                                                        </Link>
+                                                        <>
+                                                            <Link
+                                                                to={`/responsaveis/view/${record.responsavel_id}`}
+                                                                className="btn btn-soft-primary"
+                                                            >
+                                                                <i className="ri-eye-line align-middle me-1"></i>
+                                                                Visualizar
+                                                            </Link>
+                                                            <Link
+                                                                to={`/projecao-faturas/responsaveis/${record.responsavel_id}/fatura?mes=${new Date().getMonth() + 1}&ano=${new Date().getFullYear()}`}
+                                                                state={{ nome: record.nome, tipo: record.tipo }}
+                                                                className="btn btn-soft-info"
+                                                            >
+                                                                <i className="ri-file-list-3-line align-middle me-1"></i>
+                                                                Ver fatura
+                                                            </Link>
+                                                        </>
                                                     )}
                                                     <button type="submit" className="btn btn-primary">Salvar</button>
                                                     <button type="button" className="btn btn-soft-success" onClick={voltarParaRotaAnterior}>Voltar</button>

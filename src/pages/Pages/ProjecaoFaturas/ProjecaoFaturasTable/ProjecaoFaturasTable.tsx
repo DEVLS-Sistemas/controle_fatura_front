@@ -15,6 +15,7 @@ import {
 import { CurrencyValue } from 'Components/Common/CurrencyValue'
 import { formatCurrency, VALOR_TEXT_CLASS } from 'helpers/fatura_helpers'
 import { CartaoChip } from 'helpers/cartao_helpers'
+import { buildResponsavelVisualizarPath } from 'helpers/responsavel_visualizar_helpers'
 import {
   agruparCartoesPorNome,
   agruparCruzamentoPorNome,
@@ -651,7 +652,7 @@ const ProjecaoMatriz = ({
                         role={labelClickable ? 'button' : undefined}
                         tabIndex={labelClickable ? 0 : undefined}
                         title={
-                          labelClickable ? 'Ver fatura do responsável (mês de referência)' : undefined
+                          labelClickable ? 'Ver resumo do responsável' : undefined
                         }
                         onClick={labelClickable ? () => onLinhaLabelClick?.(linha) : undefined}
                         onKeyDown={
@@ -753,6 +754,7 @@ const ProjecaoMatrizCruzamento = ({
   prefix,
   acoes,
   onCelulaClick,
+  onResponsavelLabelClick,
 }: {
   titulo: string
   colunas: ProjecaoColuna[]
@@ -765,6 +767,7 @@ const ProjecaoMatrizCruzamento = ({
     coluna: ProjecaoColuna,
     valor: ProjecaoValor | undefined
   ) => void
+  onResponsavelLabelClick?: (resp: ResponsavelCruzamento) => void
 }) => {
   const [selecionado, setSelecionado] = useState<CartaoCruzamento | null>(null)
   const modalOpen = selecionado != null
@@ -932,6 +935,7 @@ const ProjecaoMatrizCruzamento = ({
                               className="text-start"
                               style={{
                                 ...stickyColStyle,
+                                ...(onResponsavelLabelClick ? { cursor: 'pointer' } : {}),
                                 ...(resp.eh_eu
                                   ? {
                                       backgroundColor:
@@ -939,8 +943,26 @@ const ProjecaoMatrizCruzamento = ({
                                     }
                                   : {}),
                               }}
+                              role={onResponsavelLabelClick ? 'button' : undefined}
+                              tabIndex={onResponsavelLabelClick ? 0 : undefined}
+                              title={onResponsavelLabelClick ? 'Ver resumo do responsável' : undefined}
+                              onClick={
+                                onResponsavelLabelClick
+                                  ? () => onResponsavelLabelClick(resp)
+                                  : undefined
+                              }
+                              onKeyDown={
+                                onResponsavelLabelClick
+                                  ? (e) => {
+                                      if (e.key === 'Enter' || e.key === ' ') {
+                                        e.preventDefault()
+                                        onResponsavelLabelClick(resp)
+                                      }
+                                    }
+                                  : undefined
+                              }
                             >
-                              <span className="fw-medium">
+                              <span className={`fw-medium ${onResponsavelLabelClick ? 'text-primary' : ''}`}>
                                 {resp.responsavelLabel}
                                 {resp.eh_eu && (
                                   <Badge
@@ -1082,6 +1104,14 @@ export const ProjecaoFaturasTable = ({ data, separarTitular = false }: ProjecaoF
   const colunaReferencia = idxReferencia >= 0 ? colunas[idxReferencia] : colunas[0]
   const resumoEuOutrosRef =
     idxReferencia >= 0 ? (data.resumo_eu_outros || [])[idxReferencia] : undefined
+
+  const goVisualizarResponsavel = (
+    responsavelId: number | string,
+    mes: number,
+    ano: number
+  ) => {
+    navigate(buildResponsavelVisualizarPath(responsavelId, mes, ano))
+  }
 
   const goFaturaResponsavel = (
     responsavelId: number | string,
@@ -1232,17 +1262,11 @@ export const ProjecaoFaturasTable = ({ data, separarTitular = false }: ProjecaoF
             resumosEuOutros={resumosResponsaveis}
             onLinhaLabelClick={(linha) => {
               if (!colunaReferencia) return
-              const valor = colunaReferencia
-                ? linha.valores[idxReferencia >= 0 ? idxReferencia : 0]
-                : undefined
-              goFaturaResponsavel(idResponsavelLinha(linha), colunaReferencia.mes, colunaReferencia.ano, {
-                nome: linha.label,
-                tipo: linha.tipo,
-                realizado: valor?.realizado,
-                projetado: valor?.projetado,
-                total: valor?.total,
-                cartaoId: cartaoLinha(linha),
-              })
+              goVisualizarResponsavel(
+                idResponsavelLinha(linha),
+                colunaReferencia.mes,
+                colunaReferencia.ano
+              )
             }}
             onRepassesClick={(linha) => {
               if (!colunaReferencia) return
@@ -1281,6 +1305,10 @@ export const ProjecaoFaturasTable = ({ data, separarTitular = false }: ProjecaoF
                 cartaoId: cartao.agrupado || typeof cartao.cartaoId !== 'number' ? null : cartao.cartaoId,
               })
             }}
+            onResponsavelLabelClick={(resp) => {
+              if (!colunaReferencia) return
+              goVisualizarResponsavel(resp.responsavelId, colunaReferencia.mes, colunaReferencia.ano)
+            }}
           />
         </Col>
       </Row>
@@ -1303,7 +1331,7 @@ export const ProjecaoFaturasTable = ({ data, separarTitular = false }: ProjecaoF
               split do consumo
             </span>
             <span className="text-muted fs-13">
-              Clique no responsável ou na célula do mês para abrir a fatura
+              Clique no responsável para o resumo · na célula do mês para a fatura
             </span>
             <span className="text-muted fs-13">
               <span className="badge bg-success me-1">Pagou?</span>

@@ -33,6 +33,7 @@ import {
 import { RepassesService } from 'services/Repasses/RepassesService'
 import { CartoesService } from 'services/Cartoes/CartoesService'
 import { SelectOptions } from 'interfaces/SystemInterfaces/SelectInterface'
+import { buildResponsavelVisualizarPath } from 'helpers/responsavel_visualizar_helpers'
 
 const RepasseModal = lazy(() => import('../RepasseModal/RepasseModal'))
 
@@ -490,6 +491,15 @@ const RepassesResponsavelViewInner = () => {
                 <button type="button" className="btn btn-soft-success" onClick={voltarParaRotaAnterior}>
                   Voltar
                 </button>
+                {responsavelId ? (
+                  <Link
+                    to={buildResponsavelVisualizarPath(responsavelId, mes, ano)}
+                    className="btn btn-soft-secondary"
+                  >
+                    <i className="ri-user-3-line me-1"></i>
+                    Ver responsável
+                  </Link>
+                ) : null}
                 <Link to={faturaPath} state={location.state} className="btn btn-soft-info">
                   Fatura do responsável
                 </Link>

@@ -3,13 +3,23 @@ import { AccessDeniedError } from "../../libs/api/exceptions/AccessDeniedError"
 import { UnexpectedError } from "../../libs/api/exceptions/UnexpectedError"
 import { ValidationError } from "../../libs/api/exceptions/ValidationError"
 import { PaginateInterface } from "interfaces/SystemInterfaces/PaginateInterface"
+import { extractVisualizarPayload } from "helpers/responsavel_visualizar_helpers"
 import {
     ResponsaveisInterface,
     ResponsaveisList,
     ResponsaveisModel,
     ResponsaveisSearch,
     ResponsaveisView,
+    ResponsavelVisualizarSearch,
+    ResponsavelVisualizarView,
 } from "interfaces/Responsaveis/ResponsaveisInterface"
+
+export class ResponsavelNaoEncontradoError extends Error {
+    constructor(message = 'Responsável não encontrado') {
+        super(message)
+        this.name = 'ResponsavelNaoEncontradoError'
+    }
+}
 
 export class ResponsaveisService implements ResponsaveisInterface {
     private readonly url: string
@@ -28,6 +38,36 @@ export class ResponsaveisService implements ResponsaveisInterface {
             case HttpStatusCode.ok: return response.body
             case HttpStatusCode.unauthorized: throw new AccessDeniedError()
             default: throw new UnexpectedError()
+        }
+    }
+
+    async getVisualizarResponsavel(
+        id: number | string,
+        params?: ResponsavelVisualizarSearch
+    ): Promise<ResponsavelVisualizarView | undefined> {
+        const query: Record<string, number> = {}
+        const mes = Number(params?.mes)
+        const ano = Number(params?.ano)
+        if (Number.isFinite(mes) && mes >= 1 && mes <= 12) query.mes = mes
+        if (Number.isFinite(ano) && ano > 2000) query.ano = ano
+
+        const response = await this.httpClient.get<any>({
+            url: `${this.url}/visualizar/${id}`,
+            body: Object.keys(query).length ? query : undefined,
+        })
+        if (!response || !response.statusCode) throw new UnexpectedError()
+
+        switch (response.statusCode) {
+            case HttpStatusCode.ok:
+                return extractVisualizarPayload(response.body)
+            case HttpStatusCode.notFound:
+                throw new ResponsavelNaoEncontradoError(
+                    response.body?.message || response.message || 'Responsável não encontrado'
+                )
+            case HttpStatusCode.unauthorized:
+                throw new AccessDeniedError()
+            default:
+                throw new UnexpectedError(response.body?.message || response.message)
         }
     }
 

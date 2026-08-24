@@ -288,14 +288,22 @@ export const resolveRankingSearchDefaults = (
   const anoUrl = Number(urlParams?.get('ano'))
   const mesValido = Number.isFinite(mesUrl) && mesUrl >= 1 && mesUrl <= 12
   const anoValido = Number.isFinite(anoUrl) && anoUrl > 2000
+  const parseId = (value?: string | null) => {
+    if (value == null || value === '') return null
+    const n = Number(value)
+    return Number.isFinite(n) && n > 0 ? n : value
+  }
+  const apenasUrl = urlParams?.get('apenas_abertas')
 
   return {
     mes: mesValido ? mesUrl : stored?.mes ?? now.getMonth() + 1,
     ano: anoValido ? anoUrl : stored?.ano ?? now.getFullYear(),
-    cartao_id: stored?.cartao_id ?? null,
-    responsavel_id: stored?.responsavel_id ?? null,
-    categoria_id: stored?.categoria_id ?? null,
-    apenas_abertas: stored?.apenas_abertas ?? true,
+    cartao_id: parseId(urlParams?.get('cartao_id')) ?? stored?.cartao_id ?? null,
+    responsavel_id: parseId(urlParams?.get('responsavel_id')) ?? stored?.responsavel_id ?? null,
+    categoria_id: parseId(urlParams?.get('categoria_id')) ?? stored?.categoria_id ?? null,
+    apenas_abertas: apenasUrl != null
+      ? (apenasUrl === '1' || apenasUrl === 'true')
+      : (stored?.apenas_abertas ?? true),
     ordenar: 'percentual_asc',
     palavra_chave: stored?.palavra_chave ?? null,
   }

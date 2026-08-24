@@ -1,4 +1,5 @@
 import React from 'react'
+import { Link } from 'react-router-dom'
 import { Card, CardBody, CardHeader, Col, Row } from 'reactstrap'
 import {
   isResponsavelEu,
@@ -134,7 +135,15 @@ const CompraVisualizacaoDados = ({ compra }: CompraVisualizacaoDadosProps) => {
             icon={ehEu ? 'ri-user-star-line' : 'ri-user-3-line'}
             tone={ehEu ? 'success' : 'info'}
             label="Responsável"
-            value={compra.responsavel?.nome}
+            value={
+              compra.responsavel?.id
+                ? (
+                  <Link to={`/responsaveis/view/${compra.responsavel.id}`} className="text-reset text-decoration-underline">
+                    {compra.responsavel.nome}
+                  </Link>
+                )
+                : compra.responsavel?.nome
+            }
           />
           <DadoTile
             icon="ri-price-tag-3-line"
