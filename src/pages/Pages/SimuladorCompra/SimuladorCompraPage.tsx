@@ -5,8 +5,7 @@ import { useForm } from 'react-hook-form'
 import { toast } from 'react-toastify'
 import UiContent from 'Components/Common/UiContent'
 import { setActiveMenu } from 'helpers/system_helpers'
-import { formatCurrency, isMeuResponsavelDisplay, splitValorEmParcelas, toCentavos } from 'helpers/fatura_helpers'
-import { CartaoChip } from 'helpers/cartao_helpers'
+import { isMeuResponsavelDisplay, splitValorEmParcelas, toCentavos } from 'helpers/fatura_helpers'
 import { buildResponsavelVisualizarPath } from 'helpers/responsavel_visualizar_helpers'
 import {
   aplicarOverlaySimulacao,
@@ -14,6 +13,8 @@ import {
   calcularImpactoSimulacao,
   competenciaPrimeiraParcela,
   filtrarCartoesDoTitular,
+  labelCompetencia,
+  labelCompetenciaCompleta,
   montarParcelasSimuladas,
   parseQueryNumber,
   parseValorQuery,
@@ -32,11 +33,10 @@ import { CartoesService } from 'services/Cartoes/CartoesService'
 import { PessoasService } from 'services/Pessoas/PessoasService'
 import { ProjecaoFaturasService } from 'services/ProjecaoFaturas/ProjecaoFaturasService'
 import { TransacoesService } from 'services/Transacoes/TransacoesService'
-import ProjecaoFaturasTable from 'pages/Pages/ProjecaoFaturas/ProjecaoFaturasTable/ProjecaoFaturasTable'
 import ResponsavelModal from 'pages/Pages/Transacoes/ResponsavelModal/ResponsavelModal'
 import SimuladorCompraForm from './SimuladorCompraForm/SimuladorCompraForm'
 import SimuladorCompraImpacto from './SimuladorCompraImpacto/SimuladorCompraImpacto'
-import SimuladorCompraTimeline from './SimuladorCompraTimeline/SimuladorCompraTimeline'
+import SimuladorCompraDetalhes from './SimuladorCompraDetalhes/SimuladorCompraDetalhes'
 
 type CartaoForm = {
   id: number
@@ -139,6 +139,7 @@ const SimuladorCompraPage = () => {
   const [responsavelModalOpen, setResponsavelModalOpen] = useState(false)
   const [dataAberta, setDataAberta] = useState(false)
   const [verTodos, setVerTodos] = useState(false)
+  const [detalhesAbertos, setDetalhesAbertos] = useState(false)
 
   const defaultsApplied = useRef(false)
   const skipTitularEffect = useRef(true)
@@ -501,6 +502,7 @@ const SimuladorCompraPage = () => {
       formKeySimulado.current = formKey
       setResultadoVisivel(true)
       setVerTodos(false)
+      setDetalhesAbertos(false)
     } catch (error: any) {
       toast.error(error?.message || 'Erro ao simular. Tente de novo.')
       setProjecaoBase(undefined)
@@ -556,6 +558,22 @@ const SimuladorCompraPage = () => {
     })
   }
 
+  const novaSimulacao = () => {
+    setResultadoVisivel(false)
+    setProjecaoBase(undefined)
+    setVerTodos(false)
+    setDetalhesAbertos(false)
+    formKeySimulado.current = null
+  }
+
+  const valorParcela = overlayInput.primeira?.valor ?? (nParcelas > 0 ? valorCentavos / 100 / nParcelas : 0)
+  const competenciaMes = overlayInput.primeira?.mes ?? impacto?.competencia?.mes
+  const competenciaAno = overlayInput.primeira?.ano ?? impacto?.competencia?.ano
+  const competenciaLabel =
+    competenciaMes && competenciaAno ? labelCompetenciaCompleta(competenciaMes, competenciaAno) : ''
+  const competenciaCurta =
+    competenciaMes && competenciaAno ? labelCompetencia(competenciaMes, competenciaAno) : ''
+
   const formEl = (
     <SimuladorCompraForm
       register={register}
@@ -565,15 +583,13 @@ const SimuladorCompraPage = () => {
       cartoesOptions={cartoesOptions}
       semCartoes={!loadingLookups && !loadingCartoesTitular && cartoesFiltrados.length === 0}
       compact={resultadoVisivel}
-      valorCentavos={valorCentavos}
-      nParcelas={nParcelas}
-      cartaoNome={cartaoSel?.nome || ''}
       responsavelNome={responsavelSel?.nome || ''}
       isMeuResponsavel={ehEu}
       dataAberta={dataAberta}
       onToggleData={() => setDataAberta((v) => !v)}
       onTrocarResponsavel={() => setResponsavelModalOpen(true)}
       onSimular={handleSimular}
+      onNovaSimulacao={novaSimulacao}
       podeSimular={podeSimular}
       simulando={simulando}
     />
@@ -633,110 +649,55 @@ const SimuladorCompraPage = () => {
                 </div>
               ) : (
                 <>
-                  <SimuladorCompraImpacto
+                  <Row className="justify-content-center">
+                    <Col lg={7} xl={6}>
+                      <SimuladorCompraImpacto
+                        impacto={impacto}
+                        cartaoNome={cartaoSel?.nome || ''}
+                        nParcelas={nParcelas}
+                        valorCompra={valorCentavos / 100}
+                        valorParcela={valorParcela}
+                        competenciaLabel={competenciaLabel}
+                        competenciaCurta={competenciaCurta}
+                        responsavelNome={responsavelSel?.nome || ''}
+                        ehEu={ehEu}
+                      />
+                      <div className="d-flex flex-wrap gap-2 mb-4">
+                        <button type="button" className="btn btn-outline-primary" onClick={registrarCompra}>
+                          <i className="ri-save-3-line me-1"></i>
+                          Registrar esta compra
+                        </button>
+                        <button type="button" className="btn btn-ghost-secondary" onClick={novaSimulacao}>
+                          Nova simulação
+                        </button>
+                      </div>
+                    </Col>
+                  </Row>
+
+                  <SimuladorCompraDetalhes
+                    aberto={detalhesAbertos}
+                    onToggle={() => setDetalhesAbertos((v) => !v)}
                     impacto={impacto}
-                    temOverlay
-                    responsavelNome={responsavelSel?.nome || ''}
-                    ehEu={ehEu}
                     cartaoNome={cartaoSel?.nome || ''}
-                    qtdParcelasJanela={overlayInput.parcelas_na_janela}
+                    competenciaLabel={competenciaLabel}
+                    valorParcela={valorParcela}
+                    alertaLimite={Number(impacto?.fatura_cartao.percentual_em_uso_depois) > 80}
+                    parcelasFora={overlayInput.parcelas_fora_da_janela}
+                    labelFimJanela={
+                      projecaoBase?.colunas?.[projecaoBase.colunas.length - 1]?.label || 'o fim da janela'
+                    }
+                    parcelas={overlayInput.parcelas}
+                    onSelectParcela={scrollToColuna}
+                    verTodos={verTodos}
+                    onVerTodos={setVerTodos}
+                    overlay={projecaoOverlay}
+                    cartaoId={cartaoId}
+                    responsavelId={responsavelId}
+                    ehEu={ehEu}
+                    responsavelNome={responsavelSel?.nome || ''}
+                    breakdown={breakdown}
                     faturaPath={faturaPath}
                     visualizarPath={visualizarPath}
-                  />
-
-                  {overlayInput.parcelas_fora_da_janela > 0 && (
-                    <div className="alert alert-warning">
-                      {overlayInput.parcelas_fora_da_janela} parcela
-                      {overlayInput.parcelas_fora_da_janela === 1 ? '' : 's'} caem depois de{' '}
-                      {projecaoBase?.colunas?.[projecaoBase.colunas.length - 1]?.label ||
-                        'o fim da janela'}
-                      . Troque a data ou registre a compra para ver o restante na Projeção.
-                    </div>
-                  )}
-
-                  <SimuladorCompraTimeline parcelas={overlayInput.parcelas} onSelect={scrollToColuna} />
-
-                  <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
-                    <div className="form-check form-switch mb-0">
-                      <input
-                        className="form-check-input"
-                        type="checkbox"
-                        id="ver-todos-simulador"
-                        checked={verTodos}
-                        onChange={(e) => setVerTodos(e.target.checked)}
-                      />
-                      <label className="form-check-label" htmlFor="ver-todos-simulador">
-                        Ver todos os cartões / responsáveis
-                      </label>
-                    </div>
-                    <div className="d-flex flex-wrap gap-2">
-                      <Link to="/projecao-faturas" className="btn btn-soft-primary">
-                        Ir para a Projeção
-                      </Link>
-                      <button type="button" className="btn btn-outline-primary" onClick={registrarCompra}>
-                        <i className="ri-save-3-line me-1"></i>
-                        Registrar esta compra
-                      </button>
-                    </div>
-                  </div>
-
-                  {breakdown.length > 1 && impacto?.competencia && (
-                    <div className="card mb-3">
-                      <div className="card-body">
-                        <h6 className="mb-3">
-                          {impacto.competencia.label} · {ehEu ? 'Eu' : responsavelSel?.nome} por cartão
-                        </h6>
-                        <div className="d-flex flex-column gap-2">
-                          {breakdown.map((item) => (
-                            <div
-                              key={item.cartao_id}
-                              className="d-flex flex-wrap align-items-center justify-content-between gap-2"
-                            >
-                              <span className="d-flex align-items-center gap-2">
-                                <CartaoChip
-                                  cor_fundo={item.cor_fundo}
-                                  cor_texto={item.cor_texto}
-                                  label={item.nome.slice(0, 1)}
-                                />
-                                <span>
-                                  {item.nome}
-                                  {item.eh_simulado && (
-                                    <span className="badge bg-primary-subtle text-primary ms-2">
-                                      simulação
-                                    </span>
-                                  )}
-                                </span>
-                              </span>
-                              <span>
-                                {formatCurrency(item.antes)}
-                                {item.simulado > 0 && (
-                                  <>
-                                    {' + '}
-                                    {formatCurrency(item.simulado)} simulado = {formatCurrency(item.depois)}
-                                  </>
-                                )}
-                                {item.simulado <= 0 && <> = {formatCurrency(item.depois)}</>}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  <ProjecaoFaturasTable
-                    data={projecaoOverlay}
-                    filtroCartaoId={verTodos ? null : cartaoId ? Number(cartaoId) : null}
-                    filtroResponsavelId={verTodos ? null : responsavelId ? Number(responsavelId) : null}
-                    destacarResponsavelId={responsavelId ? Number(responsavelId) : null}
-                    visoes={verTodos ? undefined : ['cartao', 'cruzamento', 'responsavel']}
-                    cruzamentoInline={!verTodos}
-                    hideRepasses
-                    tituloCartao="Cartão selecionado"
-                    tituloCruzamento="Neste cartão × responsável"
-                    tituloResponsavel={
-                      ehEu ? 'Meu total (todos os cartões)' : 'Responsável · todos os cartões'
-                    }
                   />
                 </>
               )}

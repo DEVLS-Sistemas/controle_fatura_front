@@ -18,6 +18,20 @@ import {
 import { ResponsavelLookup } from 'interfaces/Transacoes/TransacoesInterface'
 
 const MESES_ABREV = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+const MESES_NOMES = [
+  'Janeiro',
+  'Fevereiro',
+  'Março',
+  'Abril',
+  'Maio',
+  'Junho',
+  'Julho',
+  'Agosto',
+  'Setembro',
+  'Outubro',
+  'Novembro',
+  'Dezembro',
+]
 
 export const roundMoney = (n: number): number => Math.round((Number(n) || 0) * 100) / 100
 
@@ -26,6 +40,9 @@ export const competenciaChave = (mes: number, ano: number): string =>
 
 export const labelCompetencia = (mes: number, ano: number): string =>
   `${MESES_ABREV[(mes || 1) - 1] || String(mes)}/${ano}`
+
+export const labelCompetenciaCompleta = (mes: number, ano: number): string =>
+  `${MESES_NOMES[(mes || 1) - 1] || String(mes)}/${ano}`
 
 export const adicionarMesesCompetencia = (
   mes: number,

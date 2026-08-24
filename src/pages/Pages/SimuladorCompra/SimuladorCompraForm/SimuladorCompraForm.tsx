@@ -8,7 +8,7 @@ import { SelectListControlled } from 'Components/ComponentController/Selects/Sel
 import { required } from 'Components/ComponentController/ValidatorForm/ValidatorForm'
 import { SelectOptions } from 'interfaces/SystemInterfaces/SelectInterface'
 import { SimuladorCompraFormValues } from 'interfaces/SimuladorCompra/SimuladorCompraInterface'
-import { formatCurrency, parcelasOptions } from 'helpers/fatura_helpers'
+import { parcelasOptions } from 'helpers/fatura_helpers'
 
 type Props = {
   register: UseFormRegister<SimuladorCompraFormValues>
@@ -18,15 +18,13 @@ type Props = {
   cartoesOptions: SelectOptions[]
   semCartoes: boolean
   compact: boolean
-  valorCentavos: number
-  nParcelas: number
-  cartaoNome: string
   responsavelNome: string
   isMeuResponsavel: boolean
   dataAberta: boolean
   onToggleData: () => void
   onTrocarResponsavel: () => void
   onSimular: () => void
+  onNovaSimulacao?: () => void
   podeSimular: boolean
   simulando: boolean
 }
@@ -44,20 +42,16 @@ const SimuladorCompraForm = ({
   cartoesOptions,
   semCartoes,
   compact,
-  valorCentavos,
-  nParcelas,
-  cartaoNome,
   responsavelNome,
   isMeuResponsavel,
   dataAberta,
   onToggleData,
   onTrocarResponsavel,
   onSimular,
+  onNovaSimulacao,
   podeSimular,
   simulando,
 }: Props) => {
-  const valorLabel = valorCentavos > 0 ? formatCurrency(valorCentavos / 100) : null
-  const nLabel = nParcelas > 1 ? `${nParcelas}x` : 'à vista'
   const responsavelLabel = isMeuResponsavel ? 'Eu' : responsavelNome || 'Selecionar'
 
   return (
@@ -70,19 +64,6 @@ const SimuladorCompraForm = ({
               Veja como fica a fatura <strong>antes</strong> de lançar a compra.
             </p>
           </div>
-        )}
-
-        {compact && valorLabel && (
-          <p className="text-muted fs-13 mb-3">
-            Se eu comprar <strong>{valorLabel}</strong> em <strong>{nLabel}</strong>
-            {cartaoNome ? <> no <strong>{cartaoNome}</strong></> : null}
-            {responsavelNome ? (
-              <>
-                , no nome de <strong>{responsavelLabel}</strong>
-              </>
-            ) : null}
-            ?
-          </p>
         )}
 
         <Row className="g-3 align-items-end">
@@ -170,6 +151,15 @@ const SimuladorCompraForm = ({
                 </>
               )}
             </button>
+            {compact && onNovaSimulacao && (
+              <button
+                type="button"
+                className="btn btn-link btn-sm w-100 text-muted mt-1"
+                onClick={onNovaSimulacao}
+              >
+                Nova simulação
+              </button>
+            )}
           </Col>
         </Row>
 
