@@ -283,6 +283,7 @@ export const labelTitular = (pessoaNome?: string | null): string =>
 export type ResponsavelPorTitular = ProjecaoPorResponsavel & {
   pessoa_id: number | null
   pessoa_nome: string | null
+  pessoa_eh_principal: boolean
   cartao_ids: number[]
 }
 
@@ -319,13 +320,16 @@ export const separarResponsaveisPorTitular = (
   cruzamento.forEach((cartao) => {
     const pessoaId = cartao.pessoa_id ?? null
     const pessoaLabel = labelTitular(cartao.pessoa_nome)
+    const pessoaEhPrincipal = cartao.pessoa_eh_principal === true
     ;(cartao.por_responsavel || []).forEach((resp) => {
       const chave = `${chaveTitular(pessoaId, cartao.pessoa_nome)}|${resp.responsavel_id}`
       const atual = grupos.get(chave) || []
       atual.push({
         ...resp,
+        eh_eu: resp.eh_eu === true && pessoaEhPrincipal,
         pessoa_id: pessoaId,
         pessoa_nome: pessoaLabel,
+        pessoa_eh_principal: pessoaEhPrincipal,
         cartao_ids: [cartao.cartao_id],
       })
       grupos.set(chave, atual)
@@ -342,12 +346,14 @@ export const separarResponsaveisPorTitular = (
     }
   })
 
-  return aplicarParticipacaoNasLinhas(linhas).sort((a, b) => {
-    const titular = labelTitular(a.pessoa_nome).localeCompare(labelTitular(b.pessoa_nome), 'pt-BR')
-    if (titular !== 0) return titular
-    if (Boolean(a.eh_eu) !== Boolean(b.eh_eu)) return a.eh_eu ? -1 : 1
-    return String(a.nome).localeCompare(String(b.nome), 'pt-BR')
-  })
+  return aplicarParticipacaoNasLinhas(linhas)
+    .filter((linha) => Number(linha.total) > 0)
+    .sort((a, b) => {
+      const titular = labelTitular(a.pessoa_nome).localeCompare(labelTitular(b.pessoa_nome), 'pt-BR')
+      if (titular !== 0) return titular
+      if (Boolean(a.eh_eu) !== Boolean(b.eh_eu)) return a.eh_eu ? -1 : 1
+      return String(a.nome).localeCompare(String(b.nome), 'pt-BR')
+    })
 }
 
 export const resumosEuOutrosPorTitular = (

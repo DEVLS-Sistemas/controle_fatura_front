@@ -369,12 +369,32 @@ export const parcelasOptions = Array.from({ length: 36 }, (_, i) => ({
   label: String(i + 1),
 }))
 
+export const isNomeResponsavelEu = (nome?: string | null): boolean =>
+  (nome ?? '').trim().toLowerCase() === 'eu'
+
 /** Nome do responsável padrão da fatura, se não for o "Eu" */
 export const nomeResponsavelPadraoNaoEu = (
   source?: { responsavel_nome?: string | null } | null
 ): string | null => {
   const nome = String(source?.responsavel_nome ?? '').trim()
-  if (!nome) return null
-  if (nome.toLowerCase() === 'eu') return null
+  if (!nome || isNomeResponsavelEu(nome)) return null
   return nome
+}
+
+/** "Eu" só quando o responsável é de fato Eu — não o titular de outra pessoa. */
+export const isMeuResponsavelDisplay = (opts: {
+  responsavelId?: number | null
+  responsavelNome?: string | null
+  defaultResponsavelId?: number | null
+  padraoFaturaNome?: string | null
+}): boolean => {
+  const nome = (opts.responsavelNome ?? '').trim()
+  if (nome && !isNomeResponsavelEu(nome)) return false
+  if (opts.responsavelId == null) {
+    return !nomeResponsavelPadraoNaoEu({ responsavel_nome: opts.padraoFaturaNome ?? null })
+  }
+  if (opts.defaultResponsavelId != null) {
+    return Number(opts.responsavelId) === Number(opts.defaultResponsavelId)
+  }
+  return isNomeResponsavelEu(nome)
 }

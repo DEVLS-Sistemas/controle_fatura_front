@@ -16,7 +16,7 @@ import {
     origemCompraLabel,
     isTransacaoOperacional,
     FATURA_FILE_ACCEPT, isValidFaturaFile, resolveFaturaAnexo, downloadFaturaAnexo,
-    getCategoriaFieldStyle, VALOR_TEXT_CLASS, nomeResponsavelPadraoNaoEu,
+    getCategoriaFieldStyle, VALOR_TEXT_CLASS, isMeuResponsavelDisplay, nomeResponsavelPadraoNaoEu,
 } from 'helpers/fatura_helpers'
 import { CartaoChip, BandeiraChip, resolveCartaoCores } from 'helpers/cartao_helpers'
 import { SelectOptions } from 'interfaces/SystemInterfaces/SelectInterface'
@@ -360,22 +360,22 @@ const FaturasViewPage = () => {
         proximaCompetencia: string | null
     }>({ anteriorId: null, proximaId: null, anteriorCompetencia: null, proximaCompetencia: null })
 
-    const isNomeEu = (nome?: string | null) => (nome ?? '').trim().toLowerCase() === 'eu'
-
-    const isMeuResponsavel = (responsavelId?: number | null, responsavelNome?: string | null) => {
-        const nomeLookup = (responsavelNome
+    const nomeDoResponsavel = (responsavelId?: number | null, responsavelNome?: string | null) => (
+        (responsavelNome
             ?? (responsavelId != null
                 ? (responsaveisLookup.find((r) => Number(r.id) === Number(responsavelId))?.nome
                     ?? responsaveisOptions.find((o) => Number(o.value) === Number(responsavelId))?.label)
                 : fatura?.responsavel_nome)
             ?? '').trim()
-        if (nomeLookup && !isNomeEu(nomeLookup)) return false
-        if (responsavelId == null) {
-            return !nomeResponsavelPadraoNaoEu(fatura)
-        }
-        if (defaultResponsavelId != null) return Number(responsavelId) === Number(defaultResponsavelId)
-        return isNomeEu(nomeLookup)
-    }
+    )
+
+    const isMeuResponsavel = (responsavelId?: number | null, responsavelNome?: string | null) =>
+        isMeuResponsavelDisplay({
+            responsavelId,
+            responsavelNome: nomeDoResponsavel(responsavelId, responsavelNome),
+            defaultResponsavelId,
+            padraoFaturaNome: fatura?.responsavel_nome,
+        })
 
     const formatPeriodo = (mes?: number, ano?: number) => {
         if (!mes || !ano) return '-'
@@ -1792,6 +1792,7 @@ const FaturasViewPage = () => {
                                                 cartao_id: fatura.cartao_id,
                                                 tipo: 'purchase',
                                                 responsavel_id: fatura.responsavel_id ?? null,
+                                                responsavel_nome: fatura.responsavel_nome ?? null,
                                                 // Data no ciclo desta fatura → 1ª parcela cai aqui
                                                 // (backend usa a data da compra, não o fatura_id, para ancorar o parcelamento)
                                                 data: fatura.mes && fatura.ano

@@ -10,6 +10,8 @@ import {
     toCentavos,
     tipoTransacaoLabel,
     VALOR_TEXT_CLASS,
+    isMeuResponsavelDisplay,
+    nomeResponsavelPadraoNaoEu,
 } from 'helpers/fatura_helpers'
 import { Breadcrumb, BreadcrumbItem, Button, Card, CardBody, Col, Container, Label, Row } from 'reactstrap'
 import { SubmitHandler, useForm } from 'react-hook-form'
@@ -140,13 +142,17 @@ const TransacoesForm = () => {
         || (isEdit && (numerosOptions.length > 0 || semNumeros || numerosLoading))
 
     const responsavelAtual = responsaveisLookup.find((r) => Number(r.id) === Number(responsavelId))
-    const isMeuResponsavel =
-        responsavelId == null
-        || (defaultResponsavelId != null && Number(responsavelId) === Number(defaultResponsavelId))
-        || (responsavelAtual?.nome ?? '').trim().toLowerCase() === 'eu'
+    const isMeuResponsavel = isMeuResponsavelDisplay({
+        responsavelId,
+        responsavelNome: responsavelAtual?.nome,
+        defaultResponsavelId,
+        padraoFaturaNome: state?.source?.responsavel_nome,
+    })
     const responsavelLabel = isMeuResponsavel
         ? null
-        : (responsavelAtual?.nome ?? (responsavelId ? `#${responsavelId}` : null))
+        : (responsavelAtual?.nome
+            ?? nomeResponsavelPadraoNaoEu(state?.source)
+            ?? (responsavelId ? `#${responsavelId}` : null))
 
     const optTipos: SelectOptions[] = Object.entries(tipoTransacaoLabel).map(([value, label]) => ({
         value,

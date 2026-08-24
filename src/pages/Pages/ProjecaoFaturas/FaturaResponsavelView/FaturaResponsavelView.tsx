@@ -28,6 +28,7 @@ import {
     tipoTransacaoColor,
     tipoTransacaoLabel,
     VALOR_TEXT_CLASS,
+    isMeuResponsavelDisplay,
 } from 'helpers/fatura_helpers'
 import { SelectOptions } from 'interfaces/SystemInterfaces/SelectInterface'
 import { ResponsaveisView } from 'interfaces/Responsaveis/ResponsaveisInterface'
@@ -415,13 +416,15 @@ const FaturaResponsavelView = () => {
         return () => window.removeEventListener('keydown', onKeyDown)
     }, [anterior.mes, anterior.ano, proxima.mes, proxima.ano, goCompetencia])
 
-    const isMeuResponsavel = (id?: number | null) => {
-        if (id == null) return true
-        if (defaultResponsavelId != null) return Number(id) === Number(defaultResponsavelId)
-        const nome = responsaveisLookup.find((r) => Number(r.id) === Number(id))?.nome
-            ?? responsaveisOptions.find((o) => Number(o.value) === Number(id))?.label
-        return (nome ?? '').trim().toLowerCase() === 'eu'
-    }
+    const isMeuResponsavel = (id?: number | null, nome?: string | null) =>
+        isMeuResponsavelDisplay({
+            responsavelId: id,
+            responsavelNome: (nome
+                ?? responsaveisLookup.find((r) => Number(r.id) === Number(id))?.nome
+                ?? responsaveisOptions.find((o) => Number(o.value) === Number(id))?.label
+                ?? '').trim(),
+            defaultResponsavelId,
+        })
 
     const gruposPorCartao = useMemo(() => groupByCartao(transacoes), [transacoes])
 
@@ -1165,7 +1168,7 @@ const FaturaResponsavelView = () => {
                                                                 const subOptions = tx.categoria_id
                                                                     ? (subcategoriasByCategoria[tx.categoria_id] ?? [])
                                                                     : []
-                                                                const showResponsavelNome = !isMeuResponsavel(tx.responsavel_id)
+                                                                const showResponsavelNome = !isMeuResponsavel(tx.responsavel_id, tx.responsavel_nome)
                                                                 const responsavelNome =
                                                                     tx.responsavel_nome
                                                                     ?? responsaveisLookup.find((r) => Number(r.id) === Number(tx.responsavel_id))?.nome

@@ -16,6 +16,7 @@ import {
     origemCompraColor,
     resolveOrigemCompraLabel,
     VALOR_TEXT_CLASS,
+    isMeuResponsavelDisplay,
 } from "helpers/fatura_helpers"
 import { CartaoChip } from "helpers/cartao_helpers"
 import { SelectOptions } from "interfaces/SystemInterfaces/SelectInterface"
@@ -211,13 +212,14 @@ export const TransacoesTable = ({
 
     const rows = localRows.length ? localRows : (data?.data ?? [])
 
-    const isMeuResponsavel = (responsavelId?: number | null, responsavelNome?: string | null) => {
-        if (responsavelId == null) return true
-        if (defaultResponsavelId != null) return Number(responsavelId) === Number(defaultResponsavelId)
-        const nome = responsavelNome
-            ?? responsaveisLookup.find((r) => Number(r.id) === Number(responsavelId))?.nome
-        return (nome ?? '').trim().toLowerCase() === 'eu'
-    }
+    const isMeuResponsavel = (responsavelId?: number | null, responsavelNome?: string | null) =>
+        isMeuResponsavelDisplay({
+            responsavelId,
+            responsavelNome: (responsavelNome
+                ?? responsaveisLookup.find((r) => Number(r.id) === Number(responsavelId))?.nome
+                ?? '').trim(),
+            defaultResponsavelId,
+        })
 
     const origemLabel = (value?: string | null, apiLabel?: string | null) => {
         const fromLookup = origensCompraOptions.find((o) => o.value && o.value === value)?.label

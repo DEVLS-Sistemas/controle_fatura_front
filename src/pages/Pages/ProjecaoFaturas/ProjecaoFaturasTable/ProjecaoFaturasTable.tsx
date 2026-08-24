@@ -1183,13 +1183,15 @@ export const ProjecaoFaturasTable = ({ data, separarTitular = false }: ProjecaoF
       valores: cartao.valores || [],
       total: cartao.total,
       agrupado: cartao.agrupado,
-      responsaveis: (cartao.por_responsavel || []).map((resp) => ({
+      responsaveis: (cartao.por_responsavel || [])
+        .filter((resp) => Number(resp.total) > 0)
+        .map((resp) => ({
         responsavelId: resp.responsavel_id,
         responsavelLabel: resp.nome,
         responsavelSublabel: resp.tipo
           ? resp.tipo.charAt(0).toUpperCase() + resp.tipo.slice(1)
           : undefined,
-        eh_eu: resp.eh_eu === true,
+        eh_eu: resp.eh_eu === true && (!separarTitular || cartao.pessoa_eh_principal === true),
         valores: resp.valores || [],
         total: resp.total,
       })),
