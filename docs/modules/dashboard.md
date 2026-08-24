@@ -33,12 +33,13 @@ GET /api/v1/dashboard/ranking-parceladas?mes=8&ano=2026
 - `mes` / `ano`: competência de referência (default: atual) — **centro** da janela de 13 meses
 - Lista compras com `compra_grupo_id` e `parcelas_total > 1`, agrupadas por compra
 - Default: só compras **ativas na referência** (`apenas_abertas=1`): competência da última parcela **≥** mês/ano da query (última parcela no mês atual ainda aparece; no mês anterior some)
-- Ordenação: **menor `percentual_pago` no topo** (o % do card). Ex.: 1/10 a 10% acima de 3/12 a 25%. O front reordena por esse % ao exibir.
+- Ordenação fixa: **menor `percentual_pago` no topo**; `quitada` (100%) no final. Campo `ordenar_aplicada`. Outros `ordenar` (ex. `restantes_desc`) são ignorados; só `percentual_desc` é aceito como alternativa
 - Filtros opcionais: `cartao_id`, `responsavel_id`, `categoria_id`, `palavra_chave`, `ordenar`, `apenas_abertas`
 - Título: `observacoes` se preenchida; senão nome do estabelecimento
 - Pago / aberto / % calculados pela competência da fatura de cada parcela vs referência
 - `colunas[]`: 13 competências (6 antes + centro + 6 depois) para visão timeline no front
 - Por item: `primeira_parcela`, `ultima_parcela`, `competencia_atual`, `estimativa_termino`, `quitada`, `timeline` (índices na janela para barra cinza início→fim e azul progresso)
+- Clique no item (front) abre `GET /api/v1/transacoes/visualizar/{compra_grupo_id}` — ver [`docs/frontend-prompt-visualizacao-compra.md`](../frontend-prompt-visualizacao-compra.md)
 
 ## Resposta resumo (`data`)
 
@@ -85,4 +86,6 @@ Todas as agregações filtradas pelo `user_id` autenticado.
 
 Ver também:
 - [`docs/frontend-prompt-projecao-faturas.md`](../frontend-prompt-projecao-faturas.md)
+- [`docs/frontend-prompt-simulador-compra.md`](../frontend-prompt-simulador-compra.md) — overlay da Projeção (“e se eu comprar X em Nx?”); endpoint `POST /dashboard/simular-compra` ainda não existe
 - [`docs/frontend-prompt-ranking-parceladas.md`](../frontend-prompt-ranking-parceladas.md)
+- [`docs/frontend-prompt-visualizacao-compra.md`](../frontend-prompt-visualizacao-compra.md)

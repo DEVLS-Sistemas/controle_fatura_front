@@ -82,7 +82,7 @@ const ProjecaoFaturasFilter = ({
             <CardHeader>
               <form id="form-search-projecao" onSubmit={handleSubmit(getRemoteProjecaoFaturas)}>
                 <Row className="align-items-end g-3">
-                  <Col md={3} sm={6}>
+                  <Col md={2} sm={6}>
                     <div className="mb-0">
                       <Label htmlFor="mes" className="form-label">
                         Mês de referência
@@ -94,7 +94,7 @@ const ProjecaoFaturasFilter = ({
                       />
                     </div>
                   </Col>
-                  <Col md={3} sm={6}>
+                  <Col md={2} sm={6}>
                     <div className="mb-0">
                       <Label htmlFor="ano" className="form-label">
                         Ano de referência
@@ -110,6 +110,11 @@ const ProjecaoFaturasFilter = ({
                     <button className="btn btn-success w-100" type="submit">
                       <i className="ri-search-line align-middle me-1"></i> Buscar
                     </button>
+                  </Col>
+                  <Col md={2} sm={6}>
+                    <Link to="/simulador" className="btn btn-outline-primary w-100">
+                      <i className="ri-calculator-line align-middle me-1"></i> Simular
+                    </Link>
                   </Col>
                   <Col md={4} sm={12}>
                     <div className="mb-0">

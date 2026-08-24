@@ -114,6 +114,9 @@ const TransacoesForm = () => {
     const skipEstabelecimentoEffect = useRef(true)
     const skipCategoriaEffect = useRef(true)
     const skipCartaoNumeroEffect = useRef(true)
+    const skipRedistributeParcelas = useRef(
+        Array.isArray(state?.source?.parcelas) && state.source.parcelas.length > 0
+    )
     const applyingEstabelecimentoDefaults = useRef(false)
     const estabelecimentosCache = useRef<Map<number, EstabelecimentoLookup>>(new Map())
 
@@ -564,7 +567,16 @@ const TransacoesForm = () => {
     // Redistribui parcelas ao mudar valor_compra ou N (create)
     useEffect(() => {
         if (isEdit) return
+        if (skipRedistributeParcelas.current) {
+            skipRedistributeParcelas.current = false
+            const fromSource = Array.isArray(state?.source?.parcelas) ? state.source.parcelas : []
+            if (fromSource.length > 1) {
+                setParcelasValores(fromSource.map((p: { valor?: string | number }) => String(toCentavos(p.valor))))
+                return
+            }
+        }
         redistributeParcelas(valorCompraWatch, nParcelas)
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [valorCompraWatch, nParcelas, isEdit])
 
     // Reaplica padrões ao trocar estabelecimento

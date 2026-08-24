@@ -57,6 +57,17 @@ const Navdata = () => {
             },
         },
         {
+            id: "simulador",
+            label: "Simulador",
+            icon: "ri-calculator-line",
+            link: "/simulador",
+            click: function (e: any) {
+                e.preventDefault();
+                setIscurrentState("Simulador");
+                updateIconSidebar(e);
+            },
+        },
+        {
             id: "parceladas",
             label: "Parceladas",
             icon: "ri-list-ordered",

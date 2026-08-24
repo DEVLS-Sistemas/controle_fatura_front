@@ -94,6 +94,16 @@ const splitLabel = (
 export interface ProjecaoFaturasTableProps {
   data: ProjecaoFaturasView | undefined
   separarTitular?: boolean
+  filtroCartaoId?: number | null
+  filtroResponsavelId?: number | null
+  destacarResponsavelId?: number | null
+  visoes?: Array<'cartao' | 'responsavel' | 'cruzamento'>
+  cruzamentoInline?: boolean
+  hideRepasses?: boolean
+  hideLegend?: boolean
+  tituloCartao?: string
+  tituloResponsavel?: string
+  tituloCruzamento?: string
 }
 
 type LinhaTabela = {
@@ -105,10 +115,12 @@ type LinhaTabela = {
   limite_credito?: number | null
   uso_limite?: ProjecaoUsoLimite | null
   eh_eu?: boolean
+  destacar?: boolean
   valores: ProjecaoValor[]
   total: number
   responsavelId?: number
   cartaoIds?: number[]
+  pessoaId?: number | null
   tipo?: string
 }
 
@@ -117,6 +129,7 @@ type ResponsavelCruzamento = {
   responsavelLabel: string
   responsavelSublabel?: string
   eh_eu?: boolean
+  destacar?: boolean
   valores: ProjecaoValor[]
   total: number
 }
@@ -140,8 +153,9 @@ type CartaoCruzamento = {
 const cellClassName = (valor: ProjecaoValor | undefined, isReferencia: boolean, ehEu?: boolean): string => {
   const classes = [VALOR_TEXT_CLASS, 'text-end']
   if (isReferencia) classes.push('table-primary')
-  if (valor && Number(valor.projetado) > 0) classes.push('text-info')
-  if (valor?.fonte === 'vazio') classes.push('text-muted')
+  if (valor && Number(valor.simulado) > 0) classes.push('bg-primary-subtle')
+  else if (valor && Number(valor.projetado) > 0) classes.push('text-info')
+  if (valor?.fonte === 'vazio' && !Number(valor?.simulado)) classes.push('text-muted')
   if (ehEu) classes.push('fw-semibold')
   return classes.join(' ')
 }
@@ -354,7 +368,8 @@ const ProjecaoCelula = ({
   clickTitle?: string
 }) => {
   const clickable = typeof onClick === 'function'
-  const empty = !valor || valor.fonte === 'vazio' || Number(valor.total) === 0
+  const simulado = Number(valor?.simulado || 0)
+  const empty = !valor || ((valor.fonte === 'vazio' || Number(valor.total) === 0) && simulado <= 0)
 
   if (empty) {
     return (
@@ -411,14 +426,34 @@ const ProjecaoCelula = ({
       style={clickable ? { cursor: 'pointer' } : undefined}
     >
       <span id={cellId} className="d-inline-flex flex-column align-items-end gap-1">
-        <span className="d-inline-flex align-items-center gap-1">
-          <CurrencyValue value={valor.total} />
-          {temProjecao && (
-            <span className="badge bg-info-subtle text-info" style={{ fontSize: '0.65rem' }}>
-              proj.
+        {simulado > 0 ? (
+          <>
+            <span className="d-none d-md-inline-flex flex-column align-items-end gap-0">
+              <span className="text-muted fs-11">
+                {formatCurrency(valor.total_antes ?? Number(valor.total) - simulado)}
+                <span className="mx-1">→</span>
+              </span>
+              <span className="d-inline-flex align-items-center gap-1">
+                <CurrencyValue value={valor.total} />
+              </span>
             </span>
-          )}
-        </span>
+            <span className="d-md-none d-inline-flex align-items-center gap-1">
+              <CurrencyValue value={valor.total} />
+            </span>
+            <span className="badge bg-primary-subtle text-primary" style={{ fontSize: '0.65rem' }}>
+              +{formatCurrency(simulado)} simulado
+            </span>
+          </>
+        ) : (
+          <span className="d-inline-flex align-items-center gap-1">
+            <CurrencyValue value={valor.total} />
+            {temProjecao && (
+              <span className="badge bg-info-subtle text-info" style={{ fontSize: '0.65rem' }}>
+                proj.
+              </span>
+            )}
+          </span>
+        )}
         {showPct && tone && (
           <span className={`badge bg-${tone}-subtle text-${tone}`} style={{ fontSize: '0.65rem' }}>
             {formatPercentual(pct)} uso
@@ -441,6 +476,16 @@ const ProjecaoCelula = ({
         )}
       </span>
       <UncontrolledTooltip placement="top" target={cellId}>
+        {simulado > 0 && (
+          <>
+            Antes: {formatCurrency(valor.total_antes ?? Number(valor.total) - simulado)}
+            {' | '}
+            Simulado: {formatCurrency(simulado)}
+            {' | '}
+            Depois: {formatCurrency(valor.total)}
+            {' | '}
+          </>
+        )}
         Realizado: {formatCurrency(valor.realizado)}
         {' | '}
         Projetado: {formatCurrency(valor.projetado)}
@@ -483,13 +528,14 @@ const ProjecaoCelula = ({
   )
 }
 
-const CabecalhoMeses = ({ colunas }: { colunas: ProjecaoColuna[] }) => (
+const CabecalhoMeses = ({ colunas, idPrefix }: { colunas: ProjecaoColuna[]; idPrefix?: string }) => (
   <>
     {colunas.map((col) => {
       const { mes, ano } = labelMesAno(col)
       return (
         <th
           key={col.chave}
+          id={idPrefix ? `${idPrefix}-col-${col.chave}` : undefined}
           scope="col"
           className={`text-center ${col.referencia ? 'table-primary' : ''}`}
           style={{ minWidth: 72, width: 72, lineHeight: 1.2, whiteSpace: 'normal' }}
@@ -571,6 +617,7 @@ const ProjecaoMatriz = ({
   resumoEuOutros,
   resumosEuOutros,
   acoes,
+  hideRepasses,
   onCelulaClick,
   onLinhaLabelClick,
   onRepassesClick,
@@ -586,13 +633,14 @@ const ProjecaoMatriz = ({
   resumoEuOutros?: ProjecaoResumoEuOutros | null
   resumosEuOutros?: Array<{ titulo?: string; resumo: ProjecaoResumoEuOutros }>
   acoes?: React.ReactNode
+  hideRepasses?: boolean
   onCelulaClick?: (linha: LinhaTabela, coluna: ProjecaoColuna, valor: ProjecaoValor | undefined) => void
   onLinhaLabelClick?: (linha: LinhaTabela) => void
   onRepassesClick?: (linha: LinhaTabela) => void
 }) => {
   const idxReferencia = colunas.findIndex((c) => c.referencia)
   const labelClickable = typeof onLinhaLabelClick === 'function'
-  const repassesClickable = typeof onRepassesClick === 'function'
+  const repassesClickable = typeof onRepassesClick === 'function' && !hideRepasses
   const labelColunaRef =
     idxReferencia >= 0 ? colunas[idxReferencia]?.label : undefined
 
@@ -628,7 +676,7 @@ const ProjecaoMatriz = ({
                   <th scope="col" className="text-start" style={stickyHeadStyle}>
                     Nome
                   </th>
-                  <CabecalhoMeses colunas={colunas} />
+                  <CabecalhoMeses colunas={colunas} idPrefix={prefix} />
                   <th scope="col" className="text-end" style={{ minWidth: 90 }}>
                     Total
                   </th>
@@ -639,7 +687,7 @@ const ProjecaoMatriz = ({
                   const valorRef =
                     idxReferencia >= 0 ? linha.valores[idxReferencia] : undefined
                   return (
-                    <tr key={linha.id} className={linha.eh_eu ? 'table-info' : undefined}>
+                    <tr key={linha.id} className={linha.destacar ? 'table-warning' : linha.eh_eu ? 'table-info' : undefined}>
                       <td
                         className="text-start"
                         style={{
@@ -916,10 +964,10 @@ const ProjecaoMatrizCruzamento = ({
                     <table className="table align-middle table-nowrap table-striped-columns mb-0">
                       <thead className="table-light">
                         <tr>
-                          <th scope="col" className="text-start" style={stickyHeadStyle}>
+                  <th scope="col" className="text-start" style={stickyHeadStyle}>
                             Responsável
                           </th>
-                          <CabecalhoMeses colunas={colunas} />
+                          <CabecalhoMeses colunas={colunas} idPrefix={`${prefix}-modal`} />
                           <th scope="col" className="text-end" style={{ minWidth: 90 }}>
                             Total
                           </th>
@@ -929,7 +977,7 @@ const ProjecaoMatrizCruzamento = ({
                         {selecionado.responsaveis.map((resp) => (
                           <tr
                             key={resp.responsavelId}
-                            className={resp.eh_eu ? 'table-info' : undefined}
+                            className={resp.destacar ? 'table-warning' : resp.eh_eu ? 'table-info' : undefined}
                           >
                             <td
                               className="text-start"
@@ -1071,7 +1119,20 @@ const ProjecaoMatrizCruzamento = ({
   )
 }
 
-export const ProjecaoFaturasTable = ({ data, separarTitular = false }: ProjecaoFaturasTableProps) => {
+export const ProjecaoFaturasTable = ({
+  data,
+  separarTitular = false,
+  filtroCartaoId = null,
+  filtroResponsavelId = null,
+  destacarResponsavelId = null,
+  visoes,
+  cruzamentoInline = false,
+  hideRepasses = false,
+  hideLegend = false,
+  tituloCartao,
+  tituloResponsavel,
+  tituloCruzamento,
+}: ProjecaoFaturasTableProps) => {
   const navigate = useNavigate()
 
   const cartoesAgrupados = useMemo(
@@ -1132,7 +1193,12 @@ export const ProjecaoFaturasTable = ({ data, separarTitular = false }: ProjecaoF
     navigate(buildRepassesResponsavelPath(responsavelId, mes, ano), { state: meta })
   }
 
-  const cartoesVisiveis = separarTitular
+  const matchCartaoId = (cartaoIds: number[] | undefined, cartaoId: number | string, fallbackId?: number) => {
+    if (cartaoIds?.some((id) => Number(id) === Number(cartaoId))) return true
+    return fallbackId != null && Number(fallbackId) === Number(cartaoId)
+  }
+
+  const cartoesVisiveisRaw = separarTitular
     ? (data.por_cartao || []).map((cartao) => ({
         ...cartao,
         qtd_cartoes: 1,
@@ -1141,7 +1207,7 @@ export const ProjecaoFaturasTable = ({ data, separarTitular = false }: ProjecaoF
       }))
     : cartoesAgrupados
 
-  const cruzamentoVisivel = separarTitular
+  const cruzamentoVisivelRaw = separarTitular
     ? (data.por_cartao_responsavel || []).map((cartao) => ({
         ...cartao,
         qtd_cartoes: 1,
@@ -1149,6 +1215,14 @@ export const ProjecaoFaturasTable = ({ data, separarTitular = false }: ProjecaoF
         agrupado: false,
       }))
     : cruzamentoAgrupado
+
+  const cartoesVisiveis = filtroCartaoId
+    ? cartoesVisiveisRaw.filter((c) => matchCartaoId(c.cartao_ids, filtroCartaoId, c.cartao_id))
+    : cartoesVisiveisRaw
+
+  const cruzamentoVisivel = filtroCartaoId
+    ? cruzamentoVisivelRaw.filter((c) => matchCartaoId(c.cartao_ids, filtroCartaoId, c.cartao_id))
+    : cruzamentoVisivelRaw
 
   const linhasCartoes: LinhaTabela[] = cartoesVisiveis.map((c) => ({
     id: c.agrupado ? idGrupoCartao(c.nome) : c.cartao_id,
@@ -1160,12 +1234,14 @@ export const ProjecaoFaturasTable = ({ data, separarTitular = false }: ProjecaoF
     uso_limite: c.uso_limite,
     valores: c.valores || [],
     total: c.total,
+    cartaoIds: c.cartao_ids,
+    pessoaId: c.pessoa_id ?? null,
   }))
 
   const usarResponsaveisPorTitular =
     separarTitular && (data.por_cartao_responsavel || []).length > 0
 
-  const linhasResponsaveis: LinhaTabela[] = (usarResponsaveisPorTitular
+  const linhasResponsaveisAll: LinhaTabela[] = (usarResponsaveisPorTitular
     ? responsaveisPorTitular
     : (data.por_responsavel || []).map((r) => ({
         ...r,
@@ -1183,12 +1259,17 @@ export const ProjecaoFaturasTable = ({ data, separarTitular = false }: ProjecaoF
       .filter(Boolean)
       .join(' · ') || undefined,
     eh_eu: r.eh_eu === true,
+    destacar: destacarResponsavelId != null && Number(r.responsavel_id) === Number(destacarResponsavelId),
     valores: r.valores || [],
     total: r.total,
     responsavelId: r.responsavel_id,
     cartaoIds: r.cartao_ids,
     tipo: r.tipo,
   }))
+
+  const linhasResponsaveis = filtroResponsavelId
+    ? linhasResponsaveisAll.filter((r) => Number(r.responsavelId) === Number(filtroResponsavelId))
+    : linhasResponsaveisAll
 
   const resumosResponsaveis = usarResponsaveisPorTitular
     ? resumosEuOutrosPorTitular(responsaveisPorTitular, idxReferencia >= 0 ? idxReferencia : 0)
@@ -1214,7 +1295,12 @@ export const ProjecaoFaturasTable = ({ data, separarTitular = false }: ProjecaoF
       total: cartao.total,
       agrupado: cartao.agrupado,
       responsaveis: (cartao.por_responsavel || [])
-        .filter((resp) => Number(resp.total) > 0)
+        .filter(
+          (resp) =>
+            Number(resp.total) > 0
+            || (destacarResponsavelId != null && Number(resp.responsavel_id) === Number(destacarResponsavelId))
+            || (resp.valores || []).some((v) => Number(v.simulado) > 0)
+        )
         .map((resp) => ({
         responsavelId: resp.responsavel_id,
         responsavelLabel: resp.nome,
@@ -1222,24 +1308,64 @@ export const ProjecaoFaturasTable = ({ data, separarTitular = false }: ProjecaoF
           ? resp.tipo.charAt(0).toUpperCase() + resp.tipo.slice(1)
           : undefined,
         eh_eu: resp.eh_eu === true && (!separarTitular || cartao.pessoa_eh_principal === true),
+        destacar: destacarResponsavelId != null && Number(resp.responsavel_id) === Number(destacarResponsavelId),
         valores: resp.valores || [],
         total: resp.total,
       })),
     }
   })
 
-  const totaisCartoes = (data.totais_por_coluna || []).map((t) => t.cartoes)
-  const totaisResponsaveis = (data.totais_por_coluna || []).map((t) => t.responsaveis)
+  const totaisCartoes = filtroCartaoId
+    ? colunas.map((_, i) => {
+        const valores = cartoesVisiveis.flatMap((c) => c.valores?.[i] ? [c.valores[i]] : [])
+        return {
+          realizado: valores.reduce((acc, v) => acc + Number(v.realizado || 0), 0),
+          projetado: valores.reduce((acc, v) => acc + Number(v.projetado || 0), 0),
+          total: valores.reduce((acc, v) => acc + Number(v.total || 0), 0),
+        }
+      })
+    : (data.totais_por_coluna || []).map((t) => t.cartoes)
+  const totaisResponsaveis = filtroResponsavelId
+    ? colunas.map((_, i) => {
+        const valores = linhasResponsaveis.flatMap((l) => l.valores?.[i] ? [l.valores[i]] : [])
+        return {
+          realizado: valores.reduce((acc, v) => acc + Number(v.realizado || 0), 0),
+          projetado: valores.reduce((acc, v) => acc + Number(v.projetado || 0), 0),
+          total: valores.reduce((acc, v) => acc + Number(v.total || 0), 0),
+        }
+      })
+    : (data.totais_por_coluna || []).map((t) => t.responsaveis)
   const idResponsavelLinha = (linha: LinhaTabela) => linha.responsavelId ?? linha.id
   const cartaoLinha = (linha: LinhaTabela) =>
     linha.cartaoIds?.length === 1 ? linha.cartaoIds[0] : null
 
+  const mostrar = (visao: 'cartao' | 'responsavel' | 'cruzamento') =>
+    !visoes || visoes.includes(visao)
+
+  const linhasCruzamentoInline: LinhaTabela[] = cruzamentoInline
+    ? cartoesCruzamento.flatMap((cartao) =>
+        cartao.responsaveis.map((resp) => ({
+          id: `${cartao.cartaoId}-${resp.responsavelId}`,
+          label: resp.responsavelLabel,
+          sublabel: [cartao.cartaoLabel, resp.responsavelSublabel].filter(Boolean).join(' · ') || undefined,
+          eh_eu: resp.eh_eu,
+          destacar: resp.destacar,
+          valores: resp.valores,
+          total: resp.total,
+          responsavelId: resp.responsavelId,
+          cartaoIds: typeof cartao.cartaoId === 'number' ? [cartao.cartaoId] : undefined,
+          tipo: resp.responsavelSublabel?.toLowerCase(),
+        }))
+      )
+    : []
+
   return (
     <React.Fragment>
+      {mostrar('cartao') && (
       <Row>
         <Col xl={12}>
           <ProjecaoMatriz
-            titulo={separarTitular ? 'Por cartão · titular' : 'Por cartão'}
+            titulo={tituloCartao || (separarTitular ? 'Por cartão · titular' : 'Por cartão')}
             colunas={colunas}
             linhas={linhasCartoes}
             totais={totaisCartoes}
@@ -1249,15 +1375,18 @@ export const ProjecaoFaturasTable = ({ data, separarTitular = false }: ProjecaoF
           />
         </Col>
       </Row>
+      )}
+      {mostrar('responsavel') && (
       <Row>
         <Col xl={12}>
           <ProjecaoMatriz
-            titulo={separarTitular ? 'Por responsável · titular' : 'Por responsável'}
+            titulo={tituloResponsavel || (separarTitular ? 'Por responsável · titular' : 'Por responsável')}
             colunas={colunas}
             linhas={linhasResponsaveis}
             totais={totaisResponsaveis}
             prefix="proj-resp"
             showParticipacao
+            hideRepasses={hideRepasses}
             resumoEuOutros={usarResponsaveisPorTitular ? undefined : resumoEuOutrosRef}
             resumosEuOutros={resumosResponsaveis}
             onLinhaLabelClick={(linha) => {
@@ -1268,7 +1397,7 @@ export const ProjecaoFaturasTable = ({ data, separarTitular = false }: ProjecaoF
                 colunaReferencia.ano
               )
             }}
-            onRepassesClick={(linha) => {
+            onRepassesClick={hideRepasses ? undefined : (linha) => {
               if (!colunaReferencia) return
               goRepassesResponsavel(idResponsavelLinha(linha), colunaReferencia.mes, colunaReferencia.ano, {
                 nome: linha.label,
@@ -1288,36 +1417,74 @@ export const ProjecaoFaturasTable = ({ data, separarTitular = false }: ProjecaoF
           />
         </Col>
       </Row>
+      )}
+      {mostrar('cruzamento') && (
       <Row>
         <Col xl={12}>
-          <ProjecaoMatrizCruzamento
-            titulo={separarTitular ? 'Por cartão × responsável · titular' : 'Por cartão × responsável'}
-            colunas={colunas}
-            cartoes={cartoesCruzamento}
-            prefix="proj-cruz"
-            onCelulaClick={(cartao, resp, coluna, valor) => {
-              goFaturaResponsavel(resp.responsavelId, coluna.mes, coluna.ano, {
-                nome: resp.responsavelLabel,
-                tipo: resp.responsavelSublabel?.toLowerCase(),
-                realizado: valor?.realizado,
-                projetado: valor?.projetado,
-                total: valor?.total,
-                cartaoId: cartao.agrupado || typeof cartao.cartaoId !== 'number' ? null : cartao.cartaoId,
-              })
-            }}
-            onResponsavelLabelClick={(resp) => {
-              if (!colunaReferencia) return
-              goVisualizarResponsavel(resp.responsavelId, colunaReferencia.mes, colunaReferencia.ano)
-            }}
-          />
+          {cruzamentoInline ? (
+            <ProjecaoMatriz
+              titulo={tituloCruzamento || 'Neste cartão × responsável'}
+              colunas={colunas}
+              linhas={linhasCruzamentoInline}
+              totais={totaisCartoes}
+              prefix="proj-cruz"
+              showParticipacao
+              hideRepasses
+              onLinhaLabelClick={(linha) => {
+                if (!colunaReferencia) return
+                goVisualizarResponsavel(
+                  idResponsavelLinha(linha),
+                  colunaReferencia.mes,
+                  colunaReferencia.ano
+                )
+              }}
+              onCelulaClick={(linha, coluna, valor) => {
+                goFaturaResponsavel(idResponsavelLinha(linha), coluna.mes, coluna.ano, {
+                  nome: linha.label,
+                  tipo: linha.tipo,
+                  realizado: valor?.realizado,
+                  projetado: valor?.projetado,
+                  total: valor?.total,
+                  cartaoId: cartaoLinha(linha) ?? filtroCartaoId,
+                })
+              }}
+            />
+          ) : (
+            <ProjecaoMatrizCruzamento
+              titulo={tituloCruzamento || (separarTitular ? 'Por cartão × responsável · titular' : 'Por cartão × responsável')}
+              colunas={colunas}
+              cartoes={cartoesCruzamento}
+              prefix="proj-cruz"
+              onCelulaClick={(cartao, resp, coluna, valor) => {
+                goFaturaResponsavel(resp.responsavelId, coluna.mes, coluna.ano, {
+                  nome: resp.responsavelLabel,
+                  tipo: resp.responsavelSublabel?.toLowerCase(),
+                  realizado: valor?.realizado,
+                  projetado: valor?.projetado,
+                  total: valor?.total,
+                  cartaoId: cartao.agrupado || typeof cartao.cartaoId !== 'number' ? null : cartao.cartaoId,
+                })
+              }}
+              onResponsavelLabelClick={(resp) => {
+                if (!colunaReferencia) return
+                goVisualizarResponsavel(resp.responsavelId, colunaReferencia.mes, colunaReferencia.ano)
+              }}
+            />
+          )}
         </Col>
       </Row>
+      )}
+      {!hideLegend && (
       <Row>
         <Col md={12}>
           <div className="hstack gap-2 justify-content-end mb-3 flex-wrap">
             <span className="text-muted fs-13">
               <span className="badge bg-info-subtle text-info me-1">proj.</span>
               parcela projetada
+            </span>
+            <span className="text-muted fs-13">
+              <span className="badge bg-primary-subtle text-primary me-1">simulado</span>
+              compra hipotética
             </span>
             <span className="text-muted fs-13">
               <span className="badge bg-success-subtle text-success me-1">&lt;50%</span>
@@ -1333,13 +1500,16 @@ export const ProjecaoFaturasTable = ({ data, separarTitular = false }: ProjecaoF
             <span className="text-muted fs-13">
               Clique no responsável para o resumo · na célula do mês para a fatura
             </span>
+            {!hideRepasses && (
             <span className="text-muted fs-13">
               <span className="badge bg-success me-1">Pagou?</span>
               marcar o que o responsável já te devolveu
             </span>
+            )}
           </div>
         </Col>
       </Row>
+      )}
     </React.Fragment>
   )
 }

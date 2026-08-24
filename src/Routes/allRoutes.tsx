@@ -52,6 +52,7 @@ import SubcategoriasForm from "pages/Pages/Subcategorias/SubcategoriasForm/Subca
 
 import RelatoriosPage from "pages/Pages/Relatorios/RelatoriosPage";
 import ProjecaoFaturasPage from "pages/Pages/ProjecaoFaturas/ProjecaoFaturasPage";
+import SimuladorCompraPage from "pages/Pages/SimuladorCompra/SimuladorCompraPage";
 import RankingParceladasPage from "pages/Pages/RankingParceladas/RankingParceladasPage";
 import CompraVisualizacaoPage from "pages/Pages/CompraVisualizacao/CompraVisualizacaoPage";
 import FaturaResponsavelView from "pages/Pages/ProjecaoFaturas/FaturaResponsavelView/FaturaResponsavelView";
@@ -116,6 +117,7 @@ const authProtectedRoutes = [
   { path: "/projecao-faturas/responsaveis/:responsavelId/fatura", component: <FaturaResponsavelView /> },
   { path: "/projecao-faturas/responsaveis/:responsavelId/repasses", component: <RepassesResponsavelView /> },
   { path: "/projecao-faturas", component: <ProjecaoFaturasPage /> },
+  { path: "/simulador", component: <SimuladorCompraPage /> },
 
   { path: "/perfil", component: <SimplePage /> },
   { path: "/profile", component: <Navigate to="/perfil" /> },

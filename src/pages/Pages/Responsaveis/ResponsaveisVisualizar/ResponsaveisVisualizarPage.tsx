@@ -293,6 +293,13 @@ const ResponsaveisVisualizarPage = () => {
                                     Todas as compras
                                 </Link>
                             ) : null}
+                            <Link
+                                to={`/simulador?responsavel_id=${id}${data?.pessoa?.id ? `&pessoa_id=${data.pessoa.id}` : ''}`}
+                                className="btn btn-soft-primary"
+                            >
+                                <i className="ri-calculator-line align-middle me-1"></i>
+                                Simular compra
+                            </Link>
                             <Link to={`/responsaveis/edit/${id}`} className="btn btn-soft-info">
                                 <i className="ri-pencil-line align-middle me-1"></i>
                                 Editar

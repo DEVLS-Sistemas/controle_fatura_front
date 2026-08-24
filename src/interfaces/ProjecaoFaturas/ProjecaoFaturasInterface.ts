@@ -61,6 +61,10 @@ export interface ProjecaoValor {
   outros?: ProjecaoSplitParte
   /** Na linha do responsável: fatia no total do mês (ou do cartão) */
   percentual_participacao?: number | null
+  /** Overlay do Simulador — não vem da API */
+  simulado?: number
+  /** Total da célula antes do overlay (quando `simulado` > 0) */
+  total_antes?: number
 }
 
 export interface ProjecaoPorCartao {
