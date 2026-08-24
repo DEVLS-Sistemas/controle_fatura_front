@@ -218,6 +218,7 @@ const SimuladorCompraDetalhes = ({
             visoes={verTodos ? undefined : ['cartao', 'cruzamento', 'responsavel']}
             cruzamentoInline={!verTodos}
             hideRepasses
+            separarTitular
             tituloCartao="Cartão selecionado"
             tituloCruzamento="Neste cartão × responsável"
             tituloResponsavel={ehEu ? 'Meu total (todos os cartões)' : 'Responsável · todos os cartões'}

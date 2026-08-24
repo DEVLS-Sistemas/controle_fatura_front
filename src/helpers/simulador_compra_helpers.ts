@@ -259,6 +259,8 @@ const aplicarDeltaNaCelula = (
   valor.total_antes = roundMoney(valor.total)
   valor.simulado = roundMoney((valor.simulado || 0) + delta)
   valor.total = roundMoney(valor.total + delta)
+  valor.projetado = roundMoney(Number(valor.projetado || 0) + delta)
+  if (valor.fonte === 'vazio') valor.fonte = 'projecao'
   aplicarLimiteNaCelula(valor, limite)
   if (temSplit) somarDeltaNoSplit(valor, delta, paraEu, limite)
 }

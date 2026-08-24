@@ -369,7 +369,7 @@ const ProjecaoCelula = ({
 }) => {
   const clickable = typeof onClick === 'function'
   const simulado = Number(valor?.simulado || 0)
-  const empty = !valor || ((valor.fonte === 'vazio' || Number(valor.total) === 0) && simulado <= 0)
+  const empty = !valor || (Number(valor.total) === 0 && simulado <= 0)
 
   if (empty) {
     return (
@@ -1193,11 +1193,6 @@ export const ProjecaoFaturasTable = ({
     navigate(buildRepassesResponsavelPath(responsavelId, mes, ano), { state: meta })
   }
 
-  const matchCartaoId = (cartaoIds: number[] | undefined, cartaoId: number | string, fallbackId?: number) => {
-    if (cartaoIds?.some((id) => Number(id) === Number(cartaoId))) return true
-    return fallbackId != null && Number(fallbackId) === Number(cartaoId)
-  }
-
   const cartoesVisiveisRaw = separarTitular
     ? (data.por_cartao || []).map((cartao) => ({
         ...cartao,
@@ -1217,11 +1212,25 @@ export const ProjecaoFaturasTable = ({
     : cruzamentoAgrupado
 
   const cartoesVisiveis = filtroCartaoId
-    ? cartoesVisiveisRaw.filter((c) => matchCartaoId(c.cartao_ids, filtroCartaoId, c.cartao_id))
+    ? (data.por_cartao || [])
+        .filter((c) => Number(c.cartao_id) === Number(filtroCartaoId))
+        .map((cartao) => ({
+          ...cartao,
+          qtd_cartoes: 1,
+          cartao_ids: [cartao.cartao_id],
+          agrupado: false as const,
+        }))
     : cartoesVisiveisRaw
 
   const cruzamentoVisivel = filtroCartaoId
-    ? cruzamentoVisivelRaw.filter((c) => matchCartaoId(c.cartao_ids, filtroCartaoId, c.cartao_id))
+    ? (data.por_cartao_responsavel || [])
+        .filter((c) => Number(c.cartao_id) === Number(filtroCartaoId))
+        .map((cartao) => ({
+          ...cartao,
+          qtd_cartoes: 1,
+          cartao_ids: [cartao.cartao_id],
+          agrupado: false as const,
+        }))
     : cruzamentoVisivelRaw
 
   const linhasCartoes: LinhaTabela[] = cartoesVisiveis.map((c) => ({

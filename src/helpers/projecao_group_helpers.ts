@@ -98,11 +98,15 @@ const mergeValor = (itens: ProjecaoValor[], limiteGrupo: number | null): Projeca
   const livres = itens.map((i) => i.livre ?? i.disponivel).filter((v): v is number => v != null)
   const livre = limiteGrupo != null ? limiteGrupo - emUso : livres.length === itens.length ? soma(livres) : null
   const fonte = itens.reduce<ProjecaoFonte>((acc, item) => mergeFonte(acc, item.fonte), itens[0]?.fonte ?? 'vazio')
+  const simulado = soma(itens.map((i) => i.simulado))
+  const totalAntes = itens.some((i) => i.total_antes != null || Number(i.simulado) > 0)
+    ? soma(itens.map((i) => Number(i.total_antes ?? Number(i.total || 0) - Number(i.simulado || 0))))
+    : undefined
   return {
     realizado,
     projetado,
     total,
-    fonte,
+    fonte: simulado > 0 && fonte === 'vazio' ? 'projecao' : fonte,
     em_uso: emUso,
     livre,
     disponivel: livre,
@@ -110,6 +114,7 @@ const mergeValor = (itens: ProjecaoValor[], limiteGrupo: number | null): Projeca
     percentual_livre: limiteGrupo && limiteGrupo > 0 && livre != null ? (livre / limiteGrupo) * 100 : null,
     meu: mergeSplit(itens.map((i) => i.meu), total, limiteGrupo),
     outros: mergeSplit(itens.map((i) => i.outros), total, limiteGrupo),
+    ...(simulado > 0 ? { simulado, total_antes: totalAntes } : {}),
   }
 }
 
