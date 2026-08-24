@@ -6,6 +6,7 @@ export interface CartoesSearch {
     banco?: string | null
     ativo?: string | boolean | null
     palavra_chave?: string | null | unknown
+    pessoa_id?: number | string | null
 }
 
 export type TipoNumeroCartao = 'fisico' | 'virtual' | 'adicional'

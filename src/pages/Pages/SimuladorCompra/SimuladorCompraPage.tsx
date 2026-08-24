@@ -6,14 +6,14 @@ import { toast } from 'react-toastify'
 import UiContent from 'Components/Common/UiContent'
 import { setActiveMenu } from 'helpers/system_helpers'
 import { formatCurrency, isMeuResponsavelDisplay, splitValorEmParcelas, toCentavos } from 'helpers/fatura_helpers'
-import { removeMask } from 'helpers/functions_helpers'
 import { CartaoChip } from 'helpers/cartao_helpers'
 import { buildResponsavelVisualizarPath } from 'helpers/responsavel_visualizar_helpers'
 import {
   aplicarOverlaySimulacao,
   breakdownResponsavelPorCartao,
   calcularImpactoSimulacao,
-  cartoesDoTitular,
+  competenciaPrimeiraParcela,
+  filtrarCartoesDoTitular,
   montarParcelasSimuladas,
   parseQueryNumber,
   parseValorQuery,
@@ -23,10 +23,12 @@ import {
   todayISO,
 } from 'helpers/simulador_compra_helpers'
 import { pessoaIdOf, PessoaListItem, toPessoaSelectOption } from 'interfaces/Pessoas/PessoasInterface'
+import { CartoesList } from 'interfaces/Cartoes/CartoesInterface'
 import { ProjecaoFaturasView } from 'interfaces/ProjecaoFaturas/ProjecaoFaturasInterface'
 import { SimuladorCompraFormValues, SimuladorParcela } from 'interfaces/SimuladorCompra/SimuladorCompraInterface'
-import { ResponsavelLookup } from 'interfaces/Transacoes/TransacoesInterface'
+import { CartaoLookup, ResponsavelLookup } from 'interfaces/Transacoes/TransacoesInterface'
 import { SelectOptions } from 'interfaces/SystemInterfaces/SelectInterface'
+import { CartoesService } from 'services/Cartoes/CartoesService'
 import { PessoasService } from 'services/Pessoas/PessoasService'
 import { ProjecaoFaturasService } from 'services/ProjecaoFaturas/ProjecaoFaturasService'
 import { TransacoesService } from 'services/Transacoes/TransacoesService'
@@ -36,41 +38,115 @@ import SimuladorCompraForm from './SimuladorCompraForm/SimuladorCompraForm'
 import SimuladorCompraImpacto from './SimuladorCompraImpacto/SimuladorCompraImpacto'
 import SimuladorCompraTimeline from './SimuladorCompraTimeline/SimuladorCompraTimeline'
 
+type CartaoForm = {
+  id: number
+  nome: string
+  cor_fundo?: string | null
+  cor_texto?: string | null
+  dia_limite_fatura?: number | null
+  dia_vencimento_fatura?: number | null
+  pessoa_id?: number | null
+  pessoa_nome?: string | null
+}
+
+const parsePessoaIdCartao = (c: Record<string, any>): number | null => {
+  const raw = c?.pessoa_id ?? c?.pessoaId ?? c?.titular_id ?? c?.pessoa?.id ?? c?.pessoa?.pessoa_id
+  if (raw == null || raw === '') return null
+  const n = Number(raw)
+  return Number.isFinite(n) ? n : null
+}
+
+const normalizeCartoesList = (body: unknown): Record<string, any>[] => {
+  if (Array.isArray(body)) return body
+  if (body && typeof body === 'object') {
+    const record = body as Record<string, unknown>
+    if (Array.isArray(record.data)) return record.data as Record<string, any>[]
+    if (Array.isArray(record.cartoes)) return record.cartoes as Record<string, any>[]
+  }
+  return []
+}
+
+const toCartaoForm = (c: Record<string, any> | CartoesList | CartaoLookup | null | undefined): CartaoForm | null => {
+  if (!c) return null
+  const raw = c as Record<string, any>
+  const id = Number(raw.id ?? raw.cartao_id ?? raw.value)
+  if (!Number.isFinite(id) || id <= 0) return null
+  const ativo = raw.ativo
+  if (ativo === false || ativo === 0 || ativo === '0') return null
+  return {
+    id,
+    nome: String(raw.nome ?? raw.label ?? `Cartão ${id}`),
+    cor_fundo: raw.cor_fundo ?? null,
+    cor_texto: raw.cor_texto ?? null,
+    dia_limite_fatura: raw.dia_limite_fatura ?? null,
+    dia_vencimento_fatura: raw.dia_vencimento_fatura ?? null,
+    pessoa_id: parsePessoaIdCartao(raw),
+    pessoa_nome: raw.pessoa_nome ?? raw.pessoa?.nome_completo ?? raw.pessoa?.nome ?? null,
+  }
+}
+
+const mergeCartoes = (listas: Array<CartaoForm[] | undefined>): CartaoForm[] => {
+  const byId = new Map<number, CartaoForm>()
+  listas.forEach((lista) => {
+    (lista || []).forEach((c) => {
+      const prev = byId.get(c.id)
+      if (!prev) {
+        byId.set(c.id, c)
+        return
+      }
+      byId.set(c.id, {
+        ...prev,
+        ...c,
+        pessoa_id: c.pessoa_id ?? prev.pessoa_id ?? null,
+        pessoa_nome: c.pessoa_nome || prev.pessoa_nome,
+        dia_limite_fatura: c.dia_limite_fatura ?? prev.dia_limite_fatura ?? null,
+        cor_fundo: c.cor_fundo || prev.cor_fundo,
+        cor_texto: c.cor_texto || prev.cor_texto,
+      })
+    })
+  })
+  return Array.from(byId.values()).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+}
+
 const SimuladorCompraPage = () => {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
-  const now = new Date()
 
   const { register, control, watch, setValue } = useForm<SimuladorCompraFormValues>({
     defaultValues: {
       pessoa_id: null,
-      cartao_id: null,
-      responsavel_id: null,
+      cartao_id: parseQueryNumber(searchParams.get('cartao_id')),
+      responsavel_id: parseQueryNumber(searchParams.get('responsavel_id')),
       valor_compra: parseValorQuery(searchParams.get('valor')),
       parcelas_total: parseQueryNumber(searchParams.get('parcelas')) || 1,
       data: searchParams.get('data') || todayISO(),
-      mes: now.getMonth() + 1,
-      ano: now.getFullYear(),
+      mes: null,
+      ano: null,
     },
   })
 
   const [loadingLookups, setLoadingLookups] = useState(true)
-  const [loadingProjecao, setLoadingProjecao] = useState(true)
+  const [simulando, setSimulando] = useState(false)
+  const [resultadoVisivel, setResultadoVisivel] = useState(false)
   const [projecaoBase, setProjecaoBase] = useState<ProjecaoFaturasView>()
   const [pessoas, setPessoas] = useState<PessoaListItem[]>([])
+  const [cartoesCatalogo, setCartoesCatalogo] = useState<CartaoForm[]>([])
+  const [cartoesDoTitularApi, setCartoesDoTitularApi] = useState<CartaoForm[]>([])
+  const [loadingCartoesTitular, setLoadingCartoesTitular] = useState(false)
   const [responsaveis, setResponsaveis] = useState<ResponsavelLookup[]>([])
   const [defaultResponsavelId, setDefaultResponsavelId] = useState<number | null>(null)
   const [parcelasValores, setParcelasValores] = useState<string[]>([])
-  const [parcelasOpen, setParcelasOpen] = useState(false)
   const [responsavelModalOpen, setResponsavelModalOpen] = useState(false)
+  const [dataAberta, setDataAberta] = useState(false)
   const [verTodos, setVerTodos] = useState(false)
-  const [overlayTick, setOverlayTick] = useState(0)
 
   const defaultsApplied = useRef(false)
   const skipTitularEffect = useRef(true)
+  const formKeySimulado = useRef<string | null>(null)
   const pessoasDetalheCache = useRef<Map<number, PessoaListItem>>(new Map())
 
   const pessoasService = useRef(new PessoasService()).current
+  const cartoesService = useRef(new CartoesService()).current
   const projecaoService = useRef(new ProjecaoFaturasService()).current
   const transacoesService = useRef(new TransacoesService()).current
 
@@ -80,22 +156,45 @@ const SimuladorCompraPage = () => {
   const valorCompra = watch('valor_compra')
   const parcelasTotal = watch('parcelas_total')
   const dataCompra = watch('data')
-  const mes = watch('mes')
-  const ano = watch('ano')
 
   const nParcelas = Math.max(1, Math.min(36, Number(parcelasTotal) || 1))
   const valorCentavos = toCentavos(valorCompra)
-  const totaisBatem = nParcelas <= 1 || somaParcelasBate(
-    parcelasValores.map((v) => toCentavos(v)),
-    valorCentavos
-  )
+  const totaisBatem =
+    nParcelas <= 1 || somaParcelasBate(parcelasValores.map((v) => toCentavos(v)), valorCentavos)
 
   const titular = pessoas.find((p) => Number(pessoaIdOf(p)) === Number(pessoaId))
-  const cartoesTitular = useMemo(
-    () => cartoesDoTitular(projecaoBase?.por_cartao, pessoaId != null ? Number(pessoaId) : null, Boolean(titular?.eh_principal)),
-    [projecaoBase, pessoaId, titular]
-  )
-  const cartaoSel = cartoesTitular.find((c) => Number(c.cartao_id) === Number(cartaoId))
+  const showTitular = pessoas.length > 1
+
+  const cartoesFiltrados = useMemo(() => {
+    const titularId = pessoaId != null && pessoaId !== '' ? Number(pessoaId) : null
+    if (titularId == null || !Number.isFinite(titularId)) return []
+    const ehPrincipal = Boolean(titular?.eh_principal)
+    const doCatalogo = filtrarCartoesDoTitular(cartoesCatalogo, titularId, ehPrincipal)
+    const daApi = filtrarCartoesDoTitular(cartoesDoTitularApi, titularId, ehPrincipal)
+    const catalogoTemPessoa = cartoesCatalogo.some((c) => c.pessoa_id != null)
+    const apiSoLegado =
+      cartoesDoTitularApi.length > 0 && cartoesDoTitularApi.every((c) => c.pessoa_id == null)
+
+    if (catalogoTemPessoa) {
+      const idsCatalogo = new Set(doCatalogo.map((c) => c.id))
+      const daApiDoTitular = daApi.filter(
+        (c) => Number(c.pessoa_id) === titularId || idsCatalogo.has(c.id)
+      )
+      return mergeCartoes([doCatalogo, daApiDoTitular])
+    }
+    if (daApi.length) return mergeCartoes([daApi])
+    if (apiSoLegado) {
+      const idsApi = new Set(cartoesDoTitularApi.map((c) => c.id))
+      const pareceListaInteira =
+        cartoesCatalogo.length > 1 &&
+        cartoesCatalogo.every((c) => idsApi.has(c.id)) &&
+        cartoesDoTitularApi.length === cartoesCatalogo.length
+      if (!pareceListaInteira) return mergeCartoes([cartoesDoTitularApi])
+    }
+    return doCatalogo
+  }, [cartoesCatalogo, cartoesDoTitularApi, pessoaId, titular])
+
+  const cartaoSel = cartoesFiltrados.find((c) => Number(c.id) === Number(cartaoId))
   const responsavelSel = responsaveis.find((r) => Number(r.id) === Number(responsavelId))
   const ehEu = isMeuResponsavelDisplay({
     responsavelId: responsavelId != null ? Number(responsavelId) : null,
@@ -104,47 +203,47 @@ const SimuladorCompraPage = () => {
   })
 
   const pessoasOptions: SelectOptions[] = pessoas.map(toPessoaSelectOption)
-  const cartoesOptions: SelectOptions[] = cartoesTitular.map((c) => ({
-    value: c.cartao_id,
-    label: [
-      c.nome,
-      c.dia_limite_fatura != null ? `Fecha dia ${c.dia_limite_fatura}` : null,
-      c.dia_vencimento_fatura != null ? `Vence dia ${c.dia_vencimento_fatura}` : null,
-    ]
-      .filter(Boolean)
-      .join(' · '),
+  const cartoesOptions: SelectOptions[] = cartoesFiltrados.map((c) => ({
+    value: c.id,
+    label: c.nome,
     cor_fundo: c.cor_fundo ?? null,
     cor_texto: c.cor_texto ?? null,
   }))
 
-  const overlayInput = useMemo(
-    () => montarParcelasSimuladas({
-      valorCentavos,
-      nParcelas,
-      valoresManuaisCentavos:
-        nParcelas > 1 && parcelasValores.length === nParcelas
-          ? parcelasValores.map((v) => toCentavos(v))
-          : undefined,
-      dataISO: dataCompra,
-      diaLimite: cartaoSel?.dia_limite_fatura ?? null,
-      colunas: projecaoBase?.colunas || [],
-    }),
-    // overlayTick força o debounce
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [overlayTick, projecaoBase, cartaoSel?.dia_limite_fatura]
-  )
+  const formKey = [
+    cartaoId ?? '',
+    responsavelId ?? '',
+    valorCentavos,
+    nParcelas,
+    dataCompra ?? '',
+    parcelasValores.join(','),
+  ].join('|')
 
-  const temOverlay =
-    valorCentavos > 0 &&
-    totaisBatem &&
-    overlayInput.totais_batem &&
+  const podeSimular =
     Number(cartaoId) > 0 &&
     Number(responsavelId) > 0 &&
-    overlayInput.parcelas_na_janela + overlayInput.parcelas_fora_da_janela > 0
+    valorCentavos > 0 &&
+    nParcelas >= 1 &&
+    totaisBatem
+
+  const overlayInput = useMemo(
+    () =>
+      montarParcelasSimuladas({
+        valorCentavos,
+        nParcelas,
+        valoresManuaisCentavos:
+          nParcelas > 1 && parcelasValores.length === nParcelas
+            ? parcelasValores.map((v) => toCentavos(v))
+            : undefined,
+        dataISO: dataCompra,
+        diaLimite: cartaoSel?.dia_limite_fatura ?? null,
+        colunas: projecaoBase?.colunas || [],
+      }),
+    [valorCentavos, nParcelas, parcelasValores, dataCompra, cartaoSel?.dia_limite_fatura, projecaoBase]
+  )
 
   const projecaoOverlay = useMemo(() => {
-    if (!projecaoBase) return undefined
-    if (!temOverlay) return projecaoBase
+    if (!resultadoVisivel || !projecaoBase || !podeSimular) return undefined
     return aplicarOverlaySimulacao(projecaoBase, {
       cartaoId: Number(cartaoId),
       responsavelId: Number(responsavelId),
@@ -152,23 +251,33 @@ const SimuladorCompraPage = () => {
       ehEu,
       deltas: overlayInput.deltas,
     })
-  }, [projecaoBase, temOverlay, cartaoId, responsavelId, responsavelSel, ehEu, overlayInput.deltas])
+  }, [
+    resultadoVisivel,
+    projecaoBase,
+    podeSimular,
+    cartaoId,
+    responsavelId,
+    responsavelSel,
+    ehEu,
+    overlayInput.deltas,
+  ])
 
   const impacto = useMemo(() => {
-    if (!projecaoBase || !projecaoOverlay || !cartaoId || !responsavelId) return null
+    if (!resultadoVisivel || !projecaoBase || !projecaoOverlay || !cartaoId || !responsavelId) return null
     return calcularImpactoSimulacao({
       base: projecaoBase,
       overlay: projecaoOverlay,
       cartaoId: Number(cartaoId),
       responsavelId: Number(responsavelId),
-      deltas: temOverlay ? overlayInput.deltas : overlayInput.deltas.map(() => 0),
+      deltas: overlayInput.deltas,
       primeira: overlayInput.primeira,
     })
-  }, [projecaoBase, projecaoOverlay, cartaoId, responsavelId, temOverlay, overlayInput])
+  }, [resultadoVisivel, projecaoBase, projecaoOverlay, cartaoId, responsavelId, overlayInput])
 
-  const idxBreakdown = overlayInput.primeira?.indice_coluna ?? projecaoBase?.colunas.findIndex((c) => c.referencia) ?? 0
+  const idxBreakdown =
+    overlayInput.primeira?.indice_coluna ?? projecaoBase?.colunas.findIndex((c) => c.referencia) ?? 0
   const breakdown = useMemo(() => {
-    if (!projecaoBase || !projecaoOverlay || !responsavelId || !cartaoId) return []
+    if (!resultadoVisivel || !projecaoBase || !projecaoOverlay || !responsavelId || !cartaoId) return []
     return breakdownResponsavelPorCartao({
       overlay: projecaoOverlay,
       base: projecaoBase,
@@ -176,14 +285,14 @@ const SimuladorCompraPage = () => {
       cartaoSimuladoId: Number(cartaoId),
       indice: idxBreakdown >= 0 ? idxBreakdown : 0,
     })
-  }, [projecaoBase, projecaoOverlay, responsavelId, cartaoId, idxBreakdown])
+  }, [resultadoVisivel, projecaoBase, projecaoOverlay, responsavelId, cartaoId, idxBreakdown])
 
   const resolveDefaultResponsavel = useCallback(
     async (pessoa: PessoaListItem | undefined): Promise<number | null> => {
-      if (!pessoa) return defaultResponsavelId
+      if (!pessoa || pessoa.eh_principal) return defaultResponsavelId
       const id = pessoaIdOf(pessoa)
       let detalhe = pessoa
-      if (!pessoa.eh_principal && id != null && pessoa.responsavel_id == null) {
+      if (id != null && pessoa.responsavel_id == null) {
         if (pessoasDetalheCache.current.has(id)) {
           detalhe = pessoasDetalheCache.current.get(id)!
         } else {
@@ -194,7 +303,7 @@ const SimuladorCompraPage = () => {
               pessoasDetalheCache.current.set(id, view)
             }
           } catch {
-            // segue com match por nome
+            // match por nome
           }
         }
       }
@@ -208,29 +317,6 @@ const SimuladorCompraPage = () => {
     [defaultResponsavelId, pessoasService, responsaveis]
   )
 
-  const applyCartaoEResponsavel = useCallback(
-    async (pessoa: PessoaListItem | undefined, preferCartaoId?: number | null, preferRespId?: number | null) => {
-      const lista = cartoesDoTitular(
-        projecaoBase?.por_cartao,
-        pessoaIdOf(pessoa),
-        Boolean(pessoa?.eh_principal)
-      )
-      const cartaoPreferido = preferCartaoId
-        ? lista.find((c) => Number(c.cartao_id) === Number(preferCartaoId))
-        : undefined
-      const proximoCartao = cartaoPreferido || lista[0]
-      setValue('cartao_id', proximoCartao?.cartao_id ?? null)
-
-      const respDefault = await resolveDefaultResponsavel(pessoa)
-      const respExiste = preferRespId != null && responsaveis.some((r) => Number(r.id) === Number(preferRespId))
-      if (preferRespId != null && !respExiste) {
-        toast.error('Responsável não encontrado. Voltando ao padrão do titular.')
-      }
-      setValue('responsavel_id', respExiste ? preferRespId : respDefault)
-    },
-    [projecaoBase, resolveDefaultResponsavel, responsaveis, setValue]
-  )
-
   useEffect(() => {
     setActiveMenu('/simulador')
   }, [])
@@ -239,15 +325,21 @@ const SimuladorCompraPage = () => {
     const load = async () => {
       setLoadingLookups(true)
       try {
-        const [pessoasList, lookups] = await Promise.all([
+        const [pessoasList, lookups, cartoesList] = await Promise.all([
           pessoasService.AsyncListPessoas(),
           transacoesService.getLookupsTransacoes(),
+          cartoesService.AsyncListCartoes({}),
         ])
-        setPessoas(pessoasList || [])
+        const pessoasNorm = pessoasList || []
+        setPessoas(pessoasNorm)
         if (lookups?.responsaveis) setResponsaveis(lookups.responsaveis)
         if (lookups?.default_responsavel_id != null) {
           setDefaultResponsavelId(lookups.default_responsavel_id)
         }
+
+        const fromList = normalizeCartoesList(cartoesList).map(toCartaoForm).filter((c): c is CartaoForm => c != null)
+        const fromLookups = (lookups?.cartoes || []).map(toCartaoForm).filter((c): c is CartaoForm => c != null)
+        setCartoesCatalogo(mergeCartoes([fromLookups, fromList]))
       } catch (error: any) {
         toast.error(error?.message || 'Erro ao carregar dados do simulador')
       } finally {
@@ -255,72 +347,90 @@ const SimuladorCompraPage = () => {
       }
     }
     load()
-  }, [pessoasService, transacoesService])
-
-  useEffect(() => {
-    const mesN = Number(mes) || now.getMonth() + 1
-    const anoN = Number(ano) || now.getFullYear()
-    let cancelled = false
-    const load = async () => {
-      setLoadingProjecao(true)
-      try {
-        const result = await projecaoService.getProjecaoFaturas({ mes: mesN, ano: anoN })
-        if (!cancelled) setProjecaoBase(result)
-      } catch (error: any) {
-        if (!cancelled) {
-          toast.error(error?.message || 'Erro ao carregar projeção de faturas')
-          setProjecaoBase(undefined)
-        }
-      } finally {
-        if (!cancelled) setLoadingProjecao(false)
-      }
-    }
-    load()
-    return () => {
-      cancelled = true
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mes, ano])
+  }, [pessoasService, transacoesService, cartoesService])
 
   useEffect(() => {
     if (defaultsApplied.current) return
-    if (loadingLookups || loadingProjecao || !projecaoBase || pessoas.length === 0) return
+    if (loadingLookups) return
 
     const run = async () => {
       const qPessoa = parseQueryNumber(searchParams.get('pessoa_id'))
       const qCartao = parseQueryNumber(searchParams.get('cartao_id'))
       const qResp = parseQueryNumber(searchParams.get('responsavel_id'))
 
-      let pessoa = qPessoa != null
-        ? pessoas.find((p) => Number(pessoaIdOf(p)) === qPessoa)
-        : undefined
-
+      let pessoa =
+        qPessoa != null ? pessoas.find((p) => Number(pessoaIdOf(p)) === qPessoa) : undefined
       if (!pessoa && qCartao != null) {
-        const cartao = (projecaoBase.por_cartao || []).find((c) => Number(c.cartao_id) === qCartao)
+        const cartao = cartoesCatalogo.find((c) => Number(c.id) === qCartao)
         if (cartao?.pessoa_id != null) {
           pessoa = pessoas.find((p) => Number(pessoaIdOf(p)) === Number(cartao.pessoa_id))
         }
       }
       if (!pessoa) pessoa = titularPrincipal(pessoas)
-      if (qPessoa != null && !pessoa) {
-        toast.error('Titular não encontrado. Usando o principal.')
-        pessoa = titularPrincipal(pessoas)
-      }
 
       setValue('pessoa_id', pessoaIdOf(pessoa))
-      await applyCartaoEResponsavel(pessoa, qCartao, qResp)
+
+      const filtrada = filtrarCartoesDoTitular(
+        cartoesCatalogo,
+        pessoaIdOf(pessoa),
+        Boolean(pessoa?.eh_principal)
+      )
+      const cartaoPreferido = qCartao ? filtrada.find((c) => Number(c.id) === qCartao) : undefined
+      if (cartaoPreferido || filtrada[0]) {
+        setValue('cartao_id', (cartaoPreferido || filtrada[0])?.id ?? null)
+      }
+
+      const respDefault = await resolveDefaultResponsavel(pessoa)
+      const respExiste = qResp != null && responsaveis.some((r) => Number(r.id) === Number(qResp))
+      if (qResp != null && !respExiste) {
+        toast.error('Responsável não encontrado. Voltando ao padrão.')
+      }
+      if (!qResp || !respExiste) {
+        setValue('responsavel_id', respExiste ? qResp : respDefault)
+      }
+
       defaultsApplied.current = true
     }
     run()
   }, [
     loadingLookups,
-    loadingProjecao,
-    projecaoBase,
+    cartoesCatalogo,
     pessoas,
+    responsaveis,
     searchParams,
     setValue,
-    applyCartaoEResponsavel,
+    resolveDefaultResponsavel,
   ])
+
+  useEffect(() => {
+    const titularId = pessoaId != null && pessoaId !== '' ? Number(pessoaId) : null
+    if (titularId == null || !Number.isFinite(titularId)) {
+      setCartoesDoTitularApi([])
+      setLoadingCartoesTitular(false)
+      return
+    }
+    let cancelled = false
+    setCartoesDoTitularApi([])
+    setLoadingCartoesTitular(true)
+    cartoesService
+      .AsyncListCartoes({ pessoa_id: titularId })
+      .then((list) => {
+        if (cancelled) return
+        const mapped = normalizeCartoesList(list)
+          .map(toCartaoForm)
+          .filter((c): c is CartaoForm => c != null)
+        setCartoesDoTitularApi(mapped)
+      })
+      .catch(() => {
+        if (!cancelled) setCartoesDoTitularApi([])
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingCartoesTitular(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [pessoaId, cartoesService])
 
   useEffect(() => {
     if (!defaultsApplied.current) return
@@ -328,9 +438,21 @@ const SimuladorCompraPage = () => {
       skipTitularEffect.current = false
       return
     }
-    applyCartaoEResponsavel(titular)
+    setValue('cartao_id', null)
+    resolveDefaultResponsavel(titular).then((id) => setValue('responsavel_id', id))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pessoaId])
+
+  useEffect(() => {
+    if (!defaultsApplied.current) return
+    if (loadingCartoesTitular) return
+    const atualOk = cartoesFiltrados.some((c) => Number(c.id) === Number(cartaoId))
+    if (atualOk) return
+    const qCartao = parseQueryNumber(searchParams.get('cartao_id'))
+    const preferido =
+      qCartao != null ? cartoesFiltrados.find((c) => Number(c.id) === qCartao) : undefined
+    setValue('cartao_id', (preferido || cartoesFiltrados[0])?.id ?? null)
+  }, [cartoesFiltrados, loadingCartoesTitular, cartaoId, searchParams, setValue])
 
   useEffect(() => {
     if (nParcelas <= 1) {
@@ -341,13 +463,51 @@ const SimuladorCompraPage = () => {
   }, [valorCentavos, nParcelas])
 
   useEffect(() => {
-    const t = setTimeout(() => setOverlayTick((n) => n + 1), 300)
-    return () => clearTimeout(t)
-  }, [pessoaId, cartaoId, responsavelId, valorCompra, nParcelas, dataCompra, parcelasValores, projecaoBase])
+    if (resultadoVisivel && formKeySimulado.current && formKeySimulado.current !== formKey) {
+      setResultadoVisivel(false)
+      setProjecaoBase(undefined)
+    }
+  }, [formKey, resultadoVisivel])
 
-  const handleParcelaChange = (index: number, raw: string) => {
-    const digits = removeMask(raw)
-    setParcelasValores((prev) => prev.map((v, i) => (i === index ? digits : v)))
+  const handleSimular = async () => {
+    if (!podeSimular) {
+      toast.warning('Preencha cartão, responsável, valor e parcelas para simular.')
+      return
+    }
+    const diaLimite = cartaoSel?.dia_limite_fatura ?? null
+    const primeira = competenciaPrimeiraParcela(dataCompra, diaLimite)
+    const now = new Date()
+    const mes = primeira?.mes || now.getMonth() + 1
+    const ano = primeira?.ano || now.getFullYear()
+
+    setSimulando(true)
+    try {
+      const result = await projecaoService.getProjecaoFaturas({ mes, ano })
+      const fromProj = (result?.por_cartao || []).find((c) => Number(c.cartao_id) === Number(cartaoId))
+      if (fromProj?.dia_limite_fatura != null) {
+        setCartoesCatalogo((prev) =>
+          prev.map((c) =>
+            Number(c.id) === Number(cartaoId)
+              ? {
+                  ...c,
+                  dia_limite_fatura: fromProj.dia_limite_fatura ?? c.dia_limite_fatura,
+                  dia_vencimento_fatura: fromProj.dia_vencimento_fatura ?? c.dia_vencimento_fatura,
+                }
+              : c
+          )
+        )
+      }
+      setProjecaoBase(result)
+      formKeySimulado.current = formKey
+      setResultadoVisivel(true)
+      setVerTodos(false)
+    } catch (error: any) {
+      toast.error(error?.message || 'Erro ao simular. Tente de novo.')
+      setProjecaoBase(undefined)
+      setResultadoVisivel(false)
+    } finally {
+      setSimulando(false)
+    }
   }
 
   const scrollToColuna = (parcela: SimuladorParcela) => {
@@ -356,23 +516,23 @@ const SimuladorCompraPage = () => {
   }
 
   const faturaPath =
-    responsavelId && (impacto?.competencia || overlayInput.primeira)
+    resultadoVisivel && responsavelId && (impacto?.competencia || overlayInput.primeira)
       ? `/projecao-faturas/responsaveis/${responsavelId}/fatura?mes=${
           overlayInput.primeira?.mes || impacto?.competencia?.mes
         }&ano=${overlayInput.primeira?.ano || impacto?.competencia?.ano}`
       : undefined
   const visualizarPath =
-    responsavelId && (impacto?.competencia || overlayInput.primeira)
+    resultadoVisivel && responsavelId && (impacto?.competencia || overlayInput.primeira)
       ? buildResponsavelVisualizarPath(
           Number(responsavelId),
-          overlayInput.primeira?.mes || impacto?.competencia?.mes || Number(mes),
-          overlayInput.primeira?.ano || impacto?.competencia?.ano || Number(ano)
+          overlayInput.primeira?.mes || impacto?.competencia?.mes || new Date().getMonth() + 1,
+          overlayInput.primeira?.ano || impacto?.competencia?.ano || new Date().getFullYear()
         )
       : undefined
 
   const registrarCompra = () => {
-    if (!totaisBatem || valorCentavos <= 0 || !cartaoId) {
-      toast.warning('Preencha valor, cartão e parcelas válidas antes de registrar.')
+    if (!podeSimular || !cartaoId) {
+      toast.warning('Simule a compra antes de registrar.')
       return
     }
     navigate('/transacoes/add', {
@@ -396,7 +556,28 @@ const SimuladorCompraPage = () => {
     })
   }
 
-  const loading = loadingLookups || loadingProjecao
+  const formEl = (
+    <SimuladorCompraForm
+      register={register}
+      control={control}
+      showTitular={showTitular}
+      pessoasOptions={pessoasOptions}
+      cartoesOptions={cartoesOptions}
+      semCartoes={!loadingLookups && !loadingCartoesTitular && cartoesFiltrados.length === 0}
+      compact={resultadoVisivel}
+      valorCentavos={valorCentavos}
+      nParcelas={nParcelas}
+      cartaoNome={cartaoSel?.nome || ''}
+      responsavelNome={responsavelSel?.nome || ''}
+      isMeuResponsavel={ehEu}
+      dataAberta={dataAberta}
+      onToggleData={() => setDataAberta((v) => !v)}
+      onTrocarResponsavel={() => setResponsavelModalOpen(true)}
+      onSimular={handleSimular}
+      podeSimular={podeSimular}
+      simulando={simulando}
+    />
+  )
 
   return (
     <React.Fragment>
@@ -407,14 +588,12 @@ const SimuladorCompraPage = () => {
             <Col xs={12}>
               <div className="page-title-box d-sm-flex align-items-center justify-content-between">
                 <div className="d-flex align-items-center">
-                  <Link to="/projecao-faturas" className="me-2">
+                  <Link to="/dashboard" className="me-2">
                     <i className="bx bx-arrow-back bx-sm"></i>
                   </Link>
                   <div>
-                    <h4 className="mb-0">Simulador de compra</h4>
-                    <p className="text-muted mb-0 fs-13">
-                      Impacto mês a mês antes de registrar — não grava transação
-                    </p>
+                    <h4 className="mb-0">Simulador</h4>
+                    <p className="text-muted mb-0 fs-13">Antes de registrar a compra</p>
                   </div>
                 </div>
                 <Breadcrumb pageTitle="" listClassName="mb-sm-0 pt-1 py-2">
@@ -423,150 +602,155 @@ const SimuladorCompraPage = () => {
                       <i className="ri-home-5-fill"></i>
                     </Link>
                   </BreadcrumbItem>
-                  <BreadcrumbItem>
-                    <Link to="/projecao-faturas">Projeção</Link>
-                  </BreadcrumbItem>
                   <BreadcrumbItem active>Simulador</BreadcrumbItem>
                 </Breadcrumb>
               </div>
             </Col>
           </Row>
 
-          <SimuladorCompraForm
-            register={register}
-            control={control}
-            pessoasOptions={pessoasOptions}
-            cartoesOptions={cartoesOptions}
-            semCartoes={!loading && cartoesTitular.length === 0 && pessoaId != null}
-            overlay={overlayInput}
-            valorCentavos={valorCentavos}
-            nParcelas={nParcelas}
-            parcelasValores={parcelasValores}
-            totaisBatem={totaisBatem}
-            diaLimite={cartaoSel?.dia_limite_fatura ?? null}
-            cartaoNome={cartaoSel?.nome || ''}
-            responsavelNome={responsavelSel?.nome || ''}
-            isMeuResponsavel={ehEu}
-            parcelasOpen={parcelasOpen}
-            onToggleParcelas={() => setParcelasOpen((v) => !v)}
-            onParcelaChange={handleParcelaChange}
-            onTrocarResponsavel={() => setResponsavelModalOpen(true)}
-          />
-
-          {loading ? (
-            <div className="text-center py-5">
-              <Spinner color="primary" />
-            </div>
-          ) : (
-            <>
-              <SimuladorCompraImpacto
-                impacto={impacto}
-                temOverlay={Boolean(temOverlay)}
-                responsavelNome={responsavelSel?.nome || ''}
-                ehEu={ehEu}
-                cartaoNome={cartaoSel?.nome || ''}
-                qtdParcelasJanela={overlayInput.parcelas_na_janela}
-                faturaPath={faturaPath}
-                visualizarPath={visualizarPath}
-              />
-
-              {overlayInput.parcelas_fora_da_janela > 0 && (
-                <div className="alert alert-warning">
-                  {overlayInput.parcelas_fora_da_janela} parcela
-                  {overlayInput.parcelas_fora_da_janela === 1 ? '' : 's'} caem depois de{' '}
-                  {projecaoBase?.colunas?.[projecaoBase.colunas.length - 1]?.label || 'o fim da janela'}.
-                  Troque a referência ou registre a compra para ver o restante na Projeção.
-                </div>
-              )}
-
-              {temOverlay && (
-                <SimuladorCompraTimeline parcelas={overlayInput.parcelas} onSelect={scrollToColuna} />
-              )}
-
-              <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
-                <div className="form-check form-switch mb-0">
-                  <input
-                    className="form-check-input"
-                    type="checkbox"
-                    id="ver-todos-simulador"
-                    checked={verTodos}
-                    onChange={(e) => setVerTodos(e.target.checked)}
-                  />
-                  <label className="form-check-label" htmlFor="ver-todos-simulador">
-                    Ver todos os cartões / responsáveis
-                  </label>
-                </div>
-                <div className="d-flex flex-wrap gap-2">
-                  <Link to="/projecao-faturas" className="btn btn-soft-primary">
-                    Projeção (sem overlay)
-                  </Link>
-                  <button
-                    type="button"
-                    className="btn btn-outline-primary"
-                    onClick={registrarCompra}
-                    disabled={!temOverlay}
-                  >
-                    <i className="ri-save-3-line me-1"></i>
-                    Registrar esta compra
-                  </button>
-                </div>
-              </div>
-
-              {breakdown.length > 1 && temOverlay && impacto?.competencia && (
-                <div className="card mb-3">
-                  <div className="card-body">
-                    <h6 className="mb-3">
-                      {impacto.competencia.label} · {ehEu ? 'Eu' : responsavelSel?.nome} por cartão
-                    </h6>
-                    <div className="d-flex flex-column gap-2">
-                      {breakdown.map((item) => (
-                        <div
-                          key={item.cartao_id}
-                          className="d-flex flex-wrap align-items-center justify-content-between gap-2"
-                        >
-                          <span className="d-flex align-items-center gap-2">
-                            <CartaoChip
-                              cor_fundo={item.cor_fundo}
-                              cor_texto={item.cor_texto}
-                              label={item.nome.slice(0, 1)}
-                            />
-                            <span>
-                              {item.nome}
-                              {item.eh_simulado && (
-                                <span className="badge bg-primary-subtle text-primary ms-2">simulação</span>
-                              )}
-                            </span>
-                          </span>
-                          <span>
-                            {formatCurrency(item.antes)}
-                            {item.simulado > 0 && (
-                              <>
-                                {' + '}
-                                {formatCurrency(item.simulado)} simulado = {formatCurrency(item.depois)}
-                              </>
-                            )}
-                            {item.simulado <= 0 && <> = {formatCurrency(item.depois)}</>}
-                          </span>
-                        </div>
-                      ))}
+          {loadingLookups ? (
+            <Row className="justify-content-center">
+              <Col lg={7} xl={6}>
+                <div className="card">
+                  <div className="card-body p-4">
+                    <div className="placeholder-glow">
+                      <span className="placeholder col-4 mb-3"></span>
+                      <span className="placeholder col-12 mb-2"></span>
+                      <span className="placeholder col-12 mb-2"></span>
+                      <span className="placeholder col-8 mb-2"></span>
+                      <span className="placeholder col-5"></span>
                     </div>
                   </div>
                 </div>
-              )}
+              </Col>
+            </Row>
+          ) : resultadoVisivel ? (
+            <>
+              {formEl}
+              {simulando ? (
+                <div className="text-center py-5">
+                  <Spinner color="primary" />
+                </div>
+              ) : (
+                <>
+                  <SimuladorCompraImpacto
+                    impacto={impacto}
+                    temOverlay
+                    responsavelNome={responsavelSel?.nome || ''}
+                    ehEu={ehEu}
+                    cartaoNome={cartaoSel?.nome || ''}
+                    qtdParcelasJanela={overlayInput.parcelas_na_janela}
+                    faturaPath={faturaPath}
+                    visualizarPath={visualizarPath}
+                  />
 
-              <ProjecaoFaturasTable
-                data={projecaoOverlay}
-                filtroCartaoId={verTodos ? null : cartaoId ? Number(cartaoId) : null}
-                filtroResponsavelId={verTodos ? null : responsavelId ? Number(responsavelId) : null}
-                destacarResponsavelId={responsavelId ? Number(responsavelId) : null}
-                visoes={verTodos ? undefined : ['cartao', 'cruzamento', 'responsavel']}
-                cruzamentoInline={!verTodos}
-                hideRepasses
-                tituloCartao="Cartão selecionado"
-                tituloCruzamento="Neste cartão × responsável"
-                tituloResponsavel={ehEu ? 'Meu total (todos os cartões)' : 'Responsável · todos os cartões'}
-              />
+                  {overlayInput.parcelas_fora_da_janela > 0 && (
+                    <div className="alert alert-warning">
+                      {overlayInput.parcelas_fora_da_janela} parcela
+                      {overlayInput.parcelas_fora_da_janela === 1 ? '' : 's'} caem depois de{' '}
+                      {projecaoBase?.colunas?.[projecaoBase.colunas.length - 1]?.label ||
+                        'o fim da janela'}
+                      . Troque a data ou registre a compra para ver o restante na Projeção.
+                    </div>
+                  )}
+
+                  <SimuladorCompraTimeline parcelas={overlayInput.parcelas} onSelect={scrollToColuna} />
+
+                  <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+                    <div className="form-check form-switch mb-0">
+                      <input
+                        className="form-check-input"
+                        type="checkbox"
+                        id="ver-todos-simulador"
+                        checked={verTodos}
+                        onChange={(e) => setVerTodos(e.target.checked)}
+                      />
+                      <label className="form-check-label" htmlFor="ver-todos-simulador">
+                        Ver todos os cartões / responsáveis
+                      </label>
+                    </div>
+                    <div className="d-flex flex-wrap gap-2">
+                      <Link to="/projecao-faturas" className="btn btn-soft-primary">
+                        Ir para a Projeção
+                      </Link>
+                      <button type="button" className="btn btn-outline-primary" onClick={registrarCompra}>
+                        <i className="ri-save-3-line me-1"></i>
+                        Registrar esta compra
+                      </button>
+                    </div>
+                  </div>
+
+                  {breakdown.length > 1 && impacto?.competencia && (
+                    <div className="card mb-3">
+                      <div className="card-body">
+                        <h6 className="mb-3">
+                          {impacto.competencia.label} · {ehEu ? 'Eu' : responsavelSel?.nome} por cartão
+                        </h6>
+                        <div className="d-flex flex-column gap-2">
+                          {breakdown.map((item) => (
+                            <div
+                              key={item.cartao_id}
+                              className="d-flex flex-wrap align-items-center justify-content-between gap-2"
+                            >
+                              <span className="d-flex align-items-center gap-2">
+                                <CartaoChip
+                                  cor_fundo={item.cor_fundo}
+                                  cor_texto={item.cor_texto}
+                                  label={item.nome.slice(0, 1)}
+                                />
+                                <span>
+                                  {item.nome}
+                                  {item.eh_simulado && (
+                                    <span className="badge bg-primary-subtle text-primary ms-2">
+                                      simulação
+                                    </span>
+                                  )}
+                                </span>
+                              </span>
+                              <span>
+                                {formatCurrency(item.antes)}
+                                {item.simulado > 0 && (
+                                  <>
+                                    {' + '}
+                                    {formatCurrency(item.simulado)} simulado = {formatCurrency(item.depois)}
+                                  </>
+                                )}
+                                {item.simulado <= 0 && <> = {formatCurrency(item.depois)}</>}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <ProjecaoFaturasTable
+                    data={projecaoOverlay}
+                    filtroCartaoId={verTodos ? null : cartaoId ? Number(cartaoId) : null}
+                    filtroResponsavelId={verTodos ? null : responsavelId ? Number(responsavelId) : null}
+                    destacarResponsavelId={responsavelId ? Number(responsavelId) : null}
+                    visoes={verTodos ? undefined : ['cartao', 'cruzamento', 'responsavel']}
+                    cruzamentoInline={!verTodos}
+                    hideRepasses
+                    tituloCartao="Cartão selecionado"
+                    tituloCruzamento="Neste cartão × responsável"
+                    tituloResponsavel={
+                      ehEu ? 'Meu total (todos os cartões)' : 'Responsável · todos os cartões'
+                    }
+                  />
+                </>
+              )}
             </>
+          ) : (
+            <Row className="justify-content-center">
+              <Col lg={7} xl={6}>
+                {formEl}
+                <p className="text-muted text-center fs-13 mt-4 mb-0">
+                  Escolha o cartão, o responsável, o valor e as parcelas para ver o impacto nas
+                  próximas faturas.
+                </p>
+              </Col>
+            </Row>
           )}
         </Container>
       </div>

@@ -154,6 +154,11 @@ export interface CartaoLookup {
     nome?: string
     cor_fundo?: string | null
     cor_texto?: string | null
+    dia_limite_fatura?: number | null
+    dia_vencimento_fatura?: number | null
+    pessoa_id?: number | null
+    pessoa_nome?: string | null
+    pessoa_eh_principal?: boolean
 }
 
 export interface FaturaLookup {

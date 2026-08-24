@@ -97,11 +97,28 @@ export const cartoesDoTitular = (
   porCartao: ProjecaoPorCartao[] | undefined,
   pessoaId: number | null,
   ehPrincipal: boolean
-): ProjecaoPorCartao[] => {
-  if (!porCartao?.length || pessoaId == null) return []
-  return porCartao.filter((c) => {
-    if (Number(c.pessoa_id) === Number(pessoaId)) return true
-    if (ehPrincipal && (c.pessoa_id == null || c.pessoa_id === undefined)) return true
+): ProjecaoPorCartao[] => filtrarCartoesDoTitular(porCartao || [], pessoaId, ehPrincipal)
+
+const pessoaIdCartao = (pessoaId?: number | string | null): number | null => {
+  if (pessoaId == null || pessoaId === '') return null
+  const n = Number(pessoaId)
+  return Number.isFinite(n) ? n : null
+}
+
+/** Cartões do titular: `pessoa_id` igual ao titular. Legado sem titular só no principal, e só se a lista já tiver algum cartão com titular. Nunca devolve a lista inteira. */
+export const filtrarCartoesDoTitular = <T extends { pessoa_id?: number | string | null }>(
+  cartoes: T[] | undefined,
+  pessoaId: number | null | undefined,
+  ehPrincipal: boolean
+): T[] => {
+  if (!cartoes?.length || pessoaId == null || pessoaId === '') return []
+  const titularId = Number(pessoaId)
+  if (!Number.isFinite(titularId)) return []
+  const temTitularNaLista = cartoes.some((c) => pessoaIdCartao(c.pessoa_id) != null)
+  return cartoes.filter((c) => {
+    const id = pessoaIdCartao(c.pessoa_id)
+    if (id != null && id === titularId) return true
+    if (temTitularNaLista && ehPrincipal && id == null) return true
     return false
   })
 }
