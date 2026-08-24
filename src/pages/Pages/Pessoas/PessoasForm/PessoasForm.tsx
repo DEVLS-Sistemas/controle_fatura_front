@@ -164,6 +164,19 @@ const PessoasForm = () => {
                                                         </span>
                                                     </p>
                                                 </Col>
+                                                {!record.eh_principal && record.responsavel_id != null && (
+                                                    <Col md={6} className="mb-3">
+                                                        <Label className="form-label fw-semibold">Responsável automático</Label>
+                                                        <p className="mb-0">
+                                                            <Link to={`/responsaveis/view/${record.responsavel_id}`}>
+                                                                Vinculado a esta pessoa
+                                                            </Link>
+                                                        </p>
+                                                        <small className="text-muted">
+                                                            Criado automaticamente para faturas deste titular.
+                                                        </small>
+                                                    </Col>
+                                                )}
                                             </Row>
                                             <hr />
                                             <Row>

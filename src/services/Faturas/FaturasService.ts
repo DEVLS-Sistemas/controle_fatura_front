@@ -29,11 +29,16 @@ export class FaturasService implements FaturasInterface {
     }
 
     async getViewFaturas(params: any): Promise<FaturasView | undefined> {
-        const response = await this.httpClient.get<FaturasView>({
+        const response = await this.httpClient.get<any>({
             url: `${this.url}/listar/${params.id}`
         })
         switch (response.statusCode) {
-            case HttpStatusCode.ok: return response.body
+            case HttpStatusCode.ok: {
+                const body = response.body
+                if (!body) return undefined
+                if (body.id != null || body.cartao_id != null) return body
+                return body.data ?? body.fatura ?? body
+            }
             case HttpStatusCode.unauthorized: throw new AccessDeniedError()
             default: throw new UnexpectedError()
         }

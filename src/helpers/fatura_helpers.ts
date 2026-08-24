@@ -368,3 +368,13 @@ export const parcelasOptions = Array.from({ length: 36 }, (_, i) => ({
   value: i + 1,
   label: String(i + 1),
 }))
+
+/** Nome do responsável padrão da fatura, se não for o "Eu" */
+export const nomeResponsavelPadraoNaoEu = (
+  source?: { responsavel_nome?: string | null } | null
+): string | null => {
+  const nome = String(source?.responsavel_nome ?? '').trim()
+  if (!nome) return null
+  if (nome.toLowerCase() === 'eu') return null
+  return nome
+}

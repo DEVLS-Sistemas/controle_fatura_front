@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Badge,
@@ -15,6 +15,15 @@ import {
 import { CurrencyValue } from 'Components/Common/CurrencyValue'
 import { formatCurrency, VALOR_TEXT_CLASS } from 'helpers/fatura_helpers'
 import { CartaoChip } from 'helpers/cartao_helpers'
+import {
+  agruparCartoesPorNome,
+  agruparCruzamentoPorNome,
+  chaveTitular,
+  idGrupoCartao,
+  resumosEuOutrosPorTitular,
+  separarResponsaveisPorTitular,
+  sublabelCartao,
+} from 'helpers/projecao_group_helpers'
 import {
   ProjecaoColuna,
   ProjecaoResumoEuOutros,
@@ -83,6 +92,7 @@ const splitLabel = (
 
 export interface ProjecaoFaturasTableProps {
   data: ProjecaoFaturasView | undefined
+  separarTitular?: boolean
 }
 
 type LinhaTabela = {
@@ -96,6 +106,9 @@ type LinhaTabela = {
   eh_eu?: boolean
   valores: ProjecaoValor[]
   total: number
+  responsavelId?: number
+  cartaoIds?: number[]
+  tipo?: string
 }
 
 type ResponsavelCruzamento = {
@@ -108,7 +121,7 @@ type ResponsavelCruzamento = {
 }
 
 type CartaoCruzamento = {
-  cartaoId: number
+  cartaoId: number | string
   cartaoLabel: string
   cartaoSublabel?: string
   cartaoCorFundo?: string | null
@@ -119,6 +132,7 @@ type CartaoCruzamento = {
   valorReferencia?: ProjecaoValor
   valores: ProjecaoValor[]
   total: number
+  agrupado?: boolean
   responsaveis: ResponsavelCruzamento[]
 }
 
@@ -236,21 +250,24 @@ const LimiteUsoResumo = ({
 const EuOutrosResumoCard = ({
   resumo,
   labelColuna,
+  titulo,
 }: {
   resumo?: ProjecaoResumoEuOutros | null
   labelColuna?: string
+  titulo?: string
 }) => {
   if (!resumo) return null
 
   const meu = resumo.meu
   const outros = resumo.outros
   const total = Number(resumo.total || 0)
+  const sufixo = [titulo, labelColuna].filter(Boolean).join(' · ')
 
   return (
     <div className="d-flex flex-wrap gap-3 align-items-stretch mb-3">
       <div className="border rounded p-3 flex-grow-1" style={{ minWidth: 180 }}>
         <span className="text-muted fs-12 d-block">
-          Eu{labelColuna ? ` · ${labelColuna}` : ''}
+          Eu{sufixo ? ` · ${sufixo}` : ''}
         </span>
         <span className={`fs-5 fw-semibold text-primary ${VALOR_TEXT_CLASS}`}>
           <CurrencyValue value={meu?.total ?? 0} />
@@ -264,7 +281,7 @@ const EuOutrosResumoCard = ({
       </div>
       <div className="border rounded p-3 flex-grow-1" style={{ minWidth: 180 }}>
         <span className="text-muted fs-12 d-block">
-          Outros{labelColuna ? ` · ${labelColuna}` : ''}
+          Outros{sufixo ? ` · ${sufixo}` : ''}
         </span>
         <span className={`fs-5 fw-semibold text-secondary ${VALOR_TEXT_CLASS}`}>
           <CurrencyValue value={outros?.total ?? 0} />
@@ -551,6 +568,8 @@ const ProjecaoMatriz = ({
   showParticipacao = false,
   showEuOutrosSplit = false,
   resumoEuOutros,
+  resumosEuOutros,
+  acoes,
   onCelulaClick,
   onLinhaLabelClick,
   onRepassesClick,
@@ -564,6 +583,8 @@ const ProjecaoMatriz = ({
   showParticipacao?: boolean
   showEuOutrosSplit?: boolean
   resumoEuOutros?: ProjecaoResumoEuOutros | null
+  resumosEuOutros?: Array<{ titulo?: string; resumo: ProjecaoResumoEuOutros }>
+  acoes?: React.ReactNode
   onCelulaClick?: (linha: LinhaTabela, coluna: ProjecaoColuna, valor: ProjecaoValor | undefined) => void
   onLinhaLabelClick?: (linha: LinhaTabela) => void
   onRepassesClick?: (linha: LinhaTabela) => void
@@ -577,10 +598,23 @@ const ProjecaoMatriz = ({
   return (
     <Card>
       <CardBody>
-        <h5 className="card-title mb-3">{titulo}</h5>
-        {resumoEuOutros && (
-          <EuOutrosResumoCard resumo={resumoEuOutros} labelColuna={labelColunaRef} />
-        )}
+        <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+          <h5 className="card-title mb-0">{titulo}</h5>
+          {acoes}
+        </div>
+        {(resumosEuOutros?.length
+          ? resumosEuOutros
+          : resumoEuOutros
+            ? [{ resumo: resumoEuOutros }]
+            : []
+        ).map((item, idx) => (
+          <EuOutrosResumoCard
+            key={`resumo-eu-${item.titulo || idx}`}
+            resumo={item.resumo}
+            labelColuna={labelColunaRef}
+            titulo={item.titulo}
+          />
+        ))}
         {linhas.length === 0 ? (
           <div className="bg-primary text-white border-0 alert alert-primary fade show text-center mb-0">
             Nenhum dado encontrado para o período selecionado.
@@ -717,12 +751,14 @@ const ProjecaoMatrizCruzamento = ({
   colunas,
   cartoes,
   prefix,
+  acoes,
   onCelulaClick,
 }: {
   titulo: string
   colunas: ProjecaoColuna[]
   cartoes: CartaoCruzamento[]
   prefix: string
+  acoes?: React.ReactNode
   onCelulaClick?: (
     cartao: CartaoCruzamento,
     resp: ResponsavelCruzamento,
@@ -743,9 +779,12 @@ const ProjecaoMatrizCruzamento = ({
       <CardBody>
         <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
           <h5 className="card-title mb-0">{titulo}</h5>
-          <span className="text-muted fs-13">
-            Clique no cartão para ver responsáveis e totais Eu vs Outros
-          </span>
+          <div className="d-flex flex-wrap align-items-center gap-2">
+            <span className="text-muted fs-13">
+              Clique no cartão para ver responsáveis e totais Eu vs Outros
+            </span>
+            {acoes}
+          </div>
         </div>
         {cartoes.length === 0 ? (
           <div className="bg-primary text-white border-0 alert alert-primary fade show text-center mb-0">
@@ -1010,8 +1049,21 @@ const ProjecaoMatrizCruzamento = ({
   )
 }
 
-export const ProjecaoFaturasTable = ({ data }: ProjecaoFaturasTableProps) => {
+export const ProjecaoFaturasTable = ({ data, separarTitular = false }: ProjecaoFaturasTableProps) => {
   const navigate = useNavigate()
+
+  const cartoesAgrupados = useMemo(
+    () => agruparCartoesPorNome(data?.por_cartao || []),
+    [data]
+  )
+  const cruzamentoAgrupado = useMemo(
+    () => agruparCruzamentoPorNome(data?.por_cartao_responsavel || []),
+    [data]
+  )
+  const responsaveisPorTitular = useMemo(
+    () => separarResponsaveisPorTitular(data?.por_cartao_responsavel || []),
+    [data]
+  )
 
   if (!data) {
     return (
@@ -1050,18 +1102,28 @@ export const ProjecaoFaturasTable = ({ data }: ProjecaoFaturasTableProps) => {
     navigate(buildRepassesResponsavelPath(responsavelId, mes, ano), { state: meta })
   }
 
-  const linhasCartoes: LinhaTabela[] = (data.por_cartao || []).map((c) => ({
-    id: c.cartao_id,
+  const cartoesVisiveis = separarTitular
+    ? (data.por_cartao || []).map((cartao) => ({
+        ...cartao,
+        qtd_cartoes: 1,
+        cartao_ids: [cartao.cartao_id],
+        agrupado: false,
+      }))
+    : cartoesAgrupados
+
+  const cruzamentoVisivel = separarTitular
+    ? (data.por_cartao_responsavel || []).map((cartao) => ({
+        ...cartao,
+        qtd_cartoes: 1,
+        cartao_ids: [cartao.cartao_id],
+        agrupado: false,
+      }))
+    : cruzamentoAgrupado
+
+  const linhasCartoes: LinhaTabela[] = cartoesVisiveis.map((c) => ({
+    id: c.agrupado ? idGrupoCartao(c.nome) : c.cartao_id,
     label: c.nome,
-    sublabel: [
-      c.qtd_bandeiras != null && c.qtd_bandeiras > 0
-        ? `${c.qtd_bandeiras} ${c.qtd_bandeiras === 1 ? 'bandeira' : 'bandeiras'}`
-        : null,
-      c.bandeira,
-      c.ultimos_digitos ? `•••• ${c.ultimos_digitos}` : null,
-    ]
-      .filter(Boolean)
-      .join(' · '),
+    sublabel: sublabelCartao(c, { separarTitular, qtdCartoes: c.qtd_cartoes }) || undefined,
     cor_fundo: c.cor_fundo,
     cor_texto: c.cor_texto,
     limite_credito: c.limite_credito,
@@ -1070,34 +1132,48 @@ export const ProjecaoFaturasTable = ({ data }: ProjecaoFaturasTableProps) => {
     total: c.total,
   }))
 
-  const linhasResponsaveis: LinhaTabela[] = (data.por_responsavel || []).map((r) => ({
-    id: r.responsavel_id,
+  const usarResponsaveisPorTitular =
+    separarTitular && (data.por_cartao_responsavel || []).length > 0
+
+  const linhasResponsaveis: LinhaTabela[] = (usarResponsaveisPorTitular
+    ? responsaveisPorTitular
+    : (data.por_responsavel || []).map((r) => ({
+        ...r,
+        pessoa_id: null as number | null,
+        pessoa_nome: null as string | null,
+        cartao_ids: [] as number[],
+      }))
+  ).map((r) => ({
+    id: usarResponsaveisPorTitular ? `${chaveTitular(r.pessoa_id, r.pessoa_nome)}-${r.responsavel_id}` : r.responsavel_id,
     label: r.nome,
-    sublabel: r.tipo ? r.tipo.charAt(0).toUpperCase() + r.tipo.slice(1) : undefined,
+    sublabel: [
+      usarResponsaveisPorTitular ? r.pessoa_nome : null,
+      r.tipo ? r.tipo.charAt(0).toUpperCase() + r.tipo.slice(1) : null,
+    ]
+      .filter(Boolean)
+      .join(' · ') || undefined,
     eh_eu: r.eh_eu === true,
     valores: r.valores || [],
     total: r.total,
+    responsavelId: r.responsavel_id,
+    cartaoIds: r.cartao_ids,
+    tipo: r.tipo,
   }))
 
-  const cartoesCruzamento: CartaoCruzamento[] = (data.por_cartao_responsavel || []).map((cartao) => {
-    const cartaoSublabel = [
-      cartao.qtd_bandeiras != null && cartao.qtd_bandeiras > 0
-        ? `${cartao.qtd_bandeiras} ${cartao.qtd_bandeiras === 1 ? 'bandeira' : 'bandeiras'}`
-        : null,
-      cartao.bandeira,
-      cartao.ultimos_digitos ? `•••• ${cartao.ultimos_digitos}` : null,
-    ]
-      .filter(Boolean)
-      .join(' · ')
+  const resumosResponsaveis = usarResponsaveisPorTitular
+    ? resumosEuOutrosPorTitular(responsaveisPorTitular, idxReferencia >= 0 ? idxReferencia : 0)
+    : undefined
+
+  const cartoesCruzamento: CartaoCruzamento[] = cruzamentoVisivel.map((cartao) => {
     const valorReferencia =
       idxReferencia >= 0 ? (cartao.valores || [])[idxReferencia] : undefined
     const resumoEuOutrosRefCartao =
       idxReferencia >= 0 ? (cartao.resumo_eu_outros || [])[idxReferencia] : undefined
 
     return {
-      cartaoId: cartao.cartao_id,
+      cartaoId: cartao.agrupado ? idGrupoCartao(cartao.nome) : cartao.cartao_id,
       cartaoLabel: cartao.nome,
-      cartaoSublabel: cartaoSublabel || undefined,
+      cartaoSublabel: sublabelCartao(cartao, { separarTitular, qtdCartoes: cartao.qtd_cartoes }) || undefined,
       cartaoCorFundo: cartao.cor_fundo,
       cartaoCorTexto: cartao.cor_texto,
       limite_credito: cartao.limite_credito,
@@ -1106,6 +1182,7 @@ export const ProjecaoFaturasTable = ({ data }: ProjecaoFaturasTableProps) => {
       valorReferencia,
       valores: cartao.valores || [],
       total: cartao.total,
+      agrupado: cartao.agrupado,
       responsaveis: (cartao.por_responsavel || []).map((resp) => ({
         responsavelId: resp.responsavel_id,
         responsavelLabel: resp.nome,
@@ -1121,13 +1198,16 @@ export const ProjecaoFaturasTable = ({ data }: ProjecaoFaturasTableProps) => {
 
   const totaisCartoes = (data.totais_por_coluna || []).map((t) => t.cartoes)
   const totaisResponsaveis = (data.totais_por_coluna || []).map((t) => t.responsaveis)
+  const idResponsavelLinha = (linha: LinhaTabela) => linha.responsavelId ?? linha.id
+  const cartaoLinha = (linha: LinhaTabela) =>
+    linha.cartaoIds?.length === 1 ? linha.cartaoIds[0] : null
 
   return (
     <React.Fragment>
       <Row>
         <Col xl={12}>
           <ProjecaoMatriz
-            titulo="Por cartão"
+            titulo={separarTitular ? 'Por cartão · titular' : 'Por cartão'}
             colunas={colunas}
             linhas={linhasCartoes}
             totais={totaisCartoes}
@@ -1140,40 +1220,43 @@ export const ProjecaoFaturasTable = ({ data }: ProjecaoFaturasTableProps) => {
       <Row>
         <Col xl={12}>
           <ProjecaoMatriz
-            titulo="Por responsável"
+            titulo={separarTitular ? 'Por responsável · titular' : 'Por responsável'}
             colunas={colunas}
             linhas={linhasResponsaveis}
             totais={totaisResponsaveis}
             prefix="proj-resp"
             showParticipacao
-            resumoEuOutros={resumoEuOutrosRef}
+            resumoEuOutros={usarResponsaveisPorTitular ? undefined : resumoEuOutrosRef}
+            resumosEuOutros={resumosResponsaveis}
             onLinhaLabelClick={(linha) => {
               if (!colunaReferencia) return
               const valor = colunaReferencia
                 ? linha.valores[idxReferencia >= 0 ? idxReferencia : 0]
                 : undefined
-              goFaturaResponsavel(linha.id, colunaReferencia.mes, colunaReferencia.ano, {
+              goFaturaResponsavel(idResponsavelLinha(linha), colunaReferencia.mes, colunaReferencia.ano, {
                 nome: linha.label,
-                tipo: linha.sublabel?.toLowerCase(),
+                tipo: linha.tipo,
                 realizado: valor?.realizado,
                 projetado: valor?.projetado,
                 total: valor?.total,
+                cartaoId: cartaoLinha(linha),
               })
             }}
             onRepassesClick={(linha) => {
               if (!colunaReferencia) return
-              goRepassesResponsavel(linha.id, colunaReferencia.mes, colunaReferencia.ano, {
+              goRepassesResponsavel(idResponsavelLinha(linha), colunaReferencia.mes, colunaReferencia.ano, {
                 nome: linha.label,
-                tipo: linha.sublabel?.toLowerCase(),
+                tipo: linha.tipo,
               })
             }}
             onCelulaClick={(linha, coluna, valor) => {
-              goFaturaResponsavel(linha.id, coluna.mes, coluna.ano, {
+              goFaturaResponsavel(idResponsavelLinha(linha), coluna.mes, coluna.ano, {
                 nome: linha.label,
-                tipo: linha.sublabel?.toLowerCase(),
+                tipo: linha.tipo,
                 realizado: valor?.realizado,
                 projetado: valor?.projetado,
                 total: valor?.total,
+                cartaoId: cartaoLinha(linha),
               })
             }}
           />
@@ -1182,7 +1265,7 @@ export const ProjecaoFaturasTable = ({ data }: ProjecaoFaturasTableProps) => {
       <Row>
         <Col xl={12}>
           <ProjecaoMatrizCruzamento
-            titulo="Por cartão × responsável"
+            titulo={separarTitular ? 'Por cartão × responsável · titular' : 'Por cartão × responsável'}
             colunas={colunas}
             cartoes={cartoesCruzamento}
             prefix="proj-cruz"
@@ -1193,7 +1276,7 @@ export const ProjecaoFaturasTable = ({ data }: ProjecaoFaturasTableProps) => {
                 realizado: valor?.realizado,
                 projetado: valor?.projetado,
                 total: valor?.total,
-                cartaoId: cartao.cartaoId,
+                cartaoId: cartao.agrupado || typeof cartao.cartaoId !== 'number' ? null : cartao.cartaoId,
               })
             }}
           />

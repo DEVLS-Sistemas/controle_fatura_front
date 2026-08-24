@@ -69,6 +69,8 @@ export interface ProjecaoPorCartao {
   bandeira?: string
   ultimos_digitos?: string
   qtd_bandeiras?: number
+  pessoa_id?: number | null
+  pessoa_nome?: string | null
   limite_credito?: number | null
   cor_fundo?: string | null
   cor_texto?: string | null

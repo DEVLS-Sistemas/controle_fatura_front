@@ -9,7 +9,7 @@ import { required } from 'Components/ComponentController/ValidatorForm/Validator
 import { InputCheckbox } from 'Components/ComponentController/Inputs/Checkbox/InputCheckbox'
 import { SelectListControlled } from 'Components/ComponentController/Selects/Select/SelectListControlled'
 import { SelectOptions } from 'interfaces/SystemInterfaces/SelectInterface'
-import { FATURA_FILE_ACCEPT, isValidFaturaFile, mesesOptions } from 'helpers/fatura_helpers'
+import { FATURA_FILE_ACCEPT, isValidFaturaFile, mesesOptions, nomeResponsavelPadraoNaoEu } from 'helpers/fatura_helpers'
 import { toBandeiraSelectOption } from 'helpers/cartao_helpers'
 import {
     extractFaturaId,
@@ -296,6 +296,10 @@ const FaturasForm = () => {
         }
 
         toast.success('Fatura cadastrada com sucesso')
+        const nomeResp = nomeResponsavelPadraoNaoEu(faturaData)
+        if (nomeResp) {
+            toast.info(`Responsável "${nomeResp}" criado e aplicado nesta fatura.`)
+        }
         if (newId) {
             navigate(`/faturas/view/${newId}`)
         } else {

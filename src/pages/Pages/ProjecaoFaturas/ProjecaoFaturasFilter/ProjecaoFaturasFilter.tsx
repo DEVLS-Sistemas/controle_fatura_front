@@ -15,11 +15,15 @@ import {
 export interface ProjecaoFaturasFilterProps {
   getRemoteProjecaoFaturas: (data: ProjecaoFaturasSearch) => void
   defaultValues?: ProjecaoFaturasSearch
+  separarTitular: boolean
+  onSepararTitularChange: (value: boolean) => void
 }
 
 const ProjecaoFaturasFilter = ({
   getRemoteProjecaoFaturas,
   defaultValues = ProjecaoFaturasDefaultValues,
+  separarTitular,
+  onSepararTitularChange,
 }: ProjecaoFaturasFilterProps) => {
   const { handleSubmit, control, watch } = useForm<ProjecaoFaturasSearch>({
     defaultValues,
@@ -106,6 +110,28 @@ const ProjecaoFaturasFilter = ({
                     <button className="btn btn-success w-100" type="submit">
                       <i className="ri-search-line align-middle me-1"></i> Buscar
                     </button>
+                  </Col>
+                  <Col md={4} sm={12}>
+                    <div className="mb-0">
+                      <Label className="form-label">Cartões</Label>
+                      <div className="btn-group w-100" role="group" aria-label="Visualização dos cartões">
+                        <button
+                          type="button"
+                          className={`btn ${separarTitular ? 'btn-outline-primary' : 'btn-primary'}`}
+                          onClick={() => onSepararTitularChange(false)}
+                        >
+                          Agrupado
+                        </button>
+                        <button
+                          type="button"
+                          className={`btn ${separarTitular ? 'btn-primary' : 'btn-outline-primary'}`}
+                          onClick={() => onSepararTitularChange(true)}
+                        >
+                          <i className="ri-user-line me-1" />
+                          Por titular
+                        </button>
+                      </div>
+                    </div>
                   </Col>
                 </Row>
               </form>

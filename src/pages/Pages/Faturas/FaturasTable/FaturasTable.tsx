@@ -72,6 +72,8 @@ const flattenFaturas = (grupos: FaturasCartaoGroup[]): FaturaRow[] => {
             cartao_cor_fundo: grupo.cor_fundo,
             cartao_cor_texto: grupo.cor_texto,
             pessoa_nome: fatura.pessoa_nome ?? grupo.pessoa_nome ?? null,
+            responsavel_id: fatura.responsavel_id ?? null,
+            responsavel_nome: fatura.responsavel_nome ?? null,
         }))
     )
 }

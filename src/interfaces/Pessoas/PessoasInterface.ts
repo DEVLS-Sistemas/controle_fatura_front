@@ -17,6 +17,7 @@ export interface PessoasList {
     cpf_cnpj?: string | null
     eh_principal?: boolean
     ativo?: boolean
+    responsavel_id?: number | null
 }
 
 export interface PessoasView extends PessoasList {}
@@ -29,6 +30,7 @@ export interface PessoasModel {
     cpf_cnpj?: string | null
     eh_principal?: boolean
     ativo?: boolean
+    responsavel_id?: number | null
 }
 
 /** Item de `GET /pessoas/pessoas-list` (value/label ou modelo completo) */
@@ -42,6 +44,7 @@ export type PessoaListItem = {
     nome_completo?: string | null
     eh_principal?: boolean
     ativo?: boolean
+    responsavel_id?: number | null
 }
 
 export interface LookupsPessoas {}

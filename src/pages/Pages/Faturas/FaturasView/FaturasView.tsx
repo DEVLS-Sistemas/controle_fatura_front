@@ -16,7 +16,7 @@ import {
     origemCompraLabel,
     isTransacaoOperacional,
     FATURA_FILE_ACCEPT, isValidFaturaFile, resolveFaturaAnexo, downloadFaturaAnexo,
-    getCategoriaFieldStyle, VALOR_TEXT_CLASS,
+    getCategoriaFieldStyle, VALOR_TEXT_CLASS, nomeResponsavelPadraoNaoEu,
 } from 'helpers/fatura_helpers'
 import { CartaoChip, BandeiraChip, resolveCartaoCores } from 'helpers/cartao_helpers'
 import { SelectOptions } from 'interfaces/SystemInterfaces/SelectInterface'
@@ -360,12 +360,21 @@ const FaturasViewPage = () => {
         proximaCompetencia: string | null
     }>({ anteriorId: null, proximaId: null, anteriorCompetencia: null, proximaCompetencia: null })
 
-    const isMeuResponsavel = (responsavelId?: number | null) => {
-        if (responsavelId == null) return true
+    const isNomeEu = (nome?: string | null) => (nome ?? '').trim().toLowerCase() === 'eu'
+
+    const isMeuResponsavel = (responsavelId?: number | null, responsavelNome?: string | null) => {
+        const nomeLookup = (responsavelNome
+            ?? (responsavelId != null
+                ? (responsaveisLookup.find((r) => Number(r.id) === Number(responsavelId))?.nome
+                    ?? responsaveisOptions.find((o) => Number(o.value) === Number(responsavelId))?.label)
+                : fatura?.responsavel_nome)
+            ?? '').trim()
+        if (nomeLookup && !isNomeEu(nomeLookup)) return false
+        if (responsavelId == null) {
+            return !nomeResponsavelPadraoNaoEu(fatura)
+        }
         if (defaultResponsavelId != null) return Number(responsavelId) === Number(defaultResponsavelId)
-        const nome = responsaveisLookup.find((r) => Number(r.id) === Number(responsavelId))?.nome
-            ?? responsaveisOptions.find((o) => Number(o.value) === Number(responsavelId))?.label
-        return (nome ?? '').trim().toLowerCase() === 'eu'
+        return isNomeEu(nomeLookup)
     }
 
     const formatPeriodo = (mes?: number, ano?: number) => {
@@ -641,6 +650,7 @@ const FaturasViewPage = () => {
             toast.success('Reprocessamento concluído')
             // Refetch completo para atualizar quitação (inclui competência anterior na listagem ao voltar)
             await loadFatura({ silent: true, openSenhaIfNeeded: false })
+            await loadLookups()
         } catch (error) {
             if (error instanceof PdfSenhaError) {
                 openSenhaModal(error.senha_pdf ?? null)
@@ -686,7 +696,12 @@ const FaturasViewPage = () => {
         }
 
         toast.success('Arquivo enviado com sucesso')
+        const nomeResp = nomeResponsavelPadraoNaoEu(faturaData)
+        if (nomeResp) {
+            toast.info(`Responsável "${nomeResp}" criado e aplicado nesta fatura.`)
+        }
         await loadFatura({ silent: true, openSenhaIfNeeded: false })
+        await loadLookups()
     }
 
     const handleUploadPdf = async () => {
@@ -1356,6 +1371,7 @@ const FaturasViewPage = () => {
                 onSuccess={async () => {
                     senhaModalAutoOpenedRef.current = String(id)
                     await loadFatura({ silent: true, openSenhaIfNeeded: false })
+                    await loadLookups()
                 }}
             />
             <FaturaSelecaoModal
@@ -1472,6 +1488,13 @@ const FaturasViewPage = () => {
                                             <div className="small text-muted mt-1">
                                                 <i className="ri-user-line me-1"></i>
                                                 {fatura.pessoa_nome}
+                                            </div>
+                                        )}
+                                        {fatura.responsavel_nome && (
+                                            <div className="mt-1">
+                                                <span className="badge bg-primary-subtle text-primary">
+                                                    Responsável padrão: {fatura.responsavel_nome}
+                                                </span>
                                             </div>
                                         )}
                                     </div>
@@ -1768,6 +1791,7 @@ const FaturasViewPage = () => {
                                                 fatura_id: Number(id),
                                                 cartao_id: fatura.cartao_id,
                                                 tipo: 'purchase',
+                                                responsavel_id: fatura.responsavel_id ?? null,
                                                 // Data no ciclo desta fatura → 1ª parcela cai aqui
                                                 // (backend usa a data da compra, não o fatura_id, para ancorar o parcelamento)
                                                 data: fatura.mes && fatura.ano
@@ -1887,11 +1911,12 @@ const FaturasViewPage = () => {
                                                         const subOptions = tx.categoria_id
                                                             ? (subcategoriasByCategoria[tx.categoria_id] ?? [])
                                                             : []
-                                                        const showResponsavelNome = !isMeuResponsavel(tx.responsavel_id)
+                                                        const showResponsavelNome = !isMeuResponsavel(tx.responsavel_id, tx.responsavel_nome)
                                                         const responsavelNome =
                                                             tx.responsavel_nome
                                                             ?? responsaveisLookup.find((r) => Number(r.id) === Number(tx.responsavel_id))?.nome
                                                             ?? responsaveisOptions.find((o) => Number(o.value) === Number(tx.responsavel_id))?.label
+                                                            ?? nomeResponsavelPadraoNaoEu(fatura)
                                                         const finalSalvo = tx.id != null && finalSelecionados[tx.id] !== undefined
                                                             ? finalSelecionados[tx.id]
                                                             : (tx.cartao_numero_id ?? tx.cartao_numero?.id ?? null)

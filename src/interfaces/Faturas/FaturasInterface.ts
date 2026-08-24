@@ -67,6 +67,8 @@ export interface FaturaResumo {
     transacoes_com_categoria?: number
     pessoa_id?: number | null
     pessoa_nome?: string | null
+    responsavel_id?: number | null
+    responsavel_nome?: string | null
     created_at?: string
     updated_at?: string
 }
@@ -129,6 +131,8 @@ export interface FaturasView extends FaturaResumo {
     fatura_proxima_competencia?: string | null
     pessoa_id?: number | null
     pessoa_nome?: string | null
+    responsavel_id?: number | null
+    responsavel_nome?: string | null
     grupos_por_cartao?: FaturaGrupoPorCartao[]
 }
 

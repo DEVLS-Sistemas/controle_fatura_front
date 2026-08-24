@@ -25,6 +25,7 @@ const ProjecaoFaturasPage = () => {
   const [loading, setLoading] = useState<boolean>(true)
   const projecaoContext = useContext(ProjecaoFaturasFilterContext)
   const [projecaoData, setProjecaoData] = useState<ProjecaoFaturasView>()
+  const [separarTitular, setSepararTitular] = useState(false)
   const projecaoFaturasService = new ProjecaoFaturasService()
 
   const now = new Date()
@@ -74,9 +75,11 @@ const ProjecaoFaturasPage = () => {
                 mes: ProjecaoFaturasFilterContextValue.mes,
                 ano: ProjecaoFaturasFilterContextValue.ano,
               }}
+              separarTitular={separarTitular}
+              onSepararTitularChange={setSepararTitular}
             />
             {display && !loading ? (
-              <ProjecaoFaturasTable data={projecaoData} />
+              <ProjecaoFaturasTable data={projecaoData} separarTitular={separarTitular} />
             ) : (
               <div className="text-center py-5">
                 <Spinner color="primary" />

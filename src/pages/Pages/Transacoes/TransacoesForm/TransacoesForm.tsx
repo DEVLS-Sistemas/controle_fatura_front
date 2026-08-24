@@ -319,7 +319,9 @@ const TransacoesForm = () => {
             if (lookups?.default_responsavel_id != null) {
                 setDefaultResponsavelId(lookups.default_responsavel_id)
             }
-            if (!isEdit && lookups?.default_responsavel_id && !record.responsavel_id) {
+            if (!isEdit && record.responsavel_id) {
+                setValue('responsavel_id', record.responsavel_id)
+            } else if (!isEdit && lookups?.default_responsavel_id && !record.responsavel_id) {
                 setValue('responsavel_id', lookups.default_responsavel_id)
             }
 
