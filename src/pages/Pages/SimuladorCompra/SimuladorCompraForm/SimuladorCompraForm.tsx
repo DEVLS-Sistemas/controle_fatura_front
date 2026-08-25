@@ -57,15 +57,6 @@ const SimuladorCompraForm = ({
   return (
     <Card className={compact ? 'mb-3' : 'mb-0 shadow-sm'}>
       <CardBody className={compact ? 'py-3' : 'p-4'}>
-        {!compact && (
-          <div className="mb-4">
-            <h5 className="mb-1">Simular compra</h5>
-            <p className="text-muted mb-0">
-              Veja como fica a fatura <strong>antes</strong> de lançar a compra.
-            </p>
-          </div>
-        )}
-
         <Row className="g-3 align-items-end">
           {showTitular && (
             <Col lg={compact ? 2 : 12} md={6}>
@@ -137,17 +128,17 @@ const SimuladorCompraForm = ({
               {simulando ? (
                 <>
                   <span className="spinner-border spinner-border-sm me-1" role="status" />
-                  Simulando…
+                  Analisando…
                 </>
               ) : compact ? (
                 <>
                   <i className="ri-refresh-line me-1"></i>
-                  Simular de novo
+                  Posso comprar?
                 </>
               ) : (
                 <>
-                  <i className="ri-calculator-line me-1"></i>
-                  Simular
+                  <i className="ri-shopping-bag-3-line me-1"></i>
+                  Posso comprar?
                 </>
               )}
             </button>

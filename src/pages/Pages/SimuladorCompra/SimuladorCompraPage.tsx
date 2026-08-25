@@ -1,12 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { Breadcrumb, BreadcrumbItem, Col, Container, Row, Spinner } from 'reactstrap'
+import { Breadcrumb, BreadcrumbItem, Col, Container, Row } from 'reactstrap'
 import { useForm } from 'react-hook-form'
 import { toast } from 'react-toastify'
 import UiContent from 'Components/Common/UiContent'
 import { setActiveMenu } from 'helpers/system_helpers'
 import { isMeuResponsavelDisplay, splitValorEmParcelas, toCentavos } from 'helpers/fatura_helpers'
 import { buildResponsavelVisualizarPath } from 'helpers/responsavel_visualizar_helpers'
+import { calcularVereditoCompra } from 'helpers/posso_comprar_helpers'
 import {
   aplicarOverlaySimulacao,
   breakdownResponsavelPorCartao,
@@ -37,6 +38,9 @@ import ResponsavelModal from 'pages/Pages/Transacoes/ResponsavelModal/Responsave
 import SimuladorCompraForm from './SimuladorCompraForm/SimuladorCompraForm'
 import SimuladorCompraImpacto from './SimuladorCompraImpacto/SimuladorCompraImpacto'
 import SimuladorCompraDetalhes from './SimuladorCompraDetalhes/SimuladorCompraDetalhes'
+import SimuladorCompraVeredito, {
+  SimuladorCompraVereditoSkeleton,
+} from './SimuladorCompraVeredito/SimuladorCompraVeredito'
 
 type CartaoForm = {
   id: number
@@ -275,6 +279,28 @@ const SimuladorCompraPage = () => {
     })
   }, [resultadoVisivel, projecaoBase, projecaoOverlay, cartaoId, responsavelId, overlayInput])
 
+  const veredito = useMemo(() => {
+    if (!resultadoVisivel || !projecaoBase || !projecaoOverlay || !cartaoId) return null
+    return calcularVereditoCompra({
+      base: projecaoBase,
+      overlay: projecaoOverlay,
+      cartaoId: Number(cartaoId),
+      cartaoNome: cartaoSel?.nome || '',
+      nParcelas,
+      valorCompra: valorCentavos / 100,
+      overlayInput,
+    })
+  }, [
+    resultadoVisivel,
+    projecaoBase,
+    projecaoOverlay,
+    cartaoId,
+    cartaoSel?.nome,
+    nParcelas,
+    valorCentavos,
+    overlayInput,
+  ])
+
   const idxBreakdown =
     overlayInput.primeira?.indice_coluna ?? projecaoBase?.colunas.findIndex((c) => c.referencia) ?? 0
   const breakdown = useMemo(() => {
@@ -472,7 +498,7 @@ const SimuladorCompraPage = () => {
 
   const handleSimular = async () => {
     if (!podeSimular) {
-      toast.warning('Preencha cartão, responsável, valor e parcelas para simular.')
+      toast.warning('Preencha cartão, responsável, valor e parcelas para ver se a compra cabe.')
       return
     }
     const diaLimite = cartaoSel?.dia_limite_fatura ?? null
@@ -582,7 +608,7 @@ const SimuladorCompraPage = () => {
       pessoasOptions={pessoasOptions}
       cartoesOptions={cartoesOptions}
       semCartoes={!loadingLookups && !loadingCartoesTitular && cartoesFiltrados.length === 0}
-      compact={resultadoVisivel}
+      compact={resultadoVisivel || simulando}
       responsavelNome={responsavelSel?.nome || ''}
       isMeuResponsavel={ehEu}
       dataAberta={dataAberta}
@@ -608,8 +634,11 @@ const SimuladorCompraPage = () => {
                     <i className="bx bx-arrow-back bx-sm"></i>
                   </Link>
                   <div>
-                    <h4 className="mb-0">Simulador</h4>
-                    <p className="text-muted mb-0 fs-13">Antes de registrar a compra</p>
+                    <h4 className="mb-0">Posso comprar?</h4>
+                    <p className="text-muted mb-0 fs-13">
+                      Informe o valor e as parcelas. O sistema olha as próximas faturas e diz se a
+                      compra cabe.
+                    </p>
                   </div>
                 </div>
                 <Breadcrumb pageTitle="" listClassName="mb-sm-0 pt-1 py-2">
@@ -618,7 +647,7 @@ const SimuladorCompraPage = () => {
                       <i className="ri-home-5-fill"></i>
                     </Link>
                   </BreadcrumbItem>
-                  <BreadcrumbItem active>Simulador</BreadcrumbItem>
+                  <BreadcrumbItem active>Posso comprar?</BreadcrumbItem>
                 </Breadcrumb>
               </div>
             </Col>
@@ -640,24 +669,25 @@ const SimuladorCompraPage = () => {
                 </div>
               </Col>
             </Row>
-          ) : resultadoVisivel ? (
+          ) : resultadoVisivel || simulando ? (
             <>
               {formEl}
-              {simulando ? (
-                <div className="text-center py-5">
-                  <Spinner color="primary" />
-                </div>
-              ) : (
-                <>
-                  <Row className="justify-content-center">
-                    <Col lg={7} xl={6}>
+              <Row className="justify-content-center">
+                <Col lg={7} xl={6}>
+                  {simulando ? (
+                    <SimuladorCompraVereditoSkeleton />
+                  ) : veredito ? (
+                    <SimuladorCompraVeredito
+                      veredito={veredito}
+                      valorParcela={valorParcela}
+                      competenciaLabel={competenciaLabel}
+                    />
+                  ) : null}
+                  {!simulando && resultadoVisivel && (
+                    <>
                       <SimuladorCompraImpacto
                         impacto={impacto}
-                        cartaoNome={cartaoSel?.nome || ''}
-                        nParcelas={nParcelas}
-                        valorCompra={valorCentavos / 100}
                         valorParcela={valorParcela}
-                        competenciaLabel={competenciaLabel}
                         competenciaCurta={competenciaCurta}
                         responsavelNome={responsavelSel?.nome || ''}
                         ehEu={ehEu}
@@ -671,35 +701,36 @@ const SimuladorCompraPage = () => {
                           Nova simulação
                         </button>
                       </div>
-                    </Col>
-                  </Row>
-
-                  <SimuladorCompraDetalhes
-                    aberto={detalhesAbertos}
-                    onToggle={() => setDetalhesAbertos((v) => !v)}
-                    impacto={impacto}
-                    cartaoNome={cartaoSel?.nome || ''}
-                    competenciaLabel={competenciaLabel}
-                    valorParcela={valorParcela}
-                    alertaLimite={Number(impacto?.fatura_cartao.percentual_em_uso_depois) > 80}
-                    parcelasFora={overlayInput.parcelas_fora_da_janela}
-                    labelFimJanela={
-                      projecaoBase?.colunas?.[projecaoBase.colunas.length - 1]?.label || 'o fim da janela'
-                    }
-                    parcelas={overlayInput.parcelas}
-                    onSelectParcela={scrollToColuna}
-                    verTodos={verTodos}
-                    onVerTodos={setVerTodos}
-                    overlay={projecaoOverlay}
-                    cartaoId={cartaoId}
-                    responsavelId={responsavelId}
-                    ehEu={ehEu}
-                    responsavelNome={responsavelSel?.nome || ''}
-                    breakdown={breakdown}
-                    faturaPath={faturaPath}
-                    visualizarPath={visualizarPath}
-                  />
-                </>
+                    </>
+                  )}
+                </Col>
+              </Row>
+              {!simulando && resultadoVisivel && (
+                <SimuladorCompraDetalhes
+                  aberto={detalhesAbertos}
+                  onToggle={() => setDetalhesAbertos((v) => !v)}
+                  impacto={impacto}
+                  cartaoNome={cartaoSel?.nome || ''}
+                  competenciaLabel={competenciaLabel}
+                  valorParcela={valorParcela}
+                  alertaLimite={Number(impacto?.fatura_cartao.percentual_em_uso_depois) > 80}
+                  parcelasFora={overlayInput.parcelas_fora_da_janela}
+                  labelFimJanela={
+                    projecaoBase?.colunas?.[projecaoBase.colunas.length - 1]?.label || 'o fim da janela'
+                  }
+                  parcelas={overlayInput.parcelas}
+                  onSelectParcela={scrollToColuna}
+                  verTodos={verTodos}
+                  onVerTodos={setVerTodos}
+                  overlay={projecaoOverlay}
+                  cartaoId={cartaoId}
+                  responsavelId={responsavelId}
+                  ehEu={ehEu}
+                  responsavelNome={responsavelSel?.nome || ''}
+                  breakdown={breakdown}
+                  faturaPath={faturaPath}
+                  visualizarPath={visualizarPath}
+                />
               )}
             </>
           ) : (
@@ -707,8 +738,8 @@ const SimuladorCompraPage = () => {
               <Col lg={7} xl={6}>
                 {formEl}
                 <p className="text-muted text-center fs-13 mt-4 mb-0">
-                  Escolha o cartão, o responsável, o valor e as parcelas para ver o impacto nas
-                  próximas faturas.
+                  Escolha o cartão, o responsável, o valor e as parcelas para ver se a compra
+                  cabe.
                 </p>
               </Col>
             </Row>

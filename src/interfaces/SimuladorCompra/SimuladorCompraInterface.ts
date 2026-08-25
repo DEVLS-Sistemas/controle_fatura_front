@@ -56,6 +56,52 @@ export interface SimuladorOverlayResult {
   totais_batem: boolean
 }
 
+export type SimuladorVereditoNivel = 'baixo' | 'moderado' | 'alto'
+export type SimuladorVereditoScore = 0 | 1 | 2
+export type SimuladorVereditoMotivoId = 'limite' | 'peso' | 'duracao' | 'parcela'
+
+export interface SimuladorVereditoMotivo {
+  id: SimuladorVereditoMotivoId
+  label: string
+}
+
+export interface SimuladorVereditoMes {
+  indice: number
+  chave: string
+  label: string
+  labelCurto: string
+  mes: number
+  ano: number
+  antes: number
+  depois: number
+  parcela: number
+  limite: number | null
+  usoDepois: number | null
+  peso: number | null
+  score: SimuladorVereditoScore
+  ehCritico: boolean
+}
+
+export interface SimuladorVeredito {
+  nivel: SimuladorVereditoNivel
+  titulo: string
+  eyebrow: string
+  frase: string
+  contexto: string
+  motivos: SimuladorVereditoMotivo[]
+  meses: SimuladorVereditoMes[]
+  mesCritico: SimuladorVereditoMes | null
+  nParcelas: number
+  valorParcela: number
+  valorCompra: number
+  cartaoNome: string
+  semLimite: boolean
+  janelaTruncada: boolean
+  bumpDuracao: boolean
+  kPesados: number
+  semProjecao: boolean
+}
+
 export type SimuladorTitular = PessoaListItem
 export type SimuladorCartao = ProjecaoPorCartao
 export type SimuladorResponsavel = ResponsavelLookup

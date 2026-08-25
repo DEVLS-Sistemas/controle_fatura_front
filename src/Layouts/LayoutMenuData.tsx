@@ -69,8 +69,8 @@ const Navdata = () => {
         },
         {
             id: "simulador",
-            label: "Simulador",
-            icon: "ri-calculator-line",
+            label: "Posso comprar?",
+            icon: "ri-shopping-bag-3-line",
             link: "/simulador",
             click: function (e: any) {
                 e.preventDefault();

@@ -113,7 +113,7 @@ const ProjecaoFaturasFilter = ({
                   </Col>
                   <Col md={2} sm={6}>
                     <Link to="/simulador" className="btn btn-outline-primary w-100">
-                      <i className="ri-calculator-line align-middle me-1"></i> Simular
+                      <i className="ri-shopping-bag-3-line align-middle me-1"></i> Posso comprar?
                     </Link>
                   </Col>
                   <Col md={4} sm={12}>

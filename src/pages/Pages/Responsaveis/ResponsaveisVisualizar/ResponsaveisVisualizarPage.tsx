@@ -297,8 +297,8 @@ const ResponsaveisVisualizarPage = () => {
                                 to={`/simulador?responsavel_id=${id}${data?.pessoa?.id ? `&pessoa_id=${data.pessoa.id}` : ''}`}
                                 className="btn btn-soft-primary"
                             >
-                                <i className="ri-calculator-line align-middle me-1"></i>
-                                Simular compra
+                                <i className="ri-shopping-bag-3-line align-middle me-1"></i>
+                                Posso comprar?
                             </Link>
                             <Link to={`/responsaveis/edit/${id}`} className="btn btn-soft-info">
                                 <i className="ri-pencil-line align-middle me-1"></i>
