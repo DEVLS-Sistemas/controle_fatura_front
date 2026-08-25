@@ -67,6 +67,10 @@ const DashboardsHome = () => {
                     <i className="ri-list-ordered align-middle me-1"></i>
                     Parceladas
                   </Link>
+                  <Link to="/assinaturas" className="btn btn-soft-warning mb-1">
+                    <i className="ri-refresh-line align-middle me-1"></i>
+                    Assinaturas
+                  </Link>
                   <div>
                     <Label className="form-label mb-1">Ano</Label>
                     <input

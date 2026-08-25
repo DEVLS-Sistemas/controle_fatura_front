@@ -155,6 +155,10 @@ const TransacoesFilter = ({
             <Row>
                 <Col xs={12}>
                     <div className="d-flex flex-row justify-content-end align-items-center mb-4 gap-2 flex-wrap">
+                        <Link to="/assinaturas" className="btn btn-outline-warning">
+                            <i className="ri-refresh-line align-middle me-1"></i>
+                            Ver assinaturas
+                        </Link>
                         <Button
                             type="button"
                             color="info"

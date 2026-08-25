@@ -67,6 +67,15 @@ const rankingFallbackPath = (mes?: string | null, ano?: string | null): string =
   return qs ? `/parceladas?${qs}` : '/parceladas'
 }
 
+type CompraVisualizacaoLocationState = {
+  from?: string
+  fromRanking?: boolean
+  fromAssinaturas?: boolean
+} | null
+
+const veioDeAssinaturas = (state: CompraVisualizacaoLocationState): boolean =>
+  Boolean(state?.fromAssinaturas || state?.from?.startsWith('/assinaturas'))
+
 const CompraVisualizacaoPage = () => {
   const { identificador } = useParams()
   const [searchParams] = useSearchParams()
@@ -80,14 +89,20 @@ const CompraVisualizacaoPage = () => {
   const mesParam = searchParams.get('mes')
   const anoParam = searchParams.get('ano')
 
+  const locationState = location.state as CompraVisualizacaoLocationState
+  const fromAssinaturas = veioDeAssinaturas(locationState)
+
   const handleVoltar = () => {
-    const state = location.state as { from?: string; fromRanking?: boolean } | null
     if (location.key !== 'default') {
       navigate(-1)
       return
     }
-    if (state?.from) {
-      navigate(state.from)
+    if (locationState?.from) {
+      navigate(locationState.from)
+      return
+    }
+    if (fromAssinaturas) {
+      navigate('/assinaturas')
       return
     }
     navigate(rankingFallbackPath(mesParam, anoParam))
@@ -118,8 +133,8 @@ const CompraVisualizacaoPage = () => {
   }
 
   useEffect(() => {
-    setActiveMenu('/parceladas')
-  }, [])
+    setActiveMenu(fromAssinaturas ? '/assinaturas' : '/parceladas')
+  }, [fromAssinaturas])
 
   useEffect(() => {
     if (identificador) {
@@ -180,7 +195,11 @@ const CompraVisualizacaoPage = () => {
                     </Link>
                   </BreadcrumbItem>
                   <BreadcrumbItem>
-                    <Link to="/parceladas">Parceladas</Link>
+                    {fromAssinaturas ? (
+                      <Link to="/assinaturas">Assinaturas</Link>
+                    ) : (
+                      <Link to="/parceladas">Parceladas</Link>
+                    )}
                   </BreadcrumbItem>
                   <BreadcrumbItem active>Compra</BreadcrumbItem>
                 </Breadcrumb>

@@ -54,6 +54,8 @@ import RelatoriosPage from "pages/Pages/Relatorios/RelatoriosPage";
 import ProjecaoFaturasPage from "pages/Pages/ProjecaoFaturas/ProjecaoFaturasPage";
 import SimuladorCompraPage from "pages/Pages/SimuladorCompra/SimuladorCompraPage";
 import RankingParceladasPage from "pages/Pages/RankingParceladas/RankingParceladasPage";
+import AssinaturasPage from "pages/Pages/Assinaturas/AssinaturasPage";
+import AssinaturasDetalhePage from "pages/Pages/Assinaturas/AssinaturasDetalhe/AssinaturasDetalhePage";
 import CompraVisualizacaoPage from "pages/Pages/CompraVisualizacao/CompraVisualizacaoPage";
 import FaturaResponsavelView from "pages/Pages/ProjecaoFaturas/FaturaResponsavelView/FaturaResponsavelView";
 import RepassesResponsavelView from "pages/Pages/ProjecaoFaturas/RepassesResponsavelView/RepassesResponsavelView";
@@ -113,6 +115,8 @@ const authProtectedRoutes = [
 
   { path: "/relatorios", component: <RelatoriosPage /> },
   { path: "/parceladas", component: <RankingParceladasPage /> },
+  { path: "/assinaturas/:identificador", component: <AssinaturasDetalhePage /> },
+  { path: "/assinaturas", component: <AssinaturasPage /> },
   { path: "/compras/:identificador", component: <CompraVisualizacaoPage /> },
   { path: "/projecao-faturas/responsaveis/:responsavelId/fatura", component: <FaturaResponsavelView /> },
   { path: "/projecao-faturas/responsaveis/:responsavelId/repasses", component: <RepassesResponsavelView /> },

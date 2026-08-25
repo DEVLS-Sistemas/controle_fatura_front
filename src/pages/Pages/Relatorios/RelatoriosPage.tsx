@@ -84,6 +84,19 @@ const RelatoriosPage = () => {
                         <Col md={4}>
                             <Card className="card-animate">
                                 <CardBody>
+                                    <h5 className="card-title">Assinaturas</h5>
+                                    <p className="text-muted mb-3">
+                                        Detector de cobranças recorrentes (Netflix, Spotify, sistemas) e gasto anual estimado.
+                                    </p>
+                                    <Link to="/assinaturas" className="btn btn-soft-primary btn-sm">
+                                        Abrir assinaturas
+                                    </Link>
+                                </CardBody>
+                            </Card>
+                        </Col>
+                        <Col md={4}>
+                            <Card className="card-animate">
+                                <CardBody>
                                     <h5 className="card-title">Geral</h5>
                                     <p className="text-muted mb-0">
                                         Relatório geral de gastos. Em breve.

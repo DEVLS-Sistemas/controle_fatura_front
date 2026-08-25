@@ -79,6 +79,17 @@ const Navdata = () => {
             },
         },
         {
+            id: "assinaturas",
+            label: "Assinaturas",
+            icon: "ri-refresh-line",
+            link: "/assinaturas",
+            click: function (e: any) {
+                e.preventDefault();
+                setIscurrentState("Assinaturas");
+                updateIconSidebar(e);
+            },
+        },
+        {
             id: "cartoes",
             label: "Cartões",
             icon: "ri-bank-card-line",

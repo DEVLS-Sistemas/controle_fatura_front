@@ -76,7 +76,7 @@ const TransacoesPage = () => {
         responsavel_id: parseQueryNumber(searchParams.get('responsavel_id')),
         fatura_id: parseQueryNumber(searchParams.get('fatura_id')),
         tipo: searchParams.get('tipo'),
-        origem_compra: null,
+        origem_compra: searchParams.get('origem_compra'),
         mes: parseQueryNumber(searchParams.get('mes')),
         ano: parseQueryNumber(searchParams.get('ano')),
         palavra_chave: null,
@@ -86,6 +86,7 @@ const TransacoesPage = () => {
             searchParams.get('responsavel_id')
             || searchParams.get('tipo')
             || searchParams.get('categoria_id')
+            || searchParams.get('origem_compra')
         ),
     }).current
 

@@ -14,7 +14,7 @@
 | parcela_atual | int nullable | 1..N |
 | valor_parcela | decimal nullable | em geral = `valor` |
 | compra_grupo_id | uuid nullable | liga as N parcelas da mesma compra; null se à vista |
-| tipo | enum | purchase, payment, refund, advance, fee (tipo contábil; `fee` = encargos: juros/multa/IOF) |
+| tipo | enum | purchase, payment, refund, advance, fee, **carryover** (`fee` = encargos; `carryover` = saldo restante da fatura anterior — operação, não compra) |
 | origem_compra | enum nullable | COMPRAS_ONLINE, COMPRAS_PRESENCIAL, PAGAMENTO_SERVICOS, PAGAMENTO_FATURA — origem/canal da compra; **obrigatório no create** |
 | categoria_id | FK nullable | categoria **da compra** |
 | subcategoria_id | FK nullable | exige categoria + vínculo N:N |
@@ -28,6 +28,7 @@ CRUD padrão + `transacoes-list` + export + estabelecimentos do filtro:
 ```http
 GET /api/v1/transacoes/exportar
 GET /api/v1/transacoes/estabelecimentos-do-filtro
+GET /api/v1/transacoes/visualizar/{identificador}
 DELETE /api/v1/transacoes/excluir/{id}?excluir_grupo=1
 ```
 
@@ -52,7 +53,22 @@ Query extra: `apenas_sem_loja=true` — só estabelecimentos sem loja.
 
 Usado no botão **Vincular com loja** da listagem de compras. Ver [`frontend-prompt-loja-estabelecimento.md`](../frontend-prompt-loja-estabelecimento.md).
 
-Lookups: `tipos`, `origens_compra`, `categorias`, `subcategorias`, `responsaveis`, `default_responsavel_id`, `cartoes`, `faturas`.
+### Visualização da compra
+
+```http
+GET /api/v1/transacoes/visualizar/{identificador}?mes=8&ano=2026
+```
+
+`identificador` = `compra_grupo_id` (UUID, ranking) **ou** `id` da transação. Se a transação pertence a um grupo, devolve o **grupo inteiro**.
+
+- `mes` / `ano`: competência de referência (default: atual) — mesmo critério do ranking (pago = fatura ≤ referência)
+- Concentra metadados da compra: data, cartão/bandeira/final, categoria/sub, estabelecimento/loja, responsável, origem
+- `parcelas[]` com `status_parcela` (`paga` | `atual` | `aberta`), fatura e repasse
+- À vista: `avista: true`, `compra_grupo_id: null`, 1 item em `parcelas`
+
+Prompt: [`frontend-prompt-visualizacao-compra.md`](../frontend-prompt-visualizacao-compra.md)
+
+Lookups: `tipos`, `origens_compra`, `categorias`, `subcategorias`, `responsaveis`, `default_responsavel_id`, `cartoes` (cada item traz `pessoa_id`, `pessoa_nome`, `pessoa_eh_principal`), `faturas`.
 
 Estabelecimentos **não** vêm no lookups — usar busca async:
 
@@ -106,7 +122,7 @@ GET /api/v1/estabelecimentos/estabelecimentos-list?palavra_chave=atacad
 - `origem_compra` **obrigatório** no create. Valores:
   - `COMPRAS_ONLINE` — compra em e-commerce / internet
   - `COMPRAS_PRESENCIAL` — compra no estabelecimento físico
-  - `PAGAMENTO_SERVICOS` — assinatura / cartão cadastrado com desconto automático
+  - `PAGAMENTO_SERVICOS` — assinatura / cartão cadastrado com desconto automático (o detector de assinaturas confirma em lote nesta origem — [`assinaturas.md`](assinaturas.md))
   - `PAGAMENTO_FATURA` — pagamento de fatura
 - Em compras parceladas, a mesma `origem_compra` é gravada em todas as parcelas.
 
