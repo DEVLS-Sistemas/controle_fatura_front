@@ -1,3 +1,4 @@
+import { ParserHomologado } from 'interfaces/Cartoes/CartoesInterface'
 import { FaturaSelecaoBandeiraOption } from 'libs/api/exceptions/FaturaSelecaoError'
 
 /** Cartão sugerido / disponível no modal `precisa_confirmar_metadados` */
@@ -6,6 +7,15 @@ export type FaturaMetadadosCartaoOption = {
     label: string
     banco?: string | null
     sugerido?: boolean
+    importacao_pdf_homologada?: boolean
+    parser_homologado?: ParserHomologado | null
+}
+
+export type FaturaMetadadosConferencia = {
+    valor_cabecalho?: number | string | null
+    soma_transacoes?: number | string | null
+    bate?: boolean
+    diferenca?: number | string | null
 }
 
 export type FaturaMetadadosConfianca =
@@ -27,6 +37,10 @@ export type FaturaMetadadosSugestao = {
     cartao_bandeira_id?: number | null
     valor_fatura?: number | string | null
     confianca?: FaturaMetadadosConfianca | null
+    importacao_pdf_homologada?: boolean
+    parser_homologado?: ParserHomologado | null
+    aviso_parser?: string | null
+    conferencia?: FaturaMetadadosConferencia | null
 }
 
 /** Campos reenviados no retry após confirmar metadados */

@@ -5,6 +5,8 @@ import { setActiveMenu } from 'helpers/system_helpers'
 import { useNavegacao } from 'helpers/functions_helpers'
 import { CartaoChip, BandeiraChip, resolveCartaoCores } from 'helpers/cartao_helpers'
 import { formatCurrency, VALOR_TEXT_CLASS } from 'helpers/fatura_helpers'
+import { resolveCartaoHomologacao } from 'helpers/parser_homologado_helpers'
+import CartaoPdfHomologacaoBadge from 'Components/Cartoes/CartaoPdfHomologacaoBadge'
 import { Breadcrumb, BreadcrumbItem, Card, CardBody, Col, Container, Label, Row } from 'reactstrap'
 import { CartoesView, TIPOS_NUMERO_PADRAO } from 'interfaces/Cartoes/CartoesInterface'
 import { CartoesService } from 'services/Cartoes/CartoesService'
@@ -55,6 +57,7 @@ const CartoesViewPage = () => {
         ?? record.bandeiras?.reduce((acc, b) => acc + (b.numeros?.length ?? 0), 0)
         ?? 0
     const cores = resolveCartaoCores(record)
+    const homologacao = resolveCartaoHomologacao(record)
 
     return (
         <React.Fragment>
@@ -83,11 +86,17 @@ const CartoesViewPage = () => {
                                         <Col md={6} className="mb-3">
                                             <Label className="form-label fw-semibold">Nome</Label>
                                             <p className="mb-0">
-                                                <CartaoChip
-                                                    cor_fundo={cores.cor_fundo}
-                                                    cor_texto={cores.cor_texto}
-                                                    label={record.nome || 'Cartão'}
-                                                />
+                                                <span className="d-inline-flex flex-wrap align-items-center gap-2">
+                                                    <CartaoChip
+                                                        cor_fundo={cores.cor_fundo}
+                                                        cor_texto={cores.cor_texto}
+                                                        label={record.nome || 'Cartão'}
+                                                    />
+                                                    <CartaoPdfHomologacaoBadge
+                                                        homologacao={homologacao}
+                                                        targetId={`cartao-view-pdf-homolog-${record.id ?? 'x'}`}
+                                                    />
+                                                </span>
                                             </p>
                                         </Col>
                                         <Col md={6} className="mb-3">
@@ -136,6 +145,28 @@ const CartoesViewPage = () => {
                                                     {cores.cor_fundo} / {cores.cor_texto}
                                                 </span>
                                             </p>
+                                        </Col>
+                                        <Col md={6} className="mb-3">
+                                            <Label className="form-label fw-semibold">Importação de fatura</Label>
+                                            <p className="mb-0">
+                                                <CartaoPdfHomologacaoBadge
+                                                    homologacao={homologacao}
+                                                    targetId={`cartao-view-pdf-homolog-info-${record.id ?? 'x'}`}
+                                                />
+                                            </p>
+                                            {homologacao.homologada ? (
+                                                <small className="text-muted d-block mt-1">
+                                                    Leitura de PDF/CSV testada
+                                                    {homologacao.parser?.label ? ` para ${homologacao.parser.label}` : ''}.
+                                                    {homologacao.parser?.nota ? ` ${homologacao.parser.nota}.` : ''}
+                                                </small>
+                                            ) : (
+                                                <small className="text-muted d-block mt-1">
+                                                    Você pode usar este cartão normalmente. A leitura automática de PDF
+                                                    ainda não foi testada — ao anexar uma fatura, os valores podem não
+                                                    ser os corretos.
+                                                </small>
+                                            )}
                                         </Col>
                                         <Col md={6} className="mb-3">
                                             <Label className="form-label fw-semibold">Ativo</Label>

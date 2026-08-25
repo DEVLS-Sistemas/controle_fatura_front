@@ -17,6 +17,13 @@ import {
 import { SelectList } from 'Components/ComponentController/Selects/Select/SelectList'
 import { AnosSelect } from 'helpers/functions_helpers'
 import { formatCurrency, mesesOptions } from 'helpers/fatura_helpers'
+import {
+    avisoParserOuPadrao,
+    isParserChaveHomologada,
+    parsersHomologadosOrFallback,
+    resolveCartaoHomologacao,
+} from 'helpers/parser_homologado_helpers'
+import { ParserHomologado, PARSERS_HOMOLOGADOS_PADRAO } from 'interfaces/Cartoes/CartoesInterface'
 import { SelectOptions } from 'interfaces/SystemInterfaces/SelectInterface'
 import { buildBandeiraSelectOptions, toBandeiraSelectOption } from 'helpers/cartao_helpers'
 import {
@@ -105,6 +112,8 @@ const FaturaMetadadosModal = ({
     const [bandeirasLoading, setBandeirasLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [bandeiraError, setBandeiraError] = useState<string | null>(null)
+    const [parsersHomologados, setParsersHomologados] = useState<ParserHomologado[]>(PARSERS_HOMOLOGADOS_PADRAO)
+    const [aceiteValores, setAceiteValores] = useState(false)
     const initialCartaoRef = useRef<string | number | null>(null)
 
     const cartaoOptions: SelectOptions[] = useMemo(
@@ -239,6 +248,7 @@ const FaturaMetadadosModal = ({
                     cor_secundaria: opt.cor_secundaria,
                 }))
                 setBandeirasLookup(list)
+                setParsersHomologados(parsersHomologadosOrFallback(lookups?.parsers_homologados))
             } catch {
                 if (!cancelled) setBandeirasLookup([])
             }
@@ -252,6 +262,7 @@ const FaturaMetadadosModal = ({
         if (!isOpen) return
         setError(null)
         setBandeiraError(null)
+        setAceiteValores(false)
         const nextCartao = sugestao?.cartao_id ?? null
         initialCartaoRef.current = nextCartao
         setMes(sugestao?.mes ?? null)
@@ -385,11 +396,52 @@ const FaturaMetadadosModal = ({
     const finais = sugestao?.ultimos_digitos?.filter(Boolean) ?? []
     const valor = sugestao?.valor_fatura
     const isNovo = mode === 'novo'
+    const cartaoSelecionado = cartoes.find((c) => Number(c.value) === Number(cartaoId))
+    const homologacaoCartao = resolveCartaoHomologacao(
+        isNovo
+            ? { nome: cartaoNome, banco: null }
+            : {
+                nome: cartaoSelecionado?.label,
+                banco: cartaoSelecionado?.banco,
+                importacao_pdf_homologada: cartaoSelecionado?.importacao_pdf_homologada,
+                parser_homologado: cartaoSelecionado?.parser_homologado,
+            },
+        parsersHomologados
+    )
+    const parserNaoHomologado =
+        sugestao?.importacao_pdf_homologada === false
+        || Boolean(sugestao?.aviso_parser?.trim())
+        || (Boolean(sugestao?.parser) && !isParserChaveHomologada(sugestao?.parser, parsersHomologados))
+    const cartaoNaoHomologado = !isNovo && cartaoSelecionado
+        ? homologacaoCartao.homologada === false
+        : false
+    const precisaAceiteValores = parserNaoHomologado || cartaoNaoHomologado
+    const conferencia = sugestao?.conferencia
+    const conferenciaDiverge = conferencia != null && conferencia.bate === false
+    const parserHomologadoNota =
+        !precisaAceiteValores
+            ? (sugestao?.parser_homologado?.nota ?? homologacaoCartao.parser?.nota)
+            : null
 
     return (
         <Modal isOpen={isOpen} toggle={onClose} centered size="lg">
             <ModalHeader toggle={onClose}>Confirmar dados da fatura</ModalHeader>
             <ModalBody>
+                {precisaAceiteValores && (
+                    <Alert color="warning" className="mb-3">
+                        {avisoParserOuPadrao(sugestao?.aviso_parser)}
+                    </Alert>
+                )}
+                {parserHomologadoNota && (
+                    <p className="small text-muted mb-3">{parserHomologadoNota}</p>
+                )}
+                {conferenciaDiverge && (
+                    <Alert color="warning" className="mb-3">
+                        O total do cabeçalho da fatura ({formatCurrency(conferencia?.valor_cabecalho)})
+                        {' '}diverge da soma das transações ({formatCurrency(conferencia?.soma_transacoes)}).
+                        {' '}Vamos usar a soma das transações.
+                    </Alert>
+                )}
                 {isNovo ? (
                     <>
                         <p className="mb-2">
@@ -587,6 +639,22 @@ const FaturaMetadadosModal = ({
                 )}
 
                 {error && <FormFeedback className="d-block">{error}</FormFeedback>}
+
+                {precisaAceiteValores && (
+                    <div className="form-check mt-3">
+                        <Input
+                            id="fatura_metadados_aceite_valores"
+                            type="checkbox"
+                            className="form-check-input"
+                            checked={aceiteValores}
+                            disabled={loading}
+                            onChange={(e) => setAceiteValores(e.target.checked)}
+                        />
+                        <Label className="form-check-label" htmlFor="fatura_metadados_aceite_valores">
+                            Li que os valores podem não ser os corretos e quero continuar
+                        </Label>
+                    </div>
+                )}
             </ModalBody>
             <ModalFooter>
                 <Button type="button" color="light" onClick={onClose} disabled={loading}>
@@ -596,7 +664,7 @@ const FaturaMetadadosModal = ({
                     type="button"
                     color="primary"
                     onClick={handleSubmit}
-                    disabled={loading || bandeirasLoading}
+                    disabled={loading || bandeirasLoading || (precisaAceiteValores && !aceiteValores)}
                 >
                     {loading && <Spinner size="sm" className="me-2" />}
                     {isNovo ? 'Cadastrar cartão e fatura' : 'Confirmar e cadastrar'}

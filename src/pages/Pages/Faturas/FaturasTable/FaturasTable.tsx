@@ -15,6 +15,8 @@ import {
     resolveFaturaAnexo, downloadFaturaAnexo, FaturaAnexoDownloadTipo, FaturaAnexoDownloadMeta,
 } from "helpers/fatura_helpers"
 import { CartaoChip, BandeiraChip, resolveCartaoCores } from "helpers/cartao_helpers"
+import { resolveCartaoHomologacao } from "helpers/parser_homologado_helpers"
+import CartaoPdfHomologacaoBadge from "Components/Cartoes/CartaoPdfHomologacaoBadge"
 import {
     faturaPrecisaSenhaPdf,
     FaturaResumo,
@@ -42,6 +44,9 @@ type FaturaRow = FaturaResumo & {
     cartao_nome?: string
     cartao_cor_fundo?: string | null
     cartao_cor_texto?: string | null
+    importacao_pdf_homologada?: boolean
+    parser_homologado?: FaturasCartaoGroup['parser_homologado']
+    cartao_banco?: string | null
     pessoa_nome?: string | null
 }
 
@@ -71,6 +76,9 @@ const flattenFaturas = (grupos: FaturasCartaoGroup[]): FaturaRow[] => {
             cartao_nome: grupo.nome,
             cartao_cor_fundo: grupo.cor_fundo,
             cartao_cor_texto: grupo.cor_texto,
+            importacao_pdf_homologada: grupo.importacao_pdf_homologada,
+            parser_homologado: grupo.parser_homologado,
+            cartao_banco: grupo.banco,
             pessoa_nome: fatura.pessoa_nome ?? grupo.pessoa_nome ?? null,
             responsavel_id: fatura.responsavel_id ?? null,
             responsavel_nome: fatura.responsavel_nome ?? null,
@@ -281,14 +289,24 @@ export const FaturasTable = ({ data, getData, setPerPage, perPage, filters }: Fa
                                                                         cor_fundo: row.cartao_cor_fundo,
                                                                         cor_texto: row.cartao_cor_texto,
                                                                     })
+                                                                    const homologacao = resolveCartaoHomologacao({
+                                                                        nome: row.cartao_nome,
+                                                                        banco: row.cartao_banco,
+                                                                        importacao_pdf_homologada: row.importacao_pdf_homologada,
+                                                                        parser_homologado: row.parser_homologado,
+                                                                    })
                                                                     return (
                                                                     <tr key={row.id ?? index}>
                                                                         <td className="text-start">
-                                                                            <div className="d-flex align-items-center gap-2">
+                                                                            <div className="d-flex align-items-center gap-2 flex-wrap">
                                                                                 <CartaoChip
                                                                                     cor_fundo={cores.cor_fundo}
                                                                                     cor_texto={cores.cor_texto}
                                                                                     label={row.cartao_nome || 'Cartão'}
+                                                                                />
+                                                                                <CartaoPdfHomologacaoBadge
+                                                                                    homologacao={homologacao}
+                                                                                    targetId={`fatura-table-pdf-homolog-${row.id ?? index}`}
                                                                                 />
                                                                                 {multiBandeira && row.bandeira ? (
                                                                                     <BandeiraChip

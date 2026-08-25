@@ -1,4 +1,4 @@
-import { SenhaPdfRegraLookup } from 'interfaces/Cartoes/CartoesInterface'
+import { ParserHomologado, SenhaPdfRegraLookup } from 'interfaces/Cartoes/CartoesInterface'
 
 export interface FaturasSearch {
     id?: string | null
@@ -82,6 +82,8 @@ export interface FaturasCartaoGroup {
     dia_vencimento_fatura?: number | null
     cor_fundo?: string | null
     cor_texto?: string | null
+    importacao_pdf_homologada?: boolean
+    parser_homologado?: ParserHomologado | null
     ativo?: boolean
     pessoa_id?: number | null
     pessoa_nome?: string | null
@@ -114,6 +116,8 @@ export interface FaturasView extends FaturaResumo {
     cartao_nome?: string
     cartao_cor_fundo?: string | null
     cartao_cor_texto?: string | null
+    importacao_pdf_homologada?: boolean
+    parser_homologado?: ParserHomologado | null
     cartao_bandeira?: string
     cartao_bandeira_id?: number | null
     cartao_dia_limite_fatura?: number | null
@@ -179,8 +183,11 @@ export interface ProcessarPdfParams {
 export interface CartaoLookup {
     id?: number
     nome?: string
+    banco?: string | null
     cor_fundo?: string | null
     cor_texto?: string | null
+    importacao_pdf_homologada?: boolean
+    parser_homologado?: ParserHomologado | null
     qtd_bandeiras?: number
     qtd_numeros?: number
     /** false → cadastro com PDF/CSV abre modal de bandeira/final */
@@ -193,6 +200,7 @@ export interface CartaoLookup {
 export interface LookupsFaturas {
     cartoes?: CartaoLookup[]
     senhas_pdf_regras?: SenhaPdfRegraLookup[]
+    parsers_homologados?: ParserHomologado[]
 }
 
 /** Resposta de `DELETE /faturas/excluir-todas` */

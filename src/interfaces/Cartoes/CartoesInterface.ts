@@ -70,6 +70,13 @@ export const resolveSenhaPdfRegraDigitos = (
     return null
 }
 
+/** Parser de fatura (PDF/CSV) testado com arquivo real */
+export interface ParserHomologado {
+    chave: string
+    label: string
+    nota?: string | null
+}
+
 export interface CartoesList {
     id?: number
     nome?: string
@@ -78,6 +85,9 @@ export interface CartoesList {
     dia_vencimento_fatura?: number | null
     cor_fundo?: string | null
     cor_texto?: string | null
+    /** true = leitura de PDF/CSV testada para este banco */
+    importacao_pdf_homologada?: boolean
+    parser_homologado?: ParserHomologado | null
     ativo?: boolean
     /** Indica se há senha de PDF salva (API nunca devolve a senha em claro) */
     tem_senha_pdf?: boolean
@@ -129,6 +139,8 @@ export interface ParCorLookup {
     cor_fundo: string
     cor_texto: string
     padrao?: boolean
+    importacao_pdf_homologada?: boolean
+    parser_homologado?: ParserHomologado | null
 }
 
 export interface PresetCorLookup {
@@ -137,6 +149,8 @@ export interface PresetCorLookup {
     aliases?: string[]
     cor_fundo: string
     cor_texto: string
+    importacao_pdf_homologada?: boolean
+    parser_homologado?: ParserHomologado | null
 }
 
 export interface TipoNumeroLookup {
@@ -205,6 +219,7 @@ export interface LookupsCartoes {
     cor_padrao_bandeira?: ParCorBandeiraLookup
     dias?: DiaLookup[]
     senhas_pdf_regras?: SenhaPdfRegraLookup[]
+    parsers_homologados?: ParserHomologado[]
 }
 
 export interface CartoesInterface {
@@ -270,17 +285,29 @@ export const CARTAO_COR_PADRAO: ParCorLookup = {
     padrao: true,
 }
 
+export const PARSERS_HOMOLOGADOS_PADRAO: ParserHomologado[] = [
+    { chave: 'nubank', label: 'Nubank', nota: null },
+    { chave: 'inter', label: 'Inter', nota: null },
+    { chave: 'c6', label: 'C6 Bank', nota: null },
+    { chave: 'sofisa', label: 'Sofisa', nota: null },
+    { chave: 'picpay', label: 'PicPay', nota: null },
+    { chave: 'itau', label: 'Itaú', nota: 'Homologado com fatura Itaú Click' },
+]
+
+const parserHomologadoPadrao = (chave: string): ParserHomologado | null =>
+    PARSERS_HOMOLOGADOS_PADRAO.find((p) => p.chave === chave) ?? null
+
 export const CARTAO_PRESETS_CORES_PADRAO: PresetCorLookup[] = [
-    { chave: 'nubank', label: 'Nubank', aliases: ['nubank', 'nu bank', 'nu pagamentos', 'roxinho'], cor_fundo: '#820ad1', cor_texto: '#ffffff' },
-    { chave: 'inter', label: 'Inter', aliases: ['inter', 'banco inter', 'inter medium'], cor_fundo: '#ff7a00', cor_texto: '#ffffff' },
-    { chave: 'c6', label: 'C6 Bank', aliases: ['c6 bank', 'c6bank', 'c6'], cor_fundo: '#111111', cor_texto: '#ffffff' },
-    { chave: 'sofisa', label: 'Sofisa', aliases: ['sofisa', 'banco sofisa'], cor_fundo: '#008f5a', cor_texto: '#ffffff' },
-    { chave: 'itau', label: 'Itaú', aliases: ['itau', 'banco itau', 'itau unibanco'], cor_fundo: '#003b70', cor_texto: '#ffffff' },
+    { chave: 'nubank', label: 'Nubank', aliases: ['nubank', 'nu bank', 'nu pagamentos', 'roxinho'], cor_fundo: '#820ad1', cor_texto: '#ffffff', importacao_pdf_homologada: true, parser_homologado: parserHomologadoPadrao('nubank') },
+    { chave: 'inter', label: 'Inter', aliases: ['inter', 'banco inter', 'inter medium'], cor_fundo: '#ff7a00', cor_texto: '#ffffff', importacao_pdf_homologada: true, parser_homologado: parserHomologadoPadrao('inter') },
+    { chave: 'c6', label: 'C6 Bank', aliases: ['c6 bank', 'c6bank', 'c6'], cor_fundo: '#111111', cor_texto: '#ffffff', importacao_pdf_homologada: true, parser_homologado: parserHomologadoPadrao('c6') },
+    { chave: 'sofisa', label: 'Sofisa', aliases: ['sofisa', 'banco sofisa'], cor_fundo: '#008f5a', cor_texto: '#ffffff', importacao_pdf_homologada: true, parser_homologado: parserHomologadoPadrao('sofisa') },
+    { chave: 'itau', label: 'Itaú', aliases: ['itau', 'banco itau', 'itau unibanco'], cor_fundo: '#003b70', cor_texto: '#ffffff', importacao_pdf_homologada: true, parser_homologado: parserHomologadoPadrao('itau') },
     { chave: 'santander', label: 'Santander', aliases: ['santander'], cor_fundo: '#ec0000', cor_texto: '#ffffff' },
     { chave: 'bradesco', label: 'Bradesco', aliases: ['bradesco'], cor_fundo: '#cc092f', cor_texto: '#ffffff' },
     { chave: 'bb', label: 'Banco do Brasil', aliases: ['banco do brasil', 'banco brasil', 'bb'], cor_fundo: '#f8d117', cor_texto: '#003da5' },
     { chave: 'caixa', label: 'Caixa', aliases: ['caixa economica', 'caixa'], cor_fundo: '#005ca9', cor_texto: '#ffffff' },
-    { chave: 'picpay', label: 'PicPay', aliases: ['picpay', 'pic pay'], cor_fundo: '#21c25e', cor_texto: '#000000' },
+    { chave: 'picpay', label: 'PicPay', aliases: ['picpay', 'pic pay'], cor_fundo: '#21c25e', cor_texto: '#000000', importacao_pdf_homologada: true, parser_homologado: parserHomologadoPadrao('picpay') },
     { chave: 'mercadopago', label: 'Mercado Pago', aliases: ['mercado pago', 'mercadopago', 'mercado livre'], cor_fundo: '#009ee3', cor_texto: '#ffffff' },
     { chave: 'neon', label: 'Neon', aliases: ['neon'], cor_fundo: '#00e676', cor_texto: '#000000' },
     { chave: 'btg', label: 'BTG Pactual', aliases: ['btg pactual', 'pactual', 'btg'], cor_fundo: '#001e62', cor_texto: '#ffffff' },
@@ -309,6 +336,8 @@ export const CARTAO_PARES_CORES_PADRAO: ParCorLookup[] = [
         cor_fundo: preset.cor_fundo,
         cor_texto: preset.cor_texto,
         padrao: false,
+        importacao_pdf_homologada: preset.importacao_pdf_homologada === true,
+        parser_homologado: preset.parser_homologado ?? null,
     })),
 ]
 
@@ -370,6 +399,8 @@ export const matchPresetCorCartao = (
         cor_fundo: matchedPreset.cor_fundo,
         cor_texto: matchedPreset.cor_texto,
         padrao: false,
+        importacao_pdf_homologada: matchedPreset.importacao_pdf_homologada === true,
+        parser_homologado: matchedPreset.parser_homologado ?? null,
     }
 }
 

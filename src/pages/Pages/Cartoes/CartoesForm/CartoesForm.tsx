@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'react-toastify'
 import { setActiveMenu } from 'helpers/system_helpers'
@@ -20,6 +20,7 @@ import {
     ModalFooter,
     ModalHeader,
     Row,
+    UncontrolledTooltip,
 } from 'reactstrap'
 import { SubmitHandler, useForm } from 'react-hook-form'
 import { required } from 'Components/ComponentController/ValidatorForm/ValidatorForm'
@@ -45,6 +46,8 @@ import {
     matchPresetCorCartao,
     normalizeHexCor,
     ParCorBandeiraLookup,
+    ParserHomologado,
+    PARSERS_HOMOLOGADOS_PADRAO,
     PresetBandeiraLookup,
     PresetCorLookup,
     resolveSenhaPdfRegraDigitos,
@@ -56,6 +59,14 @@ import { CartoesService } from 'services/Cartoes/CartoesService'
 import { PessoasService } from 'services/Pessoas/PessoasService'
 import { toPessoaSelectOption } from 'interfaces/Pessoas/PessoasInterface'
 import PasswordRevealInput from 'Components/Common/PasswordRevealInput'
+import CartaoPdfHomologacaoBadge from 'Components/Cartoes/CartaoPdfHomologacaoBadge'
+import {
+    isParCorPdfHomologado,
+    parsersHomologadosOrFallback,
+    resolveCartaoHomologacao,
+    textoFormCartaoHomologacao,
+    tooltipParCorCartao,
+} from 'helpers/parser_homologado_helpers'
 
 const toPrecoDigits = (value: string | number | null | undefined): string | null => {
     if (value == null || value === '') return null
@@ -173,6 +184,7 @@ const CartoesForm = () => {
     const [limparSenhaPdf, setLimparSenhaPdf] = useState(false)
     const [senhaPdfDigitada, setSenhaPdfDigitada] = useState('')
     const [senhasPdfRegras, setSenhasPdfRegras] = useState<SenhaPdfRegraLookup[]>([])
+    const [parsersHomologados, setParsersHomologados] = useState<ParserHomologado[]>(PARSERS_HOMOLOGADOS_PADRAO)
 
     const { register, handleSubmit, control, reset, setValue, watch, getValues } = useForm<CartoesModel>({
         defaultValues: record
@@ -290,6 +302,7 @@ const CartoesForm = () => {
             setSenhaPdfRegraOptions(
                 regras.map((r) => ({ value: r.value, label: r.label }))
             )
+            setParsersHomologados(parsersHomologadosOrFallback(lookups?.parsers_homologados))
 
             try {
                 const pessoas = await pessoasService.AsyncListPessoas()
@@ -720,6 +733,15 @@ const CartoesForm = () => {
     }
 
     const limitesPendentes = getLimitesPendentes()
+    const homologacaoNome = useMemo(
+        () => resolveCartaoHomologacao(
+            { nome: nomePreview, banco: bancoWatch },
+            parsersHomologados,
+            presetsCores
+        ),
+        [nomePreview, bancoWatch, parsersHomologados, presetsCores]
+    )
+    const textoHomologacao = textoFormCartaoHomologacao(homologacaoNome, parsersHomologados)
 
     return (
         <React.Fragment>
@@ -976,7 +998,7 @@ const CartoesForm = () => {
                                                     </div>
 
                                                     <div className="cartao-cores-grid mb-3">
-                                                        {paresCores.map((par) => {
+                                                        {paresCores.map((par, index) => {
                                                             const chaveMatch = selectedChave
                                                                 ? par.chave === selectedChave
                                                                 : false
@@ -984,27 +1006,41 @@ const CartoesForm = () => {
                                                                 normalizeHexCor(corFundo) === normalizeHexCor(par.cor_fundo) &&
                                                                 normalizeHexCor(corTexto) === normalizeHexCor(par.cor_texto)
                                                             const selected = selectedChave ? chaveMatch : corMatch
+                                                            const swatchId = `cartao-cor-swatch-${par.chave || index}`
+                                                            const homologado = isParCorPdfHomologado(par, parsersHomologados)
                                                             return (
-                                                                <button
+                                                                <div
                                                                     key={`${par.chave || par.label}-${par.cor_fundo}`}
-                                                                    type="button"
                                                                     className={`cartao-cores-grid__item ${selected ? 'is-selected' : ''}`}
-                                                                    onClick={() => applyParCor(par)}
-                                                                    title={par.label || `${par.cor_fundo} / ${par.cor_texto}`}
                                                                 >
-                                                                    <span
-                                                                        className="cartao-cores-grid__chip"
-                                                                        style={{
-                                                                            backgroundColor: par.cor_fundo,
-                                                                            color: par.cor_texto,
-                                                                        }}
+                                                                    <button
+                                                                        type="button"
+                                                                        id={swatchId}
+                                                                        className="border-0 bg-transparent p-0 w-100 d-flex flex-column align-items-center gap-1"
+                                                                        onClick={() => applyParCor(par)}
                                                                     >
-                                                                        Aa
-                                                                    </span>
-                                                                    <span className="cartao-cores-grid__label">
-                                                                        {par.label || 'Cor'}
-                                                                    </span>
-                                                                </button>
+                                                                        <span
+                                                                            className="cartao-cores-grid__chip"
+                                                                            style={{
+                                                                                backgroundColor: par.cor_fundo,
+                                                                                color: par.cor_texto,
+                                                                            }}
+                                                                        >
+                                                                            Aa
+                                                                            {homologado && (
+                                                                                <span className="cartao-cores-grid__homolog" aria-hidden>
+                                                                                    <i className="ri-check-line"></i>
+                                                                                </span>
+                                                                            )}
+                                                                        </span>
+                                                                        <span className="cartao-cores-grid__label">
+                                                                            {par.label || 'Cor'}
+                                                                        </span>
+                                                                    </button>
+                                                                    <UncontrolledTooltip placement="top" target={swatchId}>
+                                                                        {tooltipParCorCartao(par, parsersHomologados)}
+                                                                    </UncontrolledTooltip>
+                                                                </div>
                                                             )
                                                         })}
                                                     </div>
@@ -1062,6 +1098,15 @@ const CartoesForm = () => {
                                                                 {corFundo || '-'} / {corTexto || '-'}
                                                             </small>
                                                         )}
+                                                        <CartaoPdfHomologacaoBadge
+                                                            homologacao={homologacaoNome}
+                                                            targetId="cartao-form-pdf-homolog"
+                                                        />
+                                                    </div>
+                                                    <div
+                                                        className={`small mt-2 ${textoHomologacao.homologada ? 'text-success' : 'text-muted'}`}
+                                                    >
+                                                        {textoHomologacao.texto}
                                                     </div>
                                                 </div>
                                             </Col>

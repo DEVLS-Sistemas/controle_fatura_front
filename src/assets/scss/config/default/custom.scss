@@ -377,6 +377,7 @@ input[type="number"].text-valor {
   }
 
   &__chip {
+    position: relative;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -386,6 +387,24 @@ input[type="number"].text-valor {
     font-size: 0.78rem;
     font-weight: 700;
     border: 1px solid rgba(0, 0, 0, 0.08);
+  }
+
+  &__homolog {
+    position: absolute;
+    top: -7px;
+    right: -7px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #0ab39c;
+    color: #fff;
+    font-size: 10px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #fff;
+    box-shadow: 0 0 0 1px rgba(10, 179, 156, 0.25);
   }
 
   &__label {

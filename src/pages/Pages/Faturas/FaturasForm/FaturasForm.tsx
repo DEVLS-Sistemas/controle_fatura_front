@@ -17,9 +17,11 @@ import {
     faturaPrecisaSenhaPdf,
     FaturasDefaultValues,
     FaturasModel,
+    CartaoLookup,
     resolveSenhaPdfMeta,
     SenhaPdfMeta,
 } from 'interfaces/Faturas/FaturasInterface'
+import { ParserHomologado, PARSERS_HOMOLOGADOS_PADRAO } from 'interfaces/Cartoes/CartoesInterface'
 import { FaturasService } from 'services/Faturas/FaturasService'
 import { CartoesService } from 'services/Cartoes/CartoesService'
 import FaturaSenhaPdfModal, { FaturaSenhaUnlockPayload } from 'Components/Faturas/FaturaSenhaPdfModal'
@@ -27,6 +29,12 @@ import FaturaSelecaoModal, { FaturaSelecaoStep } from 'Components/Faturas/Fatura
 import FaturaMetadadosModal from 'Components/Faturas/FaturaMetadadosModal'
 import FaturaTitularModal from 'Components/Faturas/FaturaTitularModal'
 import FaturaCartaoTitularModal from 'Components/Faturas/FaturaCartaoTitularModal'
+import FaturaParserNaoHomologadoModal from 'Components/Faturas/FaturaParserNaoHomologadoModal'
+import {
+    formatParsersHomologadosLista,
+    parsersHomologadosOrFallback,
+    resolveCartaoHomologacao,
+} from 'helpers/parser_homologado_helpers'
 import {
     FaturaSelecaoBandeiraOption,
     FaturaSelecaoError,
@@ -113,6 +121,13 @@ const FaturasForm = () => {
     const [cartaoTitularLoading, setCartaoTitularLoading] = useState(false)
     const [cartaoTitularError, setCartaoTitularError] = useState<FaturaCartaoTitularError | null>(null)
     const [pessoasOptions, setPessoasOptions] = useState<SelectOptions[]>([])
+    const [cartoesLookup, setCartoesLookup] = useState<CartaoLookup[]>([])
+    const [parsersHomologados, setParsersHomologados] = useState<ParserHomologado[]>(PARSERS_HOMOLOGADOS_PADRAO)
+    const [homologModalOpen, setHomologModalOpen] = useState(false)
+    const [homologIntent, setHomologIntent] = useState<'attach' | 'submit' | 'cartao'>('attach')
+    const [pendingHomologFile, setPendingHomologFile] = useState<File | null>(null)
+    const homologConfirmRef = useRef<string | null>(null)
+    const prevCartaoIdRef = useRef<FaturasModel['cartao_id']>(record.cartao_id)
     const pendingSelecaoRef = useRef<FaturaSelecaoRetryPayload>({})
     const pendingSenhaRef = useRef<PendingSenhaPayload>({})
     const pendingMetadadosRef = useRef<Partial<FaturaMetadadosRetryPayload>>({})
@@ -133,6 +148,7 @@ const FaturasForm = () => {
         try {
             const lookups = await faturasService.getLookupsFaturas()
             if (lookups?.cartoes) {
+                setCartoesLookup(lookups.cartoes)
                 setCartoesOptions(
                     lookups.cartoes.map((c) => ({
                         value: c.id!,
@@ -142,6 +158,7 @@ const FaturasForm = () => {
                     }))
                 )
             }
+            setParsersHomologados(parsersHomologadosOrFallback(lookups?.parsers_homologados))
             const pessoas = await pessoasService.AsyncListPessoas()
             if (pessoas) {
                 setPessoasOptions([
@@ -152,6 +169,42 @@ const FaturasForm = () => {
         } catch (error) {
             console.error('Erro ao carregar lookups:', error)
         }
+    }
+
+    const homologAttemptKey = (cartao?: FaturasModel['cartao_id'], file?: File | null) =>
+        `${cartao ?? ''}|${file ? `${file.name}:${file.size}:${file.lastModified}` : ''}`
+
+    const cartaoLookupById = (id?: FaturasModel['cartao_id']) =>
+        cartoesLookup.find((c) => Number(c.id) === Number(id))
+
+    const homologacaoDoCartao = (id?: FaturasModel['cartao_id']) => {
+        const lookup = cartaoLookupById(id)
+        const option = cartoesOptions.find((c) => Number(c.value) === Number(id))
+        return resolveCartaoHomologacao({
+            nome: lookup?.nome ?? option?.label,
+            banco: lookup?.banco,
+            importacao_pdf_homologada: lookup?.importacao_pdf_homologada,
+            parser_homologado: lookup?.parser_homologado,
+        }, parsersHomologados)
+    }
+
+    const applyArquivo = (file: File | null) => {
+        setArquivoFile(file)
+        setValue('arquivo_pdf', file)
+        if (!file) {
+            setExigeMetadadosManuais(false)
+            if (fileInputRef.current) fileInputRef.current.value = ''
+        }
+    }
+
+    const precisaConfirmarParser = (id?: FaturasModel['cartao_id'], file?: File | null) => {
+        if (!file || id == null || id === '') return false
+        if (homologacaoDoCartao(id).homologada) return false
+        return homologConfirmRef.current !== homologAttemptKey(id, file)
+    }
+
+    const confirmarParserDestaTentativa = (id?: FaturasModel['cartao_id'], file?: File | null) => {
+        homologConfirmRef.current = homologAttemptKey(id, file)
     }
 
     const loadBandeiras = async (id: number | string | null | undefined) => {
@@ -510,6 +563,13 @@ const FaturasForm = () => {
 
             if (!validateCreateSubmit(data)) return
 
+            if (precisaConfirmarParser(data.cartao_id, arquivoFile)) {
+                setPendingHomologFile(arquivoFile)
+                setHomologIntent('submit')
+                setHomologModalOpen(true)
+                return
+            }
+
             const result = await submitCreate()
             handleCreateSuccess(result)
         } catch (error: any) {
@@ -715,14 +775,75 @@ const FaturasForm = () => {
         if (file && !isValidFaturaFile(file)) {
             toast.error('Formato inválido. Envie PDF ou CSV.')
             e.target.value = ''
-            setArquivoFile(null)
-            setValue('arquivo_pdf', null)
+            applyArquivo(null)
             return
         }
-        setArquivoFile(file)
-        setValue('arquivo_pdf', file)
         if (!file) {
-            setExigeMetadadosManuais(false)
+            homologConfirmRef.current = null
+            applyArquivo(null)
+            return
+        }
+        const selectedCartao = getValues('cartao_id')
+        if (precisaConfirmarParser(selectedCartao, file)) {
+            e.target.value = ''
+            setPendingHomologFile(file)
+            setHomologIntent('attach')
+            setHomologModalOpen(true)
+            return
+        }
+        applyArquivo(file)
+    }
+
+    const closeHomologModal = () => {
+        setHomologModalOpen(false)
+        setPendingHomologFile(null)
+        if (homologIntent === 'attach' && fileInputRef.current) {
+            fileInputRef.current.value = ''
+        }
+    }
+
+    const handleHomologAnexarMesmoAssim = async () => {
+        const file = pendingHomologFile ?? arquivoFile
+        const selectedCartao = getValues('cartao_id')
+        confirmarParserDestaTentativa(selectedCartao, file)
+        setHomologModalOpen(false)
+
+        if (homologIntent === 'attach' && file) {
+            applyArquivo(file)
+            setPendingHomologFile(null)
+            return
+        }
+
+        setPendingHomologFile(null)
+        if (homologIntent === 'submit') {
+            try {
+                const data = getValues()
+                if (!validateCreateSubmit(data)) return
+                const result = await submitCreate()
+                handleCreateSuccess(result)
+            } catch (error: any) {
+                if (handleCreateError(error)) return
+                toast.error(error?.message || 'Erro ao salvar fatura')
+            }
+        }
+    }
+
+    const handleHomologCadastrarSemAnexo = async () => {
+        applyArquivo(null)
+        setPendingHomologFile(null)
+        setHomologModalOpen(false)
+        homologConfirmRef.current = null
+
+        if (homologIntent === 'submit') {
+            try {
+                const data = getValues()
+                if (!validateCreateSubmit(data)) return
+                const result = await submitCreate()
+                handleCreateSuccess(result)
+            } catch (error: any) {
+                if (handleCreateError(error)) return
+                toast.error(error?.message || 'Erro ao salvar fatura')
+            }
         }
     }
 
@@ -738,6 +859,16 @@ const FaturasForm = () => {
         if (!isEdit) {
             loadBandeiras(cartaoId)
         }
+
+        const prev = prevCartaoIdRef.current
+        prevCartaoIdRef.current = cartaoId
+        if (isEdit || prev === cartaoId) return
+        homologConfirmRef.current = null
+        if (!arquivoFile || cartaoId == null || cartaoId === '') return
+        if (!precisaConfirmarParser(cartaoId, arquivoFile)) return
+        setPendingHomologFile(arquivoFile)
+        setHomologIntent('cartao')
+        setHomologModalOpen(true)
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [cartaoId, isEdit])
 
@@ -746,6 +877,14 @@ const FaturasForm = () => {
 
     return (
         <React.Fragment>
+            <FaturaParserNaoHomologadoModal
+                isOpen={homologModalOpen}
+                cartaoNome={cartaoLookupById(cartaoId)?.nome ?? cartoesOptions.find((c) => Number(c.value) === Number(cartaoId))?.label}
+                parsers={parsersHomologados}
+                onAnexarMesmoAssim={handleHomologAnexarMesmoAssim}
+                onCadastrarSemAnexo={handleHomologCadastrarSemAnexo}
+                onClose={closeHomologModal}
+            />
             <FaturaSenhaPdfModal
                 isOpen={senhaModalOpen}
                 faturaId={senhaModalFaturaId}
@@ -856,6 +995,10 @@ const FaturasForm = () => {
                                                             {exigeMetadadosManuais && (
                                                                 <> Não foi possível detectar os dados: preencha cartão, mês e ano.</>
                                                             )}
+                                                        </small>
+                                                        <small className="text-muted d-block mt-1">
+                                                            Leitura automática homologada: {formatParsersHomologadosLista(parsersHomologados)}.
+                                                            Outros cartões podem ser anexados, mas o valor lido pode não ser o correto.
                                                         </small>
                                                         {arquivoFile && (
                                                             <div className="mt-1 text-success">

@@ -12,6 +12,8 @@ import { CartoesList, CartoesSearch } from "interfaces/Cartoes/CartoesInterface"
 import { CartoesService } from "services/Cartoes/CartoesService"
 import { CartaoChip, BandeiraChip, extractCartaoErrorMessage, resolveCartaoCores } from "helpers/cartao_helpers"
 import { formatCurrency, VALOR_TEXT_CLASS } from "helpers/fatura_helpers"
+import { resolveCartaoHomologacao } from "helpers/parser_homologado_helpers"
+import CartaoPdfHomologacaoBadge from "Components/Cartoes/CartaoPdfHomologacaoBadge"
 
 export interface CartoesTableProps {
     data: PaginateInterface<CartoesList> | undefined
@@ -175,15 +177,22 @@ export const CartoesTable = ({ data, getData, setPerPage, perPage, filters }: Ca
                                                                     ?? 0
                                                                 const limites = formatLimitesResumo(row)
                                                                 const cores = resolveCartaoCores(row)
+                                                                const homologacao = resolveCartaoHomologacao(row)
 
                                                                 return (
                                                                     <tr key={row.id ?? index}>
                                                                         <td className="text-start">
+                                                                            <div className="d-flex flex-wrap align-items-center gap-2">
                                                                             <CartaoChip
                                                                                 cor_fundo={cores.cor_fundo}
                                                                                 cor_texto={cores.cor_texto}
                                                                                 label={row.nome || 'Cartão'}
                                                                             />
+                                                                            <CartaoPdfHomologacaoBadge
+                                                                                homologacao={homologacao}
+                                                                                targetId={`cartao-pdf-homolog-${row.id ?? index}`}
+                                                                            />
+                                                                            </div>
                                                                         </td>
                                                                         <td className="text-start">
                                                                             {row.pessoa_nome

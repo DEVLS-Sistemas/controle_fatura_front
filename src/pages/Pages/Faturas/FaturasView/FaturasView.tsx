@@ -20,17 +20,20 @@ import {
 } from 'helpers/fatura_helpers'
 import { isCompraAvista, isEhAssinatura } from 'helpers/assinaturas_helpers'
 import { CartaoChip, BandeiraChip, resolveCartaoCores } from 'helpers/cartao_helpers'
+import { formatParsersHomologadosLista, parsersHomologadosOrFallback, resolveCartaoHomologacao } from 'helpers/parser_homologado_helpers'
+import CartaoPdfHomologacaoBadge from 'Components/Cartoes/CartaoPdfHomologacaoBadge'
 import { SelectOptions } from 'interfaces/SystemInterfaces/SelectInterface'
 import {
     extractFaturaPayload,
     faturaPrecisaSenhaPdf,
     FaturaGrupoPorCartao,
     FaturasView,
+    CartaoLookup,
     resolveSenhaPdfMeta,
     SenhaPdfMeta,
 } from 'interfaces/Faturas/FaturasInterface'
+import { NumeroListItem, ParserHomologado, PARSERS_HOMOLOGADOS_PADRAO } from 'interfaces/Cartoes/CartoesInterface'
 import { CategoriaLookup, ResponsavelLookup, TransacoesList } from 'interfaces/Transacoes/TransacoesInterface'
-import { NumeroListItem } from 'interfaces/Cartoes/CartoesInterface'
 import { FaturasService } from 'services/Faturas/FaturasService'
 import { TransacoesService } from 'services/Transacoes/TransacoesService'
 import { SubcategoriasService } from 'services/Subcategorias/SubcategoriasService'
@@ -41,6 +44,7 @@ import SubcategoriaRapidoModal, { SubcategoriaRapidoConfirm } from 'pages/Pages/
 import FaturaSenhaPdfModal from 'Components/Faturas/FaturaSenhaPdfModal'
 import FaturaSelecaoModal, { FaturaSelecaoStep } from 'Components/Faturas/FaturaSelecaoModal'
 import FaturaTitularModal from 'Components/Faturas/FaturaTitularModal'
+import FaturaParserNaoHomologadoModal from 'Components/Faturas/FaturaParserNaoHomologadoModal'
 import { PdfSenhaError } from 'libs/api/exceptions/PdfSenhaError'
 import {
     FaturaSelecaoBandeiraOption,
@@ -360,6 +364,10 @@ const FaturasViewPage = () => {
         anteriorCompetencia: string | null
         proximaCompetencia: string | null
     }>({ anteriorId: null, proximaId: null, anteriorCompetencia: null, proximaCompetencia: null })
+    const [parsersHomologados, setParsersHomologados] = useState<ParserHomologado[]>(PARSERS_HOMOLOGADOS_PADRAO)
+    const [cartoesLookup, setCartoesLookup] = useState<CartaoLookup[]>([])
+    const [homologModalOpen, setHomologModalOpen] = useState(false)
+    const homologConfirmRef = useRef<string | null>(null)
 
     const nomeDoResponsavel = (responsavelId?: number | null, responsavelNome?: string | null) => (
         (responsavelNome
@@ -480,7 +488,10 @@ const FaturasViewPage = () => {
 
     const loadLookups = useCallback(async () => {
         try {
-            const lookups = await transacoesService.getLookupsTransacoes()
+            const [lookups, faturasLookups] = await Promise.all([
+                transacoesService.getLookupsTransacoes(),
+                faturasService.getLookupsFaturas(),
+            ])
             if (lookups?.categorias) {
                 setCategoriasLookup(lookups.categorias)
                 setCategoriasOptions(
@@ -510,10 +521,14 @@ const FaturasViewPage = () => {
                     }))
                 )
             }
+            if (faturasLookups?.cartoes) {
+                setCartoesLookup(faturasLookups.cartoes)
+            }
+            setParsersHomologados(parsersHomologadosOrFallback(faturasLookups?.parsers_homologados))
         } catch (error) {
             console.error('Erro ao carregar lookups:', error)
         }
-    }, [transacoesService])
+    }, [transacoesService, faturasService])
 
     const loadNumeros = useCallback(async (faturaId: string) => {
         setNumerosLoading(true)
@@ -705,8 +720,8 @@ const FaturasViewPage = () => {
         await loadLookups()
     }
 
-    const handleUploadPdf = async () => {
-        const file = fileInputRef.current?.files?.[0]
+    const handleUploadPdf = async (opts?: { skipHomologConfirm?: boolean }) => {
+        const file = fileInputRef.current?.files?.[0] ?? pendingUploadFileRef.current
         if (!file || !id) {
             toast.warning('Selecione um arquivo PDF ou CSV')
             return
@@ -716,6 +731,22 @@ const FaturasViewPage = () => {
             return
         }
         pendingUploadFileRef.current = file
+
+        if (!opts?.skipHomologConfirm) {
+            const cartaoLookup = cartoesLookup.find((c) => Number(c.id) === Number(fatura?.cartao_id))
+            const homologacao = resolveCartaoHomologacao({
+                nome: fatura?.cartao_nome ?? cartaoLookup?.nome,
+                banco: cartaoLookup?.banco,
+                importacao_pdf_homologada: fatura?.importacao_pdf_homologada ?? cartaoLookup?.importacao_pdf_homologada,
+                parser_homologado: fatura?.parser_homologado ?? cartaoLookup?.parser_homologado,
+            }, parsersHomologados)
+            const attemptKey = `${fatura?.cartao_id ?? ''}|${file.name}:${file.size}:${file.lastModified}`
+            if (!homologacao.homologada && homologConfirmRef.current !== attemptKey) {
+                setHomologModalOpen(true)
+                return
+            }
+        }
+
         try {
             const result = await faturasService.uploadPdf({
                 id: Number(id),
@@ -1383,9 +1414,41 @@ const FaturasViewPage = () => {
         cor_fundo: fatura.cartao_cor_fundo,
         cor_texto: fatura.cartao_cor_texto,
     })
+    const cartaoLookup = cartoesLookup.find((c) => Number(c.id) === Number(fatura.cartao_id))
+    const homologacaoCartao = resolveCartaoHomologacao({
+        nome: fatura.cartao_nome ?? cartaoLookup?.nome,
+        banco: cartaoLookup?.banco,
+        importacao_pdf_homologada: fatura.importacao_pdf_homologada ?? cartaoLookup?.importacao_pdf_homologada,
+        parser_homologado: fatura.parser_homologado ?? cartaoLookup?.parser_homologado,
+    }, parsersHomologados)
 
     return (
         <React.Fragment>
+            <FaturaParserNaoHomologadoModal
+                isOpen={homologModalOpen}
+                cartaoNome={fatura.cartao_nome}
+                parsers={parsersHomologados}
+                showCadastrarSemAnexo
+                onAnexarMesmoAssim={() => {
+                    const file = pendingUploadFileRef.current ?? fileInputRef.current?.files?.[0]
+                    homologConfirmRef.current = file
+                        ? `${fatura.cartao_id ?? ''}|${file.name}:${file.size}:${file.lastModified}`
+                        : null
+                    setHomologModalOpen(false)
+                    void handleUploadPdf({ skipHomologConfirm: true })
+                }}
+                onCadastrarSemAnexo={() => {
+                    pendingUploadFileRef.current = null
+                    if (fileInputRef.current) fileInputRef.current.value = ''
+                    homologConfirmRef.current = null
+                    setHomologModalOpen(false)
+                }}
+                onClose={() => {
+                    setHomologModalOpen(false)
+                    pendingUploadFileRef.current = null
+                    if (fileInputRef.current) fileInputRef.current.value = ''
+                }}
+            />
             <FaturaSenhaPdfModal
                 isOpen={senhaModalOpen}
                 faturaId={id ?? null}
@@ -1494,6 +1557,10 @@ const FaturasViewPage = () => {
                                         cor_texto={coresCartao.cor_texto}
                                         label={fatura.cartao_nome || 'Cartão'}
                                         className="fs-5 px-3 py-2"
+                                    />
+                                    <CartaoPdfHomologacaoBadge
+                                        homologacao={homologacaoCartao}
+                                        targetId={`fatura-view-pdf-homolog-${fatura.id ?? id ?? 'x'}`}
                                     />
                                     <div className="min-w-0">
                                         {(fatura.bandeira || fatura.cartao_bandeira) && (
@@ -1679,6 +1746,12 @@ const FaturasViewPage = () => {
                                     <Label htmlFor="upload_pdf" className="form-label">Anexo da fatura (PDF ou CSV)</Label>
                                     <Input innerRef={fileInputRef} type="file" accept={FATURA_FILE_ACCEPT} />
                                     <small className="text-muted">PDF ou CSV</small>
+                                    <small className="text-muted d-block mt-1">
+                                        Leitura automática homologada: {formatParsersHomologadosLista(parsersHomologados)}.
+                                        {!homologacaoCartao.homologada && (
+                                            <> Este cartão ainda não foi testado — o valor lido pode não ser o correto.</>
+                                        )}
+                                    </small>
                                 </Col>
                                 <Col md={3}>
                                     <div className="form-check form-switch mt-4">
@@ -1693,7 +1766,7 @@ const FaturasViewPage = () => {
                                     </div>
                                 </Col>
                                 <Col md={2}>
-                                    <button type="button" className="btn btn-primary mt-2" onClick={handleUploadPdf}>
+                                    <button type="button" className="btn btn-primary mt-2" onClick={() => { void handleUploadPdf() }}>
                                         Enviar arquivo
                                     </button>
                                 </Col>
