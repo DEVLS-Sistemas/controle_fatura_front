@@ -46,6 +46,17 @@ const Navdata = () => {
             },
         },
         {
+            id: "gastos-criticos",
+            label: "Gastos críticos",
+            icon: "ri-alarm-warning-line",
+            link: "/gastos-criticos",
+            click: function (e: any) {
+                e.preventDefault();
+                setIscurrentState("GastosCriticos");
+                updateIconSidebar(e);
+            },
+        },
+        {
             id: "projecao-faturas",
             label: "Projeção",
             icon: "ri-line-chart-line",

@@ -63,6 +63,10 @@ const DashboardsHome = () => {
                   <p className="text-muted mb-0">Resumo das faturas e gastos do período</p>
                 </div>
                 <div className="d-flex gap-2 flex-wrap align-items-end">
+                  <Link to="/gastos-criticos" className="btn btn-soft-danger mb-1">
+                    <i className="ri-alarm-warning-line align-middle me-1"></i>
+                    Onde estou gastando demais?
+                  </Link>
                   <Link to="/parceladas" className="btn btn-soft-primary mb-1">
                     <i className="ri-list-ordered align-middle me-1"></i>
                     Parceladas

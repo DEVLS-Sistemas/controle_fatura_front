@@ -54,6 +54,7 @@ import RelatoriosPage from "pages/Pages/Relatorios/RelatoriosPage";
 import ProjecaoFaturasPage from "pages/Pages/ProjecaoFaturas/ProjecaoFaturasPage";
 import SimuladorCompraPage from "pages/Pages/SimuladorCompra/SimuladorCompraPage";
 import RankingParceladasPage from "pages/Pages/RankingParceladas/RankingParceladasPage";
+import GastosCriticosPage from "pages/Pages/GastosCriticos/GastosCriticosPage";
 import AssinaturasPage from "pages/Pages/Assinaturas/AssinaturasPage";
 import AssinaturasDetalhePage from "pages/Pages/Assinaturas/AssinaturasDetalhe/AssinaturasDetalhePage";
 import CompraVisualizacaoPage from "pages/Pages/CompraVisualizacao/CompraVisualizacaoPage";
@@ -114,6 +115,7 @@ const authProtectedRoutes = [
   { path: "/subcategorias/edit/:id", component: <SubcategoriasForm /> },
 
   { path: "/relatorios", component: <RelatoriosPage /> },
+  { path: "/gastos-criticos", component: <GastosCriticosPage /> },
   { path: "/parceladas", component: <RankingParceladasPage /> },
   { path: "/assinaturas/:identificador", component: <AssinaturasDetalhePage /> },
   { path: "/assinaturas", component: <AssinaturasPage /> },

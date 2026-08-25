@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { Link, useLocation, useParams } from 'react-router-dom'
+import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom'
 import { toast } from 'react-toastify'
 import { SubmitHandler, useForm } from 'react-hook-form'
 import { setActiveMenu } from 'helpers/system_helpers'
@@ -10,14 +10,17 @@ import PeriodoFiltroCampos from 'Components/Estatisticas/PeriodoFiltroCampos'
 import {
     EstatisticasCompra,
     PeriodoFiltro,
+    hasPeriodoQuery,
     pickEstatisticas,
     pickPeriodoFiltro,
+    pickPeriodoFromSearchParams,
 } from 'interfaces/Estatisticas/EstatisticasCompraInterface'
 import { EstabelecimentosView } from 'interfaces/Estabelecimentos/EstabelecimentosInterface'
 import { EstabelecimentosService } from 'services/Estabelecimentos/EstabelecimentosService'
 
 const EstabelecimentosViewPage = () => {
     const { state } = useLocation()
+    const [searchParams] = useSearchParams()
     const { id } = useParams()
     const [record, setRecord] = useState<EstabelecimentosView | null>(state?.source ?? null)
     const [stats, setStats] = useState<EstatisticasCompra | undefined>(
@@ -27,7 +30,9 @@ const EstabelecimentosViewPage = () => {
     const { voltarParaRotaAnterior } = useNavegacao()
     const estabelecimentosService = new EstabelecimentosService()
 
-    const periodoInicial = pickPeriodoFiltro(state?.periodo)
+    const periodoInicial = hasPeriodoQuery(searchParams)
+        ? pickPeriodoFromSearchParams(searchParams)
+        : pickPeriodoFiltro(state?.periodo)
     const { handleSubmit, control, register, watch, setValue } = useForm<PeriodoFiltro>({
         defaultValues: periodoInicial,
     })

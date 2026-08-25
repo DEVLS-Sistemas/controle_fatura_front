@@ -67,12 +67,12 @@ const TransacoesPage = () => {
     const transacoesContext = useRef<TransacoesFilterContextType>({
         id: null,
         transacao_id: null,
-        data_inicio: null,
-        data_fim: null,
+        data_inicio: searchParams.get('data_inicio'),
+        data_fim: searchParams.get('data_fim'),
         cartao_id: parseQueryNumber(searchParams.get('cartao_id')),
         categoria_id: parseQueryNumber(searchParams.get('categoria_id')),
-        subcategoria_id: null,
-        estabelecimento_id: null,
+        subcategoria_id: parseQueryNumber(searchParams.get('subcategoria_id')),
+        estabelecimento_id: parseQueryNumber(searchParams.get('estabelecimento_id')),
         responsavel_id: parseQueryNumber(searchParams.get('responsavel_id')),
         fatura_id: parseQueryNumber(searchParams.get('fatura_id')),
         tipo: searchParams.get('tipo'),
@@ -87,6 +87,10 @@ const TransacoesPage = () => {
             searchParams.get('responsavel_id')
             || searchParams.get('tipo')
             || searchParams.get('categoria_id')
+            || searchParams.get('subcategoria_id')
+            || searchParams.get('estabelecimento_id')
+            || searchParams.get('data_inicio')
+            || searchParams.get('data_fim')
             || searchParams.get('origem_compra')
             || searchParams.get('eh_assinatura')
         ),

@@ -76,6 +76,42 @@ export function pickPeriodoFiltro(source?: PeriodoFiltro | null): PeriodoFiltro 
     }
 }
 
+export function hasPeriodoQuery(params?: URLSearchParams | null): boolean {
+    if (!params) return false
+    return Boolean(
+        params.get('data_inicio')
+        || params.get('data_fim')
+        || (params.get('mes') && params.get('ano'))
+    )
+}
+
+export function pickPeriodoFromSearchParams(params?: URLSearchParams | null): PeriodoFiltro {
+    if (!params) return PeriodoFiltroDefault
+    const dataInicio = params.get('data_inicio')
+    const dataFim = params.get('data_fim')
+    if (dataInicio || dataFim) {
+        return {
+            periodo_modo: 'intervalo',
+            data_inicio: dataInicio,
+            data_fim: dataFim,
+            mes: null,
+            ano: null,
+        }
+    }
+    const mes = Number(params.get('mes'))
+    const ano = Number(params.get('ano'))
+    if (Number.isFinite(mes) && mes >= 1 && mes <= 12 && Number.isFinite(ano) && ano > 2000) {
+        return {
+            periodo_modo: 'mes',
+            mes,
+            ano,
+            data_inicio: null,
+            data_fim: null,
+        }
+    }
+    return PeriodoFiltroDefault
+}
+
 export function withPeriodoQuery<T extends PeriodoFiltro>(params: T): Record<string, unknown> {
     const { periodo_modo, mes, ano, data_inicio, data_fim, ...rest } = params
     return {
