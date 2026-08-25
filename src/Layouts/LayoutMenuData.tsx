@@ -1,18 +1,23 @@
 import React, { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-
-const pathIn = (path: string, prefixes: string[]) =>
-    prefixes.some((prefix) => path === prefix || path.startsWith(`${prefix}/`));
+import { pathIn } from "./menuPath";
 
 const Navdata = () => {
     const history = useNavigate();
     const location = useLocation();
+    const path = location.pathname;
 
     const [isAnalises, setIsAnalises] = useState<boolean>(false);
     const [isPlanejamento, setIsPlanejamento] = useState<boolean>(false);
     const [isLancamentos, setIsLancamentos] = useState<boolean>(false);
     const [isCadastros, setIsCadastros] = useState<boolean>(false);
     const [iscurrentState, setIscurrentState] = useState("Dashboard");
+
+    const isDashboardActive = pathIn(path, ["/dashboard"]);
+    const isAnalisesActive = pathIn(path, ["/raio-x", "/gastos-criticos", "/relatorios"]);
+    const isPlanejamentoActive = pathIn(path, ["/projecao-faturas", "/simulador", "/parceladas", "/assinaturas", "/compras"]);
+    const isLancamentosActive = pathIn(path, ["/cartoes", "/faturas", "/transacoes"]);
+    const isCadastrosActive = pathIn(path, ["/categorias", "/subcategorias", "/estabelecimentos", "/lojas", "/pessoas", "/responsaveis"]);
 
     function updateIconSidebar(e: any) {
         if (e && e.target && e.target.getAttribute("sub-items")) {
@@ -31,7 +36,6 @@ const Navdata = () => {
 
     useEffect(() => {
         document.body.classList.remove("twocolumn-panel");
-        const path = location.pathname;
 
         if (pathIn(path, ["/raio-x", "/gastos-criticos", "/relatorios"])) {
             setIscurrentState("Analises");
@@ -70,7 +74,7 @@ const Navdata = () => {
         setIsPlanejamento(false);
         setIsLancamentos(false);
         setIsCadastros(false);
-    }, [location.pathname]);
+    }, [path]);
 
     const menuItems: any = [
         {
@@ -82,6 +86,7 @@ const Navdata = () => {
             label: "Dashboard",
             icon: "ri-dashboard-2-line",
             link: "/dashboard",
+            isActive: isDashboardActive,
             click: function (e: any) {
                 e.preventDefault();
                 setIscurrentState("Dashboard");
@@ -94,6 +99,7 @@ const Navdata = () => {
             label: "Análises",
             icon: "ri-pulse-line",
             link: "/#",
+            isActive: isAnalisesActive,
             click: function (e: any) {
                 e.preventDefault();
                 setIsAnalises(!isAnalises);
@@ -105,9 +111,9 @@ const Navdata = () => {
             },
             stateVariables: isAnalises,
             subItems: [
-                { id: "raio-x", label: "Raio-X Financeiro", link: "/raio-x", parentId: "analises" },
-                { id: "gastos-criticos", label: "Gastos críticos", link: "/gastos-criticos", parentId: "analises" },
-                { id: "relatorios", label: "Relatórios", link: "/relatorios", parentId: "analises" },
+                { id: "raio-x", label: "Raio-X Financeiro", link: "/raio-x", parentId: "analises", isActive: pathIn(path, ["/raio-x"]) },
+                { id: "gastos-criticos", label: "Gastos críticos", link: "/gastos-criticos", parentId: "analises", isActive: pathIn(path, ["/gastos-criticos"]) },
+                { id: "relatorios", label: "Relatórios", link: "/relatorios", parentId: "analises", isActive: pathIn(path, ["/relatorios"]) },
             ],
         },
         {
@@ -115,6 +121,7 @@ const Navdata = () => {
             label: "Planejamento",
             icon: "ri-calendar-check-line",
             link: "/#",
+            isActive: isPlanejamentoActive,
             click: function (e: any) {
                 e.preventDefault();
                 setIsPlanejamento(!isPlanejamento);
@@ -126,10 +133,10 @@ const Navdata = () => {
             },
             stateVariables: isPlanejamento,
             subItems: [
-                { id: "projecao-faturas", label: "Projeção", link: "/projecao-faturas", parentId: "planejamento" },
-                { id: "simulador", label: "Posso comprar?", link: "/simulador", parentId: "planejamento" },
-                { id: "parceladas", label: "Parceladas", link: "/parceladas", parentId: "planejamento" },
-                { id: "assinaturas", label: "Assinaturas", link: "/assinaturas", parentId: "planejamento" },
+                { id: "projecao-faturas", label: "Projeção", link: "/projecao-faturas", parentId: "planejamento", isActive: pathIn(path, ["/projecao-faturas"]) },
+                { id: "simulador", label: "Posso comprar?", link: "/simulador", parentId: "planejamento", isActive: pathIn(path, ["/simulador"]) },
+                { id: "parceladas", label: "Parceladas", link: "/parceladas", parentId: "planejamento", isActive: pathIn(path, ["/parceladas"]) },
+                { id: "assinaturas", label: "Assinaturas", link: "/assinaturas", parentId: "planejamento", isActive: pathIn(path, ["/assinaturas", "/compras"]) },
             ],
         },
         {
@@ -137,6 +144,7 @@ const Navdata = () => {
             label: "Lançamentos",
             icon: "ri-file-list-3-line",
             link: "/#",
+            isActive: isLancamentosActive,
             click: function (e: any) {
                 e.preventDefault();
                 setIsLancamentos(!isLancamentos);
@@ -148,9 +156,9 @@ const Navdata = () => {
             },
             stateVariables: isLancamentos,
             subItems: [
-                { id: "cartoes", label: "Cartões", link: "/cartoes", parentId: "lancamentos" },
-                { id: "faturas", label: "Faturas", link: "/faturas", parentId: "lancamentos" },
-                { id: "transacoes", label: "Transações", link: "/transacoes", parentId: "lancamentos" },
+                { id: "cartoes", label: "Cartões", link: "/cartoes", parentId: "lancamentos", isActive: pathIn(path, ["/cartoes"]) },
+                { id: "faturas", label: "Faturas", link: "/faturas", parentId: "lancamentos", isActive: pathIn(path, ["/faturas"]) },
+                { id: "transacoes", label: "Transações", link: "/transacoes", parentId: "lancamentos", isActive: pathIn(path, ["/transacoes"]) },
             ],
         },
         {
@@ -158,6 +166,7 @@ const Navdata = () => {
             label: "Cadastros",
             icon: "ri-folder-settings-line",
             link: "/#",
+            isActive: isCadastrosActive,
             click: function (e: any) {
                 e.preventDefault();
                 setIsCadastros(!isCadastros);
@@ -169,12 +178,12 @@ const Navdata = () => {
             },
             stateVariables: isCadastros,
             subItems: [
-                { id: "categorias", label: "Categorias", link: "/categorias", parentId: "cadastros" },
-                { id: "subcategorias", label: "Subcategorias", link: "/subcategorias", parentId: "cadastros" },
-                { id: "estabelecimentos", label: "Estabelecimentos", link: "/estabelecimentos", parentId: "cadastros" },
-                { id: "lojas", label: "Lojas", link: "/lojas", parentId: "cadastros" },
-                { id: "pessoas", label: "Pessoas", link: "/pessoas", parentId: "cadastros" },
-                { id: "responsaveis", label: "Responsáveis", link: "/responsaveis", parentId: "cadastros" },
+                { id: "categorias", label: "Categorias", link: "/categorias", parentId: "cadastros", isActive: pathIn(path, ["/categorias"]) },
+                { id: "subcategorias", label: "Subcategorias", link: "/subcategorias", parentId: "cadastros", isActive: pathIn(path, ["/subcategorias"]) },
+                { id: "estabelecimentos", label: "Estabelecimentos", link: "/estabelecimentos", parentId: "cadastros", isActive: pathIn(path, ["/estabelecimentos"]) },
+                { id: "lojas", label: "Lojas", link: "/lojas", parentId: "cadastros", isActive: pathIn(path, ["/lojas"]) },
+                { id: "pessoas", label: "Pessoas", link: "/pessoas", parentId: "cadastros", isActive: pathIn(path, ["/pessoas"]) },
+                { id: "responsaveis", label: "Responsáveis", link: "/responsaveis", parentId: "cadastros", isActive: pathIn(path, ["/responsaveis"]) },
             ],
         },
     ];

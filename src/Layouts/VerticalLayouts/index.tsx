@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { Collapse } from 'reactstrap';
 // Import Data
 import navdata from "../LayoutMenuData";
+import { findMatchingMenuItem } from "../menuPath";
 //i18n
 import { withTranslation } from "react-i18next";
 import withRouter from "../../Components/Common/withRouter";
@@ -84,14 +85,13 @@ const VerticalLayout = (props : any) => {
     useEffect(() => {
         window.scrollTo({ top: 0, behavior: 'smooth' });
         const initMenu = () => {
-            const pathName = process.env.PUBLIC_URL + path;
+            const pathName = (process.env.PUBLIC_URL || "") + path;
             const ul = document.getElementById("navbar-nav") as HTMLElement;
+            if (!ul) return;
             const items : any = ul.getElementsByTagName("a");
             let itemsArray = [...items]; // converts NodeList to Array
             removeActivation(itemsArray);
-            let matchingMenuItem = itemsArray.find((x) => {
-                return x.pathname === pathName;
-            });
+            const matchingMenuItem = findMatchingMenuItem(itemsArray, pathName);
             if (matchingMenuItem) {
                 activateParentDropdown(matchingMenuItem);
             }
@@ -125,22 +125,12 @@ const VerticalLayout = (props : any) => {
     }
 
     const removeActivation = (items :any) => {
-        let actiItems = items.filter((x : any) => x.classList.contains("active"));
-
-        actiItems.forEach((item : any) => {
-            if (item.classList.contains("menu-link")) {
-                if (!item.classList.contains("active")) {
-                    item.setAttribute("aria-expanded", false);
-                }
+        items.forEach((item : any) => {
+            if (item.classList.contains("menu-link") || item.classList.contains("nav-link")) {
                 if (item.nextElementSibling) {
                     item.nextElementSibling.classList.remove("show");
                 }
-            }
-            if (item.classList.contains("nav-link")) {
-                if (item.nextElementSibling) {
-                    item.nextElementSibling.classList.remove("show");
-                }
-                item.setAttribute("aria-expanded", false);
+                item.setAttribute("aria-expanded", "false");
             }
             item.classList.remove("active");
         });
@@ -160,9 +150,10 @@ const VerticalLayout = (props : any) => {
                                     <li className="nav-item">
                                         <Link
                                             onClick={item.click}
-                                            className="nav-link menu-link"
+                                            className={`nav-link menu-link${item.isActive ? " active" : ""}`}
                                             to={item.link ? item.link : "/#"}
                                             data-bs-toggle="collapse"
+                                            aria-expanded={Boolean(item.stateVariables)}
                                         >
                                             <i className={item.icon}></i>
                                             <span data-key="t-apps">{props.t(item.label)}</span>
@@ -173,7 +164,7 @@ const VerticalLayout = (props : any) => {
                                         <Collapse
                                             className="menu-dropdown"
                                             isOpen={item.stateVariables}
-                                            id="sidebarApps">
+                                            id={item.id}>
                                             <ul className="nav nav-sm flex-column test">
                                                 {/* subItms  */}
                                                 {item.subItems && ((item.subItems || []).map((subItem : any, key : number) => (
@@ -182,7 +173,7 @@ const VerticalLayout = (props : any) => {
                                                             <li className="nav-item">
                                                                 <Link
                                                                     to={subItem.link ? subItem.link : "/#"}
-                                                                    className="nav-link"
+                                                                    className={`nav-link${subItem.isActive ? " active" : ""}`}
                                                                 >
                                                                     {props.t(subItem.label)}
                                                                     {subItem.badgeName ?
@@ -249,7 +240,7 @@ const VerticalLayout = (props : any) => {
                                 ) : (
                                     <li className="nav-item">
                                         <Link
-                                            className="nav-link menu-link"
+                                            className={`nav-link menu-link${item.isActive ? " active" : ""}`}
                                             to={item.link ? item.link : "/#"}>
                                             <i className={item.icon}></i> <span>{props.t(item.label)}</span>
                                             {item.badgeName ?

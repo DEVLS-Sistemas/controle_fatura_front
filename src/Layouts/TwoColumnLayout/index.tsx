@@ -10,6 +10,7 @@ import { withTranslation } from "react-i18next";
 
 // Import Data
 import navdata from "../LayoutMenuData";
+import { findMatchingMenuItem } from "../menuPath";
 import VerticalLayout from "../VerticalLayouts";
 
 //SimpleBar
@@ -44,14 +45,13 @@ const TwoColumnLayout = (props : any) => {
     const path = props.router.location.pathname;
 
     const initMenu = useCallback(() => {
-        const pathName = process.env.PUBLIC_URL + path;
+        const pathName = (process.env.PUBLIC_URL || "") + path;
         const ul = document.getElementById("navbar-nav") as HTMLElement;
+        if (!ul) return;
         const items : any = ul.getElementsByTagName("a");
         let itemsArray = [...items]; // converts NodeList to Array
         removeActivation(itemsArray);
-        let matchingMenuItem = itemsArray.find((x) => {
-            return x.pathname === pathName;
-        });
+        const matchingMenuItem = findMatchingMenuItem(itemsArray, pathName);
         if (matchingMenuItem) {
             activateParentDropdown(matchingMenuItem);
         } else {
@@ -79,19 +79,12 @@ const TwoColumnLayout = (props : any) => {
     }
 
     const removeActivation = (items : any) => {
-        let activeItems = items.filter((x : any) => x.classList.contains("active"));
-        activeItems.forEach((item : any) => {
-            if (item.classList.contains("menu-link")) {
-                if (!item.classList.contains("active")) {
-                    item.setAttribute("aria-expanded", false);
-                }
-                item.nextElementSibling.classList.remove("show");
-            }
-            if (item.classList.contains("nav-link")) {
+        items.forEach((item : any) => {
+            if (item.classList.contains("menu-link") || item.classList.contains("nav-link")) {
                 if (item.nextElementSibling) {
                     item.nextElementSibling.classList.remove("show");
                 }
-                item.setAttribute("aria-expanded", false);
+                item.setAttribute("aria-expanded", "false");
             }
             item.classList.remove("active");
         });
@@ -153,7 +146,7 @@ const TwoColumnLayout = (props : any) => {
                                                         onClick={item.click}
                                                         to="#"
                                                         sub-items={item.id}
-                                                        className="nav-icon"
+                                                        className={`nav-icon${item.isActive ? " active" : ""}`}
                                                         data-bs-toggle="collapse">
                                                         <i className={item.icon}></i>
                                                     </Link>
@@ -165,7 +158,7 @@ const TwoColumnLayout = (props : any) => {
                                                         onClick={item.click}
                                                         to={item.link ? item.link : "/#"}
                                                         sub-items={item.id}
-                                                        className="nav-icon"
+                                                        className={`nav-icon${item.isActive ? " active" : ""}`}
                                                         data-bs-toggle="collapse">
                                                         <i className={item.icon}></i>
                                                     </Link>
@@ -194,7 +187,7 @@ const TwoColumnLayout = (props : any) => {
                                                                 <li className="nav-item">
                                                                     <Link
                                                                         to={subItem.link ? subItem.link : "/#"}
-                                                                        className="nav-link"
+                                                                        className={`nav-link${subItem.isActive ? " active" : ""}`}
                                                                     >
                                                                         {props.t(subItem.label)}
                                                                         {subItem.badgeName ?
