@@ -7,6 +7,7 @@ import profileBg from '../../../../assets/images/profile-bg.jpg';
 import { useAuthUser } from 'Components/Hooks/useAuthUser';
 import { AuthService } from 'services/Auth';
 import { formatCpfCnpj } from 'helpers/functions_helpers';
+import { formatCurrency } from 'helpers/fatura_helpers';
 
 const dash = (value?: string | null) => {
     const trimmed = value?.trim();
@@ -97,6 +98,14 @@ const SimplePage = () => {
                                                                     <tr>
                                                                         <th className="ps-0" scope="row">E-mail :</th>
                                                                         <td className="text-muted">{dash(user?.email)}</td>
+                                                                    </tr>
+                                                                    <tr>
+                                                                        <th className="ps-0" scope="row">Renda mensal:</th>
+                                                                        <td className="text-muted">
+                                                                            {user?.renda_mensal
+                                                                                ? formatCurrency(user.renda_mensal)
+                                                                                : '—'}
+                                                                        </td>
                                                                     </tr>
                                                                 </tbody>
                                                             </Table>

@@ -3,6 +3,7 @@ export interface PerfilForm {
   sobrenome: string
   cpf_cnpj: string
   email: string
+  renda_mensal: string
 }
 
 export const PerfilDefaultValues: PerfilForm = {
@@ -10,4 +11,5 @@ export const PerfilDefaultValues: PerfilForm = {
   sobrenome: '',
   cpf_cnpj: '',
   email: '',
+  renda_mensal: '',
 }

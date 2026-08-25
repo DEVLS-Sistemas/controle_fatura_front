@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from "react"
+import { useSearchParams } from "react-router-dom"
 import { Container, Spinner } from 'reactstrap'
 import { SubmitHandler } from 'react-hook-form'
 import { PaginateInterface, PaginateSearch } from 'interfaces/SystemInterfaces/PaginateInterface'
@@ -14,18 +15,24 @@ type FaturasFilterContextType = {
 export const FaturasFilterContext = createContext<FaturasFilterContextType>({} as FaturasFilterContextType)
 
 const FaturasPage = () => {
+    const [searchParams] = useSearchParams()
     const [display, setDisplay] = useState<boolean>(false)
     const faturasContext = useContext(FaturasFilterContext)
     const [faturasList, setFaturasList] = useState<PaginateInterface<FaturasCartaoGroup>>()
     const faturasService = new FaturasService()
+
+    const mesUrl = Number(searchParams.get('mes'))
+    const anoUrl = Number(searchParams.get('ano'))
+    const mesValido = Number.isFinite(mesUrl) && mesUrl >= 1 && mesUrl <= 12
+    const anoValido = Number.isFinite(anoUrl) && anoUrl > 2000
 
     const FaturasFilterContextValue: FaturasFilterContextType = {
         id: null,
         fatura_id: null,
         cartao_id: null,
         pessoa_id: null,
-        mes: null,
-        ano: null,
+        mes: mesValido ? mesUrl : null,
+        ano: anoValido ? anoUrl : null,
         status: null,
         palavra_chave: null,
         page: 1,
@@ -51,6 +58,8 @@ const FaturasPage = () => {
     }, [])
 
     useEffect(() => {
+        if (mesValido) faturasContext.mes = mesUrl
+        if (anoValido) faturasContext.ano = anoUrl
         getRemoteFaturasList(faturasContext)
     }, [perPage])
 

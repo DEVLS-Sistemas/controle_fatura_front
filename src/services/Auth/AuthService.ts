@@ -15,6 +15,7 @@ export interface AuthUser {
   email: string
   sobrenome?: string | null
   cpf_cnpj?: string | null
+  renda_mensal?: number | null
 }
 
 export interface AuthLoginPayload {
@@ -58,6 +59,7 @@ export interface AuthPerfilPayload {
   sobrenome?: string
   cpf_cnpj?: string
   email: string
+  renda_mensal?: string | number | null
 }
 
 export interface AuthPerfilResult {
@@ -157,9 +159,15 @@ export class AuthService {
         if (!user) {
           throw new UnexpectedError('Resposta de perfil inválida')
         }
-        persistAuthUser(user)
+        persistAuthUser({
+          ...user,
+          renda_mensal: user.renda_mensal ?? params.renda_mensal ?? null,
+        })
         return {
-          user,
+          user: {
+            ...user,
+            renda_mensal: user.renda_mensal ?? params.renda_mensal ?? null,
+          },
           message: response.body?.auth?.message || 'Perfil atualizado com sucesso!',
         }
       }

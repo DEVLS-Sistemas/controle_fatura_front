@@ -9,6 +9,7 @@ import { useAuthUser } from 'Components/Hooks/useAuthUser';
 import { AuthService, AuthUser } from 'services/Auth';
 import { PerfilForm } from 'interfaces/Perfil/PerfilInterface';
 import { mask, removeMask } from 'helpers/functions_helpers';
+import { formatRendaPayload, rendaToInputValue } from 'helpers/raio_x_helpers';
 import { ValidationError } from 'libs/api/exceptions/ValidationError';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -18,6 +19,7 @@ const userToForm = (user?: AuthUser | null): PerfilForm => ({
     sobrenome: user?.sobrenome || '',
     cpf_cnpj: user?.cpf_cnpj ? mask('cpf_cnpj', user.cpf_cnpj) || '' : '',
     email: user?.email || '',
+    renda_mensal: rendaToInputValue(user?.renda_mensal),
 });
 
 const Settings = () => {
@@ -64,7 +66,12 @@ const Settings = () => {
         const value = event.target.value;
         setForm((current) => ({
             ...current,
-            [field]: field === 'cpf_cnpj' ? mask('cpf_cnpj', value) || '' : value,
+            [field]:
+                field === 'cpf_cnpj'
+                    ? mask('cpf_cnpj', value) || ''
+                    : field === 'renda_mensal'
+                      ? mask('preco', value) || ''
+                      : value,
         }));
     };
 
@@ -75,6 +82,10 @@ const Settings = () => {
         if (!EMAIL_REGEX.test(email)) return 'E-mail inválido';
         const digits = removeMask(data.cpf_cnpj || '') || '';
         if (digits && digits.length !== 11 && digits.length !== 14) return 'CPF/CNPJ inválido';
+        if (data.renda_mensal?.trim()) {
+            const renda = formatRendaPayload(data.renda_mensal);
+            if (!renda) return 'Renda mensal inválida';
+        }
         return null;
     };
 
@@ -95,6 +106,7 @@ const Settings = () => {
                 sobrenome: form.sobrenome.trim() || '',
                 cpf_cnpj: removeMask(form.cpf_cnpj || '') || '',
                 email: form.email.trim(),
+                renda_mensal: formatRendaPayload(form.renda_mensal),
             });
             applyUser(result.user);
             toast.success(result.message);
@@ -211,6 +223,27 @@ const Settings = () => {
                                                                 onChange={onChange('email')}
                                                                 disabled={loading || saving}
                                                             />
+                                                        </div>
+                                                    </Col>
+                                                    <Col lg={6}>
+                                                        <div className="mb-3">
+                                                            <Label htmlFor="rendaMensalInput" className="form-label">Renda mensal</Label>
+                                                            <div className="input-group">
+                                                                <span className="input-group-text">R$</span>
+                                                                <Input
+                                                                    type="text"
+                                                                    inputMode="decimal"
+                                                                    className="form-control"
+                                                                    id="rendaMensalInput"
+                                                                    placeholder="0,00"
+                                                                    value={form.renda_mensal}
+                                                                    onChange={onChange('renda_mensal')}
+                                                                    disabled={loading || saving}
+                                                                />
+                                                            </div>
+                                                            <div className="form-text">
+                                                                Opcional. Usada no Raio-X para o comprometimento das faturas.
+                                                            </div>
                                                         </div>
                                                     </Col>
                                                     <Col lg={12}>

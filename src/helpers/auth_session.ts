@@ -9,6 +9,8 @@ export interface SessionUser {
   cpf_cnpj?: string | null
   /** Pessoa principal da conta (titular do login) */
   pessoa_id?: number | null
+  /** Renda mensal informada no perfil (Raio-X / comprometimento) */
+  renda_mensal?: number | null
 }
 
 type SessionPayload = {
@@ -91,8 +93,19 @@ const emitAuthSessionUpdated = (): void => {
   window.dispatchEvent(new Event(AUTH_SESSION_UPDATED_EVENT))
 }
 
+const parseRendaMensalUser = (value: unknown): number | null => {
+  if (value == null || value === '') return null
+  if (typeof value === 'number') return Number.isFinite(value) && value > 0 ? value : null
+  const str = String(value).trim()
+  if (!str) return null
+  const n = str.includes(',')
+    ? Number(str.replace(/\./g, '').replace(',', '.'))
+    : Number(str)
+  return Number.isFinite(n) && n > 0 ? n : null
+}
+
 export const normalizeAuthUser = (
-  user: Partial<SessionUser> & { id: number; name: string; email: string }
+  user: Partial<SessionUser> & { id: number; name: string; email: string; renda_mensal?: unknown }
 ): SessionUser => ({
   id: user.id,
   name: user.name,
@@ -100,6 +113,7 @@ export const normalizeAuthUser = (
   sobrenome: user.sobrenome ?? null,
   cpf_cnpj: user.cpf_cnpj ?? null,
   pessoa_id: user.pessoa_id ?? null,
+  renda_mensal: parseRendaMensalUser(user.renda_mensal),
 })
 
 export const getUserDisplayName = (

@@ -1,6 +1,6 @@
 import UiContent from "Components/Common/UiContent"
 import React, { useEffect, useState } from "react"
-import { Link } from "react-router-dom"
+import { Link, useSearchParams } from "react-router-dom"
 import { useForm } from "react-hook-form"
 import {
     Breadcrumb, BreadcrumbItem, Button, Card, CardHeader, Col, Collapse,
@@ -32,7 +32,15 @@ const optStatus: SelectOptions[] = [
 ]
 
 const FaturasFilter = ({ getRemoteFaturasList }: FaturasFilterProps) => {
-    const { handleSubmit, control, register } = useForm<FaturasSearch>({ defaultValues: {} })
+    const [searchParams] = useSearchParams()
+    const mesUrl = Number(searchParams.get('mes'))
+    const anoUrl = Number(searchParams.get('ano'))
+    const { handleSubmit, control, register } = useForm<FaturasSearch>({
+        defaultValues: {
+            mes: Number.isFinite(mesUrl) && mesUrl >= 1 && mesUrl <= 12 ? mesUrl : null,
+            ano: Number.isFinite(anoUrl) && anoUrl > 2000 ? anoUrl : null,
+        },
+    })
     const [showFilter, setShowFilter] = useState<boolean>(false)
     const [cartoesOptions, setCartoesOptions] = useState<SelectOptions[]>([{ value: '', label: 'Todos' }])
     const [pessoasOptions, setPessoasOptions] = useState<SelectOptions[]>([{ value: '', label: 'Todas' }])

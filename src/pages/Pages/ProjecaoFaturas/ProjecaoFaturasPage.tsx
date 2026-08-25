@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Container, Spinner } from 'reactstrap'
 import { SubmitHandler } from 'react-hook-form'
 import { toast } from 'react-toastify'
@@ -21,6 +22,7 @@ export const ProjecaoFaturasFilterContext = createContext<ProjecaoFaturasFilterC
 )
 
 const ProjecaoFaturasPage = () => {
+  const [searchParams] = useSearchParams()
   const [display, setDisplay] = useState<boolean>(false)
   const [loading, setLoading] = useState<boolean>(true)
   const projecaoContext = useContext(ProjecaoFaturasFilterContext)
@@ -29,9 +31,14 @@ const ProjecaoFaturasPage = () => {
   const projecaoFaturasService = new ProjecaoFaturasService()
 
   const now = new Date()
+  const mesUrl = Number(searchParams.get('mes'))
+  const anoUrl = Number(searchParams.get('ano'))
+  const mesValido = Number.isFinite(mesUrl) && mesUrl >= 1 && mesUrl <= 12
+  const anoValido = Number.isFinite(anoUrl) && anoUrl > 2000
+
   const ProjecaoFaturasFilterContextValue: ProjecaoFaturasFilterContextType = {
-    mes: ProjecaoFaturasDefaultValues.mes ?? now.getMonth() + 1,
-    ano: ProjecaoFaturasDefaultValues.ano ?? now.getFullYear(),
+    mes: mesValido ? mesUrl : ProjecaoFaturasDefaultValues.mes ?? now.getMonth() + 1,
+    ano: anoValido ? anoUrl : ProjecaoFaturasDefaultValues.ano ?? now.getFullYear(),
     palavra_chave: null,
     firstEntry: false,
   }

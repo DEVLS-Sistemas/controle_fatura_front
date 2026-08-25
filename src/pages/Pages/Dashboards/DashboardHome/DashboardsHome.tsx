@@ -63,6 +63,10 @@ const DashboardsHome = () => {
                   <p className="text-muted mb-0">Resumo das faturas e gastos do período</p>
                 </div>
                 <div className="d-flex gap-2 flex-wrap align-items-end">
+                  <Link to="/raio-x" className="btn btn-soft-success mb-1">
+                    <i className="ri-pulse-line align-middle me-1"></i>
+                    Raio-X
+                  </Link>
                   <Link to="/gastos-criticos" className="btn btn-soft-danger mb-1">
                     <i className="ri-alarm-warning-line align-middle me-1"></i>
                     Onde estou gastando demais?

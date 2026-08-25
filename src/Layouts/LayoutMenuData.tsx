@@ -46,6 +46,17 @@ const Navdata = () => {
             },
         },
         {
+            id: "raio-x",
+            label: "Raio-X Financeiro",
+            icon: "ri-pulse-line",
+            link: "/raio-x",
+            click: function (e: any) {
+                e.preventDefault();
+                setIscurrentState("RaioX");
+                updateIconSidebar(e);
+            },
+        },
+        {
             id: "gastos-criticos",
             label: "Gastos críticos",
             icon: "ri-alarm-warning-line",
