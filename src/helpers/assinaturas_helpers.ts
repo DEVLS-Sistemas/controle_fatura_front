@@ -1,6 +1,5 @@
 import { SelectOptions } from 'interfaces/SystemInterfaces/SelectInterface'
 import {
-  AssinaturaAcao,
   AssinaturaCobranca,
   AssinaturaItem,
   AssinaturaLookupOption,
@@ -10,11 +9,40 @@ import {
 } from 'interfaces/Assinaturas/AssinaturasInterface'
 
 export const STATUS_TABS: { value: AssinaturaStatusFiltro; label: string }[] = [
-  { value: 'todas', label: 'Todas' },
-  { value: 'candidata', label: 'Candidatas' },
-  { value: 'confirmada', label: 'Confirmadas' },
+  { value: 'todas', label: 'Lista' },
   { value: 'ignorada', label: 'Ignoradas' },
 ]
+
+export const isEhAssinatura = (value: unknown): boolean =>
+  value === true || value === 1 || value === '1' || value === 'true'
+
+export const isCompraAvista = (row?: {
+  compra_grupo_id?: string | number | null
+  parcelas_total?: number | string | null
+} | null): boolean => {
+  if (!row) return true
+  if (row.compra_grupo_id) return false
+  const n = Number(row.parcelas_total ?? 1)
+  return !Number.isFinite(n) || n <= 1
+}
+
+export const podeConfirmarAssinatura = (item: AssinaturaItem): boolean => {
+  if (item.pode_confirmar === false) return false
+  if (item.pode_confirmar === true) return true
+  const acoes = item.acoes_disponiveis ?? []
+  if (acoes.length) return acoes.includes('confirmar')
+  return item.status === 'candidata'
+}
+
+export const acoesAssinatura = (item: AssinaturaItem): string[] => {
+  if (Array.isArray(item.acoes_disponiveis) && item.acoes_disponiveis.length) {
+    return item.acoes_disponiveis.map(String)
+  }
+  if (item.status === 'candidata') return ['confirmar', 'ignorar']
+  if (item.status === 'confirmada') return ['desfazer_confirmacao']
+  if (item.status === 'ignorada') return ['restaurar']
+  return []
+}
 
 export const statusAssinaturaBadge = (
   status?: string | null,
@@ -24,7 +52,7 @@ export const statusAssinaturaBadge = (
     case 'candidata':
       return { color: 'warning', label: 'Possível assinatura' }
     case 'confirmada':
-      return { color: 'success', label: 'Pagamento de serviços' }
+      return { color: 'success', label: 'Assinatura' }
     case 'ignorada':
       return { color: 'secondary', label: 'Ignorada' }
     default:
@@ -35,27 +63,15 @@ export const statusAssinaturaBadge = (
 export const emptyAssinaturasMessage = (
   status?: string | null
 ): { title: string; text: string } => {
-  if (status === 'candidata') {
-    return {
-      title: 'Nada para revisar.',
-      text: 'Quando uma cobrança se repetir com valor parecido, ela aparece aqui para você confirmar.',
-    }
-  }
   if (status === 'ignorada') {
     return {
       title: 'Você não ignorou nenhuma.',
-      text: 'Itens ignorados ficam só nesta aba e podem ser restaurados a qualquer momento.',
-    }
-  }
-  if (status === 'confirmada') {
-    return {
-      title: 'Nenhuma assinatura confirmada.',
-      text: 'Confirme as candidatas para marcá-las como pagamento de serviços.',
+      text: 'Sugestões recusadas ficam só nesta lista e podem ser restauradas a qualquer momento.',
     }
   }
   return {
-    title: 'Ainda não encontramos assinaturas.',
-    text: 'Elas aparecem quando a mesma cobrança se repete (ex.: Netflix todo mês).',
+    title: 'Nenhuma assinatura confirmada.',
+    text: 'Marque na compra ou confirme uma sugestão acima.',
   }
 }
 
@@ -122,13 +138,13 @@ export const mensagemAcaoAssinatura = (acao: AssinaturaAcao, apiMessage?: string
   if (apiMessage) return apiMessage
   switch (acao) {
     case 'confirmar':
-      return 'Cobranças marcadas como pagamento de serviços'
+      return 'Assinatura confirmada e incluída na lista oficial'
     case 'ignorar':
-      return 'Assinatura ignorada'
+      return 'Sugestão ignorada'
     case 'restaurar':
       return 'Assinatura restaurada'
     case 'desfazer_confirmacao':
-      return 'Confirmação desfeita'
+      return 'Removida da lista de assinaturas'
     default:
       return 'Assinatura atualizada'
   }

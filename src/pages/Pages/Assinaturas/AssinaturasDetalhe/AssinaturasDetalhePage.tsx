@@ -104,7 +104,7 @@ const AssinaturasDetalhePage = () => {
 
   const handleAcao = async (id: string, acao: AssinaturaAcao) => {
     if (acao === 'desfazer_confirmacao') {
-      const ok = window.confirm('As cobranças deixam de ser pagamento de serviços. Continuar?')
+      const ok = window.confirm('As cobranças deixam de ser assinatura. Continuar?')
       if (!ok) return
     }
 
@@ -384,9 +384,9 @@ const AssinaturasDetalhePage = () => {
                                     >
                                       {origem}
                                     </Badge>
-                                    {cobranca.confirmada ? (
+                                    {cobranca.eh_assinatura || cobranca.confirmada ? (
                                       <Badge color="success" pill>
-                                        Serviço
+                                        Assinatura
                                       </Badge>
                                     ) : null}
                                   </div>

@@ -56,6 +56,7 @@ export interface AssinaturaCobranca {
   fatura_mes?: number | null
   fatura_ano?: number | null
   confirmada?: boolean | null
+  eh_assinatura?: boolean | null
 }
 
 export interface AssinaturaItem {
@@ -94,6 +95,8 @@ export interface AssinaturaItem {
   origem_compra_predominante?: string | null
   origem_compra_predominante_label?: string | null
   ignorada?: boolean | null
+  pode_confirmar?: boolean | null
+  acoes_disponiveis?: AssinaturaAcao[] | string[] | null
 }
 
 export interface AssinaturaView extends AssinaturaItem {
@@ -104,6 +107,7 @@ export interface AssinaturasTotais {
   assinaturas?: number
   confirmadas?: number
   candidatas?: number
+  pendentes_confirmacao?: number
   gasto_12_meses?: number
   estimativa_mensal?: number
   estimativa_anual?: number
@@ -117,11 +121,18 @@ export interface AssinaturasListView {
   ordenar_aplicada?: string | null
   status_aplicado?: string | null
   totais?: AssinaturasTotais
+  /** Lista oficial — preferir este campo */
+  assinaturas?: AssinaturaItem[]
+  /** Sugestões do detector — nunca misturar com a oficial */
+  candidatas?: AssinaturaItem[]
+  ignoradas?: AssinaturaItem[]
+  /** Atalho legado; no default só a oficial. Preferir assinaturas + candidatas. */
   itens?: AssinaturaItem[]
 }
 
 export interface AssinaturasModel {
-  identificador: string
+  identificador?: string
+  transacao_id?: number | string | null
   acao?: AssinaturaAcao | string | null
   loja_id?: number | null
   estabelecimento_id?: number | null
@@ -154,5 +165,6 @@ export const AssinaturasDefaultValues: AssinaturasSearch = {
 
 export const AssinaturaAcaoDefaultValues: AssinaturasModel = {
   identificador: '',
+  transacao_id: null,
   acao: 'confirmar',
 }

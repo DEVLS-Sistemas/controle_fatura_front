@@ -7,7 +7,6 @@ import { setActiveMenu } from 'helpers/system_helpers'
 import { SelectOptions } from 'interfaces/SystemInterfaces/SelectInterface'
 import {
   AssinaturaAcao,
-  AssinaturaStatusFiltro,
   AssinaturasListView,
   AssinaturasSearch,
   AssinaturasTotais,
@@ -103,7 +102,7 @@ const AssinaturasPage = () => {
 
   const handleAcao = async (identificador: string, acao: AssinaturaAcao) => {
     if (acao === 'desfazer_confirmacao') {
-      const ok = window.confirm('As cobranças deixam de ser pagamento de serviços. Continuar?')
+      const ok = window.confirm('As cobranças deixam de ser assinatura. Continuar?')
       if (!ok) return
     }
 
@@ -174,15 +173,23 @@ const AssinaturasPage = () => {
             cartoesOptions={cartoesOptions}
             categoriasOptions={categoriasOptions}
             responsaveisOptions={responsaveisOptions}
-            totais={totais}
           />
-          <AssinaturasHero
-            totais={totais}
-            loading={loading && !totais}
-            onRevisar={() => filterRef.current?.setStatus('candidata' as AssinaturaStatusFiltro)}
-          />
+          {statusFiltro !== 'ignorada' ? (
+            <AssinaturasHero
+              totais={totais}
+              loading={loading && !totais}
+              onRevisar={() => {
+                document.getElementById('assinaturas-para-confirmar')?.scrollIntoView({
+                  behavior: 'smooth',
+                  block: 'start',
+                })
+              }}
+            />
+          ) : null}
           <AssinaturasList
-            itens={listData?.itens}
+            oficiais={listData?.assinaturas}
+            candidatas={listData?.candidatas}
+            ignoradas={listData?.ignoradas}
             loading={loading}
             error={loadError}
             statusFiltro={statusFiltro}

@@ -108,6 +108,7 @@ export interface CompraVisualizacaoView {
   tipo_label?: string | null
   origem_compra?: string | null
   origem_compra_label?: string | null
+  eh_assinatura?: boolean | null
   importada_pdf?: boolean
   parcelas_total?: number | null
   parcela_atual?: number | null

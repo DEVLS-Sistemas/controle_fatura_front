@@ -167,6 +167,14 @@ const CompraVisualizacaoDados = ({ compra }: CompraVisualizacaoDadosProps) => {
             label="Origem"
             value={origemLabel}
           />
+          {compra.eh_assinatura ? (
+            <DadoTile
+              icon="ri-refresh-line"
+              tone="success"
+              label="Assinatura"
+              value="Sim — entra na lista oficial"
+            />
+          ) : null}
         </Row>
 
         {compra.observacoes ? (

@@ -77,6 +77,7 @@ const TransacoesPage = () => {
         fatura_id: parseQueryNumber(searchParams.get('fatura_id')),
         tipo: searchParams.get('tipo'),
         origem_compra: searchParams.get('origem_compra'),
+        eh_assinatura: searchParams.get('eh_assinatura'),
         mes: parseQueryNumber(searchParams.get('mes')),
         ano: parseQueryNumber(searchParams.get('ano')),
         palavra_chave: null,
@@ -87,6 +88,7 @@ const TransacoesPage = () => {
             || searchParams.get('tipo')
             || searchParams.get('categoria_id')
             || searchParams.get('origem_compra')
+            || searchParams.get('eh_assinatura')
         ),
     }).current
 
@@ -115,6 +117,7 @@ const TransacoesPage = () => {
         transacoesContext.fatura_id = data.fatura_id
         transacoesContext.tipo = data.tipo
         transacoesContext.origem_compra = data.origem_compra
+        transacoesContext.eh_assinatura = data.eh_assinatura
         transacoesContext.mes = data.mes
         transacoesContext.ano = data.ano
         transacoesContext.page = data.page

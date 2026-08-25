@@ -12,6 +12,7 @@ export interface TransacoesSearch {
     fatura_id?: string | number | null
     tipo?: string | null
     origem_compra?: string | null
+    eh_assinatura?: boolean | number | string | null
     mes?: string | number | null
     ano?: string | number | null
     palavra_chave?: string | null | unknown
@@ -49,6 +50,7 @@ export interface TransacoesList {
     grupo_chave?: 'cartao' | 'pagamentos_financiamentos' | 'operacionais' | string | null
     origem_compra?: string | null
     origem_compra_label?: string | null
+    eh_assinatura?: boolean | number | string | null
     categoria_id?: number | null
     categoria_nome?: string
     categoria_cor?: string
@@ -118,6 +120,8 @@ export interface TransacoesModel {
     tipo?: string | null
     /** Canal/origem da compra — obrigatório no create */
     origem_compra?: string | null
+    /** Independente de origem_compra: marca a compra como assinatura */
+    eh_assinatura?: boolean | null
     categoria_id?: number | string | null
     subcategoria_id?: number | string | null
     responsavel_id?: number | string | null
@@ -220,6 +224,7 @@ export const TransacoesDefaultValues: TransacoesModel = {
     propagar_grupo: false,
     tipo: 'purchase',
     origem_compra: null,
+    eh_assinatura: false,
     categoria_id: null,
     subcategoria_id: null,
     responsavel_id: null,

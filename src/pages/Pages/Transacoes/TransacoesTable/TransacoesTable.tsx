@@ -19,6 +19,7 @@ import {
     isMeuResponsavelDisplay,
 } from "helpers/fatura_helpers"
 import { CartaoChip } from "helpers/cartao_helpers"
+import { isCompraAvista, isEhAssinatura } from "helpers/assinaturas_helpers"
 import { SelectOptions } from "interfaces/SystemInterfaces/SelectInterface"
 import {
     ResponsavelLookup,
@@ -98,6 +99,7 @@ export const TransacoesTable = ({
     const [localRows, setLocalRows] = useState<TransacoesList[]>([])
     const [responsavelModalOpen, setResponsavelModalOpen] = useState(false)
     const [rowForResponsavel, setRowForResponsavel] = useState<TransacoesList | null>(null)
+    const [togglingAssinaturaId, setTogglingAssinaturaId] = useState<number | null>(null)
     const { voltarParaRotaAnterior } = useNavegacao()
 
     const toggleModal = () => {
@@ -157,6 +159,27 @@ export const TransacoesTable = ({
             console.error('Erro ao atualizar responsável:', error)
             updateLocalRow(rowForResponsavel.id, previous)
             throw error
+        }
+    }
+
+    const handleToggleAssinatura = async (row: TransacoesList) => {
+        if (!row.id || togglingAssinaturaId) return
+        const next = !isEhAssinatura(row.eh_assinatura)
+        const previous = row.eh_assinatura
+        setTogglingAssinaturaId(row.id)
+        updateLocalRow(row.id, { eh_assinatura: next })
+        try {
+            await transacoesService.editTransacoes({
+                id: row.id,
+                eh_assinatura: next,
+            } as Parameters<typeof transacoesService.editTransacoes>[0])
+            toast.success(next ? 'Marcada como assinatura' : 'Removida das assinaturas')
+        } catch (error) {
+            console.error('Erro ao atualizar assinatura:', error)
+            updateLocalRow(row.id, { eh_assinatura: previous })
+            toast.error('Não foi possível atualizar a assinatura')
+        } finally {
+            setTogglingAssinaturaId(null)
         }
     }
 
@@ -305,6 +328,7 @@ export const TransacoesTable = ({
                                                                         </td>
                                                                         <td className={VALOR_TEXT_CLASS}>{formatCurrency(row.valor)}</td>
                                                                         <td>
+                                                                            <div className="d-flex flex-column align-items-center gap-1">
                                                                             {row.origem_compra ? (
                                                                                 <Badge
                                                                                     color={origemCompraColor[row.origem_compra] ?? 'secondary'}
@@ -313,6 +337,13 @@ export const TransacoesTable = ({
                                                                                     {origemLabel(row.origem_compra, row.origem_compra_label)}
                                                                                 </Badge>
                                                                             ) : '-'}
+                                                                            {isEhAssinatura(row.eh_assinatura) ? (
+                                                                                <Badge color="success" className="fw-normal">
+                                                                                    <i className="ri-refresh-line me-1"></i>
+                                                                                    Assinatura
+                                                                                </Badge>
+                                                                            ) : null}
+                                                                            </div>
                                                                         </td>
                                                                         <td>
                                                                             {row.categoria_nome ? (
@@ -391,6 +422,16 @@ export const TransacoesTable = ({
                                                                                 <Link to={`/transacoes/edit/${row.id}`} state={{ source: row }}>
                                                                                     <DropdownItem>Editar</DropdownItem>
                                                                                 </Link>
+                                                                                {isCompraAvista(row) ? (
+                                                                                    <DropdownItem
+                                                                                        disabled={togglingAssinaturaId === row.id}
+                                                                                        onClick={() => handleToggleAssinatura(row)}
+                                                                                    >
+                                                                                        {isEhAssinatura(row.eh_assinatura)
+                                                                                            ? 'Remover das assinaturas'
+                                                                                            : 'Marcar como assinatura'}
+                                                                                    </DropdownItem>
+                                                                                ) : null}
                                                                                 <DropdownItem onClick={() => openDeleteModal(row)}>
                                                                                     Excluir
                                                                                 </DropdownItem>

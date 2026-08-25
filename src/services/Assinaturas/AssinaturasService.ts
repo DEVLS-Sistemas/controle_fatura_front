@@ -93,9 +93,30 @@ export class AssinaturasService implements AssinaturasInterface {
       switch (response.statusCode) {
         case HttpStatusCode.ok: {
           const data = unwrap<AssinaturasListView>(response.body)
+          const itens = Array.isArray(data?.itens) ? data.itens : []
+          const hasSplit = Array.isArray(data?.assinaturas) || Array.isArray(data?.candidatas)
+          const assinaturas = hasSplit
+            ? (data.assinaturas ?? [])
+            : itens.filter((item) => item.status === 'confirmada')
+          const candidatas = hasSplit
+            ? (data.candidatas ?? [])
+            : itens.filter((item) => item.status === 'candidata')
+          const ignoradas = Array.isArray(data?.ignoradas)
+            ? data.ignoradas
+            : itens.filter((item) => item.status === 'ignorada')
+          const pendentes = Number(
+            data?.totais?.pendentes_confirmacao ?? data?.totais?.candidatas ?? candidatas.length
+          )
           return {
             ...data,
-            itens: Array.isArray(data?.itens) ? data.itens : [],
+            assinaturas,
+            candidatas,
+            ignoradas,
+            itens: hasSplit ? (data.itens ?? assinaturas) : itens,
+            totais: {
+              ...(data?.totais ?? {}),
+              pendentes_confirmacao: pendentes,
+            },
           }
         }
         case HttpStatusCode.unauthorized:
@@ -156,9 +177,13 @@ export class AssinaturasService implements AssinaturasInterface {
   }
 
   async createAssinaturas(params: AssinaturasModel) {
+    const body: Record<string, unknown> = {}
+    if (params.identificador) body.identificador = params.identificador
+    if (params.transacao_id) body.transacao_id = params.transacao_id
+
     const response = await this.httpClient.post({
       url: `${this.url}/cadastrar`,
-      body: { identificador: params.identificador },
+      body,
     })
     switch (response.statusCode) {
       case HttpStatusCode.ok:
@@ -177,9 +202,10 @@ export class AssinaturasService implements AssinaturasInterface {
 
   async editAssinaturas(params: AssinaturasModel) {
     const payload: Record<string, unknown> = {
-      identificador: params.identificador,
       acao: params.acao,
     }
+    if (params.identificador) payload.identificador = params.identificador
+    if (params.transacao_id) payload.transacao_id = params.transacao_id
     if (params.loja_id) payload.loja_id = params.loja_id
     if (params.estabelecimento_id) payload.estabelecimento_id = params.estabelecimento_id
 

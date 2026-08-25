@@ -272,6 +272,20 @@ const TransacoesFilter = ({
                                                         />
                                                     </div>
                                                 </Col>
+                                                <Col md={2}>
+                                                    <div className="mb-3">
+                                                        <Label htmlFor="eh_assinatura" className="form-label">Assinatura</Label>
+                                                        <SelectListControlled<TransacoesSearch>
+                                                            options={[
+                                                                { value: '', label: 'Todas' },
+                                                                { value: 'true', label: 'Só assinaturas' },
+                                                                { value: 'false', label: 'Exceto assinaturas' },
+                                                            ]}
+                                                            field="eh_assinatura"
+                                                            control={control}
+                                                        />
+                                                    </div>
+                                                </Col>
                                                 <Col md={3}>
                                                     <div className="mb-3">
                                                         <Label htmlFor="estabelecimento_id" className="form-label">Estabelecimento</Label>

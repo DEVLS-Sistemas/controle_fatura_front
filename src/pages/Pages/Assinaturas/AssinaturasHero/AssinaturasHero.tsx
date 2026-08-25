@@ -10,9 +10,8 @@ interface AssinaturasHeroProps {
 }
 
 const AssinaturasHero = ({ totais, loading, onRevisar }: AssinaturasHeroProps) => {
-  const candidatas = Number(totais?.candidatas ?? 0)
-  const confirmadas = Number(totais?.confirmadas ?? 0)
-  const assinaturas = Number(totais?.assinaturas ?? 0)
+  const pendentes = Number(totais?.pendentes_confirmacao ?? totais?.candidatas ?? 0)
+  const assinaturas = Number(totais?.assinaturas ?? totais?.confirmadas ?? 0)
 
   if (loading && !totais) {
     return (
@@ -92,21 +91,20 @@ const AssinaturasHero = ({ totais, loading, onRevisar }: AssinaturasHeroProps) =
                     <Spinner size="sm" className="ms-2" color="secondary" />
                   ) : null}
                 </h4>
-                <p className="text-muted mb-0 fs-12">
-                  {confirmadas} confirmadas · {candidatas} a revisar
-                </p>
-                {candidatas > 0 && onRevisar ? (
+                {pendentes > 0 && onRevisar ? (
                   <button
                     type="button"
                     className="btn btn-sm btn-soft-warning mt-2"
                     onClick={onRevisar}
                   >
-                    {candidatas} para revisar
+                    {pendentes} para confirmar
                   </button>
-                ) : null}
+                ) : (
+                  <p className="text-muted mb-0 fs-12">Lista oficial</p>
+                )}
               </div>
               <div className="avatar-sm flex-shrink-0">
-                <span className="avatar-title bg-warning-subtle text-warning rounded fs-3">
+                <span className="avatar-title bg-success-subtle text-success rounded fs-3">
                   <i className="ri-refresh-line"></i>
                 </span>
               </div>

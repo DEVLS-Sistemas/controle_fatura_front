@@ -18,6 +18,7 @@ import {
     FATURA_FILE_ACCEPT, isValidFaturaFile, resolveFaturaAnexo, downloadFaturaAnexo,
     getCategoriaFieldStyle, VALOR_TEXT_CLASS, isMeuResponsavelDisplay, nomeResponsavelPadraoNaoEu,
 } from 'helpers/fatura_helpers'
+import { isCompraAvista, isEhAssinatura } from 'helpers/assinaturas_helpers'
 import { CartaoChip, BandeiraChip, resolveCartaoCores } from 'helpers/cartao_helpers'
 import { SelectOptions } from 'interfaces/SystemInterfaces/SelectInterface'
 import {
@@ -910,6 +911,7 @@ const FaturasViewPage = () => {
             | 'valor'
             | 'observacoes'
             | 'origem_compra'
+            | 'eh_assinatura'
         >> & {
             propagar_grupo?: boolean
         }
@@ -925,6 +927,9 @@ const FaturasViewPage = () => {
             const origemCompra = patch.origem_compra !== undefined
                 ? patch.origem_compra
                 : (tx.origem_compra ?? null)
+            const ehAssinatura = patch.eh_assinatura !== undefined
+                ? patch.eh_assinatura
+                : (tx.eh_assinatura ?? null)
             const { propagar_grupo: propagarGrupo, ...rowPatch } = patch
 
             await transacoesService.editTransacoes({
@@ -939,6 +944,7 @@ const FaturasViewPage = () => {
                 data: tx.data ?? null,
                 tipo: tx.tipo ?? null,
                 origem_compra: origemCompra,
+                eh_assinatura: ehAssinatura != null ? Boolean(ehAssinatura) : undefined,
                 categoria_id: categoriaId,
                 subcategoria_id: subcategoriaId,
                 responsavel_id: patch.responsavel_id !== undefined ? patch.responsavel_id : (tx.responsavel_id ?? null),
@@ -1051,11 +1057,28 @@ const FaturasViewPage = () => {
                             origensCompraOptions.find((o) => o.value === origem)?.label
                             ?? origemCompraLabel[origem ?? '']
                             ?? null,
+                        ...(origem === 'PAGAMENTO_SERVICOS' && isCompraAvista(tx)
+                            ? { eh_assinatura: true }
+                            : {}),
                     }
                     : item
             )
         )
-        await saveTransacao(tx, { origem_compra: origem })
+        await saveTransacao(tx, {
+            origem_compra: origem,
+            ...(origem === 'PAGAMENTO_SERVICOS' && isCompraAvista(tx)
+                ? { eh_assinatura: true }
+                : {}),
+        })
+    }
+
+    const handleToggleAssinatura = async (tx: TransacoesList) => {
+        if (!tx.id || !isCompraAvista(tx)) return
+        const next = !isEhAssinatura(tx.eh_assinatura)
+        setTransacoes((prev) =>
+            prev.map((item) => (item.id === tx.id ? { ...item, eh_assinatura: next } : item))
+        )
+        await saveTransacao(tx, { eh_assinatura: next })
     }
 
     const handleUpdateFinal = async (tx: TransacoesList, value: string) => {
@@ -2021,6 +2044,22 @@ const FaturasViewPage = () => {
                                                                         </option>
                                                                     ))}
                                                                 </Input>
+                                                                {isCompraAvista(tx) ? (
+                                                                    <div className="form-check form-switch mt-1 mb-0">
+                                                                        <Input
+                                                                            type="checkbox"
+                                                                            className="form-check-input"
+                                                                            role="switch"
+                                                                            id={`eh-assinatura-${tx.id}`}
+                                                                            checked={isEhAssinatura(tx.eh_assinatura)}
+                                                                            disabled={!!savingIds[tx.id!]}
+                                                                            onChange={() => handleToggleAssinatura(tx)}
+                                                                        />
+                                                                        <Label className="form-check-label fs-12" htmlFor={`eh-assinatura-${tx.id}`}>
+                                                                            Assinatura
+                                                                        </Label>
+                                                                    </div>
+                                                                ) : null}
                                                             </td>
                                                             <td style={{ minWidth: 160 }}>
                                                                 <div className="d-flex gap-1 align-items-center">

@@ -1,7 +1,7 @@
 import React, { forwardRef, useEffect, useImperativeHandle } from 'react'
 import { Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
-import { Breadcrumb, BreadcrumbItem, Card, CardHeader, Col, Label, Nav, NavItem, NavLink, Row } from 'reactstrap'
+import { Breadcrumb, BreadcrumbItem, Card, CardHeader, Col, Label, Row } from 'reactstrap'
 import UiContent from 'Components/Common/UiContent'
 import { InputTextControlled } from 'Components/ComponentController/Inputs/Text/InputTextControlled'
 import { SelectListControlled } from 'Components/ComponentController/Selects/Select/SelectListControlled'
@@ -10,9 +10,7 @@ import {
   AssinaturaStatusFiltro,
   AssinaturasDefaultValues,
   AssinaturasSearch,
-  AssinaturasTotais,
 } from 'interfaces/Assinaturas/AssinaturasInterface'
-import { STATUS_TABS } from 'helpers/assinaturas_helpers'
 
 export interface AssinaturasFilterHandle {
   setStatus: (status: AssinaturaStatusFiltro) => void
@@ -26,7 +24,6 @@ export interface AssinaturasFilterProps {
   cartoesOptions: SelectOptions[]
   categoriasOptions: SelectOptions[]
   responsaveisOptions: SelectOptions[]
-  totais?: AssinaturasTotais
 }
 
 const AssinaturasFilter = forwardRef<AssinaturasFilterHandle, AssinaturasFilterProps>(({
@@ -37,7 +34,6 @@ const AssinaturasFilter = forwardRef<AssinaturasFilterHandle, AssinaturasFilterP
   cartoesOptions,
   categoriasOptions,
   responsaveisOptions,
-  totais,
 }, ref) => {
   const { handleSubmit, control, watch, setValue } = useForm<AssinaturasSearch>({
     defaultValues,
@@ -49,6 +45,7 @@ const AssinaturasFilter = forwardRef<AssinaturasFilterHandle, AssinaturasFilterP
   const cartaoWatch = watch('cartao_id')
   const responsavelWatch = watch('responsavel_id')
   const categoriaWatch = watch('categoria_id')
+  const verIgnoradas = (statusWatch || 'todas') === 'ignorada'
 
   useImperativeHandle(ref, () => ({
     setStatus: (status: AssinaturaStatusFiltro) => {
@@ -60,13 +57,6 @@ const AssinaturasFilter = forwardRef<AssinaturasFilterHandle, AssinaturasFilterP
     handleSubmit(getRemoteAssinaturas)()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statusWatch, ordenarWatch, periodicidadeWatch, cartaoWatch, responsavelWatch, categoriaWatch])
-
-  const tabCount = (value: AssinaturaStatusFiltro): number | null => {
-    if (value === 'candidata') return Number(totais?.candidatas ?? 0)
-    if (value === 'confirmada') return Number(totais?.confirmadas ?? 0)
-    if (value === 'todas') return Number(totais?.assinaturas ?? 0)
-    return null
-  }
 
   return (
     <React.Fragment>
@@ -82,18 +72,28 @@ const AssinaturasFilter = forwardRef<AssinaturasFilterHandle, AssinaturasFilterP
               <div>
                 <h4 className="mb-0">Assinaturas</h4>
                 <p className="text-muted mb-0 fs-13">
-                  Cobranças recorrentes detectadas nas compras à vista
+                  Confirme as sugestões ou marque na própria compra
                 </p>
               </div>
             </div>
-            <Breadcrumb pageTitle="" listClassName="mb-sm-0 pt-1 py-2">
-              <BreadcrumbItem>
-                <Link to="/dashboard">
-                  <i className="ri-home-5-fill"></i>
-                </Link>
-              </BreadcrumbItem>
-              <BreadcrumbItem active>Assinaturas</BreadcrumbItem>
-            </Breadcrumb>
+            <div className="d-flex flex-column flex-sm-row align-items-sm-center gap-2">
+              <button
+                type="button"
+                className={`btn btn-sm ${verIgnoradas ? 'btn-secondary' : 'btn-soft-secondary'}`}
+                onClick={() => setValue('status', verIgnoradas ? 'todas' : 'ignorada')}
+              >
+                <i className="ri-eye-off-line align-middle me-1"></i>
+                {verIgnoradas ? 'Voltar à lista' : 'Ignoradas'}
+              </button>
+              <Breadcrumb pageTitle="" listClassName="mb-sm-0 pt-1 py-2">
+                <BreadcrumbItem>
+                  <Link to="/dashboard">
+                    <i className="ri-home-5-fill"></i>
+                  </Link>
+                </BreadcrumbItem>
+                <BreadcrumbItem active>Assinaturas</BreadcrumbItem>
+              </Breadcrumb>
+            </div>
           </div>
         </Col>
       </Row>
@@ -186,33 +186,6 @@ const AssinaturasFilter = forwardRef<AssinaturasFilterHandle, AssinaturasFilterP
                   </Col>
                 </Row>
               </form>
-
-              <Nav pills className="mt-3 gap-1 flex-wrap">
-                {STATUS_TABS.map((tab) => {
-                  const count = tabCount(tab.value)
-                  const active = (statusWatch || 'todas') === tab.value
-                  return (
-                    <NavItem key={tab.value}>
-                      <NavLink
-                        href="#"
-                        active={active}
-                        className={active ? '' : 'bg-light text-body'}
-                        onClick={(e) => {
-                          e.preventDefault()
-                          setValue('status', tab.value)
-                        }}
-                      >
-                        {tab.label}
-                        {count != null ? (
-                          <span className={`badge ms-1 ${active ? 'bg-white text-primary' : 'bg-secondary-subtle text-body'}`}>
-                            {count}
-                          </span>
-                        ) : null}
-                      </NavLink>
-                    </NavItem>
-                  )
-                })}
-              </Nav>
             </CardHeader>
           </Card>
         </Col>

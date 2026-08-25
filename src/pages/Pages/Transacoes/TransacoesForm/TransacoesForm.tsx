@@ -13,12 +13,14 @@ import {
     isMeuResponsavelDisplay,
     nomeResponsavelPadraoNaoEu,
 } from 'helpers/fatura_helpers'
+import { isEhAssinatura } from 'helpers/assinaturas_helpers'
 import { Breadcrumb, BreadcrumbItem, Button, Card, CardBody, Col, Container, Label, Row } from 'reactstrap'
 import { SubmitHandler, useForm } from 'react-hook-form'
 import { toast } from 'react-toastify'
 import { required } from 'Components/ComponentController/ValidatorForm/ValidatorForm'
 import { InputTextControlled } from 'Components/ComponentController/Inputs/Text/InputTextControlled'
 import { InputDate } from 'Components/ComponentController/Inputs/Date/InputDate'
+import { InputCheckbox } from 'Components/ComponentController/Inputs/Checkbox/InputCheckbox'
 import { SelectListControlled } from 'Components/ComponentController/Selects/Select/SelectListControlled'
 import { AsyncSelectListControlled } from 'Components/ComponentController/Selects/AsyncSelect/AsyncSelectListControlled'
 import { SelectOptions } from 'interfaces/SystemInterfaces/SelectInterface'
@@ -80,6 +82,9 @@ const TransacoesForm = () => {
                 estabelecimento_id: state.source.estabelecimento_id ?? null,
                 subcategoria_id: state.source.subcategoria_id ?? null,
                 origem_compra: state.source.origem_compra ?? null,
+                eh_assinatura: state.source.eh_assinatura != null
+                    ? isEhAssinatura(state.source.eh_assinatura)
+                    : state.source.origem_compra === 'PAGAMENTO_SERVICOS',
                 valor: toPrecoDigits(state.source.valor ?? state.source.valor_compra),
                 valor_compra: toPrecoDigits(state.source.valor_compra ?? state.source.valor),
                 parcelas_total: state.source.parcelas_total ?? 1,
@@ -119,6 +124,7 @@ const TransacoesForm = () => {
     )
     const applyingEstabelecimentoDefaults = useRef(false)
     const estabelecimentosCache = useRef<Map<number, EstabelecimentoLookup>>(new Map())
+    const origemAnteriorRef = useRef(record.origem_compra)
 
     const { voltarParaRotaAnterior } = useNavegacao()
     const navigate = useNavigate()
@@ -135,6 +141,7 @@ const TransacoesForm = () => {
     const responsavelId = watch('responsavel_id')
     const valorCompraWatch = watch('valor_compra')
     const parcelasTotalWatch = watch('parcelas_total')
+    const origemCompraWatch = watch('origem_compra')
     const propagarGrupo = watch('propagar_grupo')
 
     const nParcelas = Math.max(1, Math.min(36, Number(parcelasTotalWatch) || 1))
@@ -461,6 +468,7 @@ const TransacoesForm = () => {
                     valor: toCentavos(data.valor ?? data.valor_compra) / 100,
                     tipo: data.tipo,
                     origem_compra: data.origem_compra,
+                    eh_assinatura: nParcelas <= 1 ? Boolean(data.eh_assinatura) : false,
                     categoria_id: data.categoria_id,
                     subcategoria_id: data.categoria_id ? data.subcategoria_id : null,
                     responsavel_id: data.responsavel_id,
@@ -486,6 +494,7 @@ const TransacoesForm = () => {
                     valor_compra: toBrPayload(data.valor_compra),
                     tipo: data.tipo || 'purchase',
                     origem_compra: data.origem_compra,
+                    eh_assinatura: nParcelas <= 1 ? Boolean(data.eh_assinatura) : false,
                     parcelas_total: nParcelas,
                     categoria_id: data.categoria_id || undefined,
                     subcategoria_id: data.categoria_id ? (data.subcategoria_id || undefined) : undefined,
@@ -530,6 +539,22 @@ const TransacoesForm = () => {
     useEffect(() => {
         getLookups()
     }, [])
+
+    useEffect(() => {
+        if (nParcelas > 1) {
+            setValue('eh_assinatura', false)
+            origemAnteriorRef.current = origemCompraWatch
+            return
+        }
+        if (
+            origemCompraWatch === 'PAGAMENTO_SERVICOS'
+            && origemAnteriorRef.current !== 'PAGAMENTO_SERVICOS'
+        ) {
+            setValue('eh_assinatura', true)
+        }
+        origemAnteriorRef.current = origemCompraWatch
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [origemCompraWatch, nParcelas])
 
     useEffect(() => {
         setActiveMenu('/transacoes')
@@ -761,6 +786,21 @@ const TransacoesForm = () => {
                                                         control={control}
                                                         required={required}
                                                     />
+                                                    {nParcelas <= 1 ? (
+                                                        <div className="form-check form-switch mt-2 mb-0">
+                                                            <InputCheckbox<TransacoesModel>
+                                                                field="eh_assinatura"
+                                                                register={register}
+                                                                role="switch"
+                                                            />
+                                                            <Label className="form-check-label" htmlFor="eh_assinatura">
+                                                                É assinatura
+                                                            </Label>
+                                                            <div className="text-muted fs-12">
+                                                                Entra na lista oficial mesmo sem o detector
+                                                            </div>
+                                                        </div>
+                                                    ) : null}
                                                 </div>
                                             </Col>
                                             <Col md={2}>

@@ -2,12 +2,12 @@ import React from 'react'
 import { DropdownItem, Spinner } from 'reactstrap'
 import TableActionsDropdown from 'Components/Common/TableActionsDropdown'
 import { AssinaturaAcao, AssinaturaItem } from 'interfaces/Assinaturas/AssinaturasInterface'
+import { acoesAssinatura, podeConfirmarAssinatura } from 'helpers/assinaturas_helpers'
 
 interface AssinaturasAcoesProps {
   item: AssinaturaItem
   acting?: boolean
   onAcao: (identificador: string, acao: AssinaturaAcao) => void
-  onVerCobrancas?: (identificador: string) => void
 }
 
 const stop = (event: React.MouseEvent) => {
@@ -15,9 +15,13 @@ const stop = (event: React.MouseEvent) => {
   event.stopPropagation()
 }
 
-const AssinaturasAcoes = ({ item, acting, onAcao, onVerCobrancas }: AssinaturasAcoesProps) => {
+const AssinaturasAcoes = ({ item, acting, onAcao }: AssinaturasAcoesProps) => {
   const identificador = item.identificador
-  const status = item.status
+  const acoes = acoesAssinatura(item)
+  const confirmar = podeConfirmarAssinatura(item) && acoes.includes('confirmar')
+  const ignorar = acoes.includes('ignorar')
+  const restaurar = acoes.includes('restaurar')
+  const desfazer = acoes.includes('desfazer_confirmacao')
 
   const handleAcao = (event: React.MouseEvent, acao: AssinaturaAcao) => {
     stop(event)
@@ -25,14 +29,11 @@ const AssinaturasAcoes = ({ item, acting, onAcao, onVerCobrancas }: AssinaturasA
     onAcao(identificador, acao)
   }
 
-  const handleVer = (event: React.MouseEvent) => {
-    stop(event)
-    onVerCobrancas?.(identificador)
-  }
+  if (!confirmar && !ignorar && !restaurar && !desfazer) return null
 
-  if (status === 'candidata') {
-    return (
-      <div className="d-flex flex-wrap gap-2" onClick={stop}>
+  return (
+    <div className="d-flex flex-wrap align-items-center gap-2" onClick={stop}>
+      {confirmar ? (
         <button
           type="button"
           className="btn btn-sm btn-success"
@@ -42,46 +43,18 @@ const AssinaturasAcoes = ({ item, acting, onAcao, onVerCobrancas }: AssinaturasA
           {acting ? <Spinner size="sm" className="me-1" /> : <i className="ri-check-line align-middle me-1"></i>}
           Confirmar
         </button>
+      ) : null}
+      {ignorar ? (
         <button
           type="button"
           className="btn btn-sm btn-soft-secondary"
           disabled={acting}
           onClick={(e) => handleAcao(e, 'ignorar')}
         >
-          Ignorar
+          Não é assinatura
         </button>
-        {onVerCobrancas ? (
-          <button type="button" className="btn btn-sm btn-soft-primary" onClick={handleVer}>
-            Ver cobranças
-          </button>
-        ) : null}
-      </div>
-    )
-  }
-
-  if (status === 'confirmada') {
-    return (
-      <div className="d-flex flex-wrap align-items-center gap-2" onClick={stop}>
-        {onVerCobrancas ? (
-          <button type="button" className="btn btn-sm btn-primary" onClick={handleVer}>
-            Ver cobranças
-          </button>
-        ) : null}
-        <TableActionsDropdown toggleClassName="btn btn-sm btn-soft-secondary">
-          <DropdownItem
-            disabled={acting}
-            onClick={(e) => handleAcao(e, 'desfazer_confirmacao')}
-          >
-            Desfazer confirmação
-          </DropdownItem>
-        </TableActionsDropdown>
-      </div>
-    )
-  }
-
-  if (status === 'ignorada') {
-    return (
-      <div className="d-flex flex-wrap gap-2" onClick={stop}>
+      ) : null}
+      {restaurar ? (
         <button
           type="button"
           className="btn btn-sm btn-success"
@@ -91,11 +64,19 @@ const AssinaturasAcoes = ({ item, acting, onAcao, onVerCobrancas }: AssinaturasA
           {acting ? <Spinner size="sm" className="me-1" /> : <i className="ri-arrow-go-back-line align-middle me-1"></i>}
           Restaurar
         </button>
-      </div>
-    )
-  }
-
-  return null
+      ) : null}
+      {desfazer ? (
+        <TableActionsDropdown toggleClassName="btn btn-sm btn-soft-secondary">
+          <DropdownItem
+            disabled={acting}
+            onClick={(e) => handleAcao(e, 'desfazer_confirmacao')}
+          >
+            Desfazer confirmação
+          </DropdownItem>
+        </TableActionsDropdown>
+      ) : null}
+    </div>
+  )
 }
 
 export default AssinaturasAcoes
