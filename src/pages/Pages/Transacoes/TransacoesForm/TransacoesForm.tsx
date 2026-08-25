@@ -14,6 +14,19 @@ import {
     nomeResponsavelPadraoNaoEu,
 } from 'helpers/fatura_helpers'
 import { isEhAssinatura } from 'helpers/assinaturas_helpers'
+import {
+    adicionarMesesCompetencia,
+    competenciaPrimeiraParcela,
+    labelCompetenciaCompleta,
+    todayISO,
+} from 'helpers/simulador_compra_helpers'
+import {
+    dataCaiForaDaFaturaAberta,
+    faturaAbertaDoSource,
+    identificadorAposCadastro,
+    mensagemAposCadastro,
+    pathVisualizacaoCompra,
+} from 'helpers/cadastro_manual_compra_helpers'
 import { Breadcrumb, BreadcrumbItem, Button, Card, CardBody, Col, Container, Label, Row } from 'reactstrap'
 import { SubmitHandler, useForm } from 'react-hook-form'
 import { toast } from 'react-toastify'
@@ -25,8 +38,10 @@ import { SelectListControlled } from 'Components/ComponentController/Selects/Sel
 import { AsyncSelectListControlled } from 'Components/ComponentController/Selects/AsyncSelect/AsyncSelectListControlled'
 import { SelectOptions } from 'interfaces/SystemInterfaces/SelectInterface'
 import {
+    CartaoLookup,
     CategoriaLookup,
     EstabelecimentoLookup,
+    FaturaLookup,
     ResponsavelLookup,
     TransacoesDefaultValues,
     TransacoesModel,
@@ -70,34 +85,43 @@ const TransacoesForm = () => {
         return String(toCentavos(value))
     }
 
-    const [record] = useState<TransacoesModel>(
-        state?.source
-            ? {
-                ...TransacoesDefaultValues,
-                ...state.source,
-                transacao_id: state.source.transacao_id ?? state.source.id,
-                cartao_id: state.source.cartao_id ?? null,
-                cartao_numero_id: state.source.cartao_numero_id ?? state.source.cartao_numero?.id ?? null,
-                fatura_id: state.source.fatura_id ?? null,
-                estabelecimento_id: state.source.estabelecimento_id ?? null,
-                subcategoria_id: state.source.subcategoria_id ?? null,
-                origem_compra: state.source.origem_compra ?? null,
-                eh_assinatura: state.source.eh_assinatura != null
-                    ? isEhAssinatura(state.source.eh_assinatura)
-                    : state.source.origem_compra === 'PAGAMENTO_SERVICOS',
-                valor: toPrecoDigits(state.source.valor ?? state.source.valor_compra),
-                valor_compra: toPrecoDigits(state.source.valor_compra ?? state.source.valor),
-                parcelas_total: state.source.parcelas_total ?? 1,
-                compra_grupo_id: state.source.compra_grupo_id ?? null,
-            }
-            : TransacoesDefaultValues
-    )
+    const [record] = useState<TransacoesModel>(() => {
+        const source = state?.source
+        const isEditInit = Boolean(source?.transacao_id ?? source?.id)
+        if (!source) {
+            return { ...TransacoesDefaultValues, data: todayISO(), tipo: 'purchase' }
+        }
+        return {
+            ...TransacoesDefaultValues,
+            ...source,
+            transacao_id: source.transacao_id ?? source.id,
+            cartao_id: source.cartao_id ?? null,
+            cartao_numero_id: source.cartao_numero_id ?? source.cartao_numero?.id ?? null,
+            fatura_id: source.fatura_id ?? null,
+            estabelecimento_id: source.estabelecimento_id ?? null,
+            estabelecimento: source.estabelecimento_id ? null : (source.estabelecimento ?? null),
+            subcategoria_id: source.subcategoria_id ?? null,
+            origem_compra: source.origem_compra ?? null,
+            eh_assinatura: source.eh_assinatura != null
+                ? isEhAssinatura(source.eh_assinatura)
+                : source.origem_compra === 'PAGAMENTO_SERVICOS',
+            valor: toPrecoDigits(source.valor ?? source.valor_compra),
+            valor_compra: toPrecoDigits(source.valor_compra ?? source.valor),
+            parcelas_total: source.parcelas_total ?? 1,
+            compra_grupo_id: source.compra_grupo_id ?? null,
+            tipo: source.tipo ?? 'purchase',
+            data: source.data ?? (isEditInit ? null : todayISO()),
+        }
+    })
 
     const { register, handleSubmit, control, setValue, watch } = useForm<TransacoesModel>({
         defaultValues: record,
     })
 
     const [cartoesOptions, setCartoesOptions] = useState<SelectOptions[]>([])
+    const [cartoesLookup, setCartoesLookup] = useState<CartaoLookup[]>([])
+    const [faturasLookup, setFaturasLookup] = useState<FaturaLookup[]>([])
+    const [lookupsReady, setLookupsReady] = useState(false)
     const [numerosOptions, setNumerosOptions] = useState<SelectOptions[]>([])
     const [showNumeroSelect, setShowNumeroSelect] = useState(false)
     const [semNumeros, setSemNumeros] = useState(false)
@@ -136,7 +160,10 @@ const TransacoesForm = () => {
     const fromFatura = Boolean(record.fatura_id)
 
     const cartaoId = watch('cartao_id')
+    const cartaoNumeroId = watch('cartao_numero_id')
     const estabelecimentoId = watch('estabelecimento_id')
+    const estabelecimentoTexto = watch('estabelecimento')
+    const dataWatch = watch('data')
     const categoriaId = watch('categoria_id')
     const responsavelId = watch('responsavel_id')
     const valorCompraWatch = watch('valor_compra')
@@ -150,10 +177,34 @@ const TransacoesForm = () => {
     const totaisBatem = nParcelas <= 1 || totalParcelasCentavos === valorCompraCentavos
     const showFinalField = showNumeroSelect || semNumeros || numerosLoading
         || (isEdit && (numerosOptions.length > 0 || semNumeros || numerosLoading))
+    const isCompraFlow = !isEdit || (record.tipo ?? 'purchase') === 'purchase'
+    const pageTitle = isEdit
+        ? (isCompraFlow ? 'Editar compra' : 'Editar transação')
+        : 'Nova compra'
+
+    const cartaoAtual = cartoesLookup.find((c) => Number(c.id) === Number(cartaoId))
+    const numeroAtual = numerosOptions.find((n) => Number(n.value) === Number(cartaoNumeroId))
+    const primeiraCompetencia = competenciaPrimeiraParcela(dataWatch, cartaoAtual?.dia_limite_fatura ?? null)
+    const ultimaCompetencia = primeiraCompetencia && nParcelas > 1
+        ? adicionarMesesCompetencia(primeiraCompetencia.mes, primeiraCompetencia.ano, nParcelas - 1)
+        : null
+    const faturaAberta = faturaAbertaDoSource(state?.source)
+        ?? (record.fatura_id
+            ? (() => {
+                const fat = faturasLookup.find((f) => Number(f.id) === Number(record.fatura_id))
+                return fat?.mes && fat?.ano ? { mes: fat.mes, ano: fat.ano } : null
+            })()
+            : null)
+    const caiForaDaFaturaAberta = Boolean(
+        fromFatura && !isEdit && dataCaiForaDaFaturaAberta(primeiraCompetencia, faturaAberta)
+    )
 
     const responsavelAtual = responsaveisLookup.find((r) => Number(r.id) === Number(responsavelId))
+    const responsavelIdNum = responsavelId == null || responsavelId === ''
+        ? null
+        : Number(responsavelId)
     const isMeuResponsavel = isMeuResponsavelDisplay({
-        responsavelId,
+        responsavelId: Number.isFinite(responsavelIdNum) ? responsavelIdNum : null,
         responsavelNome: responsavelAtual?.nome,
         defaultResponsavelId,
         padraoFaturaNome: state?.source?.responsavel_nome,
@@ -303,6 +354,7 @@ const TransacoesForm = () => {
         try {
             const lookups = await transacoesService.getLookupsTransacoes()
             if (lookups?.cartoes) {
+                setCartoesLookup(lookups.cartoes)
                 setCartoesOptions(
                     lookups.cartoes.map((c) => ({
                         value: c.id!,
@@ -311,6 +363,9 @@ const TransacoesForm = () => {
                         cor_texto: c.cor_texto ?? null,
                     }))
                 )
+            }
+            if (lookups?.faturas) {
+                setFaturasLookup(lookups.faturas)
             }
             if (lookups?.categorias) {
                 setCategoriasLookup(lookups.categorias)
@@ -346,6 +401,8 @@ const TransacoesForm = () => {
             }
         } catch (error) {
             console.error('Erro ao carregar lookups:', error)
+        } finally {
+            setLookupsReady(true)
         }
     }
 
@@ -456,6 +513,17 @@ const TransacoesForm = () => {
                 return
             }
 
+            const estabelecimentoNome = String(data.estabelecimento ?? '').trim()
+            if (!data.estabelecimento_id && !estabelecimentoNome) {
+                toast.warning('Informe o estabelecimento — pode ser o nome que você conhece')
+                return
+            }
+
+            if (!isEdit && isCompraFlow && !String(data.observacoes ?? '').trim()) {
+                toast.warning('Informe a descrição da compra')
+                return
+            }
+
             if (isEdit) {
                 const payload: TransacoesModel = {
                     id: record.id ?? record.transacao_id,
@@ -465,8 +533,9 @@ const TransacoesForm = () => {
                     fatura_id: data.fatura_id,
                     data: data.data,
                     estabelecimento_id: data.estabelecimento_id,
+                    estabelecimento: data.estabelecimento_id ? undefined : (estabelecimentoNome || undefined),
                     valor: toCentavos(data.valor ?? data.valor_compra) / 100,
-                    tipo: data.tipo,
+                    tipo: isCompraFlow ? 'purchase' : data.tipo,
                     origem_compra: data.origem_compra,
                     eh_assinatura: nParcelas <= 1 ? Boolean(data.eh_assinatura) : false,
                     categoria_id: data.categoria_id,
@@ -478,61 +547,77 @@ const TransacoesForm = () => {
                 if (payload.estabelecimento_id) {
                     delete (payload as any).estabelecimento
                 }
-                await transacoesService.editTransacoes(payload)
-                toast.success('Transação atualizada com sucesso')
-            } else {
-                if (nParcelas > 1 && !totaisBatem) {
-                    toast.error('O total das parcelas deve ser igual ao valor da compra.')
+                const result = await transacoesService.editTransacoes(payload)
+                toast.success(mensagemAposCadastro(result, 'Compra atualizada com sucesso'))
+                const identificador = record.compra_grupo_id
+                    || record.transacao_id
+                    || record.id
+                if (identificador && isCompraFlow) {
+                    navigate(pathVisualizacaoCompra(String(identificador)), {
+                        state: { from: returnTo || '/transacoes' },
+                    })
                     return
                 }
-
-                const payload: TransacoesModel = {
-                    cartao_id: data.cartao_id,
-                    cartao_numero_id: data.cartao_numero_id || undefined,
-                    data: data.data,
-                    estabelecimento_id: data.estabelecimento_id,
-                    valor_compra: toBrPayload(data.valor_compra),
-                    tipo: data.tipo || 'purchase',
-                    origem_compra: data.origem_compra,
-                    eh_assinatura: nParcelas <= 1 ? Boolean(data.eh_assinatura) : false,
-                    parcelas_total: nParcelas,
-                    categoria_id: data.categoria_id || undefined,
-                    subcategoria_id: data.categoria_id ? (data.subcategoria_id || undefined) : undefined,
-                    responsavel_id: data.responsavel_id || undefined,
-                    observacoes: data.observacoes || undefined,
-                }
-
-                if (fromFatura && data.fatura_id) {
-                    payload.fatura_id = data.fatura_id
-                }
-
-                if (nParcelas > 1) {
-                    payload.parcelas = parcelasValores.map((valor, idx) => ({
-                        parcela: idx + 1,
-                        valor: toBrPayload(valor),
-                    }))
-                }
-
-                if (payload.estabelecimento_id) {
-                    delete (payload as any).estabelecimento
-                }
-
-                // Não enviar parcela_atual no create
-                delete (payload as any).parcela_atual
-                delete (payload as any).valor
-
-                await transacoesService.createTransacoes(payload)
-                toast.success(
-                    nParcelas > 1
-                        ? `Compra parcelada cadastrada (${nParcelas} parcelas)`
-                        : 'Transação cadastrada com sucesso'
-                )
+                navigate(returnTo || '/transacoes')
+                return
             }
 
+            if (nParcelas > 1 && !totaisBatem) {
+                toast.error('O total das parcelas deve ser igual ao valor da compra.')
+                return
+            }
+
+            const payload: TransacoesModel = {
+                cartao_id: data.cartao_id,
+                cartao_numero_id: data.cartao_numero_id || undefined,
+                data: data.data,
+                valor_compra: toBrPayload(data.valor_compra),
+                tipo: 'purchase',
+                origem_compra: data.origem_compra,
+                eh_assinatura: nParcelas <= 1 ? Boolean(data.eh_assinatura) : false,
+                parcelas_total: nParcelas,
+                categoria_id: data.categoria_id || undefined,
+                subcategoria_id: data.categoria_id ? (data.subcategoria_id || undefined) : undefined,
+                responsavel_id: data.responsavel_id || undefined,
+                observacoes: String(data.observacoes ?? '').trim() || undefined,
+            }
+
+            if (data.estabelecimento_id) {
+                payload.estabelecimento_id = data.estabelecimento_id
+            } else {
+                payload.estabelecimento = estabelecimentoNome
+            }
+
+            if (fromFatura && data.fatura_id) {
+                payload.fatura_id = data.fatura_id
+            }
+
+            if (nParcelas > 1) {
+                payload.parcelas = parcelasValores.map((valor, idx) => ({
+                    parcela: idx + 1,
+                    valor: toBrPayload(valor),
+                }))
+            }
+
+            delete (payload as any).parcela_atual
+            delete (payload as any).valor
+
+            const result = await transacoesService.createTransacoes(payload)
+            const fallbackMsg = nParcelas > 1
+                ? `Compra parcelada cadastrada (${nParcelas} parcelas)`
+                : 'Transação cadastrada com sucesso!'
+            toast.success(mensagemAposCadastro(result, fallbackMsg))
+
+            const identificador = identificadorAposCadastro(result)
+            if (identificador) {
+                navigate(pathVisualizacaoCompra(identificador), {
+                    state: { from: returnTo || '/transacoes' },
+                })
+                return
+            }
             navigate(returnTo || '/transacoes')
         } catch (error: any) {
-            toast.error('Erro ao salvar transação')
-            throw error
+            toast.error(error?.message || 'Erro ao salvar compra')
         }
     }
 
@@ -638,6 +723,7 @@ const TransacoesForm = () => {
             applyingEstabelecimentoDefaults.current = true
             setValue('categoria_id', est.categoria_padrao_id ?? null)
             setValue('subcategoria_id', est.subcategoria_padrao_id ?? null)
+            setValue('estabelecimento', null)
             loadSubcategorias(est.categoria_padrao_id)
         }
 
@@ -667,16 +753,12 @@ const TransacoesForm = () => {
                             <div className="page-title-box d-sm-flex align-items-center justify-content-between">
                                 <div className="d-sm-flex align-items-center justify-content-between">
                                     <Link to={returnTo || '/transacoes'}><i className="bx bx-arrow-back bx-sm"></i></Link>
-                                    <h4 className="mb-sm-0 ms-3">
-                                        {isEdit ? 'Editar' : 'Adicionar'} {fromFatura && !isEdit ? 'Compra' : 'Transação'}
-                                    </h4>
+                                    <h4 className="mb-sm-0 ms-3">{pageTitle}</h4>
                                 </div>
                                 <Breadcrumb pageTitle="" listClassName="mb-sm-0 pt-1 py-2">
                                     <BreadcrumbItem><Link to="/dashboard"><i className="ri-home-5-fill"></i></Link></BreadcrumbItem>
                                     <BreadcrumbItem><Link to="/transacoes">Transações</Link></BreadcrumbItem>
-                                    <BreadcrumbItem active>
-                                        {isEdit ? 'Editar' : 'Adicionar'} Transação
-                                    </BreadcrumbItem>
+                                    <BreadcrumbItem active>{pageTitle}</BreadcrumbItem>
                                 </Breadcrumb>
                             </div>
                         </Col>
@@ -686,8 +768,36 @@ const TransacoesForm = () => {
                             <Card>
                                 <CardBody>
                                     <form onSubmit={handleSubmit(onSubmit)}>
+                                        {lookupsReady && cartoesOptions.length === 0 ? (
+                                            <div className="alert alert-warning">
+                                                Cadastre um cartão antes de registrar uma compra.{' '}
+                                                <Link to="/cartoes/add">Ir para cartões</Link>
+                                            </div>
+                                        ) : null}
+
+                                        {isCompraFlow ? (
+                                            <Row>
+                                                <Col md={12}>
+                                                    <div className="mb-3">
+                                                        <Label htmlFor="observacoes" className="form-label">
+                                                            Descrição da compra
+                                                        </Label>
+                                                        <textarea
+                                                            {...register('observacoes', { required: !isEdit ? required : undefined })}
+                                                            className="form-control"
+                                                            rows={2}
+                                                            placeholder="Ex.: Mouse Logitech"
+                                                        />
+                                                        <small className="text-muted">
+                                                            Nome que você reconhece. Não precisa ser o texto da fatura.
+                                                        </small>
+                                                    </div>
+                                                </Col>
+                                            </Row>
+                                        ) : null}
+
                                         <Row>
-                                            <Col md={showFinalField ? 4 : 6}>
+                                            <Col md={showFinalField ? (isCompraFlow ? 5 : 4) : (isCompraFlow ? 6 : 6)}>
                                                 <div className="mb-3">
                                                     <Label htmlFor="cartao_id" className="form-label">Cartão</Label>
                                                     <SelectListControlled<TransacoesModel>
@@ -703,7 +813,7 @@ const TransacoesForm = () => {
                                                 </div>
                                             </Col>
                                             {showFinalField && (
-                                                <Col md={4}>
+                                                <Col md={isCompraFlow ? 4 : 4}>
                                                     <div className="mb-3">
                                                         <Label htmlFor="cartao_numero_id" className="form-label">
                                                             Final do cartão
@@ -737,12 +847,13 @@ const TransacoesForm = () => {
                                                     </div>
                                                 </Col>
                                             )}
-                                            <Col md={showFinalField ? 2 : 3}>
+                                            <Col md={showFinalField ? 3 : 3}>
                                                 <div className="mb-3">
                                                     <Label htmlFor="data" className="form-label">Data da compra</Label>
                                                     <InputDate<TransacoesModel>
                                                         field="data"
                                                         register={register}
+                                                        required={required}
                                                     />
                                                     {fromFatura && !isEdit && (
                                                         <small className="text-muted">
@@ -751,17 +862,19 @@ const TransacoesForm = () => {
                                                     )}
                                                 </div>
                                             </Col>
-                                            <Col md={showFinalField ? 2 : 3}>
-                                                <div className="mb-3">
-                                                    <Label htmlFor="tipo" className="form-label">Tipo</Label>
-                                                    <SelectListControlled<TransacoesModel>
-                                                        options={optTipos}
-                                                        field="tipo"
-                                                        control={control}
-                                                        required={required}
-                                                    />
-                                                </div>
-                                            </Col>
+                                            {!isCompraFlow ? (
+                                                <Col md={showFinalField ? 2 : 3}>
+                                                    <div className="mb-3">
+                                                        <Label htmlFor="tipo" className="form-label">Tipo</Label>
+                                                        <SelectListControlled<TransacoesModel>
+                                                            options={optTipos}
+                                                            field="tipo"
+                                                            control={control}
+                                                            required={required}
+                                                        />
+                                                    </div>
+                                                </Col>
+                                            ) : null}
                                         </Row>
                                         <Row>
                                             <Col md={5}>
@@ -771,10 +884,43 @@ const TransacoesForm = () => {
                                                         callback={searchEstabelecimentos}
                                                         field="estabelecimento_id"
                                                         control={control}
-                                                        required={required}
+                                                        required={!String(estabelecimentoTexto ?? '').trim() ? required : undefined}
                                                         defaultValue={estabelecimentoDefault}
                                                         placeholder="Digite para buscar..."
                                                     />
+                                                    <small className="text-muted d-block">
+                                                        Pode ser o nome que você conhece. Não precisa ser igual ao da fatura.
+                                                    </small>
+                                                    {!estabelecimentoId ? (
+                                                        <div className="mt-2">
+                                                            <Label htmlFor="estabelecimento" className="form-label small mb-1">
+                                                                Não encontrou? Use o nome digitado
+                                                            </Label>
+                                                            <input
+                                                                id="estabelecimento"
+                                                                type="text"
+                                                                className="form-control"
+                                                                placeholder="Ex.: Magazine ou Mouse Logitech"
+                                                                {...register('estabelecimento')}
+                                                            />
+                                                        </div>
+                                                    ) : (
+                                                        <button
+                                                            type="button"
+                                                            className="btn btn-link btn-sm px-0"
+                                                            onClick={() => {
+                                                                setValue('estabelecimento_id', null)
+                                                                setValue('estabelecimento', '')
+                                                            }}
+                                                        >
+                                                            Usar um nome novo em vez deste
+                                                        </button>
+                                                    )}
+                                                    {estabelecimentoId ? null : String(estabelecimentoTexto ?? '').trim() ? (
+                                                        <small className="text-success d-block mt-1">
+                                                            Vai cadastrar: {String(estabelecimentoTexto).trim()}
+                                                        </small>
+                                                    ) : null}
                                                 </div>
                                             </Col>
                                             <Col md={3}>
@@ -849,6 +995,40 @@ const TransacoesForm = () => {
                                                 </div>
                                             </Col>
                                         </Row>
+
+                                        {!isEdit && primeiraCompetencia ? (
+                                            <Row>
+                                                <Col md={12}>
+                                                    <div className={`mb-3 border rounded p-3 ${caiForaDaFaturaAberta ? 'border-warning bg-warning-subtle' : 'bg-light'}`}>
+                                                        <div className="text-muted text-uppercase fs-11 fw-semibold mb-1">Fatura</div>
+                                                        <div className="fw-semibold">
+                                                            {nParcelas > 1 ? 'Primeira fatura: ' : ''}
+                                                            {labelCompetenciaCompleta(primeiraCompetencia.mes, primeiraCompetencia.ano)}
+                                                        </div>
+                                                        {ultimaCompetencia ? (
+                                                            <div className="fw-semibold">
+                                                                Última fatura: {labelCompetenciaCompleta(ultimaCompetencia.mes, ultimaCompetencia.ano)}
+                                                            </div>
+                                                        ) : null}
+                                                        <div className="text-muted fs-13 mt-1">
+                                                            {[
+                                                                cartaoAtual?.nome,
+                                                                numeroAtual?.label,
+                                                            ].filter(Boolean).join(' · ')}
+                                                        </div>
+                                                        <small className="text-muted d-block mt-1">
+                                                            Definida pelo cartão e pela data. As parcelas seguintes caem nas faturas dos meses seguintes.
+                                                        </small>
+                                                        {caiForaDaFaturaAberta && faturaAberta ? (
+                                                            <div className="alert alert-warning mb-0 mt-2 py-2">
+                                                                Esta data cai na fatura de {labelCompetenciaCompleta(primeiraCompetencia.mes, primeiraCompetencia.ano)}, não na fatura aberta ({labelCompetenciaCompleta(faturaAberta.mes, faturaAberta.ano)}).
+                                                            </div>
+                                                        ) : null}
+                                                    </div>
+                                                </Col>
+                                            </Row>
+                                        ) : null}
+
                                         <Row>
                                             <Col md={4}>
                                                 <div className="mb-3">
@@ -902,7 +1082,7 @@ const TransacoesForm = () => {
                                             </Col>
                                             <Col md={4}>
                                                 <div className="mb-3">
-                                                    <Label htmlFor="parcelas_total" className="form-label">Parcelas</Label>
+                                                    <Label htmlFor="parcelas_total" className="form-label">Parcelamento</Label>
                                                     {isEdit ? (
                                                         <div className="form-control-plaintext">
                                                             {record.parcelas_total && Number(record.parcelas_total) > 1
@@ -910,12 +1090,36 @@ const TransacoesForm = () => {
                                                                 : 'À vista'}
                                                         </div>
                                                     ) : (
-                                                        <SelectListControlled<TransacoesModel>
-                                                            options={optParcelas}
-                                                            field="parcelas_total"
-                                                            control={control}
-                                                            required={required}
-                                                        />
+                                                        <>
+                                                            <div className="btn-group w-100 mb-2" role="group">
+                                                                <button
+                                                                    type="button"
+                                                                    className={`btn ${nParcelas <= 1 ? 'btn-primary' : 'btn-soft-primary'}`}
+                                                                    onClick={() => setValue('parcelas_total', 1)}
+                                                                >
+                                                                    À vista
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    className={`btn ${nParcelas > 1 ? 'btn-primary' : 'btn-soft-primary'}`}
+                                                                    onClick={() => {
+                                                                        if (nParcelas <= 1) setValue('parcelas_total', 2)
+                                                                    }}
+                                                                >
+                                                                    Parcelada
+                                                                </button>
+                                                            </div>
+                                                            {nParcelas > 1 ? (
+                                                                <SelectListControlled<TransacoesModel>
+                                                                    options={optParcelas.filter((o) => Number(o.value) > 1)}
+                                                                    field="parcelas_total"
+                                                                    control={control}
+                                                                    required={required}
+                                                                />
+                                                            ) : (
+                                                                <input type="hidden" {...register('parcelas_total')} />
+                                                            )}
+                                                        </>
                                                     )}
                                                 </div>
                                             </Col>
@@ -925,9 +1129,11 @@ const TransacoesForm = () => {
                                             <Row>
                                                 <Col md={12}>
                                                     <div className="mb-3 border rounded p-3 bg-light">
-                                                        <div className="d-flex justify-content-between align-items-center mb-2">
+                                                        <div className="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
                                                             <Label className="form-label mb-0">Valores das parcelas</Label>
                                                             <span className={`small ${totaisBatem ? 'text-success' : 'text-danger'}`}>
+                                                                {parcelasValores[0] ? `Parcela: ${centavosToBr(toCentavos(parcelasValores[0]))}` : null}
+                                                                {' · '}
                                                                 Total das parcelas: {centavosToBr(totalParcelasCentavos)}
                                                                 {!totaisBatem && (
                                                                     <> · esperado {centavosToBr(valorCompraCentavos)}</>
@@ -961,6 +1167,7 @@ const TransacoesForm = () => {
                                             </Row>
                                         )}
 
+                                        {!isCompraFlow ? (
                                         <Row>
                                             <Col md={12}>
                                                 <div className="mb-3">
@@ -974,6 +1181,7 @@ const TransacoesForm = () => {
                                                 </div>
                                             </Col>
                                         </Row>
+                                        ) : null}
 
                                         {isEdit && record.compra_grupo_id && (
                                             <Row>
@@ -1005,6 +1213,7 @@ const TransacoesForm = () => {
                                                             semNumeros
                                                             || numerosLoading
                                                             || (!isEdit && nParcelas > 1 && !totaisBatem)
+                                                            || (!isEdit && lookupsReady && cartoesOptions.length === 0)
                                                         }
                                                     >
                                                         Salvar

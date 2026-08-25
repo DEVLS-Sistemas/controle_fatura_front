@@ -9,6 +9,9 @@ import {
   CardBody,
   Col,
   Container,
+  Modal,
+  ModalBody,
+  ModalHeader,
   Row,
 } from 'reactstrap'
 import { toast } from 'react-toastify'
@@ -18,6 +21,11 @@ import {
   CompraNaoEncontradaError,
   CompraVisualizacaoService,
 } from 'services/CompraVisualizacao/CompraVisualizacaoService'
+import { TransacoesService } from 'services/Transacoes/TransacoesService'
+import {
+  compraToEditSource,
+  faturaIdDaCompra,
+} from 'helpers/cadastro_manual_compra_helpers'
 import CompraVisualizacaoResumo from './CompraVisualizacaoResumo'
 import CompraVisualizacaoDados from './CompraVisualizacaoDados'
 import CompraVisualizacaoParcelas from './CompraVisualizacaoParcelas'
@@ -76,6 +84,12 @@ type CompraVisualizacaoLocationState = {
 const veioDeAssinaturas = (state: CompraVisualizacaoLocationState): boolean =>
   Boolean(state?.fromAssinaturas || state?.from?.startsWith('/assinaturas'))
 
+const veioDeTransacoes = (state: CompraVisualizacaoLocationState): boolean =>
+  Boolean(state?.from === '/transacoes' || state?.from?.startsWith('/transacoes'))
+
+const veioDeFatura = (state: CompraVisualizacaoLocationState): boolean =>
+  Boolean(state?.from?.startsWith('/faturas'))
+
 const CompraVisualizacaoPage = () => {
   const { identificador } = useParams()
   const [searchParams] = useSearchParams()
@@ -84,13 +98,18 @@ const CompraVisualizacaoPage = () => {
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
   const [compra, setCompra] = useState<CompraVisualizacaoView>()
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const service = new CompraVisualizacaoService()
+  const transacoesService = new TransacoesService()
 
   const mesParam = searchParams.get('mes')
   const anoParam = searchParams.get('ano')
 
   const locationState = location.state as CompraVisualizacaoLocationState
   const fromAssinaturas = veioDeAssinaturas(locationState)
+  const fromTransacoes = veioDeTransacoes(locationState)
+  const fromFatura = veioDeFatura(locationState)
 
   const handleVoltar = () => {
     if (location.key !== 'default') {
@@ -106,6 +125,48 @@ const CompraVisualizacaoPage = () => {
       return
     }
     navigate(rankingFallbackPath(mesParam, anoParam))
+  }
+
+  const handleEditar = () => {
+    if (!compra) return
+    const source = compraToEditSource(compra)
+    const editId = source.id ?? source.transacao_id
+    if (!editId) {
+      toast.error('Não foi possível abrir a edição desta compra')
+      return
+    }
+    navigate(`/transacoes/edit/${editId}`, {
+      state: {
+        source,
+        returnTo: `${location.pathname}${location.search}`,
+      },
+    })
+  }
+
+  const handleExcluir = async (excluirGrupo = false) => {
+    const id = compra?.transacao_id ?? compra?.parcelas?.[0]?.id
+    if (!id || deleting) return
+    setDeleting(true)
+    try {
+      await transacoesService.deleteTransacoes(id, { excluir_grupo: excluirGrupo })
+      toast.success(
+        excluirGrupo
+          ? 'Todas as parcelas da compra foram excluídas'
+          : 'Compra excluída com sucesso'
+      )
+      setDeleteOpen(false)
+      if (locationState?.from) {
+        navigate(locationState.from)
+      } else if (fromAssinaturas) {
+        navigate('/assinaturas')
+      } else {
+        navigate('/transacoes')
+      }
+    } catch (error: any) {
+      toast.error(error?.message || 'Erro ao excluir a compra')
+    } finally {
+      setDeleting(false)
+    }
   }
 
   const loadCompra = async (id: string) => {
@@ -133,8 +194,11 @@ const CompraVisualizacaoPage = () => {
   }
 
   useEffect(() => {
-    setActiveMenu(fromAssinaturas ? '/assinaturas' : '/parceladas')
-  }, [fromAssinaturas])
+    if (fromAssinaturas) setActiveMenu('/assinaturas')
+    else if (fromTransacoes) setActiveMenu('/transacoes')
+    else if (fromFatura) setActiveMenu('/faturas')
+    else setActiveMenu('/parceladas')
+  }, [fromAssinaturas, fromTransacoes, fromFatura])
 
   useEffect(() => {
     if (identificador) {
@@ -148,6 +212,8 @@ const CompraVisualizacaoPage = () => {
     compra?.titulo_origem === 'observacoes'
       ? compra.estabelecimento?.nome || compra.estabelecimento?.loja_nome
       : null
+  const faturaId = faturaIdDaCompra(compra)
+  const ehParcelada = Boolean(compra?.compra_grupo_id) && !compra?.avista
 
   return (
     <React.Fragment>
@@ -182,27 +248,60 @@ const CompraVisualizacaoPage = () => {
                           Quitada
                         </Badge>
                       ) : null}
+                      {compra && compra.importada_pdf === true ? (
+                        <Badge color="info" pill>
+                          Importada da fatura
+                        </Badge>
+                      ) : compra && compra.importada_pdf === false ? (
+                        <Badge color="warning" pill>
+                          Cadastro manual
+                        </Badge>
+                      ) : null}
                     </div>
                     {subtituloEstabelecimento ? (
                       <p className="text-muted mb-0 fs-13">{subtituloEstabelecimento}</p>
                     ) : null}
                   </div>
                 </div>
-                <Breadcrumb pageTitle="" listClassName="mb-sm-0 pt-1 py-2">
-                  <BreadcrumbItem>
-                    <Link to="/dashboard">
-                      <i className="ri-home-5-fill"></i>
-                    </Link>
-                  </BreadcrumbItem>
-                  <BreadcrumbItem>
-                    {fromAssinaturas ? (
-                      <Link to="/assinaturas">Assinaturas</Link>
-                    ) : (
-                      <Link to="/parceladas">Parceladas</Link>
-                    )}
-                  </BreadcrumbItem>
-                  <BreadcrumbItem active>Compra</BreadcrumbItem>
-                </Breadcrumb>
+                <div className="d-flex flex-wrap align-items-center gap-2 mb-sm-0 pt-1">
+                  {compra ? (
+                    <>
+                      <Button color="primary" outline size="sm" onClick={handleEditar}>
+                        <i className="ri-pencil-line me-1"></i>
+                        Editar
+                      </Button>
+                      {faturaId ? (
+                        <Link to={`/faturas/view/${faturaId}`} className="btn btn-soft-info btn-sm">
+                          <i className="ri-file-list-3-line me-1"></i>
+                          Ver fatura
+                        </Link>
+                      ) : null}
+                      <Button color="danger" outline size="sm" onClick={() => setDeleteOpen(true)}>
+                        <i className="ri-delete-bin-line me-1"></i>
+                        Excluir
+                      </Button>
+                    </>
+                  ) : null}
+                  <Breadcrumb pageTitle="" listClassName="mb-0 py-1">
+                    <BreadcrumbItem>
+                      <Link to="/dashboard">
+                        <i className="ri-home-5-fill"></i>
+                      </Link>
+                    </BreadcrumbItem>
+                    <BreadcrumbItem>
+                      {fromAssinaturas ? (
+                        <Link to="/assinaturas">Assinaturas</Link>
+                      ) : fromTransacoes ? (
+                        <Link to="/transacoes">Transações</Link>
+                      ) : fromFatura && locationState?.from ? (
+                        <Link to={locationState.from}>Fatura</Link>
+                      ) : (
+                        <Link to="/parceladas">Parceladas</Link>
+                      )}
+                    </BreadcrumbItem>
+                    <BreadcrumbItem active>Compra</BreadcrumbItem>
+                  </Breadcrumb>
+                </div>
               </div>
             </Col>
           </Row>
@@ -244,6 +343,46 @@ const CompraVisualizacaoPage = () => {
           )}
         </Container>
       </div>
+
+      <Modal isOpen={deleteOpen} toggle={() => !deleting && setDeleteOpen(false)} centered>
+        <ModalHeader toggle={() => !deleting && setDeleteOpen(false)}>
+          Confirmação de exclusão
+        </ModalHeader>
+        <ModalBody className="text-center py-4">
+          <i className="ri-delete-bin-line display-5 text-danger"></i>
+          {ehParcelada ? (
+            <>
+              <p className="mt-3 mb-1">Esta compra possui múltiplas parcelas.</p>
+              <p className="text-muted small mb-4">
+                Excluir só a parcela atual ou todas as parcelas da compra?
+              </p>
+              <div className="d-flex flex-column flex-sm-row gap-2 justify-content-center">
+                <Button color="light" onClick={() => setDeleteOpen(false)} disabled={deleting}>
+                  Cancelar
+                </Button>
+                <Button color="warning" onClick={() => handleExcluir(false)} disabled={deleting}>
+                  Só esta parcela
+                </Button>
+                <Button color="danger" onClick={() => handleExcluir(true)} disabled={deleting}>
+                  Todas as parcelas
+                </Button>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="mt-3 mb-4">Deseja realmente excluir esta compra?</p>
+              <div className="d-flex gap-2 justify-content-center">
+                <Button color="light" onClick={() => setDeleteOpen(false)} disabled={deleting}>
+                  Cancelar
+                </Button>
+                <Button color="danger" onClick={() => handleExcluir(false)} disabled={deleting}>
+                  Excluir
+                </Button>
+              </div>
+            </>
+          )}
+        </ModalBody>
+      </Modal>
     </React.Fragment>
   )
 }

@@ -12,6 +12,7 @@ import {
   origemCompraColor,
 } from 'helpers/fatura_helpers'
 import { CompraVisualizacaoView } from 'interfaces/CompraVisualizacao/CompraVisualizacaoInterface'
+import { faturaIdDaCompra } from 'helpers/cadastro_manual_compra_helpers'
 
 interface CompraVisualizacaoDadosProps {
   compra: CompraVisualizacaoView
@@ -63,6 +64,21 @@ const CompraVisualizacaoDados = ({ compra }: CompraVisualizacaoDadosProps) => {
   const temCartao = Boolean(
     compra.cartao || compra.bandeira || digitos || compra.cartao_numero?.nome_no_cartao
   )
+  const faturaRef = compra.competencia_atual ?? compra.primeira_parcela
+  const faturaId = faturaIdDaCompra(compra)
+  const parcelaFatura = (compra.parcelas ?? []).find((p) =>
+    (faturaId != null && Number(p.fatura_id) === Number(faturaId))
+    || (faturaRef && p.fatura_mes === faturaRef.mes && p.fatura_ano === faturaRef.ano)
+  )
+  const faturaLabel = parcelaFatura?.fatura_label
+    || (faturaRef
+      ? `${String(faturaRef.mes).padStart(2, '0')}/${faturaRef.ano}`
+      : null)
+  const origemLancamento = compra.importada_pdf === true
+    ? 'Importada da fatura'
+    : compra.importada_pdf === false
+      ? 'Cadastro manual'
+      : null
 
   return (
     <Card className="compra-dados">
@@ -120,6 +136,24 @@ const CompraVisualizacaoDados = ({ compra }: CompraVisualizacaoDadosProps) => {
             tone="primary"
             label="Data da compra"
             value={compra.data_compra ? formatDateBr(compra.data_compra) : null}
+          />
+          <DadoTile
+            icon="ri-file-list-3-line"
+            tone="info"
+            label="Fatura"
+            value={
+              faturaLabel && faturaId ? (
+                <Link to={`/faturas/view/${faturaId}`} className="text-reset text-decoration-underline">
+                  {faturaLabel}
+                </Link>
+              ) : faturaLabel
+            }
+          />
+          <DadoTile
+            icon={compra.importada_pdf ? 'ri-file-pdf-line' : 'ri-edit-line'}
+            tone={compra.importada_pdf ? 'info' : 'warning'}
+            label="Origem do lançamento"
+            value={origemLancamento}
           />
           <DadoTile
             icon="ri-store-2-line"

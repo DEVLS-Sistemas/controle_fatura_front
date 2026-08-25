@@ -1894,6 +1894,8 @@ const FaturasViewPage = () => {
                                                 data: fatura.mes && fatura.ano
                                                     ? `${fatura.ano}-${String(fatura.mes).padStart(2, '0')}-01`
                                                     : undefined,
+                                                fatura_mes: fatura.mes ?? null,
+                                                fatura_ano: fatura.ano ?? null,
                                             },
                                             returnTo: `/faturas/view/${id}`,
                                         }}

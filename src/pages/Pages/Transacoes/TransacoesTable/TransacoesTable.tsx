@@ -17,7 +17,9 @@ import {
     resolveOrigemCompraLabel,
     VALOR_TEXT_CLASS,
     isMeuResponsavelDisplay,
+    isTransacaoOperacional,
 } from "helpers/fatura_helpers"
+import { pathVisualizacaoDaLinha, tituloListagemCompra } from "helpers/cadastro_manual_compra_helpers"
 import { CartaoChip } from "helpers/cartao_helpers"
 import { isCompraAvista, isEhAssinatura } from "helpers/assinaturas_helpers"
 import { SelectOptions } from "interfaces/SystemInterfaces/SelectInterface"
@@ -295,12 +297,11 @@ export const TransacoesTable = ({
                                                         <thead className="table-light">
                                                             <tr>
                                                                 <th scope="col">Data</th>
-                                                                <th scope="col" className="text-start">Estabelecimento</th>
+                                                                <th scope="col" className="text-start">Compra</th>
                                                                 <th scope="col" className={VALOR_TEXT_CLASS}>Valor</th>
                                                                 <th scope="col">Origem</th>
                                                                 <th scope="col">Categoria</th>
                                                                 <th scope="col">Subcategoria</th>
-                                                                <th scope="col" className="text-start">Observação</th>
                                                                 <th scope="col" style={{ width: "100px" }} title="Responsável">Resp.</th>
                                                                 <th scope="col">Fatura / Cartão</th>
                                                                 <th scope="col">Final</th>
@@ -310,9 +311,11 @@ export const TransacoesTable = ({
                                                         </thead>
                                                         <tbody>
                                                             {rows.map((row, index) => {
-                                                                const observacaoId = `obs-${row.id ?? index}`
-                                                                const estabelecimentoNome =
-                                                                    row.estabelecimento_nome ?? row.estabelecimento ?? '-'
+                                                                const { titulo, subtitulo } = tituloListagemCompra(row)
+                                                                const visualizarPath = isTransacaoOperacional(row)
+                                                                    ? null
+                                                                    : pathVisualizacaoDaLinha(row)
+                                                                const tituloId = `compra-titulo-${row.id ?? index}`
                                                                 const showResponsavelNome = !isMeuResponsavel(
                                                                     row.responsavel_id,
                                                                     row.responsavel_nome
@@ -321,10 +324,25 @@ export const TransacoesTable = ({
                                                                     <tr key={row.id ?? index}>
                                                                         <td>{formatDateBr(row.data)}</td>
                                                                         <td className="text-start">
-                                                                            <div>{estabelecimentoNome}</div>
-                                                                            {row.loja_nome && (
-                                                                                <div className="small text-muted">{row.loja_nome}</div>
+                                                                            {visualizarPath ? (
+                                                                                <Link
+                                                                                    to={visualizarPath}
+                                                                                    className="fw-medium"
+                                                                                    state={{ from: '/transacoes' }}
+                                                                                >
+                                                                                    <span id={tituloId}>{truncate(titulo, 48)}</span>
+                                                                                </Link>
+                                                                            ) : (
+                                                                                <span id={tituloId}>{truncate(titulo, 48)}</span>
                                                                             )}
+                                                                            {titulo.length > 48 && (
+                                                                                <UncontrolledTooltip placement="top" target={tituloId}>
+                                                                                    {titulo}
+                                                                                </UncontrolledTooltip>
+                                                                            )}
+                                                                            {subtitulo ? (
+                                                                                <div className="small text-muted">{subtitulo}</div>
+                                                                            ) : null}
                                                                         </td>
                                                                         <td className={VALOR_TEXT_CLASS}>{formatCurrency(row.valor)}</td>
                                                                         <td>
@@ -363,18 +381,6 @@ export const TransacoesTable = ({
                                                                             ) : '-'}
                                                                         </td>
                                                                         <td>{row.subcategoria_nome ?? '-'}</td>
-                                                                        <td className="text-start">
-                                                                            {row.observacoes ? (
-                                                                                <>
-                                                                                    <span id={observacaoId}>{truncate(row.observacoes)}</span>
-                                                                                    {row.observacoes.length > 40 && (
-                                                                                        <UncontrolledTooltip placement="top" target={observacaoId}>
-                                                                                            {row.observacoes}
-                                                                                        </UncontrolledTooltip>
-                                                                                    )}
-                                                                                </>
-                                                                            ) : '-'}
-                                                                        </td>
                                                                         <td>
                                                                             <Button
                                                                                 type="button"
@@ -419,6 +425,11 @@ export const TransacoesTable = ({
                                                                         <td>{formatParcelas(row.parcela_atual, row.parcelas_total)}</td>
                                                                         <td>
                                                                             <TableActionsDropdown>
+                                                                                {visualizarPath ? (
+                                                                                    <Link to={visualizarPath} state={{ from: '/transacoes' }}>
+                                                                                        <DropdownItem>Visualizar</DropdownItem>
+                                                                                    </Link>
+                                                                                ) : null}
                                                                                 <Link to={`/transacoes/edit/${row.id}`} state={{ source: row }}>
                                                                                     <DropdownItem>Editar</DropdownItem>
                                                                                 </Link>

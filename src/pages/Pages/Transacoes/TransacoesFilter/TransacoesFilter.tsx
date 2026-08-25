@@ -169,7 +169,7 @@ const TransacoesFilter = ({
                             Vincular com loja
                         </Button>
                         <Link to="/transacoes/add" className="btn btn-primary">
-                            <i className="ri-add-circle-line align-middle me-1"></i> Adicionar Transação
+                            <i className="ri-add-circle-line align-middle me-1"></i> Nova compra
                         </Link>
                         <Button
                             type="button"

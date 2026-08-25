@@ -244,7 +244,7 @@ Mobile: tabela vira lista de cards por parcela.
 - [ ] Lista de parcelas com status paga / atual / aberta
 - [ ] Repasse visível quando houver pagamento
 - [ ] À vista funciona se o identificador for o `id` da transação
-- [ ] Somente leitura (sem editar nesta tela)
+- [ ] Ações **Editar** / **Excluir** / **Ver fatura** navegam para o form existente ou `DELETE` — sem edição inline
 - [ ] Voltar preserva o contexto do ranking
 - [ ] Loading / 404 / responsivo
 
@@ -252,9 +252,10 @@ Mobile: tabela vira lista de cards por parcela.
 
 ## Fora de escopo
 
-- Editar compra, parcela, categoria ou responsável nesta tela
+- Editar campos inline nesta tela (usar o formulário `/transacoes/edit/:id`)
 - Registrar repasse (continuar na tela de repasses)
 - Upload / PDF da fatura
+- Anexos da compra e conciliação compra ↔ lançamento
 
 ---
 
