@@ -1,40 +1,106 @@
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
+import { useForm } from 'react-hook-form'
 import { Card, CardBody, Col, Container, Label, Row, Spinner } from 'reactstrap'
 import ReactApexChart from 'react-apexcharts'
 import { DashboardService, DashboardResumo } from 'services/Dashboard'
 import { formatCurrency, tipoTransacaoLabel, VALOR_TEXT_CLASS } from 'helpers/fatura_helpers'
 import { CartaoChip } from 'helpers/cartao_helpers'
+import { AnosSelect, mesesSelect } from 'helpers/functions_helpers'
+import {
+  DASHBOARD_ANO_TODO,
+  DashboardFiltro,
+  MESES_ABREV_DASHBOARD,
+  buildDashboardResumoParams,
+  buildDashboardSearchParams,
+  mesesDoFiltro,
+  persistDashboardFiltro,
+  resolveDashboardFiltro,
+} from 'helpers/dashboard_resumo_helpers'
+import { SelectListControlled } from 'Components/ComponentController/Selects/Select/SelectListControlled'
+import { SelectOptions } from 'interfaces/SystemInterfaces/SelectInterface'
 import { toast } from 'react-toastify'
-import { Link } from 'react-router-dom'
+
+const optAnos = AnosSelect()
+const optMesesDe: SelectOptions[] = [{ value: DASHBOARD_ANO_TODO, label: 'Ano todo' }, ...mesesSelect()]
 
 const DashboardsHome = () => {
-  const dashboardService = new DashboardService()
+  const dashboardService = useRef(new DashboardService()).current
+  const [searchParams, setSearchParams] = useSearchParams()
+  const defaultValues = useRef(resolveDashboardFiltro(searchParams)).current
+  const { control, watch, setValue } = useForm<DashboardFiltro>({ defaultValues })
   const [loading, setLoading] = useState(true)
-  const [ano, setAno] = useState(new Date().getFullYear())
-  const [mes, setMes] = useState<number | ''>('')
   const [resumo, setResumo] = useState<DashboardResumo | null>(null)
+  const lastKeyRef = useRef('')
 
-  const loadResumo = async () => {
-    setLoading(true)
-    try {
-      const data = await dashboardService.getResumo({
-        ano,
-        mes: mes === '' ? null : Number(mes),
-      })
-      setResumo(data || null)
-    } catch (e: any) {
-      toast.error(e?.message || 'Erro ao carregar dashboard')
-    } finally {
-      setLoading(false)
-    }
-  }
+  const anoWatch = watch('ano')
+  const mesInicioWatch = watch('mes_inicio')
+  const mesFimWatch = watch('mes_fim')
+  const isAnoTodo = mesInicioWatch === DASHBOARD_ANO_TODO || mesInicioWatch == null
+  const optMesesAte = useMemo(() => {
+    const inicio = Number(mesInicioWatch)
+    if (!Number.isInteger(inicio) || inicio < 1) return mesesSelect()
+    return mesesSelect().filter((opt) => Number(opt.value) >= inicio)
+  }, [mesInicioWatch])
+
+  const loadResumo = useCallback(
+    async (filtro: DashboardFiltro) => {
+      const params = buildDashboardResumoParams(filtro)
+      const key = JSON.stringify(params)
+      if (lastKeyRef.current === key) return
+      lastKeyRef.current = key
+      persistDashboardFiltro(filtro)
+      const next = buildDashboardSearchParams(filtro)
+      const nextQs = next.toString()
+      const currentQs = new URLSearchParams(window.location.search).toString()
+      if (nextQs !== currentQs) {
+        setSearchParams(next, { replace: true })
+      }
+      setLoading(true)
+      try {
+        const data = await dashboardService.getResumo(params)
+        setResumo(data || null)
+      } catch (e: any) {
+        lastKeyRef.current = ''
+        toast.error(e?.message || 'Erro ao carregar dashboard')
+      } finally {
+        setLoading(false)
+      }
+    },
+    [dashboardService, setSearchParams]
+  )
 
   useEffect(() => {
-    loadResumo()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ano, mes])
+    const ano = Number(anoWatch) || new Date().getFullYear()
+    if (isAnoTodo) {
+      if (mesFimWatch != null) {
+        setValue('mes_fim', null)
+        return
+      }
+      loadResumo({ ano, mes_inicio: DASHBOARD_ANO_TODO, mes_fim: null })
+      return
+    }
 
-  const mesesLabels = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+    const inicio = Number(mesInicioWatch)
+    if (!Number.isInteger(inicio) || inicio < 1) return
+
+    if (mesFimWatch == null || Number(mesFimWatch) < inicio) {
+      setValue('mes_fim', inicio)
+      return
+    }
+
+    loadResumo({ ano, mes_inicio: inicio, mes_fim: Number(mesFimWatch) })
+  }, [anoWatch, mesInicioWatch, mesFimWatch, isAnoTodo, loadResumo, setValue])
+
+  const filtroAtual: DashboardFiltro = {
+    ano: Number(anoWatch) || new Date().getFullYear(),
+    mes_inicio: isAnoTodo ? DASHBOARD_ANO_TODO : Number(mesInicioWatch),
+    mes_fim: isAnoTodo ? null : Number(mesFimWatch ?? mesInicioWatch),
+  }
+  const mesesDestacados = new Set(resumo?.periodo?.meses?.length ? resumo.periodo.meses : mesesDoFiltro(filtroAtual))
+  const coresMensal = MESES_ABREV_DASHBOARD.map((_, i) =>
+    mesesDestacados.has(i + 1) ? '#405189' : 'rgba(64, 81, 137, 0.28)'
+  )
   const serieMensal = Array.from({ length: 12 }, (_, i) => {
     const found = resumo?.por_mes?.find((m) => m.mes === i + 1)
     return found ? Number(found.total) : 0
@@ -43,13 +109,23 @@ const DashboardsHome = () => {
   const categoriasLabels = resumo?.por_categoria?.map((c) => c.nome) || []
   const categoriasSeries = resumo?.por_categoria?.map((c) => Number(c.total)) || []
   const categoriasCores = resumo?.por_categoria?.map((c) => c.cor || '#6b7280') || []
+  const semLancamentos = !loading && (resumo?.totais?.total_transacoes ?? 0) === 0
 
   const summaryCards = [
+    { title: 'Líquido', value: resumo?.totais?.total_liquido, icon: 'ri-funds-line', color: 'primary', highlight: true },
     { title: 'Compras', value: resumo?.totais?.total_compras, icon: 'ri-shopping-bag-line', color: 'danger' },
     { title: 'Pagamentos', value: resumo?.totais?.total_pagamentos, icon: 'ri-bank-card-line', color: 'success' },
-    { title: 'Líquido', value: resumo?.totais?.total_liquido, icon: 'ri-funds-line', color: 'primary' },
+    { title: 'Estornos', value: resumo?.totais?.total_estornos, icon: 'ri-refund-2-line', color: 'warning' },
+    { title: 'Antecipações', value: resumo?.totais?.total_antecipacoes, icon: 'ri-flashlight-line', color: 'secondary' },
+    { title: 'Encargos', value: resumo?.totais?.total_encargos, icon: 'ri-percent-line', color: 'dark' },
     { title: 'Transações', value: resumo?.totais?.total_transacoes, icon: 'ri-list-check-2', color: 'info', isCount: true },
   ]
+
+  const handleBarClick = (mes: number) => {
+    if (mes < 1 || mes > 12) return
+    setValue('mes_inicio', mes)
+    setValue('mes_fim', mes)
+  }
 
   return (
     <React.Fragment>
@@ -57,12 +133,14 @@ const DashboardsHome = () => {
         <Container fluid>
           <Row className="mb-3">
             <Col xs={12}>
-              <div className="d-flex align-items-lg-center flex-lg-row flex-column gap-3">
+              <div className="d-flex align-items-lg-center flex-lg-row flex-column gap-3 mb-3">
                 <div className="flex-grow-1">
                   <h4 className="fs-16 mb-1">Dashboard</h4>
-                  <p className="text-muted mb-0">Resumo das faturas e gastos do período</p>
+                  <p className="text-muted mb-0">
+                    {resumo?.periodo?.label || 'Resumo das faturas e gastos do período'}
+                  </p>
                 </div>
-                <div className="d-flex gap-2 flex-wrap align-items-end">
+                <div className="d-flex gap-2 flex-wrap">
                   <Link to="/raio-x" className="btn btn-soft-success mb-1">
                     <i className="ri-pulse-line align-middle me-1"></i>
                     Raio-X
@@ -79,32 +157,24 @@ const DashboardsHome = () => {
                     <i className="ri-refresh-line align-middle me-1"></i>
                     Assinaturas
                   </Link>
-                  <div>
-                    <Label className="form-label mb-1">Ano</Label>
-                    <input
-                      type="number"
-                      className="form-control"
-                      style={{ width: 110 }}
-                      value={ano}
-                      onChange={(e) => setAno(Number(e.target.value))}
-                    />
-                  </div>
-                  <div>
-                    <Label className="form-label mb-1">Mês</Label>
-                    <select
-                      className="form-select"
-                      style={{ width: 120 }}
-                      value={mes}
-                      onChange={(e) => setMes(e.target.value === '' ? '' : Number(e.target.value))}
-                    >
-                      <option value="">Ano todo</option>
-                      {mesesLabels.map((label, idx) => (
-                        <option key={label} value={idx + 1}>{label}</option>
-                      ))}
-                    </select>
-                  </div>
                 </div>
               </div>
+              <Row className="g-2">
+                <Col xs={12} sm={4} lg={2}>
+                  <Label className="form-label mb-1">Ano</Label>
+                  <SelectListControlled<DashboardFiltro> field="ano" control={control} options={optAnos} />
+                </Col>
+                <Col xs={12} sm={4} lg={2}>
+                  <Label className="form-label mb-1">De</Label>
+                  <SelectListControlled<DashboardFiltro> field="mes_inicio" control={control} options={optMesesDe} />
+                </Col>
+                {!isAnoTodo && (
+                  <Col xs={12} sm={4} lg={2}>
+                    <Label className="form-label mb-1">Até</Label>
+                    <SelectListControlled<DashboardFiltro> field="mes_fim" control={control} options={optMesesAte} />
+                  </Col>
+                )}
+              </Row>
             </Col>
           </Row>
 
@@ -114,10 +184,15 @@ const DashboardsHome = () => {
             </div>
           ) : (
             <>
+              {semLancamentos && (
+                <p className="text-muted">
+                  Sem lançamentos neste período. Importe uma fatura ou altere o filtro.
+                </p>
+              )}
               <Row>
                 {summaryCards.map((card) => (
                   <Col xl={3} md={6} key={card.title}>
-                    <Card className="card-animate">
+                    <Card className={`card-animate ${card.highlight ? 'border-primary' : ''}`}>
                       <CardBody>
                         <div className="d-flex align-items-center">
                           <div className="flex-grow-1">
@@ -142,16 +217,29 @@ const DashboardsHome = () => {
                 <Col xl={8}>
                   <Card>
                     <CardBody>
-                      <h5 className="card-title mb-3">Evolução mensal ({ano})</h5>
+                      <h5 className="card-title mb-3">
+                        Evolução mensal ({resumo?.periodo?.ano || filtroAtual.ano})
+                      </h5>
                       <ReactApexChart
-                        type="area"
+                        type="bar"
                         height={320}
                         series={[{ name: 'Total líquido', data: serieMensal }]}
                         options={{
-                          chart: { toolbar: { show: false } },
+                          chart: {
+                            toolbar: { show: false },
+                            events: {
+                              dataPointSelection: (_event, _ctx, config) => {
+                                handleBarClick(Number(config.dataPointIndex) + 1)
+                              },
+                            },
+                          },
+                          states: { active: { filter: { type: 'none' } } },
+                          plotOptions: {
+                            bar: { distributed: true, columnWidth: '55%', borderRadius: 4 },
+                          },
                           dataLabels: { enabled: false },
-                          stroke: { curve: 'smooth', width: 2 },
-                          xaxis: { categories: mesesLabels },
+                          legend: { show: false },
+                          xaxis: { categories: MESES_ABREV_DASHBOARD },
                           yaxis: {
                             labels: {
                               formatter: (val: number) => formatCurrency(val),
@@ -160,7 +248,7 @@ const DashboardsHome = () => {
                           tooltip: {
                             y: { formatter: (val: number) => formatCurrency(val) },
                           },
-                          colors: ['#405189'],
+                          colors: coresMensal,
                         }}
                       />
                     </CardBody>

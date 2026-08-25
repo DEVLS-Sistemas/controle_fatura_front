@@ -1,14 +1,26 @@
 import { AxiosHttpClient, HttpStatusCode } from '../../libs/api/ApiConfig'
 import { AccessDeniedError } from '../../libs/api/exceptions/AccessDeniedError'
 import { UnexpectedError } from '../../libs/api/exceptions/UnexpectedError'
+import { DashboardResumoParams } from 'helpers/dashboard_resumo_helpers'
+
+export interface DashboardPeriodo {
+  ano: number
+  mes: number | null
+  mes_inicio?: number | null
+  mes_fim?: number | null
+  tipo?: 'ano' | 'mes' | 'intervalo'
+  label?: string
+  meses?: number[]
+}
 
 export interface DashboardResumo {
-  periodo: { ano: number; mes: number | null }
+  periodo: DashboardPeriodo
   totais: {
     total_compras: number
     total_pagamentos: number
     total_estornos: number
     total_antecipacoes: number
+    total_encargos?: number
     total_liquido: number
     total_transacoes: number
   }
@@ -28,7 +40,7 @@ export class DashboardService {
     this.httpClient = new AxiosHttpClient()
   }
 
-  async getResumo(params: { ano?: number; mes?: number | null }): Promise<DashboardResumo | undefined> {
+  async getResumo(params: DashboardResumoParams): Promise<DashboardResumo | undefined> {
     const response = await this.httpClient.get({
       url: `${this.url}/resumo`,
       body: params,
@@ -39,6 +51,8 @@ export class DashboardService {
         return response.body?.data
       case HttpStatusCode.unauthorized:
         throw new AccessDeniedError()
+      case HttpStatusCode.invalidForm:
+        throw new UnexpectedError(response.body?.message || response.message)
       default:
         throw new UnexpectedError(response.body?.message || response.message)
     }
