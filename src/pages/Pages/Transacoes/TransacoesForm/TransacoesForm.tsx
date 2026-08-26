@@ -107,6 +107,12 @@ const TransacoesForm = () => {
             eh_assinatura: source.eh_assinatura != null
                 ? isEhAssinatura(source.eh_assinatura)
                 : source.origem_compra === 'PAGAMENTO_SERVICOS',
+            descricao: source.descricao
+                ?? ((source.tipo ?? 'purchase') === 'purchase' && !source.descricao ? source.observacoes : null)
+                ?? null,
+            observacoes: source.descricao
+                ? (source.observacoes ?? null)
+                : ((source.tipo ?? 'purchase') === 'purchase' ? null : (source.observacoes ?? null)),
             valor: toPrecoDigits(source.valor ?? source.valor_compra),
             valor_compra: toPrecoDigits(source.valor_compra ?? source.valor),
             parcelas_total: source.parcelas_total ?? 1,
@@ -174,6 +180,9 @@ const TransacoesForm = () => {
     const valorCompraWatch = watch('valor_compra')
     const parcelasTotalWatch = watch('parcelas_total')
     const origemCompraWatch = watch('origem_compra')
+    const faturaIdWatch = watch('fatura_id')
+    const descricaoWatch = watch('descricao')
+    const observacoesWatch = watch('observacoes')
     const propagarGrupo = watch('propagar_grupo')
 
     const nParcelas = Math.max(1, Math.min(36, Number(parcelasTotalWatch) || 1))
@@ -189,7 +198,11 @@ const TransacoesForm = () => {
 
     const cartaoAtual = cartoesLookup.find((c) => Number(c.id) === Number(cartaoId))
     const numeroAtual = numerosOptions.find((n) => Number(n.value) === Number(cartaoNumeroId))
-    const primeiraCompetencia = competenciaPrimeiraParcela(dataWatch, cartaoAtual?.dia_limite_fatura ?? null)
+    const primeiraCompetenciaCiclo = competenciaPrimeiraParcela(dataWatch, cartaoAtual?.dia_limite_fatura ?? null)
+    const faturaOverride = faturasLookup.find((f) => Number(f.id) === Number(faturaIdWatch))
+    const primeiraCompetencia = faturaOverride?.mes && faturaOverride?.ano
+        ? { mes: faturaOverride.mes, ano: faturaOverride.ano }
+        : primeiraCompetenciaCiclo
     const ultimaCompetencia = primeiraCompetencia && nParcelas > 1
         ? adicionarMesesCompetencia(primeiraCompetencia.mes, primeiraCompetencia.ano, nParcelas - 1)
         : null
@@ -203,6 +216,24 @@ const TransacoesForm = () => {
     const caiForaDaFaturaAberta = Boolean(
         fromFatura && !isEdit && dataCaiForaDaFaturaAberta(primeiraCompetencia, faturaAberta)
     )
+    const faturasOptions = [
+        { value: '', label: 'Automática (pelo ciclo)' },
+        ...faturasLookup
+            .filter((f) => {
+                if (f.id == null) return false
+                if (!cartaoId) return true
+                if (f.cartao_id != null) return Number(f.cartao_id) === Number(cartaoId)
+                if (f.cartao_nome && cartaoAtual?.nome) return f.cartao_nome === cartaoAtual.nome
+                return true
+            })
+            .map((f) => ({
+                value: f.id!,
+                label: [
+                    f.mes && f.ano ? labelCompetenciaCompleta(f.mes, f.ano) : `Fatura ${f.id}`,
+                    f.cartao_nome && f.cartao_nome !== cartaoAtual?.nome ? f.cartao_nome : null,
+                ].filter(Boolean).join(' · '),
+            })),
+    ]
 
     const responsavelAtual = responsaveisLookup.find((r) => Number(r.id) === Number(responsavelId))
     const responsavelIdNum = responsavelId == null || responsavelId === ''
@@ -600,12 +631,10 @@ const TransacoesForm = () => {
             }
 
             const estabelecimentoNome = String(data.estabelecimento ?? '').trim()
-            if (!data.estabelecimento_id && !estabelecimentoNome) {
-                toast.warning('Informe o estabelecimento — pode ser o nome que você conhece')
-                return
-            }
+            const descricao = String(data.descricao ?? descricaoWatch ?? '').trim()
+            const observacoes = String(data.observacoes ?? observacoesWatch ?? '').trim()
 
-            if (!isEdit && isCompraFlow && !String(data.observacoes ?? '').trim()) {
+            if (isCompraFlow && !descricao) {
                 toast.warning('Informe a descrição da compra')
                 return
             }
@@ -627,7 +656,8 @@ const TransacoesForm = () => {
                     categoria_id: data.categoria_id,
                     subcategoria_id: data.categoria_id ? data.subcategoria_id : null,
                     responsavel_id: data.responsavel_id,
-                    observacoes: data.observacoes,
+                    descricao: descricao || undefined,
+                    observacoes: observacoes || undefined,
                     propagar_grupo: Boolean(data.propagar_grupo && record.compra_grupo_id),
                 }
                 if (payload.estabelecimento_id) {
@@ -665,16 +695,17 @@ const TransacoesForm = () => {
                 categoria_id: data.categoria_id || undefined,
                 subcategoria_id: data.categoria_id ? (data.subcategoria_id || undefined) : undefined,
                 responsavel_id: data.responsavel_id || undefined,
-                observacoes: String(data.observacoes ?? '').trim() || undefined,
+                descricao: descricao || undefined,
+                observacoes: observacoes || undefined,
             }
 
             if (data.estabelecimento_id) {
                 payload.estabelecimento_id = data.estabelecimento_id
-            } else {
+            } else if (estabelecimentoNome) {
                 payload.estabelecimento = estabelecimentoNome
             }
 
-            if (fromFatura && data.fatura_id) {
+            if (data.fatura_id) {
                 payload.fatura_id = data.fatura_id
             }
 
@@ -869,11 +900,11 @@ const TransacoesForm = () => {
                                             <Row>
                                                 <Col md={12}>
                                                     <div className="mb-3">
-                                                        <Label htmlFor="observacoes" className="form-label">
+                                                        <Label htmlFor="descricao" className="form-label">
                                                             Descrição da compra
                                                         </Label>
                                                         <textarea
-                                                            {...register('observacoes', { required: !isEdit ? required : undefined })}
+                                                            {...register('descricao', { required: required })}
                                                             className="form-control"
                                                             rows={2}
                                                             placeholder="Ex.: Mouse Logitech"
@@ -995,17 +1026,18 @@ const TransacoesForm = () => {
                                         <Row>
                                             <Col md={5}>
                                                 <div className="mb-3">
-                                                    <Label htmlFor="estabelecimento_id" className="form-label">Estabelecimento</Label>
+                                                    <Label htmlFor="estabelecimento_id" className="form-label">
+                                                        Estabelecimento <span className="text-muted fw-normal">(opcional)</span>
+                                                    </Label>
                                                     <AsyncSelectListControlled<TransacoesModel>
                                                         callback={searchEstabelecimentos}
                                                         field="estabelecimento_id"
                                                         control={control}
-                                                        required={!String(estabelecimentoTexto ?? '').trim() ? required : undefined}
                                                         defaultValue={estabelecimentoDefault}
                                                         placeholder="Digite para buscar..."
                                                     />
                                                     <small className="text-muted d-block">
-                                                        Pode ser o nome que você conhece. Não precisa ser igual ao da fatura.
+                                                        Não precisa ser o nome da fatura. Se deixar em branco, usamos a descrição.
                                                     </small>
                                                     {!estabelecimentoId ? (
                                                         <div className="mt-2">
@@ -1117,6 +1149,15 @@ const TransacoesForm = () => {
                                                 <Col md={12}>
                                                     <div className={`mb-3 border rounded p-3 ${caiForaDaFaturaAberta ? 'border-warning bg-warning-subtle' : 'bg-light'}`}>
                                                         <div className="text-muted text-uppercase fs-11 fw-semibold mb-1">Fatura</div>
+                                                        {faturasOptions.length > 1 ? (
+                                                            <div className="mb-2" style={{ maxWidth: 360 }}>
+                                                                <SelectListControlled<TransacoesModel>
+                                                                    options={faturasOptions}
+                                                                    field="fatura_id"
+                                                                    control={control}
+                                                                />
+                                                            </div>
+                                                        ) : null}
                                                         <div className="fw-semibold">
                                                             {nParcelas > 1 ? 'Primeira fatura: ' : ''}
                                                             {labelCompetenciaCompleta(primeiraCompetencia.mes, primeiraCompetencia.ano)}
@@ -1134,7 +1175,9 @@ const TransacoesForm = () => {
                                                             ].filter(Boolean).join(' · ')}
                                                         </div>
                                                         <small className="text-muted d-block mt-1">
-                                                            Definida pelo cartão e pela data. As parcelas seguintes caem nas faturas dos meses seguintes.
+                                                            {faturaIdWatch
+                                                                ? 'Você escolheu a primeira fatura. As parcelas seguintes avançam um mês a partir dela.'
+                                                                : 'Definida pelo cartão e pela data. As parcelas seguintes caem nas faturas dos meses seguintes.'}
                                                         </small>
                                                         {caiForaDaFaturaAberta && faturaAberta ? (
                                                             <div className="alert alert-warning mb-0 mt-2 py-2">
@@ -1284,7 +1327,23 @@ const TransacoesForm = () => {
                                             </Row>
                                         )}
 
-                                        {!isCompraFlow ? (
+                                        {isCompraFlow ? (
+                                        <Row>
+                                            <Col md={12}>
+                                                <div className="mb-3">
+                                                    <Label htmlFor="observacoes" className="form-label">
+                                                        Observações <span className="text-muted fw-normal">(opcional)</span>
+                                                    </Label>
+                                                    <textarea
+                                                        {...register('observacoes')}
+                                                        className="form-control"
+                                                        rows={2}
+                                                        placeholder="Texto extra — não substitui a descrição"
+                                                    />
+                                                </div>
+                                            </Col>
+                                        </Row>
+                                        ) : (
                                         <Row>
                                             <Col md={12}>
                                                 <div className="mb-3">
@@ -1298,7 +1357,7 @@ const TransacoesForm = () => {
                                                 </div>
                                             </Col>
                                         </Row>
-                                        ) : null}
+                                        )}
 
                                         {isEdit && record.compra_grupo_id && (
                                             <Row>

@@ -156,6 +156,18 @@ const CompraVisualizacaoDados = ({ compra }: CompraVisualizacaoDadosProps) => {
             value={origemLancamento}
           />
           <DadoTile
+            icon="ri-text"
+            tone="primary"
+            label="Descrição"
+            value={compra.descricao}
+          />
+          <DadoTile
+            icon="ri-bank-card-line"
+            tone="info"
+            label="Na fatura"
+            value={compra.descricao_fatura}
+          />
+          <DadoTile
             icon="ri-store-2-line"
             tone="warning"
             label="Estabelecimento"
@@ -211,7 +223,7 @@ const CompraVisualizacaoDados = ({ compra }: CompraVisualizacaoDadosProps) => {
           ) : null}
         </Row>
 
-        {compra.observacoes ? (
+        {compra.observacoes && compra.observacoes !== compra.descricao ? (
           <div className="compra-dados-obs mt-3">
             <span className="compra-dado-tile__label">Observação</span>
             <p className="mb-0 mt-1" style={{ whiteSpace: 'pre-wrap' }}>

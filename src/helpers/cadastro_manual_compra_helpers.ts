@@ -82,26 +82,27 @@ export const pathVisualizacaoDaLinha = (row: {
 }
 
 export const tituloListagemCompra = (row: {
+  descricao?: string | null
   observacoes?: string | null
+  descricao_fatura?: string | null
   estabelecimento_nome?: string | null
   estabelecimento?: string | null
   loja_nome?: string | null
 }): TituloListagemCompra => {
+  const descricao = String(row.descricao ?? '').trim()
   const observacoes = String(row.observacoes ?? '').trim()
   const estabelecimento = String(row.estabelecimento_nome ?? row.estabelecimento ?? '').trim()
   const loja = String(row.loja_nome ?? '').trim()
+  const descricaoFatura = String(row.descricao_fatura ?? '').trim()
+  const titulo = descricao || observacoes || estabelecimento || '—'
 
-  if (observacoes) {
-    const sub = [estabelecimento, loja && loja !== estabelecimento ? loja : null]
-      .filter(Boolean)
-      .join(' · ')
-    return { titulo: observacoes, subtitulo: sub || null }
-  }
+  const subParts = [
+    descricaoFatura && descricaoFatura !== titulo ? descricaoFatura : null,
+    !descricaoFatura && estabelecimento && estabelecimento !== titulo ? estabelecimento : null,
+    loja && loja !== estabelecimento && loja !== titulo ? loja : null,
+  ].filter(Boolean)
 
-  return {
-    titulo: estabelecimento || '—',
-    subtitulo: loja && loja !== estabelecimento ? loja : null,
-  }
+  return { titulo, subtitulo: subParts.join(' · ') || null }
 }
 
 export const faturaIdDaCompra = (compra?: CompraVisualizacaoView | null): number | null => {
@@ -178,6 +179,74 @@ export const compraToEditSource = (compra: CompraVisualizacaoView): Partial<Tran
     responsavel_nome: compra.responsavel?.nome,
     responsavel_tipo: compra.responsavel?.tipo ?? undefined,
     observacoes: compra.observacoes ?? null,
+    descricao: compra.descricao
+      ?? (compra.titulo_origem === 'descricao' || compra.titulo_origem === 'observacoes'
+        ? compra.titulo
+        : null)
+      ?? null,
     cartao_nome: compra.cartao?.nome,
   }
 }
+
+export const identificadorDaCompra = (compra?: {
+  compra_grupo_id?: string | number | null
+  transacao_id?: number | null
+  parcelas?: { id?: number | null }[] | null
+} | null): string | null => {
+  if (!compra) return null
+  if (compra.compra_grupo_id != null && String(compra.compra_grupo_id).trim() !== '') {
+    return String(compra.compra_grupo_id)
+  }
+  const id = compra.transacao_id ?? compra.parcelas?.[0]?.id
+  return id != null ? String(id) : null
+}
+
+export const badgeConciliacaoColor = (status?: string | null): string => {
+  switch (status) {
+    case 'conciliada':
+      return 'success'
+    case 'pendente':
+      return 'warning'
+    case 'rejeitada':
+      return 'secondary'
+    case 'nao_conciliada':
+    default:
+      return 'warning'
+  }
+}
+
+export const badgeConciliacaoStyle = (status?: string | null): {
+  backgroundColor: string
+  borderColor: string
+  color: string
+} | undefined => {
+  if (status === 'pendente') {
+    return { backgroundColor: '#f97316', borderColor: '#f97316', color: '#fff' }
+  }
+  if (status === 'nao_conciliada') {
+    return { backgroundColor: '#f59e0b', borderColor: '#f59e0b', color: '#fff' }
+  }
+  return undefined
+}
+
+export const ANEXO_TIPO_LABEL: Record<string, string> = {
+  nota_fiscal: 'Nota fiscal',
+  comprovante: 'Comprovante',
+  recibo: 'Recibo',
+  print: 'Print',
+  pdf: 'PDF',
+  imagem: 'Imagem',
+  outro: 'Outro',
+}
+
+export const formatTamanhoAnexo = (bytes?: number | null): string => {
+  const n = Number(bytes)
+  if (!Number.isFinite(n) || n < 0) return ''
+  if (n < 1024) return `${n} B`
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`
+}
+
+export const ANEXO_ACCEPT = '.pdf,.jpg,.jpeg,.png,.webp,.gif'
+export const ANEXO_MAX_BYTES = 10 * 1024 * 1024
+

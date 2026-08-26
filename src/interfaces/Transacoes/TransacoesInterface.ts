@@ -18,6 +18,7 @@ export interface TransacoesSearch {
     palavra_chave?: string | null | unknown
     /** Usado em `/transacoes/estabelecimentos-do-filtro` */
     apenas_sem_loja?: boolean | number | string | null
+    status_conciliacao?: string | null
 }
 
 /** Item de `GET /transacoes/estabelecimentos-do-filtro` */
@@ -78,6 +79,10 @@ export interface TransacoesList {
     cartao_bandeira?: string | null
     fatura_mes?: number
     fatura_ano?: number
+    descricao?: string | null
+    descricao_fatura?: string | null
+    status_conciliacao?: string | null
+    status_conciliacao_label?: string | null
     observacoes?: string
     /** Repasse do responsável (não confundir com quitação da bandeira) */
     valor_pago_repasse?: number | null
@@ -125,6 +130,8 @@ export interface TransacoesModel {
     categoria_id?: number | string | null
     subcategoria_id?: number | string | null
     responsavel_id?: number | string | null
+    /** Nome amigável da compra (obrigatório no cadastro manual) */
+    descricao?: string | null
     observacoes?: string | null
 }
 
@@ -169,6 +176,7 @@ export interface FaturaLookup {
     id?: number
     mes?: number
     ano?: number
+    cartao_id?: number | null
     cartao_nome?: string
 }
 
@@ -183,9 +191,15 @@ export interface OrigemCompraLookup {
     label?: string
 }
 
+export interface StatusConciliacaoLookup {
+    value?: string
+    label?: string
+}
+
 export interface LookupsTransacoes {
     tipos?: TipoLookup[]
     origens_compra?: OrigemCompraLookup[]
+    status_conciliacao?: StatusConciliacaoLookup[]
     categorias?: CategoriaLookup[]
     subcategorias?: SubcategoriaLookup[]
     responsaveis?: ResponsavelLookup[]
@@ -204,6 +218,51 @@ export interface TransacoesInterface {
     deleteTransacoes(id: number, options?: { excluir_grupo?: boolean }): Promise<any>
     getLookupsTransacoes(): Promise<LookupsTransacoes | undefined>
     exportCsv(params: TransacoesSearch): Promise<Blob>
+    listCandidatosConciliacao(identificador: string | number): Promise<CandidatoConciliacao[]>
+    conciliarTransacao(params: { compra_id: string | number; lancamento_id: number }): Promise<any>
+    desvincularConciliacao(params: { compra_id: string | number }): Promise<any>
+    rejeitarConciliacao(params: { compra_id: string | number }): Promise<any>
+    listAnexosTransacao(params: { transacao_id?: number | string; identificador?: string | number }): Promise<CompraAnexo[]>
+    uploadAnexosTransacao(params: {
+        transacao_id?: number | string
+        identificador?: string | number
+        arquivos: File[]
+        tipo?: string
+    }): Promise<any>
+    downloadAnexoTransacao(id: number): Promise<{ blob: Blob; filename: string }>
+    deleteAnexoTransacao(id: number): Promise<any>
+    getHistoricoTransacao(identificador: string | number): Promise<CompraHistoricoItem[]>
+}
+
+export type StatusConciliacao = 'nao_conciliada' | 'pendente' | 'conciliada' | 'rejeitada'
+
+export interface CandidatoConciliacao {
+    id: number
+    lancamento_id?: number | null
+    descricao?: string | null
+    descricao_fatura?: string | null
+    estabelecimento_nome?: string | null
+    valor?: number | string | null
+    data?: string | null
+    score?: number | null
+    sugestao?: boolean
+}
+
+export interface CompraAnexo {
+    id: number
+    nome?: string | null
+    nome_original?: string | null
+    tipo?: string | null
+    mime?: string | null
+    tamanho?: number | null
+    created_at?: string | null
+}
+
+export interface CompraHistoricoItem {
+    id?: number
+    acao?: string | null
+    descricao?: string | null
+    created_at?: string | null
 }
 
 export const TransacoesDefaultValues: TransacoesModel = {
@@ -228,5 +287,6 @@ export const TransacoesDefaultValues: TransacoesModel = {
     categoria_id: null,
     subcategoria_id: null,
     responsavel_id: null,
+    descricao: null,
     observacoes: null,
 }

@@ -16,11 +16,11 @@ export class CompraNaoEncontradaError extends Error {
 
 const extractPayload = (body: any): CompraVisualizacaoView | undefined => {
   if (!body) return undefined
-  if (body.titulo != null || body.parcelas || body.transacao_id != null || body.compra_grupo_id) {
+  if (body.titulo != null || body.parcelas || body.transacao_id != null || body.compra_grupo_id || body.conciliacao) {
     return body
   }
   const nested = body.data
-  if (nested && (nested.titulo != null || nested.parcelas || nested.transacao_id != null)) {
+  if (nested && (nested.titulo != null || nested.parcelas || nested.transacao_id != null || nested.conciliacao)) {
     return nested
   }
   return nested ?? body

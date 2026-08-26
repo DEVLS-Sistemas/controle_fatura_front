@@ -26,6 +26,7 @@ export interface TransacoesFilterProps {
     responsaveisOptions: SelectOptions[]
     tiposOptions: SelectOptions[]
     origensCompraOptions: SelectOptions[]
+    statusConciliacaoOptions: SelectOptions[]
     filtersRef: TransacoesSearch
     onAfterVincularLoja?: () => void | Promise<void>
 }
@@ -37,6 +38,7 @@ const TransacoesFilter = ({
     responsaveisOptions,
     tiposOptions,
     origensCompraOptions,
+    statusConciliacaoOptions,
     filtersRef,
     onAfterVincularLoja,
 }: TransacoesFilterProps) => {
@@ -346,6 +348,16 @@ const TransacoesFilter = ({
                                                         <SelectListControlled<TransacoesSearch>
                                                             options={optAnos}
                                                             field="ano"
+                                                            control={control}
+                                                        />
+                                                    </div>
+                                                </Col>
+                                                <Col md={3}>
+                                                    <div className="mb-3">
+                                                        <Label htmlFor="status_conciliacao" className="form-label">Conciliação</Label>
+                                                        <SelectListControlled<TransacoesSearch>
+                                                            options={statusConciliacaoOptions}
+                                                            field="status_conciliacao"
                                                             control={control}
                                                         />
                                                     </div>

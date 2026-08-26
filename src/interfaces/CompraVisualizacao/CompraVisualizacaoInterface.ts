@@ -1,6 +1,37 @@
-export type CompraTituloOrigem = 'observacoes' | 'estabelecimento'
+export type CompraTituloOrigem = 'descricao' | 'observacoes' | 'estabelecimento'
 
 export type CompraStatusParcela = 'paga' | 'atual' | 'aberta'
+
+export type StatusConciliacao = 'nao_conciliada' | 'pendente' | 'conciliada' | 'rejeitada'
+
+export interface CompraConciliacaoLancamento {
+  id: number
+  descricao?: string | null
+  descricao_fatura?: string | null
+  estabelecimento_nome?: string | null
+  valor?: number | string | null
+  data?: string | null
+}
+
+export interface CompraConciliacao {
+  status?: StatusConciliacao | string | null
+  status_label?: string | null
+  mensagem?: string | null
+  descricao_compra?: string | null
+  descricao_fatura?: string | null
+  lancamento_id?: number | null
+  lancamento?: CompraConciliacaoLancamento | null
+}
+
+export interface CompraAnexoView {
+  id: number
+  nome?: string | null
+  nome_original?: string | null
+  tipo?: string | null
+  mime?: string | null
+  tamanho?: number | null
+  created_at?: string | null
+}
 
 export interface CompraVisualizacaoSearch {
   mes?: number | null
@@ -102,6 +133,8 @@ export interface CompraVisualizacaoView {
   avista?: boolean
   titulo?: string | null
   titulo_origem?: CompraTituloOrigem | string | null
+  descricao?: string | null
+  descricao_fatura?: string | null
   observacoes?: string | null
   data_compra?: string | null
   tipo?: string | null
@@ -137,6 +170,8 @@ export interface CompraVisualizacaoView {
   cartao_nome?: string | null
   cartao_cor_fundo?: string | null
   cartao_cor_texto?: string | null
+  conciliacao?: CompraConciliacao | null
+  anexos?: CompraAnexoView[]
 }
 
 export interface CompraVisualizacaoInterface {

@@ -4,6 +4,9 @@ import { UnexpectedError } from "../../libs/api/exceptions/UnexpectedError"
 import { ValidationError } from "../../libs/api/exceptions/ValidationError"
 import { PaginateInterface } from "interfaces/SystemInterfaces/PaginateInterface"
 import {
+    CandidatoConciliacao,
+    CompraAnexo,
+    CompraHistoricoItem,
     EstabelecimentoDoFiltro,
     LookupsTransacoes,
     TransacoesInterface,
@@ -187,5 +190,192 @@ export class TransacoesService implements TransacoesInterface {
             responseType: 'blob',
         })
         return response.data
+    }
+
+    async listCandidatosConciliacao(identificador: string | number): Promise<CandidatoConciliacao[]> {
+        const response = await this.httpClient.get<any>({
+            url: `${this.url}/candidatos-conciliacao/${encodeURIComponent(String(identificador))}`,
+        })
+        switch (response.statusCode) {
+            case HttpStatusCode.ok:
+                return unwrapCandidatos(response.body)
+            case HttpStatusCode.unauthorized:
+                throw new AccessDeniedError()
+            case HttpStatusCode.invalidForm:
+                throw new ValidationError(response.body)
+            default:
+                throw new UnexpectedError(response.body?.message || response.message)
+        }
+    }
+
+    async conciliarTransacao(params: { compra_id: string | number; lancamento_id: number }) {
+        const response = await this.httpClient.post({
+            url: this.url + '/conciliar',
+            body: params,
+        })
+        return unwrapMutation(response, 'Erro ao conciliar')
+    }
+
+    async desvincularConciliacao(params: { compra_id: string | number }) {
+        const response = await this.httpClient.post({
+            url: this.url + '/desvincular',
+            body: params,
+        })
+        return unwrapMutation(response, 'Erro ao desvincular')
+    }
+
+    async rejeitarConciliacao(params: { compra_id: string | number }) {
+        const response = await this.httpClient.post({
+            url: this.url + '/rejeitar-conciliacao',
+            body: params,
+        })
+        return unwrapMutation(response, 'Erro ao rejeitar conciliação')
+    }
+
+    async listAnexosTransacao(params: {
+        transacao_id?: number | string
+        identificador?: string | number
+    }): Promise<CompraAnexo[]> {
+        const body: Record<string, unknown> = {}
+        if (params.transacao_id != null) body.transacao_id = params.transacao_id
+        if (params.identificador != null) body.identificador = params.identificador
+        const response = await this.httpClient.get<any>({
+            url: this.url + '/anexos',
+            body,
+        })
+        switch (response.statusCode) {
+            case HttpStatusCode.ok:
+                return unwrapAnexos(response.body)
+            case HttpStatusCode.unauthorized:
+                throw new AccessDeniedError()
+            default:
+                throw new UnexpectedError(response.body?.message || response.message)
+        }
+    }
+
+    async uploadAnexosTransacao(params: {
+        transacao_id?: number | string
+        identificador?: string | number
+        arquivos: File[]
+        tipo?: string
+    }) {
+        const form = new FormData()
+        if (params.transacao_id != null) form.append('transacao_id', String(params.transacao_id))
+        if (params.identificador != null) form.append('identificador', String(params.identificador))
+        if (params.tipo) form.append('tipo', params.tipo)
+        if (params.arquivos.length === 1) {
+            form.append('arquivo', params.arquivos[0])
+        } else {
+            params.arquivos.forEach((file) => form.append('arquivos[]', file))
+        }
+        const response = await this.httpClient.post({
+            url: this.url + '/anexos',
+            body: form,
+            headers: { 'Content-Type': 'multipart/form-data' },
+        })
+        return unwrapMutation(response, 'Erro ao enviar anexo')
+    }
+
+    async downloadAnexoTransacao(id: number): Promise<{ blob: Blob; filename: string }> {
+        const { ApiConfig } = await import('../../libs/api/ApiConfig')
+        const response = await ApiConfig.get(`${this.url}/anexos/${id}`, {
+            responseType: 'blob',
+        })
+        const disposition = String(response.headers?.['content-disposition'] ?? '')
+        const match = disposition.match(/filename\*?=(?:UTF-8''|"?)([^";]+)/i)
+        const filename = match ? decodeURIComponent(match[1].replace(/"/g, '')) : `anexo-${id}`
+        return { blob: response.data, filename }
+    }
+
+    async deleteAnexoTransacao(id: number) {
+        const response = await this.httpClient.delete({
+            url: `${this.url}/anexos/${id}`,
+        })
+        return unwrapMutation(response, 'Erro ao excluir anexo')
+    }
+
+    async getHistoricoTransacao(identificador: string | number): Promise<CompraHistoricoItem[]> {
+        const response = await this.httpClient.get<any>({
+            url: `${this.url}/historico/${encodeURIComponent(String(identificador))}`,
+        })
+        switch (response.statusCode) {
+            case HttpStatusCode.ok:
+                return unwrapHistorico(response.body)
+            case HttpStatusCode.unauthorized:
+                throw new AccessDeniedError()
+            default:
+                throw new UnexpectedError(response.body?.message || response.message)
+        }
+    }
+}
+
+const unwrapList = (body: any): any[] => {
+    if (Array.isArray(body)) return body
+    if (Array.isArray(body?.data)) return body.data
+    if (Array.isArray(body?.candidatos)) return body.candidatos
+    if (Array.isArray(body?.candidatos?.data)) return body.candidatos.data
+    if (Array.isArray(body?.anexos)) return body.anexos
+    if (Array.isArray(body?.anexos?.data)) return body.anexos.data
+    if (Array.isArray(body?.historico)) return body.historico
+    if (Array.isArray(body?.historico?.data)) return body.historico.data
+    return []
+}
+
+const unwrapCandidatos = (body: any): CandidatoConciliacao[] =>
+    unwrapList(body)
+        .map((item: any) => {
+            const id = Number(item?.id ?? item?.lancamento_id)
+            if (!Number.isFinite(id) || id <= 0) return null
+            return {
+                id,
+                lancamento_id: item?.lancamento_id != null ? Number(item.lancamento_id) : id,
+                descricao: item?.descricao ?? item?.descricao_fatura ?? item?.estabelecimento_nome ?? null,
+                descricao_fatura: item?.descricao_fatura ?? item?.descricao ?? null,
+                estabelecimento_nome: item?.estabelecimento_nome ?? item?.estabelecimento ?? null,
+                valor: item?.valor ?? item?.valor_parcela ?? null,
+                data: item?.data ?? item?.data_compra ?? null,
+                score: item?.score != null ? Number(item.score) : null,
+                sugestao: item?.sugestao === true || item?.sugestao === 1,
+            } as CandidatoConciliacao
+        })
+        .filter(Boolean) as CandidatoConciliacao[]
+
+const unwrapAnexos = (body: any): CompraAnexo[] =>
+    unwrapList(body)
+        .map((item: any) => {
+            const id = Number(item?.id)
+            if (!Number.isFinite(id) || id <= 0) return null
+            return {
+                id,
+                nome: item?.nome ?? item?.nome_original ?? null,
+                nome_original: item?.nome_original ?? item?.nome ?? null,
+                tipo: item?.tipo ?? null,
+                mime: item?.mime ?? item?.mime_type ?? null,
+                tamanho: item?.tamanho != null ? Number(item.tamanho) : null,
+                created_at: item?.created_at ?? item?.data ?? null,
+            } as CompraAnexo
+        })
+        .filter(Boolean) as CompraAnexo[]
+
+const unwrapHistorico = (body: any): CompraHistoricoItem[] =>
+    unwrapList(body).map((item: any, index: number) => ({
+        id: item?.id != null ? Number(item.id) : index,
+        acao: item?.acao ?? item?.action ?? null,
+        descricao: item?.descricao ?? item?.message ?? item?.texto ?? null,
+        created_at: item?.created_at ?? item?.data ?? null,
+    }))
+
+const unwrapMutation = (response: { statusCode: number; body?: any; message?: string }, fallback: string) => {
+    switch (response.statusCode) {
+        case HttpStatusCode.ok:
+        case HttpStatusCode.created:
+        case HttpStatusCode.noContent:
+            return response.body
+        case HttpStatusCode.unauthorized:
+            throw new AccessDeniedError()
+        case HttpStatusCode.invalidForm:
+            throw new ValidationError(response.body)
+        default:
+            throw new UnexpectedError(response.body?.message || response.message || fallback)
     }
 }

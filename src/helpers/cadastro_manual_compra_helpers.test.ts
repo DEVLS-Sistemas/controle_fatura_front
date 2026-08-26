@@ -70,7 +70,19 @@ describe('pathVisualizacaoCompra', () => {
 })
 
 describe('tituloListagemCompra', () => {
-  it('usa observações como título e estabelecimento como subtítulo', () => {
+  it('usa descricao como título e o nome da fatura como subtítulo', () => {
+    expect(tituloListagemCompra({
+      descricao: 'Mouse Logitech',
+      observacoes: 'Garantia',
+      descricao_fatura: 'PAG*LOJA XYZ',
+      estabelecimento_nome: 'PAG*LOJA XYZ',
+    })).toEqual({
+      titulo: 'Mouse Logitech',
+      subtitulo: 'PAG*LOJA XYZ',
+    })
+  })
+
+  it('usa observações como título quando não há descricao', () => {
     expect(tituloListagemCompra({
       observacoes: 'Mouse Logitech',
       estabelecimento_nome: 'PAG*LOJA XYZ',

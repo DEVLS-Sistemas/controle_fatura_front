@@ -30,6 +30,14 @@ const defaultOrigensCompraOptions: SelectOptions[] = [
     ...Object.entries(origemCompraLabel).map(([value, label]) => ({ value, label })),
 ]
 
+const defaultStatusConciliacaoOptions: SelectOptions[] = [
+    { value: '', label: 'Todos' },
+    { value: 'nao_conciliada', label: 'Não conciliada' },
+    { value: 'pendente', label: 'Pendente' },
+    { value: 'conciliada', label: 'Conciliada' },
+    { value: 'rejeitada', label: 'Rejeitada' },
+]
+
 const buildSelectOptions = (
     items: {
         id?: number
@@ -78,6 +86,7 @@ const TransacoesPage = () => {
         tipo: searchParams.get('tipo'),
         origem_compra: searchParams.get('origem_compra'),
         eh_assinatura: searchParams.get('eh_assinatura'),
+        status_conciliacao: searchParams.get('status_conciliacao'),
         mes: parseQueryNumber(searchParams.get('mes')),
         ano: parseQueryNumber(searchParams.get('ano')),
         palavra_chave: null,
@@ -106,6 +115,7 @@ const TransacoesPage = () => {
     const [responsaveisOptions, setResponsaveisOptions] = useState<SelectOptions[]>([{ value: '', label: 'Todos' }])
     const [tiposOptions, setTiposOptions] = useState<SelectOptions[]>(defaultTiposOptions)
     const [origensCompraOptions, setOrigensCompraOptions] = useState<SelectOptions[]>(defaultOrigensCompraOptions)
+    const [statusConciliacaoOptions, setStatusConciliacaoOptions] = useState<SelectOptions[]>(defaultStatusConciliacaoOptions)
     const [responsaveisLookup, setResponsaveisLookup] = useState<ResponsavelLookup[]>([])
     const [defaultResponsavelId, setDefaultResponsavelId] = useState<number | null>(null)
 
@@ -122,6 +132,7 @@ const TransacoesPage = () => {
         transacoesContext.tipo = data.tipo
         transacoesContext.origem_compra = data.origem_compra
         transacoesContext.eh_assinatura = data.eh_assinatura
+        transacoesContext.status_conciliacao = data.status_conciliacao
         transacoesContext.mes = data.mes
         transacoesContext.ano = data.ano
         transacoesContext.page = data.page
@@ -166,6 +177,15 @@ const TransacoesPage = () => {
                         })),
                     ])
                 }
+                if (result.status_conciliacao?.length) {
+                    setStatusConciliacaoOptions([
+                        { value: '', label: 'Todos' },
+                        ...result.status_conciliacao.map((s) => ({
+                            value: s.value ?? '',
+                            label: s.label ?? s.value ?? '',
+                        })),
+                    ])
+                }
             }
         } catch (error) {
             console.error('Erro ao carregar lookups de transações:', error)
@@ -193,6 +213,7 @@ const TransacoesPage = () => {
                             responsaveisOptions={responsaveisOptions}
                             tiposOptions={tiposOptions}
                             origensCompraOptions={origensCompraOptions}
+                            statusConciliacaoOptions={statusConciliacaoOptions}
                             filtersRef={transacoesContext}
                             onAfterVincularLoja={() => getRemoteTransacoesList(transacoesContext)}
                         />

@@ -25,10 +25,15 @@ import { TransacoesService } from 'services/Transacoes/TransacoesService'
 import {
   compraToEditSource,
   faturaIdDaCompra,
+  badgeConciliacaoColor,
+  badgeConciliacaoStyle,
 } from 'helpers/cadastro_manual_compra_helpers'
 import CompraVisualizacaoResumo from './CompraVisualizacaoResumo'
 import CompraVisualizacaoDados from './CompraVisualizacaoDados'
 import CompraVisualizacaoParcelas from './CompraVisualizacaoParcelas'
+import CompraVisualizacaoConciliacao from './CompraVisualizacaoConciliacao'
+import CompraVisualizacaoAnexos from './CompraVisualizacaoAnexos'
+import CompraVisualizacaoHistorico from './CompraVisualizacaoHistorico'
 
 const CompraVisualizacaoSkeleton = () => (
   <React.Fragment>
@@ -179,6 +184,17 @@ const CompraVisualizacaoPage = () => {
         mes: Number.isFinite(mes) && mes > 0 ? mes : null,
         ano: Number.isFinite(ano) && ano > 0 ? ano : null,
       })
+      if (result) {
+        try {
+          const anexos = await transacoesService.listAnexosTransacao({
+            identificador: id,
+            transacao_id: result.transacao_id ?? undefined,
+          })
+          result.anexos = anexos
+        } catch {
+          // visualização pode já trazer anexos
+        }
+      }
       setCompra(result)
     } catch (error: any) {
       if (error instanceof CompraNaoEncontradaError || error?.name === 'CompraNaoEncontradaError') {
@@ -207,11 +223,15 @@ const CompraVisualizacaoPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [identificador, mesParam, anoParam])
 
-  const titulo = compra?.titulo || 'Visualização da compra'
+  const titulo = compra?.titulo || compra?.descricao || 'Visualização da compra'
   const subtituloEstabelecimento =
-    compra?.titulo_origem === 'observacoes'
-      ? compra.estabelecimento?.nome || compra.estabelecimento?.loja_nome
-      : null
+    compra?.descricao_fatura
+    && compra.descricao_fatura !== titulo
+      ? compra.descricao_fatura
+      : (compra?.titulo_origem === 'descricao' || compra?.titulo_origem === 'observacoes'
+        ? compra.estabelecimento?.nome || compra.estabelecimento?.loja_nome
+        : null)
+  const statusConciliacao = compra?.conciliacao?.status
   const faturaId = faturaIdDaCompra(compra)
   const ehParcelada = Boolean(compra?.compra_grupo_id) && !compra?.avista
 
@@ -255,6 +275,15 @@ const CompraVisualizacaoPage = () => {
                       ) : compra && compra.importada_pdf === false ? (
                         <Badge color="warning" pill>
                           Cadastro manual
+                        </Badge>
+                      ) : null}
+                      {statusConciliacao ? (
+                        <Badge
+                          color={badgeConciliacaoColor(statusConciliacao)}
+                          pill
+                          style={badgeConciliacaoStyle(statusConciliacao)}
+                        >
+                          {compra?.conciliacao?.status_label || statusConciliacao}
                         </Badge>
                       ) : null}
                     </div>
@@ -328,7 +357,16 @@ const CompraVisualizacaoPage = () => {
           ) : compra ? (
             <React.Fragment>
               <CompraVisualizacaoResumo compra={compra} />
+              <CompraVisualizacaoConciliacao
+                compra={compra}
+                onChanged={() => identificador && loadCompra(identificador)}
+              />
               <CompraVisualizacaoDados compra={compra} />
+              <CompraVisualizacaoAnexos
+                compra={compra}
+                onChanged={() => identificador && loadCompra(identificador)}
+              />
+              <CompraVisualizacaoHistorico compra={compra} />
               <CompraVisualizacaoParcelas compra={compra} />
             </React.Fragment>
           ) : (
