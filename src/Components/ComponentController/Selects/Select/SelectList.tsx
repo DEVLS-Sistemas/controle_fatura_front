@@ -52,9 +52,32 @@ const formatOptionLabel = (
                 }}
             />
         ) : null}
-        <span>{option.label}</span>
+        <span className="d-inline-flex align-items-baseline flex-wrap">
+            <span>{option.label}</span>
+            {option.subtitulo ? (
+                <span
+                    className="fw-normal ms-1"
+                    style={{ fontSize: '0.92em', color: 'inherit', opacity: 0.72 }}
+                >
+                    - {option.subtitulo}
+                </span>
+            ) : null}
+        </span>
     </div>
 )
+
+const filterOption = (
+    option: { label?: string; data?: SelectOptions },
+    input: string
+) => {
+    const q = String(input || '').trim().toLowerCase()
+    if (!q) return true
+    const haystack = [option.label, option.data?.subtitulo]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+    return haystack.includes(q)
+}
 
 const invalidControlStyles = {
     control: (styles: any) => ({
@@ -71,6 +94,8 @@ export function SelectList(props: SelectProps) {
     const hasColorOptions = props.options.some(
         (option) => !!option.cor_principal || !!option.cor_fundo || !!option.cor
     )
+    const hasSubtitulo = props.options.some((option) => !!option.subtitulo)
+    const useCustomOptionLabel = hasColorOptions || hasSubtitulo
     const selectStyles = props.errors
         ? { ...customStyles, ...invalidControlStyles }
         : customStyles
@@ -99,7 +124,8 @@ export function SelectList(props: SelectProps) {
                     menuPlacement={props.menuPlacement ?? 'auto'}
                     isClearable
                     closeMenuOnSelect={true}
-                    formatOptionLabel={hasColorOptions ? formatOptionLabel : undefined}
+                    formatOptionLabel={useCustomOptionLabel ? formatOptionLabel : undefined}
+                    filterOption={hasSubtitulo ? filterOption : undefined}
                     className={`${props.errors ? 'select is-invalid' : ''}`}
                 />
                 {props.errors && <div className="d-block invalid-feedback text-danger ps-3">{props.errors.message}</div>}
@@ -131,7 +157,8 @@ export function SelectList(props: SelectProps) {
                 styles={selectStyles}
                 closeMenuOnSelect={props.closeMenuOnSelect ?? false}
                 menuPlacement={props.menuPlacement ?? 'auto'}
-                formatOptionLabel={hasColorOptions ? formatOptionLabel : undefined}
+                formatOptionLabel={useCustomOptionLabel ? formatOptionLabel : undefined}
+                filterOption={hasSubtitulo ? filterOption : undefined}
             />
             {props.errors && <div className="d-block invalid-feedback text-danger ps-3">{props.errors.message}</div>}
         </>

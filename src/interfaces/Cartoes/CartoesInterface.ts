@@ -222,6 +222,52 @@ export interface LookupsCartoes {
     parsers_homologados?: ParserHomologado[]
 }
 
+export interface CartaoRapidoPayload {
+    nome?: string
+    bandeira: string
+    ultimos_digitos: string
+    dia_limite_fatura?: number
+    dia_vencimento_fatura?: number
+    cartao_id?: number
+    tipo?: TipoNumeroCartao | string
+    apelido?: string
+    nome_no_cartao?: string
+}
+
+export interface CartaoRapidoNumero {
+    id: number
+    ultimos_digitos?: string | null
+    tipo?: string | null
+}
+
+export interface CartaoRapidoBandeira {
+    id?: number
+    bandeira?: string | null
+    numeros?: CartaoRapidoNumero[]
+}
+
+export interface CartaoRapidoData {
+    id: number
+    cartao_id?: number
+    cartao_numero_id?: number | null
+    nome: string
+    banco?: string | null
+    dia_limite_fatura?: number | null
+    dia_vencimento_fatura?: number | null
+    cor_fundo?: string | null
+    cor_texto?: string | null
+    pessoa_id?: number | null
+    pessoa_nome?: string | null
+    bandeiras?: CartaoRapidoBandeira[]
+}
+
+export interface CartaoRapidoResult {
+    data: CartaoRapidoData
+    status: boolean
+    criado: boolean
+    message: string
+}
+
 export interface CartoesInterface {
     getViewCartoes(params: { id: number | string }): Promise<CartoesView | undefined>
     listCartoesPaginate(params: CartoesSearch): Promise<any>
@@ -229,6 +275,7 @@ export interface CartoesInterface {
     AsyncListBandeiras(params: { cartao_id: number | string }): Promise<BandeiraListItem[] | undefined>
     AsyncListNumeros(params: NumerosListParams): Promise<NumeroListItem[] | undefined>
     createCartoes(params: CartoesModel): Promise<any>
+    createCartoesRapido(params: CartaoRapidoPayload): Promise<CartaoRapidoResult>
     editCartoes(params: CartoesModel): Promise<any>
     /** Persiste `senha_pdf_regra` no cartão sem alterar a senha */
     atualizarSenhaPdfRegra(cartaoId: number, senhaPdfRegra: string): Promise<any>

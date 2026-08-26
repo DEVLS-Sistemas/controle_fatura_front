@@ -12,6 +12,8 @@ export type SelectOptions = {
     /** Par de cores da bandeira (principal + secundária) */
     cor_principal?: string | null;
     cor_secundaria?: string | null;
+    /** Texto secundário (ex.: titular do cartão), exibido em cinza */
+    subtitulo?: string | null;
 };
 
 export type SelectProps = {

@@ -131,6 +131,31 @@ export const resolveBandeiraCores = (
     }
 }
 
+export const toCartaoSelectOption = (cartao: {
+    id?: number | string | null
+    nome?: string | null
+    cor_fundo?: string | null
+    cor_texto?: string | null
+    pessoa_nome?: string | null
+    pessoa?: { nome?: string | null; nome_completo?: string | null } | null
+}): SelectOptions => {
+    const id = cartao.id
+    const nome = String(cartao.nome ?? '').trim() || (id != null ? `Cartão ${id}` : 'Cartão')
+    const pessoa = String(
+        cartao.pessoa_nome
+        ?? cartao.pessoa?.nome_completo
+        ?? cartao.pessoa?.nome
+        ?? ''
+    ).trim()
+    return {
+        value: id,
+        label: nome,
+        subtitulo: pessoa || null,
+        cor_fundo: cartao.cor_fundo ?? null,
+        cor_texto: cartao.cor_texto ?? null,
+    }
+}
+
 export const toBandeiraSelectOption = (
     value: string | number | null | undefined,
     label: string,

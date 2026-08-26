@@ -51,9 +51,11 @@ import { EstabelecimentosService } from 'services/Estabelecimentos/Estabelecimen
 import { SubcategoriasService } from 'services/Subcategorias/SubcategoriasService'
 import { CartoesService } from 'services/Cartoes/CartoesService'
 import { NumeroListItem } from 'interfaces/Cartoes/CartoesInterface'
+import { toCartaoSelectOption } from 'helpers/cartao_helpers'
 import ResponsavelModal from '../ResponsavelModal/ResponsavelModal'
 import CategoriaRapidoModal, { CategoriaRapidoConfirm } from '../CategoriaRapidoModal/CategoriaRapidoModal'
 import SubcategoriaRapidoModal, { SubcategoriaRapidoConfirm } from '../SubcategoriaRapidoModal/SubcategoriaRapidoModal'
+import CartaoRapidoModal, { CartaoRapidoConfirm, CartaoRapidoModo } from '../CartaoRapidoModal/CartaoRapidoModal'
 
 const formatNumeroOptionLabel = (n: NumeroListItem): string => {
     if (n.label) return n.label
@@ -137,12 +139,15 @@ const TransacoesForm = () => {
     const [responsavelModalOpen, setResponsavelModalOpen] = useState(false)
     const [categoriaRapidoOpen, setCategoriaRapidoOpen] = useState(false)
     const [subcategoriaRapidoOpen, setSubcategoriaRapidoOpen] = useState(false)
+    const [cartaoRapidoOpen, setCartaoRapidoOpen] = useState(false)
+    const [cartaoRapidoModo, setCartaoRapidoModo] = useState<CartaoRapidoModo>('cartao')
     const [categoriasLookup, setCategoriasLookup] = useState<CategoriaLookup[]>([])
     const [parcelasValores, setParcelasValores] = useState<string[]>([])
 
     const skipEstabelecimentoEffect = useRef(true)
     const skipCategoriaEffect = useRef(true)
     const skipCartaoNumeroEffect = useRef(true)
+    const preserveNumeroFromRapido = useRef(false)
     const skipRedistributeParcelas = useRef(
         Array.isArray(state?.source?.parcelas) && state.source.parcelas.length > 0
     )
@@ -355,14 +360,7 @@ const TransacoesForm = () => {
             const lookups = await transacoesService.getLookupsTransacoes()
             if (lookups?.cartoes) {
                 setCartoesLookup(lookups.cartoes)
-                setCartoesOptions(
-                    lookups.cartoes.map((c) => ({
-                        value: c.id!,
-                        label: c.nome ?? `Cartão ${c.id}`,
-                        cor_fundo: c.cor_fundo ?? null,
-                        cor_texto: c.cor_texto ?? null,
-                    }))
-                )
+                setCartoesOptions(lookups.cartoes.map((c) => toCartaoSelectOption(c)))
             }
             if (lookups?.faturas) {
                 setFaturasLookup(lookups.faturas)
@@ -496,6 +494,94 @@ const TransacoesForm = () => {
             } catch (error) {
                 console.error('Erro ao vincular subcategoria na transação:', error)
                 toast.error('Subcategoria cadastrada, mas falhou ao salvar na compra')
+            }
+        }
+    }
+
+    const applyNumerosFromRapido = (result: CartaoRapidoConfirm) => {
+        const data = result.data
+        const list: NumeroListItem[] = []
+        ;(data.bandeiras ?? []).forEach((bandeiraItem) => {
+            ;(bandeiraItem.numeros ?? []).forEach((numero) => {
+                if (numero.id == null) return
+                list.push({
+                    value: numero.id,
+                    ultimos_digitos: numero.ultimos_digitos ?? null,
+                    tipo: numero.tipo ?? null,
+                    bandeira: bandeiraItem.bandeira ?? null,
+                    label: '',
+                })
+            })
+        })
+        if (
+            data.cartao_numero_id
+            && !list.some((n) => Number(n.value) === Number(data.cartao_numero_id))
+        ) {
+            list.push({
+                value: data.cartao_numero_id,
+                ultimos_digitos: null,
+                label: `•••• ${data.cartao_numero_id}`,
+            })
+        }
+        setNumerosOptions(
+            list.map((n) => ({
+                value: n.value,
+                label: formatNumeroOptionLabel(n),
+            }))
+        )
+        setSemNumeros(list.length === 0)
+        setShowNumeroSelect(isEdit || list.length > 1)
+        setNumerosLoading(false)
+        setValue('cartao_numero_id', data.cartao_numero_id ?? list[0]?.value ?? null)
+    }
+
+    const handleConfirmCartaoRapido = async (result: CartaoRapidoConfirm) => {
+        const data = result.data
+        const cartaoIdNovo = data.id
+        setCartoesLookup((prev) => {
+            const next: CartaoLookup = {
+                id: cartaoIdNovo,
+                nome: data.nome,
+                cor_fundo: data.cor_fundo ?? null,
+                cor_texto: data.cor_texto ?? null,
+                dia_limite_fatura: data.dia_limite_fatura ?? null,
+                dia_vencimento_fatura: data.dia_vencimento_fatura ?? null,
+                pessoa_id: (data as CartaoLookup).pessoa_id ?? null,
+                pessoa_nome: (data as CartaoLookup).pessoa_nome ?? null,
+            }
+            if (prev.some((c) => Number(c.id) === Number(cartaoIdNovo))) {
+                return prev.map((c) => (Number(c.id) === Number(cartaoIdNovo) ? { ...c, ...next } : c))
+            }
+            return [...prev, next]
+        })
+        setCartoesOptions((prev) => {
+            const option = toCartaoSelectOption(data)
+            if (prev.some((o) => Number(o.value) === Number(cartaoIdNovo))) {
+                return prev.map((o) => (Number(o.value) === Number(cartaoIdNovo) ? { ...o, ...option } : o))
+            }
+            return [...prev, option]
+        })
+
+        if (Number(cartaoId) !== Number(cartaoIdNovo)) {
+            preserveNumeroFromRapido.current = true
+        }
+        applyNumerosFromRapido(result)
+        setValue('cartao_id', cartaoIdNovo)
+
+        if (isEdit) {
+            const txId = record.id ?? record.transacao_id
+            if (!txId) return
+            try {
+                await transacoesService.editTransacoes({
+                    id: txId,
+                    transacao_id: txId,
+                    cartao_id: cartaoIdNovo,
+                    cartao_numero_id: data.cartao_numero_id ?? undefined,
+                    propagar_grupo: result.propagar_grupo || undefined,
+                } as TransacoesModel)
+            } catch (error) {
+                console.error('Erro ao vincular cartão na transação:', error)
+                toast.error('Cartão cadastrado, mas falhou ao salvar na compra')
             }
         }
     }
@@ -650,6 +736,11 @@ const TransacoesForm = () => {
         const isFirst = skipCartaoNumeroEffect.current
         if (isFirst) skipCartaoNumeroEffect.current = false
 
+        if (preserveNumeroFromRapido.current) {
+            preserveNumeroFromRapido.current = false
+            return
+        }
+
         // Edit com fatura: só finais da bandeira da fatura (corrigir/atribuir final)
         if (isEdit && record.fatura_id) {
             loadNumeros({
@@ -770,8 +861,7 @@ const TransacoesForm = () => {
                                     <form onSubmit={handleSubmit(onSubmit)}>
                                         {lookupsReady && cartoesOptions.length === 0 ? (
                                             <div className="alert alert-warning">
-                                                Cadastre um cartão antes de registrar uma compra.{' '}
-                                                <Link to="/cartoes/add">Ir para cartões</Link>
+                                                Cadastre um cartão com o botão <strong>Nova</strong> ao lado do campo Cartão.
                                             </div>
                                         ) : null}
 
@@ -800,13 +890,32 @@ const TransacoesForm = () => {
                                             <Col md={showFinalField ? (isCompraFlow ? 5 : 4) : (isCompraFlow ? 6 : 6)}>
                                                 <div className="mb-3">
                                                     <Label htmlFor="cartao_id" className="form-label">Cartão</Label>
-                                                    <SelectListControlled<TransacoesModel>
-                                                        options={cartoesOptions}
-                                                        field="cartao_id"
-                                                        control={control}
-                                                        required={required}
-                                                        disabled={fromFatura && !isEdit}
-                                                    />
+                                                    <div className="d-flex gap-2 align-items-start">
+                                                        <div className="flex-grow-1">
+                                                            <SelectListControlled<TransacoesModel>
+                                                                options={cartoesOptions}
+                                                                field="cartao_id"
+                                                                control={control}
+                                                                required={required}
+                                                                disabled={fromFatura && !isEdit}
+                                                            />
+                                                        </div>
+                                                        {!(fromFatura && !isEdit) ? (
+                                                            <Button
+                                                                type="button"
+                                                                color="light"
+                                                                className="border flex-shrink-0"
+                                                                title="Novo cartão"
+                                                                onClick={() => {
+                                                                    setCartaoRapidoModo('cartao')
+                                                                    setCartaoRapidoOpen(true)
+                                                                }}
+                                                            >
+                                                                <i className="ri-add-line me-1"></i>
+                                                                Nova
+                                                            </Button>
+                                                        ) : null}
+                                                    </div>
                                                     {fromFatura && !isEdit && (
                                                         <small className="text-muted">Vinculado à fatura selecionada</small>
                                                     )}
@@ -823,11 +932,18 @@ const TransacoesForm = () => {
                                                         ) : semNumeros ? (
                                                             <div className="alert alert-warning mb-0 py-2">
                                                                 Cadastre um final neste cartão antes de registrar a compra.{' '}
-                                                                {cartaoId && (
-                                                                    <Link to={`/cartoes/edit/${cartaoId}`}>
-                                                                        Abrir cartão
-                                                                    </Link>
-                                                                )}
+                                                                {cartaoId ? (
+                                                                    <button
+                                                                        type="button"
+                                                                        className="btn btn-link btn-sm p-0 align-baseline"
+                                                                        onClick={() => {
+                                                                            setCartaoRapidoModo('final')
+                                                                            setCartaoRapidoOpen(true)
+                                                                        }}
+                                                                    >
+                                                                        Cadastrar final
+                                                                    </button>
+                                                                ) : null}
                                                             </div>
                                                         ) : (
                                                             <SelectListControlled<TransacoesModel>
@@ -1013,6 +1129,7 @@ const TransacoesForm = () => {
                                                         <div className="text-muted fs-13 mt-1">
                                                             {[
                                                                 cartaoAtual?.nome,
+                                                                cartaoAtual?.pessoa_nome,
                                                                 numeroAtual?.label,
                                                             ].filter(Boolean).join(' · ')}
                                                         </div>
@@ -1246,6 +1363,16 @@ const TransacoesForm = () => {
                     setValue('responsavel_id', responsavel.id ?? null)
                     toast.success(`Responsável: ${responsavel.nome}`)
                 }}
+            />
+
+            <CartaoRapidoModal
+                isOpen={cartaoRapidoOpen}
+                toggle={() => setCartaoRapidoOpen(false)}
+                modo={cartaoRapidoModo}
+                cartaoId={cartaoRapidoModo === 'final' ? cartaoId : null}
+                cartaoNome={cartaoAtual?.nome}
+                showPropagarGrupo={isEdit && Boolean(record.compra_grupo_id)}
+                onConfirm={handleConfirmCartaoRapido}
             />
 
             <CategoriaRapidoModal
