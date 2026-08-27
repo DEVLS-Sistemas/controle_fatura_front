@@ -85,6 +85,7 @@ export interface TransacoesList {
     status_conciliacao_label?: string | null
     observacoes?: string
     texto_compra?: string | null
+    /** true só se o usuário cadastrou. false no PDF e nas parcelas materializadas em faturas sem anexo. */
     compra_manual?: boolean | null
     precisa_conciliar?: boolean | null
     precisa_conciliar_label?: string | null
@@ -145,6 +146,7 @@ export interface TransacoesModel {
     descricao?: string | null
     observacoes?: string | null
     texto_compra?: string | null
+    compra_manual?: boolean | null
 }
 
 export interface CategoriaLookup {

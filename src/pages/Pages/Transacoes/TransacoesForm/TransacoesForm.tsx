@@ -699,6 +699,7 @@ const TransacoesForm = () => {
                 responsavel_id: data.responsavel_id || undefined,
                 observacoes: textoCompra || undefined,
                 descricao: textoCompra || undefined,
+                compra_manual: true,
             }
 
             if (!isCompraFlow) {

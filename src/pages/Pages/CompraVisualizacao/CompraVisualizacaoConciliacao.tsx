@@ -7,6 +7,7 @@ import {
   badgeConciliacaoStyle,
   idLancamentoCandidato,
   identificadorDaCompra,
+  precisaConciliarCompra,
 } from 'helpers/cadastro_manual_compra_helpers'
 import { CompraVisualizacaoView } from 'interfaces/CompraVisualizacao/CompraVisualizacaoInterface'
 import { TransacoesService } from 'services/Transacoes/TransacoesService'
@@ -33,7 +34,7 @@ const CompraVisualizacaoConciliacao = ({ compra, onChanged }: CompraVisualizacao
     || lancamento?.estabelecimento_nome
   const mostrarLancamento = Boolean(descricaoFatura) && status !== 'nao_conciliada' && status !== 'rejeitada'
 
-  const podeConciliar = Boolean(compraId) && status !== 'conciliada'
+  const podeConciliar = precisaConciliarCompra(compra) && Boolean(compraId) && status !== 'conciliada'
   const podeDesvincular = Boolean(compraId) && (status === 'conciliada' || status === 'pendente')
   const podeRejeitar = Boolean(compraId) && status === 'pendente'
 

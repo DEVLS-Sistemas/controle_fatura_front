@@ -12,7 +12,7 @@ import {
   origemCompraColor,
 } from 'helpers/fatura_helpers'
 import { CompraVisualizacaoView } from 'interfaces/CompraVisualizacao/CompraVisualizacaoInterface'
-import { faturaIdDaCompra, LABEL_ESTABELECIMENTO_VAZIO, textoCompraDaCompra } from 'helpers/cadastro_manual_compra_helpers'
+import { faturaIdDaCompra, LABEL_ESTABELECIMENTO_VAZIO, origemLancamentoCompra, textoCompraDaCompra } from 'helpers/cadastro_manual_compra_helpers'
 
 interface CompraVisualizacaoDadosProps {
   compra: CompraVisualizacaoView
@@ -75,11 +75,7 @@ const CompraVisualizacaoDados = ({ compra }: CompraVisualizacaoDadosProps) => {
     || (faturaRef
       ? `${String(faturaRef.mes).padStart(2, '0')}/${faturaRef.ano}`
       : null)
-  const origemLancamento = compra.importada_pdf === true
-    ? 'Importada da fatura'
-    : compra.importada_pdf === false
-      ? 'Cadastro manual'
-      : null
+  const origemLancamento = origemLancamentoCompra(compra)
 
   return (
     <Card className="compra-dados">
@@ -150,12 +146,14 @@ const CompraVisualizacaoDados = ({ compra }: CompraVisualizacaoDadosProps) => {
               ) : faturaLabel
             }
           />
-          <DadoTile
-            icon={compra.importada_pdf ? 'ri-file-pdf-line' : 'ri-edit-line'}
-            tone={compra.importada_pdf ? 'info' : 'warning'}
-            label="Origem do lançamento"
-            value={origemLancamento}
-          />
+          {origemLancamento ? (
+            <DadoTile
+              icon={origemLancamento.icon}
+              tone={origemLancamento.tone}
+              label="Origem do lançamento"
+              value={origemLancamento.label}
+            />
+          ) : null}
           <DadoTile
             icon="ri-text"
             tone="primary"

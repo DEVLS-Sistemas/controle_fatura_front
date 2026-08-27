@@ -27,8 +27,10 @@ import {
   faturaIdDaCompra,
   badgeConciliacaoColor,
   badgeConciliacaoStyle,
+  isCompraManual,
   precisaConciliarCompra,
   labelPrecisaConciliar,
+  origemLancamentoCompra,
   textoCompraDaCompra,
   LABEL_ESTABELECIMENTO_VAZIO,
 } from 'helpers/cadastro_manual_compra_helpers'
@@ -234,9 +236,10 @@ const CompraVisualizacaoPage = () => {
   const precisaConciliar = precisaConciliarCompra({
     precisa_conciliar: compra?.precisa_conciliar,
     compra_manual: compra?.compra_manual,
-    importada_pdf: compra?.importada_pdf,
     status_conciliacao: statusConciliacao,
   })
+  const origemLancamento = origemLancamentoCompra(compra)
+  const mostrarConciliacao = precisaConciliar || isCompraManual(compra)
   const faturaId = faturaIdDaCompra(compra)
   const ehParcelada = Boolean(compra?.compra_grupo_id) && !compra?.avista
 
@@ -282,16 +285,12 @@ const CompraVisualizacaoPage = () => {
                           <i className="ri-alert-line me-1"></i>
                           {labelPrecisaConciliar(compra)}
                         </Badge>
-                      ) : compra && compra.importada_pdf === true ? (
-                        <Badge color="info" pill>
-                          Importada da fatura
-                        </Badge>
-                      ) : compra && compra.importada_pdf === false ? (
-                        <Badge color="warning" pill>
-                          Cadastro manual
+                      ) : origemLancamento ? (
+                        <Badge color={origemLancamento.tone} pill>
+                          {origemLancamento.label}
                         </Badge>
                       ) : null}
-                      {statusConciliacao ? (
+                      {mostrarConciliacao && statusConciliacao ? (
                         <Badge
                           color={badgeConciliacaoColor(statusConciliacao)}
                           pill
@@ -382,10 +381,12 @@ const CompraVisualizacaoPage = () => {
                 </div>
               ) : null}
               <CompraVisualizacaoResumo compra={compra} />
-              <CompraVisualizacaoConciliacao
-                compra={compra}
-                onChanged={() => identificador && loadCompra(identificador)}
-              />
+              {mostrarConciliacao ? (
+                <CompraVisualizacaoConciliacao
+                  compra={compra}
+                  onChanged={() => identificador && loadCompra(identificador)}
+                />
+              ) : null}
               <CompraVisualizacaoDados compra={compra} />
               <CompraVisualizacaoAnexos
                 compra={compra}

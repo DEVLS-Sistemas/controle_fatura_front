@@ -106,19 +106,55 @@ export const tituloListagemCompra = (row: {
   return { titulo, subtitulo: subParts.join(' · ') || null }
 }
 
+/** Só a compra que o usuário cadastrou (Nova compra / Posso comprar). Nunca inferir por `importada_pdf`. */
+export const isCompraManual = (row?: { compra_manual?: boolean | null } | null): boolean =>
+  row?.compra_manual === true
+
+export type OrigemLancamentoTipo = 'manual' | 'pdf' | 'automatica'
+
+export type OrigemLancamentoInfo = {
+  tipo: OrigemLancamentoTipo
+  label: string
+  icon: string
+  tone: string
+}
+
+/**
+ * Origem persistida pelo back (`compra_manual`).
+ * PDF = linha importada do anexo; automática = parcela materializada em fatura vizinha.
+ */
+export const origemLancamentoCompra = (row?: {
+  compra_manual?: boolean | null
+  importada_pdf?: boolean | null
+} | null): OrigemLancamentoInfo | null => {
+  if (!row) return null
+  if (row.compra_manual === true) {
+    return { tipo: 'manual', label: 'Cadastro manual', icon: 'ri-edit-line', tone: 'warning' }
+  }
+  if (row.importada_pdf === true) {
+    return { tipo: 'pdf', label: 'Importada da fatura', icon: 'ri-file-pdf-line', tone: 'info' }
+  }
+  if (row.compra_manual === false) {
+    return { tipo: 'automatica', label: 'Gerada automaticamente', icon: 'ri-repeat-line', tone: 'secondary' }
+  }
+  return null
+}
+
 export const precisaConciliarCompra = (row?: {
   precisa_conciliar?: boolean | null
   compra_manual?: boolean | null
+  /** Ignorado: origem vem de `compra_manual`, não do PDF. */
   importada_pdf?: boolean | null
   status_conciliacao?: string | null
 } | null): boolean => {
   if (!row) return false
+  // PDF e parcelas copiadas para faturas sem anexo nunca pedem conciliar — só a compra cadastrada à mão.
+  if (row.compra_manual === false) return false
   if (row.precisa_conciliar === true) return true
   if (row.precisa_conciliar === false) return false
+  if (row.compra_manual !== true) return false
   const status = String(row.status_conciliacao ?? '').trim()
   if (status === 'conciliada' || status === 'rejeitada') return false
-  const manual = row.compra_manual === true || row.importada_pdf === false
-  if (!manual) return false
   return status === 'nao_conciliada' || status === 'pendente' || !status
 }
 
@@ -172,11 +208,11 @@ export const temSugestaoConciliacao = (row?: {
   status_conciliacao?: string | null
   compra_manual?: boolean | null
   precisa_conciliar?: boolean | null
-  importada_pdf?: boolean | null
 } | null): boolean => {
   if (!row || precisaConciliarCompra(row) || conciliadaComManual(row)) return false
   if (row.tem_sugestao_conciliacao === true) return true
   if (row.tem_sugestao_conciliacao === false) return false
+  if (row.compra_manual === true) return false
   return String(row.status_conciliacao ?? '') === 'pendente'
 }
 
@@ -206,14 +242,13 @@ export const tituloLinhaFatura = (row: {
   loja_nome?: string | null
   compra_manual?: boolean | null
   precisa_conciliar?: boolean | null
-  importada_pdf?: boolean | null
   status_conciliacao?: string | null
   compra_manual_vinculada?: {
     texto_compra?: string | null
     observacoes?: string | null
   } | null
 }): TituloListagemCompra => {
-  if (precisaConciliarCompra(row) || row.compra_manual === true) {
+  if (precisaConciliarCompra(row) || isCompraManual(row)) {
     return tituloListagemCompra(row)
   }
   const estabelecimento = String(

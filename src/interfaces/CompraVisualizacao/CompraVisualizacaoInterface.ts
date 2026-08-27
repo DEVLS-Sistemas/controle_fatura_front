@@ -137,6 +137,7 @@ export interface CompraVisualizacaoView {
   descricao_fatura?: string | null
   observacoes?: string | null
   texto_compra?: string | null
+  /** true só se o usuário cadastrou (Nova compra / Posso comprar). false no PDF e nas parcelas automáticas. */
   compra_manual?: boolean | null
   precisa_conciliar?: boolean | null
   precisa_conciliar_label?: string | null

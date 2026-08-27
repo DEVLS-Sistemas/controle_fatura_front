@@ -4,9 +4,12 @@ import {
   faturaAbertaDoSource,
   faturaIdDaCompra,
   identificadorAposCadastro,
+  isCompraManual,
   mensagemAposCadastro,
+  origemLancamentoCompra,
   pathVisualizacaoCompra,
   pathVisualizacaoDaLinha,
+  precisaConciliarCompra,
   temSugestaoConciliacao,
   tituloLinhaFatura,
   tituloListagemCompra,
@@ -127,6 +130,18 @@ describe('tituloLinhaFatura', () => {
       subtitulo: 'Mouse Logitech',
     })
   })
+
+  it('parcela automática na fatura vizinha não usa o layout de compra manual', () => {
+    expect(tituloLinhaFatura({
+      compra_manual: false,
+      precisa_conciliar: false,
+      estabelecimento_nome: 'PAG*LOJA XYZ',
+      observacoes: 'PAG*LOJA XYZ',
+    })).toEqual({
+      titulo: 'PAG*LOJA XYZ',
+      subtitulo: null,
+    })
+  })
 })
 
 describe('contaNoTotalLinha / temSugestaoConciliacao', () => {
@@ -146,6 +161,65 @@ describe('contaNoTotalLinha / temSugestaoConciliacao', () => {
       precisa_conciliar: true,
       tem_sugestao_conciliacao: true,
     })).toBe(false)
+  })
+})
+
+describe('compra_manual / precisaConciliarCompra', () => {
+  it('compra cadastrada pelo usuário (Nova compra ou Posso comprar) pede conciliação', () => {
+    expect(isCompraManual({ compra_manual: true })).toBe(true)
+    expect(precisaConciliarCompra({
+      compra_manual: true,
+      precisa_conciliar: true,
+      status_conciliacao: 'nao_conciliada',
+    })).toBe(true)
+    expect(precisaConciliarCompra({
+      compra_manual: true,
+      status_conciliacao: 'nao_conciliada',
+    })).toBe(true)
+  })
+
+  it('parcela automática em fatura vizinha (sem PDF) não pede conciliar', () => {
+    const parcelaAutomatica = {
+      compra_manual: false,
+      importada_pdf: false,
+      precisa_conciliar: false,
+      status_conciliacao: 'nao_conciliada',
+    }
+    expect(isCompraManual(parcelaAutomatica)).toBe(false)
+    expect(precisaConciliarCompra(parcelaAutomatica)).toBe(false)
+    expect(origemLancamentoCompra(parcelaAutomatica)).toEqual({
+      tipo: 'automatica',
+      label: 'Gerada automaticamente',
+      icon: 'ri-repeat-line',
+      tone: 'secondary',
+    })
+  })
+
+  it('não infere cadastro manual só porque importada_pdf é false', () => {
+    expect(precisaConciliarCompra({
+      importada_pdf: false,
+      status_conciliacao: 'nao_conciliada',
+    })).toBe(false)
+    expect(origemLancamentoCompra({ importada_pdf: false })).toBeNull()
+  })
+
+  it('mesmo com precisa_conciliar true, parcela automática não fica em evidência', () => {
+    expect(precisaConciliarCompra({
+      compra_manual: false,
+      precisa_conciliar: true,
+      status_conciliacao: 'nao_conciliada',
+    })).toBe(false)
+  })
+
+  it('linha importada do PDF não pede conciliar e mostra origem da fatura', () => {
+    expect(precisaConciliarCompra({
+      compra_manual: false,
+      importada_pdf: true,
+    })).toBe(false)
+    expect(origemLancamentoCompra({
+      compra_manual: false,
+      importada_pdf: true,
+    })?.tipo).toBe('pdf')
   })
 })
 
