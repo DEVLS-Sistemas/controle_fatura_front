@@ -353,15 +353,21 @@ export class FaturasService implements FaturasInterface {
     }
 
     async removerAnexo(params: RemoverAnexoParams): Promise<RemoverAnexoResult> {
-        const body: Record<string, unknown> = {
-            id: params.id,
-            motivo: params.motivo,
-        }
-        if (params.tipo) body.tipo = params.tipo
-        const response = await this.httpClient.post<any>({
-            url: `${this.url}/remover-anexo`,
-            body,
-        })
+        const isMultipart = params.motivo === 'trocar_pdf' || params.arquivo_pdf instanceof File
+        const response = isMultipart
+            ? await this.httpClient.post<any>({
+                url: `${this.url}/remover-anexo`,
+                body: this.buildRemoverAnexoForm(params),
+                headers: { 'Content-Type': 'multipart/form-data' },
+            })
+            : await this.httpClient.post<any>({
+                url: `${this.url}/remover-anexo`,
+                body: {
+                    id: params.id,
+                    motivo: params.motivo,
+                    ...(params.tipo ? { tipo: params.tipo } : {}),
+                },
+            })
         switch (response.statusCode) {
             case HttpStatusCode.ok: {
                 const payload = extractRemoverAnexoResult(response.body)
@@ -369,7 +375,17 @@ export class FaturasService implements FaturasInterface {
                 return payload
             }
             case HttpStatusCode.unauthorized: throw new AccessDeniedError()
-            case HttpStatusCode.invalidForm: throw new ValidationError(response.body)
+            case HttpStatusCode.invalidForm: {
+                const respBody = response.body as Record<string, any> | undefined
+                if (
+                    respBody?.precisa_senha_pdf
+                    || respBody?.codigo === 'pdf_senha_incorreta'
+                    || respBody?.codigo === 'pdf_senha_necessaria'
+                ) {
+                    throw new PdfSenhaError(respBody)
+                }
+                throw new ValidationError(response.body)
+            }
             case HttpStatusCode.notFound: {
                 const respBody = response.body as Record<string, unknown> | undefined
                 const message = response.message
@@ -379,5 +395,24 @@ export class FaturasService implements FaturasInterface {
             }
             default: throw new UnexpectedError(response.message)
         }
+    }
+
+    private buildRemoverAnexoForm(params: RemoverAnexoParams): FormData {
+        const form = new FormData()
+        form.append('id', String(params.id))
+        form.append('motivo', params.motivo)
+        if (params.tipo) form.append('tipo', params.tipo)
+        if (params.arquivo_pdf) form.append('arquivo_pdf', params.arquivo_pdf)
+        form.append('processar_automatico', params.processar_automatico === false ? 'false' : 'true')
+        if (params.senha_pdf != null && params.senha_pdf !== '') {
+            form.append('senha_pdf', params.senha_pdf)
+        }
+        if (params.salvar_senha_pdf !== undefined) {
+            form.append('salvar_senha_pdf', params.salvar_senha_pdf ? '1' : '0')
+        }
+        if (params.senha_pdf_regra != null && params.senha_pdf_regra !== '') {
+            form.append('senha_pdf_regra', params.senha_pdf_regra)
+        }
+        return form
     }
 }

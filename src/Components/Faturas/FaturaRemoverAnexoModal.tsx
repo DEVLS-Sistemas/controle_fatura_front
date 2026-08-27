@@ -27,15 +27,20 @@ import {
     tituloConfirmacaoRemoverAnexo,
     tituloModalRemoverAnexo,
     stubsExcluidosComCompetencia,
+    labelUsarArquivoTroca,
 } from 'helpers/fatura_anexo_remover_helpers'
 import {
     ImpactoRemoverAnexo,
     ImpactoRemoverAnexoCompra,
     MotivoRemoverAnexo,
     RemoverAnexoResult,
+    SenhaPdfMeta,
     TipoRemoverAnexo,
 } from 'interfaces/Faturas/FaturasInterface'
 import { FaturasService } from 'services/Faturas/FaturasService'
+import { PdfSenhaError } from 'libs/api/exceptions/PdfSenhaError'
+import FaturaSenhaPdfModal, { FaturaSenhaUnlockPayload } from 'Components/Faturas/FaturaSenhaPdfModal'
+import FaturaTrocarAnexoPasso from 'Components/Faturas/FaturaTrocarAnexoPasso'
 
 export type FaturaRemoverAnexoModalProps = {
     isOpen: boolean
@@ -43,6 +48,7 @@ export type FaturaRemoverAnexoModalProps = {
     tipo?: TipoRemoverAnexo | null
     onClose: () => void
     onRemoved: (result: RemoverAnexoResult) => void | Promise<void>
+    onTrocado: (result: RemoverAnexoResult) => void | Promise<void>
 }
 
 const badgeStatusColor = (status?: string | null): string => {
@@ -95,7 +101,18 @@ const CompraImpactoCard = ({ compra }: { compra: ImpactoRemoverAnexoCompra }) =>
     )
 }
 
-type PassoRemoverAnexo = 'impacto' | 'confirmar'
+type PassoRemoverAnexo = 'impacto' | 'confirmar' | 'trocar'
+
+const enriquecerResultado = (
+    result: RemoverAnexoResult,
+    impacto: ImpactoRemoverAnexo | null,
+): RemoverAnexoResult => ({
+    ...result,
+    faturas_stub_excluidas: stubsExcluidosComCompetencia(
+        result.faturas_stub_excluidas,
+        impacto?.faturas_stub_que_serao_excluidas,
+    ),
+})
 
 const FaturaRemoverAnexoModal = ({
     isOpen,
@@ -103,18 +120,24 @@ const FaturaRemoverAnexoModal = ({
     tipo = null,
     onClose,
     onRemoved,
+    onTrocado,
 }: FaturaRemoverAnexoModalProps) => {
     const faturasService = useRef(new FaturasService()).current
     const onCloseRef = useRef(onClose)
     onCloseRef.current = onClose
     const onRemovedRef = useRef(onRemoved)
     onRemovedRef.current = onRemoved
+    const onTrocadoRef = useRef(onTrocado)
+    onTrocadoRef.current = onTrocado
 
     const [loading, setLoading] = useState(false)
     const [saving, setSaving] = useState(false)
     const [passo, setPasso] = useState<PassoRemoverAnexo>('impacto')
     const [impacto, setImpacto] = useState<ImpactoRemoverAnexo | null>(null)
     const [motivo, setMotivo] = useState<MotivoRemoverAnexo | string | null>(null)
+    const [arquivoNovo, setArquivoNovo] = useState<File | null>(null)
+    const [senhaModalOpen, setSenhaModalOpen] = useState(false)
+    const [senhaModalMeta, setSenhaModalMeta] = useState<SenhaPdfMeta | null>(null)
 
     useEffect(() => {
         if (!isOpen || faturaId == null) {
@@ -123,6 +146,9 @@ const FaturaRemoverAnexoModal = ({
             setPasso('impacto')
             setLoading(false)
             setSaving(false)
+            setArquivoNovo(null)
+            setSenhaModalOpen(false)
+            setSenhaModalMeta(null)
             return
         }
 
@@ -132,6 +158,7 @@ const FaturaRemoverAnexoModal = ({
         setMotivo(null)
         setPasso('impacto')
         setImpacto(null)
+        setArquivoNovo(null)
 
         faturasService.getImpactoRemoverAnexo(faturaId)
             .then((data) => {
@@ -169,6 +196,11 @@ const FaturaRemoverAnexoModal = ({
         if (!podeContinuar || busy) return
         if (motivo === 'remover') {
             setPasso('confirmar')
+            return
+        }
+        if (motivo === 'trocar_pdf') {
+            setArquivoNovo(null)
+            setPasso('trocar')
         }
     }
 
@@ -181,13 +213,7 @@ const FaturaRemoverAnexoModal = ({
                 motivo: 'remover',
                 tipo: tipoParaPostRemoverAnexo(tipo, impacto),
             })
-            await onRemovedRef.current({
-                ...result,
-                faturas_stub_excluidas: stubsExcluidosComCompetencia(
-                    result.faturas_stub_excluidas,
-                    impacto?.faturas_stub_que_serao_excluidas,
-                ),
-            })
+            await onRemovedRef.current(enriquecerResultado(result, impacto))
         } catch (error: unknown) {
             toast.error(error instanceof Error ? error.message : 'Erro ao remover o anexo')
         } finally {
@@ -195,11 +221,43 @@ const FaturaRemoverAnexoModal = ({
         }
     }
 
+    const handleTrocarPdf = async (senha?: FaturaSenhaUnlockPayload) => {
+        if (faturaId == null || !arquivoNovo || busy) return
+        setSaving(true)
+        try {
+            const result = await faturasService.removerAnexo({
+                id: Number(faturaId),
+                motivo: 'trocar_pdf',
+                arquivo_pdf: arquivoNovo,
+                processar_automatico: true,
+                senha_pdf: senha?.senha_pdf,
+                salvar_senha_pdf: senha?.salvar_senha_pdf,
+                senha_pdf_regra: senha?.senha_pdf_regra,
+            })
+            setSenhaModalOpen(false)
+            await onTrocadoRef.current(enriquecerResultado(result, impacto))
+        } catch (error: unknown) {
+            if (error instanceof PdfSenhaError) {
+                setSenhaModalMeta(error.senha_pdf ?? null)
+                setSenhaModalOpen(true)
+                if (senha) throw error
+                return
+            }
+            toast.error(error instanceof Error ? error.message : 'Erro ao trocar o PDF')
+            if (senha) throw error
+        } finally {
+            setSaving(false)
+        }
+    }
+
     const titulo = passo === 'confirmar'
         ? tituloConfirmacaoRemoverAnexo(competencia, tipo, impacto)
-        : tituloModalRemoverAnexo(tipo, impacto)
+        : passo === 'trocar'
+            ? 'Enviar o PDF correto'
+            : tituloModalRemoverAnexo(tipo, impacto)
 
     return (
+        <>
         <Modal
             isOpen={isOpen}
             toggle={busy ? undefined : onClose}
@@ -219,6 +277,12 @@ const FaturaRemoverAnexoModal = ({
                     </div>
                 ) : passo === 'confirmar' ? (
                     <p className="mb-0">{TEXTO_CONFIRMACAO_REMOVER_ANEXO}</p>
+                ) : passo === 'trocar' ? (
+                    <FaturaTrocarAnexoPasso
+                        file={arquivoNovo}
+                        disabled={saving}
+                        onFile={setArquivoNovo}
+                    />
                 ) : impacto ? (
                     <>
                         {subtitulo && (
@@ -365,6 +429,35 @@ const FaturaRemoverAnexoModal = ({
                             )}
                         </Button>
                     </>
+                ) : passo === 'trocar' ? (
+                    <>
+                        <Button
+                            type="button"
+                            color="light"
+                            onClick={() => {
+                                setArquivoNovo(null)
+                                setPasso('impacto')
+                            }}
+                            disabled={saving}
+                        >
+                            Voltar
+                        </Button>
+                        <Button
+                            type="button"
+                            color="primary"
+                            disabled={!arquivoNovo || saving}
+                            onClick={() => { void handleTrocarPdf() }}
+                        >
+                            {saving ? (
+                                <>
+                                    <Spinner size="sm" className="me-2" />
+                                    Enviando…
+                                </>
+                            ) : (
+                                labelUsarArquivoTroca(arquivoNovo)
+                            )}
+                        </Button>
+                    </>
                 ) : (
                     <>
                         <Button type="button" color="light" onClick={onClose} disabled={busy}>
@@ -388,6 +481,15 @@ const FaturaRemoverAnexoModal = ({
                 )}
             </ModalFooter>
         </Modal>
+        <FaturaSenhaPdfModal
+            isOpen={senhaModalOpen}
+            faturaId={faturaId}
+            senhaMeta={senhaModalMeta}
+            submitLabel="Usar senha e enviar"
+            onClose={() => setSenhaModalOpen(false)}
+            onUnlock={handleTrocarPdf}
+        />
+        </>
     )
 }
 

@@ -23,6 +23,10 @@ import {
     labelBotaoRemoverAnexo,
     podeRemoverAnexo,
     TOOLTIP_REMOVER_ANEXO,
+    precisaPollProcessamentoFatura,
+    faturaProcessamentoTerminou,
+    POLL_FATURA_INTERVAL_MS,
+    POLL_FATURA_MAX_MS,
 } from 'helpers/fatura_anexo_remover_helpers'
 import { isCompraAvista, isEhAssinatura } from 'helpers/assinaturas_helpers'
 import {
@@ -397,6 +401,8 @@ const FaturasViewPage = () => {
     const [removerAnexoOpen, setRemoverAnexoOpen] = useState(false)
     const [removerAnexoTipo, setRemoverAnexoTipo] = useState<TipoRemoverAnexo | null>(null)
     const [comprasRestauradas, setComprasRestauradas] = useState<RemoverAnexoResult | null>(null)
+    const [processandoTroca, setProcessandoTroca] = useState<RemoverAnexoResult | null>(null)
+    const pollTrocaSeqRef = useRef(0)
     const homologConfirmRef = useRef<string | null>(null)
 
     const nomeDoResponsavel = (responsavelId?: number | null, responsavelNome?: string | null) => (
@@ -1042,6 +1048,63 @@ const FaturasViewPage = () => {
         toast.success(result.message || 'Anexo removido.')
     }
 
+    const handleAnexoTrocado = async (result: RemoverAnexoResult) => {
+        setRemoverAnexoOpen(false)
+        const seq = ++pollTrocaSeqRef.current
+        const temCompras = (result.compras_que_voltaram_a_conciliar ?? []).length > 0
+        const abrirApontamento = () => {
+            if (temCompras) setComprasRestauradas(result)
+        }
+
+        if (!id) return
+
+        if (!precisaPollProcessamentoFatura(result)) {
+            await loadFatura({ silent: true, openSenhaIfNeeded: false })
+            if (seq !== pollTrocaSeqRef.current) return
+            toast.success(result.message || 'PDF atualizado.')
+            abrirApontamento()
+            return
+        }
+
+        setProcessandoTroca(result)
+        await loadFatura({ silent: true, openSenhaIfNeeded: false })
+        if (seq !== pollTrocaSeqRef.current) return
+
+        const started = Date.now()
+        let lastStatus: string | null | undefined
+        while (Date.now() - started < POLL_FATURA_MAX_MS) {
+            await new Promise((resolve) => setTimeout(resolve, POLL_FATURA_INTERVAL_MS))
+            if (seq !== pollTrocaSeqRef.current) return
+            try {
+                const view = await faturasService.getViewFaturas({ id })
+                if (view) {
+                    setFatura(view)
+                    lastStatus = view.status
+                    if (faturaProcessamentoTerminou(view.status)) break
+                }
+            } catch (error) {
+                console.error('Erro ao acompanhar o processamento da fatura:', error)
+            }
+        }
+
+        if (seq !== pollTrocaSeqRef.current) return
+        await loadFatura({ silent: true, openSenhaIfNeeded: false })
+        setProcessandoTroca(null)
+
+        if (lastStatus === 'erro') {
+            toast.error('Erro ao processar o PDF novo')
+            abrirApontamento()
+            return
+        }
+        if (!faturaProcessamentoTerminou(lastStatus)) {
+            toast.info('O processamento está demorando. Acompanhe o status nesta fatura.')
+            abrirApontamento()
+            return
+        }
+        toast.success(result.message || 'PDF atualizado.')
+        abrirApontamento()
+    }
+
     const handleDownloadAnexo = async (tipo: 'pdf' | 'csv') => {
         if (!id || !fatura) return
         try {
@@ -1451,7 +1514,13 @@ const FaturasViewPage = () => {
 
     useEffect(() => {
         senhaModalAutoOpenedRef.current = null
+        pollTrocaSeqRef.current += 1
+        setProcessandoTroca(null)
+        setComprasRestauradas(null)
         loadFatura()
+        return () => {
+            pollTrocaSeqRef.current += 1
+        }
         // eslint-disable-next-line react-hooks/exhaustive-deps -- carga única ao abrir a tela / trocar id
     }, [id])
 
@@ -1585,12 +1654,18 @@ const FaturasViewPage = () => {
                 tipo={removerAnexoTipo}
                 onClose={() => setRemoverAnexoOpen(false)}
                 onRemoved={handleAnexoRemovido}
+                onTrocado={handleAnexoTrocado}
             />
             <FaturaComprasRestauradasModal
-                isOpen={comprasRestauradas != null}
-                result={comprasRestauradas}
+                isOpen={processandoTroca != null || comprasRestauradas != null}
+                result={processandoTroca ?? comprasRestauradas}
                 tipo={removerAnexoTipo}
-                onClose={() => setComprasRestauradas(null)}
+                processing={processandoTroca != null}
+                contexto={(processandoTroca ?? comprasRestauradas)?.motivo === 'trocar_pdf' ? 'trocar' : 'remover'}
+                onClose={() => {
+                    setComprasRestauradas(null)
+                    setProcessandoTroca(null)
+                }}
             />
             <FaturaParserNaoHomologadoModal
                 isOpen={homologModalOpen}

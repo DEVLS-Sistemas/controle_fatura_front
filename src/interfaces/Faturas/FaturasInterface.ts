@@ -299,9 +299,14 @@ export interface RemoverAnexoParams {
     id: number
     motivo: MotivoRemoverAnexo
     tipo?: TipoRemoverAnexo
+    arquivo_pdf?: File
+    processar_automatico?: boolean
+    senha_pdf?: string
+    salvar_senha_pdf?: boolean
+    senha_pdf_regra?: string | null
 }
 
-/** `POST /faturas/remover-anexo` — etapa 2 (`motivo=remover`) */
+/** `POST /faturas/remover-anexo` — etapas 2 (`remover`) e 3 (`trocar_pdf`) */
 export interface RemoverAnexoResult {
     fatura_id: number
     motivo?: MotivoRemoverAnexo | string
@@ -309,6 +314,8 @@ export interface RemoverAnexoResult {
     tem_pdf?: boolean
     tem_csv?: boolean
     pdf_url?: string | null
+    status?: string | null
+    aguardando_processamento?: boolean
     lancamentos_apagados?: number
     parcelas_apagadas_outras_faturas?: number
     faturas_stub_excluidas?: Array<number | ImpactoRemoverAnexoStub>
@@ -371,6 +378,7 @@ export const extractRemoverAnexoResult = (result: unknown): RemoverAnexoResult |
         candidate.fatura_id == null
         && candidate.anexo_removido == null
         && candidate.compras_que_voltaram_a_conciliar == null
+        && candidate.aguardando_processamento == null
     ) {
         return null
     }

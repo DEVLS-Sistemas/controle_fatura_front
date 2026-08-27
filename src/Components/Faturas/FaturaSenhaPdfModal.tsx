@@ -41,6 +41,7 @@ export type FaturaSenhaPdfModalProps = {
      * Quando informado, substitui a chamada a `processarPdf`.
      */
     onUnlock?: (payload: FaturaSenhaUnlockPayload) => void | Promise<void>
+    submitLabel?: string
 }
 
 const MSG_SENHA_OU_REGRA_INCORRETA =
@@ -72,6 +73,7 @@ const FaturaSenhaPdfModal = ({
     onClose,
     onSuccess,
     onUnlock,
+    submitLabel,
 }: FaturaSenhaPdfModalProps) => {
     const [senha, setSenha] = useState('')
     const [salvarSenha, setSalvarSenha] = useState(true)
@@ -299,7 +301,7 @@ const FaturaSenhaPdfModal = ({
                 </Button>
                 <Button type="button" color="primary" onClick={handleSubmit} disabled={loading}>
                     {loading && <Spinner size="sm" className="me-2" />}
-                    {onUnlock ? 'Continuar cadastro' : 'Desbloquear e processar'}
+                    {submitLabel || (onUnlock ? 'Continuar cadastro' : 'Desbloquear e processar')}
                 </Button>
             </ModalFooter>
         </Modal>

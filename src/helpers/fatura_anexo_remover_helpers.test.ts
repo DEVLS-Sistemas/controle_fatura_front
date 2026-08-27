@@ -16,6 +16,12 @@ import {
     tipoParaPostRemoverAnexo,
     tituloConfirmacaoRemoverAnexo,
     tituloModalRemoverAnexo,
+    arquivoTrocaEhPdf,
+    formatTamanhoArquivo,
+    primeirasLinhasCsv,
+    labelUsarArquivoTroca,
+    precisaPollProcessamentoFatura,
+    faturaProcessamentoTerminou,
 } from './fatura_anexo_remover_helpers'
 
 describe('podeRemoverAnexo', () => {
@@ -137,14 +143,14 @@ describe('labelStatusConciliacaoImpacto', () => {
     })
 })
 
-describe('continuar da etapa 2', () => {
-    it('libera Continuar só para “apenas remover”', () => {
+describe('continuar da etapa 3', () => {
+    it('libera Continuar para remover e para trocar PDF', () => {
         expect(podeContinuarRemoverAnexo(null)).toBe(false)
         expect(hintContinuarRemoverAnexo(null)).toBe('Escolha um motivo para continuar')
         expect(podeContinuarRemoverAnexo('remover')).toBe(true)
         expect(hintContinuarRemoverAnexo('remover')).toBe('')
-        expect(podeContinuarRemoverAnexo('trocar_pdf')).toBe(false)
-        expect(hintContinuarRemoverAnexo('trocar_pdf')).toBe('Em breve: trocar o PDF')
+        expect(podeContinuarRemoverAnexo('trocar_pdf')).toBe(true)
+        expect(hintContinuarRemoverAnexo('trocar_pdf')).toBe('')
     })
 })
 
@@ -211,5 +217,28 @@ describe('extractRemoverAnexoResult', () => {
             anexo_removido: true,
             message: 'Anexo removido. 1 compra voltou a precisar de conciliação.',
         })
+    })
+})
+
+describe('preview local do arquivo novo', () => {
+    it('reconhece PDF e formata tamanho', () => {
+        const pdf = new File(['%PDF'], 'fatura.pdf', { type: 'application/pdf' })
+        const csv = new File(['a;b'], 'fatura.csv', { type: 'text/csv' })
+        expect(arquivoTrocaEhPdf(pdf)).toBe(true)
+        expect(arquivoTrocaEhPdf(csv)).toBe(false)
+        expect(labelUsarArquivoTroca(pdf)).toBe('Usar este PDF')
+        expect(labelUsarArquivoTroca(csv)).toBe('Usar este CSV')
+        expect(formatTamanhoArquivo(512)).toBe('512 B')
+        expect(primeirasLinhasCsv('a\nb\nc\nd', 2)).toBe('a\nb')
+    })
+})
+
+describe('poll do processamento', () => {
+    it('poll enquanto aguarda job; termina em processada ou erro', () => {
+        expect(precisaPollProcessamentoFatura({ aguardando_processamento: true, status: 'pendente' })).toBe(true)
+        expect(precisaPollProcessamentoFatura({ status: 'processada' })).toBe(false)
+        expect(faturaProcessamentoTerminou('processada')).toBe(true)
+        expect(faturaProcessamentoTerminou('erro')).toBe(true)
+        expect(faturaProcessamentoTerminou('processando')).toBe(false)
     })
 })

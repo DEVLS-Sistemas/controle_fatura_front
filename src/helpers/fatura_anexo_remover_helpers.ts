@@ -9,7 +9,10 @@ import {
 export const POST_REMOVER_ANEXO_HABILITADO = true
 
 /** Etapa 3: POST multipart com `motivo=trocar_pdf`. */
-export const POST_TROCAR_PDF_HABILITADO = false
+export const POST_TROCAR_PDF_HABILITADO = true
+
+export const POLL_FATURA_INTERVAL_MS = 2000
+export const POLL_FATURA_MAX_MS = 120000
 
 export const TOOLTIP_REMOVER_ANEXO =
     'Desfaz o extrato deste arquivo: apaga lançamentos importados e parcelas que este PDF criou em outras competências.'
@@ -200,4 +203,38 @@ export const textoStubsExcluidos = (competencias: string[]): string | null => {
         return `A competência ${competencias[0]} era só projeção deste PDF e foi removida.`
     }
     return `As competências ${competencias.join(', ')} eram só projeção deste PDF e foram removidas.`
+}
+
+export const arquivoTrocaEhPdf = (file: File): boolean => {
+    const ext = file.name.split('.').pop()?.toLowerCase() || ''
+    const mime = (file.type || '').toLowerCase()
+    return ext === 'pdf' || mime === 'application/pdf'
+}
+
+export const formatTamanhoArquivo = (bytes: number): string => {
+    if (bytes < 1024) return `${bytes} B`
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+export const primeirasLinhasCsv = (texto: string, max = 20): string =>
+    texto.split(/\r?\n/).slice(0, max).join('\n')
+
+export const labelUsarArquivoTroca = (file?: File | null): string => {
+    if (!file) return 'Usar este PDF'
+    return arquivoTrocaEhPdf(file) ? 'Usar este PDF' : 'Usar este CSV'
+}
+
+export const precisaPollProcessamentoFatura = (result?: {
+    aguardando_processamento?: boolean
+    status?: string | null
+} | null): boolean => {
+    if (result?.aguardando_processamento === true) return true
+    const status = String(result?.status ?? '').toLowerCase()
+    return status === 'pendente' || status === 'processando'
+}
+
+export const faturaProcessamentoTerminou = (status?: string | null): boolean => {
+    const s = String(status ?? '').toLowerCase()
+    return s === 'processada' || s === 'erro'
 }
