@@ -1,9 +1,12 @@
 import {
+    CompraParaReconcilia,
     ImpactoRemoverAnexo,
+    ImpactoRemoverAnexoCompra,
     ImpactoRemoverAnexoMotivo,
     MotivoRemoverAnexo,
     TipoRemoverAnexo,
 } from 'interfaces/Faturas/FaturasInterface'
+import { CandidatoConciliacao } from 'interfaces/Transacoes/TransacoesInterface'
 
 /** Etapa 2: POST `/remover-anexo` com `motivo=remover`. */
 export const POST_REMOVER_ANEXO_HABILITADO = true
@@ -238,3 +241,33 @@ export const faturaProcessamentoTerminou = (status?: string | null): boolean => 
     const s = String(status ?? '').toLowerCase()
     return s === 'processada' || s === 'erro'
 }
+
+export const TOAST_RECONCILIA_AUTO =
+    'PDF atualizado. As compras foram conciliadas automaticamente.'
+
+export const comprasPendentesReconcilia = (
+    list?: CompraParaReconcilia[] | null,
+): CompraParaReconcilia[] =>
+    (list ?? []).filter((c) => c.id != null && c.precisa_conciliar !== false)
+
+export const candidatoSugeridoReconcilia = (
+    candidatos?: CandidatoConciliacao[] | null,
+): CandidatoConciliacao | null => {
+    if (!candidatos?.length) return null
+    return [...candidatos].sort((a, b) => {
+        if (Boolean(b.sugestao) !== Boolean(a.sugestao)) return a.sugestao ? -1 : 1
+        return Number(b.score ?? 0) - Number(a.score ?? 0)
+    })[0] ?? null
+}
+
+export const compraRestauradaParaReconcilia = (
+    compra: ImpactoRemoverAnexoCompra,
+    candidatos: CandidatoConciliacao[],
+): CompraParaReconcilia => ({
+    id: compra.id,
+    texto_compra: compra.texto_compra,
+    valor: compra.valor,
+    data: compra.data,
+    precisa_conciliar: true,
+    candidatos,
+})

@@ -1,4 +1,5 @@
 import { ParserHomologado, SenhaPdfRegraLookup } from 'interfaces/Cartoes/CartoesInterface'
+import { CandidatoConciliacao } from 'interfaces/Transacoes/TransacoesInterface'
 
 export interface FaturasSearch {
     id?: string | null
@@ -324,6 +325,22 @@ export interface RemoverAnexoResult {
     message?: string
 }
 
+/** Item de `GET /faturas/compras-para-reconcilia/{id}` */
+export interface CompraParaReconcilia {
+    id: number
+    texto_compra?: string | null
+    valor?: number | string | null
+    data?: string | null
+    precisa_conciliar?: boolean
+    candidatos?: CandidatoConciliacao[]
+}
+
+export interface ComprasParaReconcilia {
+    fatura_id: number
+    status?: string | null
+    compras_para_conciliar: CompraParaReconcilia[]
+}
+
 export interface FaturasInterface {
     getViewFaturas(params: any): Promise<FaturasView | undefined>
     listFaturasPaginate(params: FaturasSearch): Promise<any>
@@ -352,6 +369,7 @@ export interface FaturasInterface {
     processarPdf(id: number, params?: ProcessarPdfParams): Promise<any>
     getImpactoRemoverAnexo(id: number | string): Promise<ImpactoRemoverAnexo>
     removerAnexo(params: RemoverAnexoParams): Promise<RemoverAnexoResult>
+    getComprasParaReconcilia(id: number | string): Promise<ComprasParaReconcilia | null>
 }
 
 /** Extrai `data` de `GET /impacto-remover-anexo/{id}` */
@@ -384,6 +402,63 @@ export const extractRemoverAnexoResult = (result: unknown): RemoverAnexoResult |
     }
     const message = typeof body.message === 'string' ? body.message : undefined
     return { ...(candidate as unknown as RemoverAnexoResult), message }
+}
+
+const mapCandidatoReconcilia = (raw: unknown): CandidatoConciliacao | null => {
+    if (!raw || typeof raw !== 'object') return null
+    const item = raw as Record<string, unknown>
+    const id = Number(item.id ?? item.lancamento_id)
+    if (!Number.isFinite(id) || id <= 0) return null
+    const estabelecimento = String(
+        item.estabelecimento_nome ?? item.estabelecimento ?? item.descricao_fatura ?? item.descricao ?? '',
+    ).trim() || null
+    return {
+        id,
+        lancamento_id: item.lancamento_id != null ? Number(item.lancamento_id) : id,
+        estabelecimento_nome: estabelecimento,
+        descricao: estabelecimento,
+        descricao_fatura: estabelecimento,
+        valor: (item.valor as number | string | null) ?? null,
+        data: (item.data as string | null) ?? null,
+        score: item.score != null ? Number(item.score) : null,
+        sugestao: item.sugestao === true || item.sugestao === 1,
+    }
+}
+
+/** Extrai `data` de `GET /compras-para-reconcilia/{id}` */
+export const extractComprasParaReconcilia = (result: unknown): ComprasParaReconcilia | null => {
+    if (!result || typeof result !== 'object') return null
+    const body = result as Record<string, unknown>
+    const nested = body.data
+    const candidate = (nested && typeof nested === 'object' && !Array.isArray(nested))
+        ? nested as Record<string, unknown>
+        : body
+    const rawList = candidate.compras_para_conciliar
+    if (candidate.fatura_id == null && !Array.isArray(rawList)) return null
+    const compras = (Array.isArray(rawList) ? rawList : [])
+        .map((item): CompraParaReconcilia | null => {
+            if (!item || typeof item !== 'object') return null
+            const compra = item as Record<string, unknown>
+            const id = Number(compra.id)
+            if (!Number.isFinite(id) || id <= 0) return null
+            const candidatosRaw = Array.isArray(compra.candidatos) ? compra.candidatos : []
+            return {
+                id,
+                texto_compra: (compra.texto_compra as string | null) ?? null,
+                valor: (compra.valor as number | string | null) ?? null,
+                data: (compra.data as string | null) ?? null,
+                precisa_conciliar: compra.precisa_conciliar !== false,
+                candidatos: candidatosRaw
+                    .map((c) => mapCandidatoReconcilia(c))
+                    .filter((c): c is CandidatoConciliacao => c != null),
+            }
+        })
+        .filter((c): c is CompraParaReconcilia => c != null)
+    return {
+        fatura_id: Number(candidate.fatura_id ?? 0),
+        status: (candidate.status as string | null) ?? null,
+        compras_para_conciliar: compras,
+    }
 }
 
 /** Extrai payload de fatura aninhado em respostas `result.fatura` / `fatura.data` */

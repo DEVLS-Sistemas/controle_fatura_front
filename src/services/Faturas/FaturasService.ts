@@ -15,8 +15,10 @@ import {
     ProcessarPdfParams,
     RemoverAnexoParams,
     RemoverAnexoResult,
+    ComprasParaReconcilia,
     extractImpactoRemoverAnexo,
     extractRemoverAnexoResult,
+    extractComprasParaReconcilia,
 } from "interfaces/Faturas/FaturasInterface"
 import { PdfSenhaError } from "../../libs/api/exceptions/PdfSenhaError"
 import { FaturaSelecaoError } from "../../libs/api/exceptions/FaturaSelecaoError"
@@ -393,6 +395,27 @@ export class FaturasService implements FaturasInterface {
                     || 'Não foi possível remover o anexo'
                 throw new UnexpectedError(message)
             }
+            default: throw new UnexpectedError(response.message)
+        }
+    }
+
+    /**
+     * Etapa 4. `null` se a rota ainda não existir (404) — o caller usa o fallback de candidatos.
+     */
+    async getComprasParaReconcilia(id: number | string): Promise<ComprasParaReconcilia | null> {
+        const response = await this.httpClient.get<any>({
+            url: `${this.url}/compras-para-reconcilia/${id}`,
+        })
+        switch (response.statusCode) {
+            case HttpStatusCode.ok: {
+                const payload = extractComprasParaReconcilia(response.body)
+                if (!payload) return { fatura_id: Number(id), compras_para_conciliar: [] }
+                return payload
+            }
+            case HttpStatusCode.notFound:
+                return null
+            case HttpStatusCode.unauthorized: throw new AccessDeniedError()
+            case HttpStatusCode.invalidForm: throw new ValidationError(response.body)
             default: throw new UnexpectedError(response.message)
         }
     }

@@ -1,4 +1,9 @@
-import { extractImpactoRemoverAnexo, extractRemoverAnexoResult, ImpactoRemoverAnexo } from 'interfaces/Faturas/FaturasInterface'
+import {
+    extractComprasParaReconcilia,
+    extractImpactoRemoverAnexo,
+    extractRemoverAnexoResult,
+    ImpactoRemoverAnexo,
+} from 'interfaces/Faturas/FaturasInterface'
 import {
     apoioMotivoRemoverAnexo,
     avisosImpactoRemoverAnexo,
@@ -22,6 +27,10 @@ import {
     labelUsarArquivoTroca,
     precisaPollProcessamentoFatura,
     faturaProcessamentoTerminou,
+    candidatoSugeridoReconcilia,
+    comprasPendentesReconcilia,
+    compraRestauradaParaReconcilia,
+    TOAST_RECONCILIA_AUTO,
 } from './fatura_anexo_remover_helpers'
 
 describe('podeRemoverAnexo', () => {
@@ -240,5 +249,85 @@ describe('poll do processamento', () => {
         expect(faturaProcessamentoTerminou('processada')).toBe(true)
         expect(faturaProcessamentoTerminou('erro')).toBe(true)
         expect(faturaProcessamentoTerminou('processando')).toBe(false)
+    })
+})
+
+describe('extractComprasParaReconcilia', () => {
+    it('mapeia estabelecimento do candidato para estabelecimento_nome', () => {
+        const payload = extractComprasParaReconcilia({
+            status: true,
+            data: {
+                fatura_id: 73,
+                status: 'processada',
+                compras_para_conciliar: [{
+                    id: 901,
+                    texto_compra: 'Mouse Logitech',
+                    valor: 249.9,
+                    data: '2026-08-23',
+                    precisa_conciliar: true,
+                    candidatos: [{
+                        id: 1204,
+                        estabelecimento: 'PAG*LOJA XYZ',
+                        valor: 249.9,
+                        data: '2026-08-23',
+                        score: 0.92,
+                        sugestao: true,
+                    }],
+                }],
+            },
+        })
+        expect(payload).toMatchObject({ fatura_id: 73, status: 'processada' })
+        expect(payload?.compras_para_conciliar).toHaveLength(1)
+        expect(payload?.compras_para_conciliar[0].candidatos?.[0]).toMatchObject({
+            id: 1204,
+            lancamento_id: 1204,
+            estabelecimento_nome: 'PAG*LOJA XYZ',
+            sugestao: true,
+            score: 0.92,
+        })
+    })
+
+    it('aceita lista vazia (match exato já conciliou)', () => {
+        expect(extractComprasParaReconcilia({
+            data: { fatura_id: 73, compras_para_conciliar: [] },
+        })).toEqual({
+            fatura_id: 73,
+            status: null,
+            compras_para_conciliar: [],
+        })
+    })
+})
+
+describe('candidatoSugeridoReconcilia', () => {
+    it('prefere sugestao e, na falta, o maior score', () => {
+        expect(candidatoSugeridoReconcilia([
+            { id: 1, estabelecimento_nome: 'A', score: 0.99, sugestao: false },
+            { id: 2, estabelecimento_nome: 'B', score: 0.4, sugestao: true },
+        ])?.id).toBe(2)
+        expect(candidatoSugeridoReconcilia([
+            { id: 1, score: 0.2 },
+            { id: 3, score: 0.8 },
+            { id: 2, score: 0.5 },
+        ])?.id).toBe(3)
+        expect(candidatoSugeridoReconcilia([])).toBeNull()
+    })
+})
+
+describe('comprasPendentesReconcilia', () => {
+    it('ignora compras já conciliadas e monta fallback a partir da restauração', () => {
+        expect(comprasPendentesReconcilia([
+            { id: 1, precisa_conciliar: true },
+            { id: 2, precisa_conciliar: false },
+            { id: 3 },
+        ]).map((c) => c.id)).toEqual([1, 3])
+        expect(compraRestauradaParaReconcilia(
+            { id: 901, texto_compra: 'Mouse', valor: 10, data: '2026-08-23' },
+            [{ id: 1204, estabelecimento_nome: 'PAG' }],
+        )).toMatchObject({
+            id: 901,
+            precisa_conciliar: true,
+            candidatos: [{ id: 1204 }],
+        })
+        expect(TOAST_RECONCILIA_AUTO).toContain('conciliadas automaticamente')
     })
 })

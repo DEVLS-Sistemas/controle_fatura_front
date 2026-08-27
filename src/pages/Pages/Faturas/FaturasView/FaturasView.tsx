@@ -27,6 +27,9 @@ import {
     faturaProcessamentoTerminou,
     POLL_FATURA_INTERVAL_MS,
     POLL_FATURA_MAX_MS,
+    comprasPendentesReconcilia,
+    compraRestauradaParaReconcilia,
+    TOAST_RECONCILIA_AUTO,
 } from 'helpers/fatura_anexo_remover_helpers'
 import { isCompraAvista, isEhAssinatura } from 'helpers/assinaturas_helpers'
 import {
@@ -55,6 +58,8 @@ import {
     SenhaPdfMeta,
     TipoRemoverAnexo,
     RemoverAnexoResult,
+    CompraParaReconcilia,
+    ImpactoRemoverAnexoCompra,
 } from 'interfaces/Faturas/FaturasInterface'
 import { NumeroListItem, ParserHomologado, PARSERS_HOMOLOGADOS_PADRAO } from 'interfaces/Cartoes/CartoesInterface'
 import { CategoriaLookup, CandidatoConciliacao, ResponsavelLookup, TransacoesList } from 'interfaces/Transacoes/TransacoesInterface'
@@ -71,6 +76,7 @@ import FaturaTitularModal from 'Components/Faturas/FaturaTitularModal'
 import FaturaParserNaoHomologadoModal from 'Components/Faturas/FaturaParserNaoHomologadoModal'
 import FaturaRemoverAnexoModal from 'Components/Faturas/FaturaRemoverAnexoModal'
 import FaturaComprasRestauradasModal from 'Components/Faturas/FaturaComprasRestauradasModal'
+import FaturaReconciliaComprasModal from 'Components/Faturas/FaturaReconciliaComprasModal'
 import ConciliacaoCandidatosModal from 'pages/Pages/Transacoes/ConciliacaoCandidatosModal/ConciliacaoCandidatosModal'
 import FaturaConciliacaoLinha from './FaturaConciliacaoLinha'
 import FaturaTotalizadorPendencias from './FaturaTotalizadorPendencias'
@@ -402,6 +408,7 @@ const FaturasViewPage = () => {
     const [removerAnexoTipo, setRemoverAnexoTipo] = useState<TipoRemoverAnexo | null>(null)
     const [comprasRestauradas, setComprasRestauradas] = useState<RemoverAnexoResult | null>(null)
     const [processandoTroca, setProcessandoTroca] = useState<RemoverAnexoResult | null>(null)
+    const [reconciliaCompras, setReconciliaCompras] = useState<CompraParaReconcilia[]>([])
     const pollTrocaSeqRef = useRef(0)
     const homologConfirmRef = useRef<string | null>(null)
 
@@ -1048,12 +1055,56 @@ const FaturasViewPage = () => {
         toast.success(result.message || 'Anexo removido.')
     }
 
+    const carregarPendentesReconcilia = async (
+        faturaId: string | number,
+        restauradas: ImpactoRemoverAnexoCompra[],
+    ): Promise<CompraParaReconcilia[]> => {
+        const fromApi = await faturasService.getComprasParaReconcilia(faturaId)
+        if (fromApi) {
+            return comprasPendentesReconcilia(fromApi.compras_para_conciliar)
+        }
+        const mapped = await Promise.all(
+            restauradas.map(async (compra) => {
+                let candidatos: CandidatoConciliacao[] = []
+                try {
+                    candidatos = await transacoesService.listCandidatosConciliacao(compra.id)
+                } catch {
+                    candidatos = []
+                }
+                return compraRestauradaParaReconcilia(compra, candidatos)
+            }),
+        )
+        return comprasPendentesReconcilia(mapped)
+    }
+
     const handleAnexoTrocado = async (result: RemoverAnexoResult) => {
         setRemoverAnexoOpen(false)
         const seq = ++pollTrocaSeqRef.current
-        const temCompras = (result.compras_que_voltaram_a_conciliar ?? []).length > 0
+        const restauradas = result.compras_que_voltaram_a_conciliar ?? []
+        const temCompras = restauradas.length > 0
         const abrirApontamento = () => {
             if (temCompras) setComprasRestauradas(result)
+        }
+        const abrirReconciliaAposProcessada = async () => {
+            if (!id) return
+            try {
+                const pendentes = await carregarPendentesReconcilia(id, restauradas)
+                if (seq !== pollTrocaSeqRef.current) return
+                setProcessandoTroca(null)
+                if (pendentes.length === 0) {
+                    toast.success(temCompras
+                        ? TOAST_RECONCILIA_AUTO
+                        : (result.message || 'PDF atualizado.'))
+                    return
+                }
+                toast.success(result.message || 'PDF atualizado.')
+                setReconciliaCompras(pendentes)
+            } catch (error) {
+                if (seq !== pollTrocaSeqRef.current) return
+                setProcessandoTroca(null)
+                toast.error((error as Error)?.message || 'Erro ao carregar compras para conciliar')
+                abrirApontamento()
+            }
         }
 
         if (!id) return
@@ -1061,8 +1112,7 @@ const FaturasViewPage = () => {
         if (!precisaPollProcessamentoFatura(result)) {
             await loadFatura({ silent: true, openSenhaIfNeeded: false })
             if (seq !== pollTrocaSeqRef.current) return
-            toast.success(result.message || 'PDF atualizado.')
-            abrirApontamento()
+            await abrirReconciliaAposProcessada()
             return
         }
 
@@ -1089,20 +1139,20 @@ const FaturasViewPage = () => {
 
         if (seq !== pollTrocaSeqRef.current) return
         await loadFatura({ silent: true, openSenhaIfNeeded: false })
-        setProcessandoTroca(null)
 
         if (lastStatus === 'erro') {
+            setProcessandoTroca(null)
             toast.error('Erro ao processar o PDF novo')
             abrirApontamento()
             return
         }
         if (!faturaProcessamentoTerminou(lastStatus)) {
+            setProcessandoTroca(null)
             toast.info('O processamento está demorando. Acompanhe o status nesta fatura.')
             abrirApontamento()
             return
         }
-        toast.success(result.message || 'PDF atualizado.')
-        abrirApontamento()
+        await abrirReconciliaAposProcessada()
     }
 
     const handleDownloadAnexo = async (tipo: 'pdf' | 'csv') => {
@@ -1517,6 +1567,7 @@ const FaturasViewPage = () => {
         pollTrocaSeqRef.current += 1
         setProcessandoTroca(null)
         setComprasRestauradas(null)
+        setReconciliaCompras([])
         loadFatura()
         return () => {
             pollTrocaSeqRef.current += 1
@@ -1665,6 +1716,14 @@ const FaturasViewPage = () => {
                 onClose={() => {
                     setComprasRestauradas(null)
                     setProcessandoTroca(null)
+                }}
+            />
+            <FaturaReconciliaComprasModal
+                isOpen={reconciliaCompras.length > 0}
+                compras={reconciliaCompras}
+                onClose={async () => {
+                    setReconciliaCompras([])
+                    await loadFatura({ silent: true, openSenhaIfNeeded: false })
                 }}
             />
             <FaturaParserNaoHomologadoModal
