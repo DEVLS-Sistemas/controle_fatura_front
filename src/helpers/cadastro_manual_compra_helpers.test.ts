@@ -11,6 +11,7 @@ import {
   pathVisualizacaoDaLinha,
   precisaConciliarCompra,
   temSugestaoConciliacao,
+  totaisConciliacaoFatura,
   tituloLinhaFatura,
   tituloListagemCompra,
   valorContaNoTotal,
@@ -246,5 +247,73 @@ describe('faturaAbertaDoSource / faturaIdDaCompra', () => {
       competencia_atual: { parcela_atual: 2, mes: 9, ano: 2026, valor: 200, fatura_id: 88 },
       primeira_parcela: { parcela_atual: 1, mes: 8, ano: 2026, valor: 200, fatura_id: 80 },
     })).toBe(88)
+  })
+})
+
+describe('totaisConciliacaoFatura', () => {
+  it('soma o extrato com a compra manual ainda aberta', () => {
+    expect(totaisConciliacaoFatura({
+      valor_total: 3445.97,
+      valor_extrato: 3565.87,
+      valor_nao_conciliado: 177.48,
+      valor_total_com_pendencias: 3743.35,
+      tem_compras_nao_conciliadas: true,
+      compras_nao_conciliadas_label: 'Compras ainda não conciliadas',
+    })).toEqual({
+      valorExtrato: 3565.87,
+      valorNaoConciliado: 177.48,
+      valorTotalComPendencias: 3743.35,
+      temComprasNaoConciliadas: true,
+      labelNaoConciliadas: 'Compras ainda não conciliadas',
+    })
+  })
+
+  it('esconde o aviso quando não há pendência e o total da tela iguala o extrato', () => {
+    expect(totaisConciliacaoFatura({
+      valor_total: 3445.97,
+      valor_extrato: 3565.87,
+      valor_nao_conciliado: 0,
+      valor_total_com_pendencias: 3565.87,
+      tem_compras_nao_conciliadas: false,
+    })).toEqual({
+      valorExtrato: 3565.87,
+      valorNaoConciliado: 0,
+      valorTotalComPendencias: 3565.87,
+      temComprasNaoConciliadas: false,
+      labelNaoConciliadas: 'Compras ainda não conciliadas',
+    })
+  })
+
+  it('não soma parcela automática no extra e cai no valor_total se a API não mandar extrato', () => {
+    expect(totaisConciliacaoFatura(
+      { valor_total: 3565.87 },
+      [
+        { compra_manual: true, precisa_conciliar: true, valor: 177.48 },
+        { compra_manual: false, precisa_conciliar: false, valor: 119.9 },
+      ]
+    )).toEqual({
+      valorExtrato: 3565.87,
+      valorNaoConciliado: 177.48,
+      valorTotalComPendencias: 3743.35,
+      temComprasNaoConciliadas: true,
+      labelNaoConciliadas: 'Compras ainda não conciliadas',
+    })
+  })
+
+  it('não usa a quitação (valor_total) como se fosse o PDF', () => {
+    expect(totaisConciliacaoFatura({
+      valor_total: 3445.97,
+      valor_extrato: 3445.97,
+      valor_nao_conciliado: 177.48,
+      valor_total_com_pendencias: 3623.45,
+      pagamentos_antecipado: 119.90,
+      tem_compras_nao_conciliadas: true,
+    })).toEqual({
+      valorExtrato: 3565.87,
+      valorNaoConciliado: 177.48,
+      valorTotalComPendencias: 3743.35,
+      temComprasNaoConciliadas: true,
+      labelNaoConciliadas: 'Compras ainda não conciliadas',
+    })
   })
 })

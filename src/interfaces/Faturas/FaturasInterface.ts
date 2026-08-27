@@ -41,6 +41,14 @@ export interface FaturaResumo {
     periodo_fim?: string
     data_vencimento?: string
     valor_total?: number | string
+    /** Valor descrito no PDF / lançamentos (sem compras manuais abertas) */
+    valor_extrato?: number | string | null
+    /** Soma das compras manuais ainda nao_conciliada / pendente */
+    valor_nao_conciliado?: number | string | null
+    /** valor_extrato + valor_nao_conciliado — número grande do detalhe */
+    valor_total_com_pendencias?: number | string | null
+    tem_compras_nao_conciliadas?: boolean | null
+    compras_nao_conciliadas_label?: string | null
     /** Quitação: true quando valor_restante é 0 (não confundir com status do PDF) */
     pago?: boolean
     valor_pago?: number | string

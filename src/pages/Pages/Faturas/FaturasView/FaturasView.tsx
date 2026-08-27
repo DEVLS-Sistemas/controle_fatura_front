@@ -27,6 +27,7 @@ import {
     pathVisualizacaoCompra,
     precisaConciliarCompra,
     temSugestaoConciliacao,
+    totaisConciliacaoFatura,
     tituloLinhaFatura,
     valorContaNoTotal,
 } from 'helpers/cadastro_manual_compra_helpers'
@@ -58,6 +59,7 @@ import FaturaTitularModal from 'Components/Faturas/FaturaTitularModal'
 import FaturaParserNaoHomologadoModal from 'Components/Faturas/FaturaParserNaoHomologadoModal'
 import ConciliacaoCandidatosModal from 'pages/Pages/Transacoes/ConciliacaoCandidatosModal/ConciliacaoCandidatosModal'
 import FaturaConciliacaoLinha from './FaturaConciliacaoLinha'
+import FaturaTotalizadorPendencias from './FaturaTotalizadorPendencias'
 import { PdfSenhaError } from 'libs/api/exceptions/PdfSenhaError'
 import {
     FaturaSelecaoBandeiraOption,
@@ -1491,6 +1493,11 @@ const FaturasViewPage = () => {
         [transacoes, fatura?.grupos_por_cartao]
     )
 
+    const totaisConciliacao = useMemo(
+        () => totaisConciliacaoFatura(fatura, transacoes),
+        [fatura, transacoes]
+    )
+
     const gruposVisiveis = useMemo(() => {
         if (!filtroFinalKey) return gruposPorFinal
         const filtered = gruposPorFinal.filter((g) => g.key === filtroFinalKey)
@@ -1761,10 +1768,10 @@ const FaturasViewPage = () => {
                                     <Col xs={6} md={3}>
                                         <small className="text-muted text-uppercase d-block">Total da fatura</small>
                                         <span
-                                            className={`fw-semibold text-primary ${VALOR_TEXT_CLASS} d-block`}
+                                            className={`fw-semibold ${totaisConciliacao.temComprasNaoConciliadas ? 'text-warning' : 'text-primary'} ${VALOR_TEXT_CLASS} d-block`}
                                             style={{ fontSize: '1.5rem', lineHeight: 1.2 }}
                                         >
-                                            {formatCurrency(fatura.valor_total)}
+                                            {formatCurrency(totaisConciliacao.valorTotalComPendencias)}
                                         </span>
                                     </Col>
                                     <Col xs={6} md={3}>
@@ -1809,6 +1816,7 @@ const FaturasViewPage = () => {
                                         </ul>
                                     </div>
                                 )}
+                                <FaturaTotalizadorPendencias totais={totaisConciliacao} />
                             </div>
 
                             <Row className="align-items-center">

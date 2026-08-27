@@ -171,6 +171,79 @@ export const contaNoTotalLinha = (row?: { conta_no_total?: boolean | null } | nu
 export const valorContaNoTotal = (row?: { conta_no_total?: boolean | null; valor?: number | string | null } | null): number =>
   contaNoTotalLinha(row) ? Number(row?.valor ?? 0) : 0
 
+const moneyOrNull = (value?: number | string | null): number | null => {
+  if (value == null || value === '') return null
+  const n = Number(value)
+  return Number.isFinite(n) ? n : null
+}
+
+const roundMoney = (value: number): number => Math.round(value * 100) / 100
+
+export type TotaisConciliacaoFatura = {
+  valorExtrato: number
+  valorNaoConciliado: number
+  valorTotalComPendencias: number
+  temComprasNaoConciliadas: boolean
+  labelNaoConciliadas: string
+}
+
+/**
+ * Totais do detalhe da fatura: extrato (PDF) + compras manuais ainda abertas.
+ * Prefere os campos do GET /faturas/listar/{id}. Não soma o extrato no front.
+ */
+export const totaisConciliacaoFatura = (
+  fatura?: {
+    valor_total?: number | string | null
+    valor_extrato?: number | string | null
+    valor_nao_conciliado?: number | string | null
+    valor_total_com_pendencias?: number | string | null
+    tem_compras_nao_conciliadas?: boolean | null
+    compras_nao_conciliadas_label?: string | null
+    pagamentos_antecipado?: number | string | null
+  } | null,
+  transacoes: Array<{
+    valor?: number | string | null
+    compra_manual?: boolean | null
+    precisa_conciliar?: boolean | null
+    status_conciliacao?: string | null
+    importada_pdf?: boolean | null
+  }> = []
+): TotaisConciliacaoFatura => {
+  const valorQuitacao = moneyOrNull(fatura?.valor_total) ?? 0
+  const antecipado = Math.max(moneyOrNull(fatura?.pagamentos_antecipado) ?? 0, 0)
+  const extratoApi = moneyOrNull(fatura?.valor_extrato)
+  const extratoPareceQuitacao = extratoApi != null
+    && antecipado > 0.009
+    && Math.abs(extratoApi - valorQuitacao) < 0.02
+
+  const valorExtrato = extratoPareceQuitacao
+    ? roundMoney(valorQuitacao + antecipado)
+    : (extratoApi ?? roundMoney(valorQuitacao + antecipado))
+
+  const valorNaoConciliadoApi = moneyOrNull(fatura?.valor_nao_conciliado)
+  const valorNaoConciliado = valorNaoConciliadoApi != null
+    ? roundMoney(Math.max(valorNaoConciliadoApi, 0))
+    : roundMoney(transacoes.reduce((acc, tx) => (
+      precisaConciliarCompra(tx) ? acc + Number(tx.valor ?? 0) : acc
+    ), 0))
+
+  const valorTotalComPendencias = roundMoney(valorExtrato + valorNaoConciliado)
+
+  const temComprasNaoConciliadas = valorNaoConciliado > 0.009
+    && fatura?.tem_compras_nao_conciliadas !== false
+
+  const labelNaoConciliadas = String(fatura?.compras_nao_conciliadas_label ?? '').trim()
+    || 'Compras ainda não conciliadas'
+
+  return {
+    valorExtrato,
+    valorNaoConciliado,
+    valorTotalComPendencias,
+    temComprasNaoConciliadas,
+    labelNaoConciliadas,
+  }
+}
+
 export const identificadorCompraManualVinculada = (row?: {
   compra_manual_vinculada?: {
     id?: number | string | null
