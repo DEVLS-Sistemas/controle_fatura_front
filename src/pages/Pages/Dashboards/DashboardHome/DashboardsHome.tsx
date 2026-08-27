@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { Card, CardBody, Col, Container, Label, Row, Spinner } from 'reactstrap'
 import ReactApexChart from 'react-apexcharts'
@@ -27,6 +27,7 @@ const optMesesDe: SelectOptions[] = [{ value: DASHBOARD_ANO_TODO, label: 'Ano to
 const DashboardsHome = () => {
   const dashboardService = useRef(new DashboardService()).current
   const [searchParams, setSearchParams] = useSearchParams()
+  const navigate = useNavigate()
   const defaultValues = useRef(resolveDashboardFiltro(searchParams)).current
   const { control, watch, setValue } = useForm<DashboardFiltro>({ defaultValues })
   const [loading, setLoading] = useState(true)
@@ -145,6 +146,10 @@ const DashboardsHome = () => {
                     <i className="ri-pulse-line align-middle me-1"></i>
                     Raio-X
                   </Link>
+                  <Link to="/gastos-por-categoria" className="btn btn-soft-info mb-1">
+                    <i className="ri-pie-chart-2-line align-middle me-1"></i>
+                    Gastos por categoria
+                  </Link>
                   <Link to="/gastos-criticos" className="btn btn-soft-danger mb-1">
                     <i className="ri-alarm-warning-line align-middle me-1"></i>
                     Onde estou gastando demais?
@@ -257,7 +262,12 @@ const DashboardsHome = () => {
                 <Col xl={4}>
                   <Card>
                     <CardBody>
-                      <h5 className="card-title mb-3">Por categoria</h5>
+                      <div className="d-flex justify-content-between align-items-center mb-3">
+                        <h5 className="card-title mb-0">Por categoria</h5>
+                        <Link to="/gastos-por-categoria" className="btn btn-sm btn-soft-primary">
+                          Ver por categoria e subcategoria
+                        </Link>
+                      </div>
                       {categoriasSeries.length === 0 ? (
                         <p className="text-muted mb-0">Sem dados no período.</p>
                       ) : (
@@ -269,6 +279,18 @@ const DashboardsHome = () => {
                             labels: categoriasLabels,
                             colors: categoriasCores,
                             legend: { position: 'bottom' },
+                            chart: {
+                              events: {
+                                dataPointSelection: (_event, _ctx, config) => {
+                                  const item = resumo?.por_categoria?.[config.dataPointIndex]
+                                  if (item?.categoria_id) {
+                                    navigate(`/gastos-por-categoria?categoria_id=${item.categoria_id}`)
+                                    return
+                                  }
+                                  navigate('/gastos-por-categoria')
+                                },
+                              },
+                            },
                             tooltip: {
                               y: { formatter: (val: number) => formatCurrency(val) },
                             },

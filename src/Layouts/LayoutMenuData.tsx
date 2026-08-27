@@ -14,7 +14,7 @@ const Navdata = () => {
     const [iscurrentState, setIscurrentState] = useState("Dashboard");
 
     const isDashboardActive = pathIn(path, ["/dashboard"]);
-    const isAnalisesActive = pathIn(path, ["/raio-x", "/gastos-criticos", "/relatorios"]);
+    const isAnalisesActive = pathIn(path, ["/raio-x", "/gastos-criticos", "/gastos-por-categoria", "/relatorios"]);
     const isPlanejamentoActive = pathIn(path, ["/projecao-faturas", "/simulador", "/parceladas", "/assinaturas", "/compras"]);
     const isLancamentosActive = pathIn(path, ["/cartoes", "/faturas", "/transacoes"]);
     const isCadastrosActive = pathIn(path, ["/categorias", "/subcategorias", "/estabelecimentos", "/lojas", "/pessoas", "/responsaveis"]);
@@ -37,7 +37,7 @@ const Navdata = () => {
     useEffect(() => {
         document.body.classList.remove("twocolumn-panel");
 
-        if (pathIn(path, ["/raio-x", "/gastos-criticos", "/relatorios"])) {
+        if (pathIn(path, ["/raio-x", "/gastos-criticos", "/gastos-por-categoria", "/relatorios"])) {
             setIscurrentState("Analises");
             setIsAnalises(true);
             setIsPlanejamento(false);
@@ -113,6 +113,7 @@ const Navdata = () => {
             subItems: [
                 { id: "raio-x", label: "Raio-X Financeiro", link: "/raio-x", parentId: "analises", isActive: pathIn(path, ["/raio-x"]) },
                 { id: "gastos-criticos", label: "Gastos críticos", link: "/gastos-criticos", parentId: "analises", isActive: pathIn(path, ["/gastos-criticos"]) },
+                { id: "gastos-por-categoria", label: "Gastos por categoria", link: "/gastos-por-categoria", parentId: "analises", isActive: pathIn(path, ["/gastos-por-categoria"]) },
                 { id: "relatorios", label: "Relatórios", link: "/relatorios", parentId: "analises", isActive: pathIn(path, ["/relatorios"]) },
             ],
         },
