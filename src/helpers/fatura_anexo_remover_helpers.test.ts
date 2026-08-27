@@ -1,15 +1,20 @@
-import { extractImpactoRemoverAnexo, ImpactoRemoverAnexo } from 'interfaces/Faturas/FaturasInterface'
+import { extractImpactoRemoverAnexo, extractRemoverAnexoResult, ImpactoRemoverAnexo } from 'interfaces/Faturas/FaturasInterface'
 import {
     apoioMotivoRemoverAnexo,
     avisosImpactoRemoverAnexo,
     hintContinuarRemoverAnexo,
     labelBotaoRemoverAnexo,
+    labelConfirmarRemoverAnexo,
     labelStatusConciliacaoImpacto,
     motivosRemoverAnexo,
     MOTIVOS_REMOVER_ANEXO_FALLBACK,
     podeContinuarRemoverAnexo,
     podeRemoverAnexo,
+    stubsExcluidosComCompetencia,
     subtituloModalRemoverAnexo,
+    textoStubsExcluidos,
+    tipoParaPostRemoverAnexo,
+    tituloConfirmacaoRemoverAnexo,
     tituloModalRemoverAnexo,
 } from './fatura_anexo_remover_helpers'
 
@@ -132,10 +137,14 @@ describe('labelStatusConciliacaoImpacto', () => {
     })
 })
 
-describe('continuar da etapa 1', () => {
-    it('permanece desabilitado enquanto o POST não existir', () => {
-        expect(podeContinuarRemoverAnexo('remover')).toBe(false)
-        expect(hintContinuarRemoverAnexo('remover')).toBe('Em breve: confirmar remoção')
+describe('continuar da etapa 2', () => {
+    it('libera Continuar só para “apenas remover”', () => {
+        expect(podeContinuarRemoverAnexo(null)).toBe(false)
+        expect(hintContinuarRemoverAnexo(null)).toBe('Escolha um motivo para continuar')
+        expect(podeContinuarRemoverAnexo('remover')).toBe(true)
+        expect(hintContinuarRemoverAnexo('remover')).toBe('')
+        expect(podeContinuarRemoverAnexo('trocar_pdf')).toBe(false)
+        expect(hintContinuarRemoverAnexo('trocar_pdf')).toBe('Em breve: trocar o PDF')
     })
 })
 
@@ -151,5 +160,56 @@ describe('extractImpactoRemoverAnexo', () => {
     it('devolve null quando o payload não é de impacto', () => {
         expect(extractImpactoRemoverAnexo(null)).toBeNull()
         expect(extractImpactoRemoverAnexo({ status: true, data: { id: 1 } })).toBeNull()
+    })
+})
+
+describe('tipoParaPostRemoverAnexo', () => {
+    it('omite tipo quando só existe um anexo', () => {
+        expect(tipoParaPostRemoverAnexo('pdf', { tem_pdf: true, tem_csv: false })).toBeUndefined()
+        expect(tipoParaPostRemoverAnexo('csv', { tem_pdf: false, tem_csv: true })).toBeUndefined()
+    })
+
+    it('envia o recorte quando PDF e CSV coexistem', () => {
+        expect(tipoParaPostRemoverAnexo('pdf', { tem_pdf: true, tem_csv: true })).toBe('pdf')
+        expect(tipoParaPostRemoverAnexo('csv', { tem_pdf: true, tem_csv: true })).toBe('csv')
+        expect(tipoParaPostRemoverAnexo('ambos', { tem_pdf: true, tem_csv: true })).toBe('ambos')
+    })
+})
+
+describe('tituloConfirmacaoRemoverAnexo', () => {
+    it('usa a competência no título destrutivo', () => {
+        expect(tituloConfirmacaoRemoverAnexo('08/2026', 'pdf')).toBe('Remover o PDF de 08/2026?')
+        expect(tituloConfirmacaoRemoverAnexo('08/2026', 'csv')).toBe('Remover o CSV de 08/2026?')
+        expect(labelConfirmarRemoverAnexo('pdf')).toBe('Remover PDF')
+        expect(labelConfirmarRemoverAnexo('csv')).toBe('Remover CSV')
+    })
+})
+
+describe('stubsExcluidosComCompetencia', () => {
+    it('resolve competência dos ids com o preview', () => {
+        expect(stubsExcluidosComCompetencia(
+            [74],
+            [{ id: 74, competencia: '09/2026' }],
+        )).toEqual([{ id: 74, competencia: '09/2026' }])
+        expect(textoStubsExcluidos(['09/2026']))
+            .toBe('A competência 09/2026 era só projeção deste PDF e foi removida.')
+    })
+})
+
+describe('extractRemoverAnexoResult', () => {
+    it('lê o envelope e a message da API', () => {
+        expect(extractRemoverAnexoResult({
+            status: true,
+            message: 'Anexo removido. 1 compra voltou a precisar de conciliação.',
+            data: {
+                fatura_id: 73,
+                anexo_removido: true,
+                compras_que_voltaram_a_conciliar: [{ id: 901, texto_compra: 'Mouse', valor: 10, data: '2026-08-23' }],
+            },
+        })).toMatchObject({
+            fatura_id: 73,
+            anexo_removido: true,
+            message: 'Anexo removido. 1 compra voltou a precisar de conciliação.',
+        })
     })
 })

@@ -13,7 +13,10 @@ import {
     ImpactoRemoverAnexo,
     LookupsFaturas,
     ProcessarPdfParams,
+    RemoverAnexoParams,
+    RemoverAnexoResult,
     extractImpactoRemoverAnexo,
+    extractRemoverAnexoResult,
 } from "interfaces/Faturas/FaturasInterface"
 import { PdfSenhaError } from "../../libs/api/exceptions/PdfSenhaError"
 import { FaturaSelecaoError } from "../../libs/api/exceptions/FaturaSelecaoError"
@@ -343,6 +346,35 @@ export class FaturasService implements FaturasInterface {
                 const message = response.message
                     || (typeof body?.message === 'string' ? body.message : null)
                     || 'Impacto da remoção não encontrado'
+                throw new UnexpectedError(message)
+            }
+            default: throw new UnexpectedError(response.message)
+        }
+    }
+
+    async removerAnexo(params: RemoverAnexoParams): Promise<RemoverAnexoResult> {
+        const body: Record<string, unknown> = {
+            id: params.id,
+            motivo: params.motivo,
+        }
+        if (params.tipo) body.tipo = params.tipo
+        const response = await this.httpClient.post<any>({
+            url: `${this.url}/remover-anexo`,
+            body,
+        })
+        switch (response.statusCode) {
+            case HttpStatusCode.ok: {
+                const payload = extractRemoverAnexoResult(response.body)
+                if (!payload) throw new UnexpectedError(response.message)
+                return payload
+            }
+            case HttpStatusCode.unauthorized: throw new AccessDeniedError()
+            case HttpStatusCode.invalidForm: throw new ValidationError(response.body)
+            case HttpStatusCode.notFound: {
+                const respBody = response.body as Record<string, unknown> | undefined
+                const message = response.message
+                    || (typeof respBody?.message === 'string' ? respBody.message : null)
+                    || 'Não foi possível remover o anexo'
                 throw new UnexpectedError(message)
             }
             default: throw new UnexpectedError(response.message)

@@ -269,6 +269,7 @@ export interface ImpactoRemoverAnexoCompra {
     status_conciliacao_atual?: string | null
     status_conciliacao_depois?: string | null
     origem_restauracao?: OrigemRestauracaoAnexo | string | null
+    precisa_conciliar_label?: string | null
 }
 
 export interface ImpactoRemoverAnexoStub {
@@ -292,6 +293,28 @@ export interface ImpactoRemoverAnexo {
     compras_que_voltam_a_conciliar?: ImpactoRemoverAnexoCompra[]
     faturas_stub_que_serao_excluidas?: ImpactoRemoverAnexoStub[]
     avisos?: string[]
+}
+
+export interface RemoverAnexoParams {
+    id: number
+    motivo: MotivoRemoverAnexo
+    tipo?: TipoRemoverAnexo
+}
+
+/** `POST /faturas/remover-anexo` — etapa 2 (`motivo=remover`) */
+export interface RemoverAnexoResult {
+    fatura_id: number
+    motivo?: MotivoRemoverAnexo | string
+    anexo_removido?: boolean
+    tem_pdf?: boolean
+    tem_csv?: boolean
+    pdf_url?: string | null
+    lancamentos_apagados?: number
+    parcelas_apagadas_outras_faturas?: number
+    faturas_stub_excluidas?: Array<number | ImpactoRemoverAnexoStub>
+    compras_que_voltaram_a_conciliar?: ImpactoRemoverAnexoCompra[]
+    avisos?: string[]
+    message?: string
 }
 
 export interface FaturasInterface {
@@ -321,6 +344,7 @@ export interface FaturasInterface {
     }): Promise<any>
     processarPdf(id: number, params?: ProcessarPdfParams): Promise<any>
     getImpactoRemoverAnexo(id: number | string): Promise<ImpactoRemoverAnexo>
+    removerAnexo(params: RemoverAnexoParams): Promise<RemoverAnexoResult>
 }
 
 /** Extrai `data` de `GET /impacto-remover-anexo/{id}` */
@@ -333,6 +357,25 @@ export const extractImpactoRemoverAnexo = (result: unknown): ImpactoRemoverAnexo
         : body
     if (candidate.fatura_id == null && candidate.lancamentos_deste_anexo == null) return null
     return candidate as unknown as ImpactoRemoverAnexo
+}
+
+/** Extrai `data` + `message` de `POST /remover-anexo` */
+export const extractRemoverAnexoResult = (result: unknown): RemoverAnexoResult | null => {
+    if (!result || typeof result !== 'object') return null
+    const body = result as Record<string, unknown>
+    const nested = body.data
+    const candidate = (nested && typeof nested === 'object' && !Array.isArray(nested))
+        ? nested as Record<string, unknown>
+        : body
+    if (
+        candidate.fatura_id == null
+        && candidate.anexo_removido == null
+        && candidate.compras_que_voltaram_a_conciliar == null
+    ) {
+        return null
+    }
+    const message = typeof body.message === 'string' ? body.message : undefined
+    return { ...(candidate as unknown as RemoverAnexoResult), message }
 }
 
 /** Extrai payload de fatura aninhado em respostas `result.fatura` / `fatura.data` */

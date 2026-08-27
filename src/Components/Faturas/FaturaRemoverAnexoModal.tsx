@@ -17,16 +17,22 @@ import {
     apoioMotivoRemoverAnexo,
     avisosImpactoRemoverAnexo,
     hintContinuarRemoverAnexo,
+    labelConfirmarRemoverAnexo,
     labelStatusConciliacaoImpacto,
     motivosRemoverAnexo,
     podeContinuarRemoverAnexo,
     subtituloModalRemoverAnexo,
+    TEXTO_CONFIRMACAO_REMOVER_ANEXO,
+    tipoParaPostRemoverAnexo,
+    tituloConfirmacaoRemoverAnexo,
     tituloModalRemoverAnexo,
+    stubsExcluidosComCompetencia,
 } from 'helpers/fatura_anexo_remover_helpers'
 import {
     ImpactoRemoverAnexo,
     ImpactoRemoverAnexoCompra,
     MotivoRemoverAnexo,
+    RemoverAnexoResult,
     TipoRemoverAnexo,
 } from 'interfaces/Faturas/FaturasInterface'
 import { FaturasService } from 'services/Faturas/FaturasService'
@@ -36,6 +42,7 @@ export type FaturaRemoverAnexoModalProps = {
     faturaId: number | string | null
     tipo?: TipoRemoverAnexo | null
     onClose: () => void
+    onRemoved: (result: RemoverAnexoResult) => void | Promise<void>
 }
 
 const badgeStatusColor = (status?: string | null): string => {
@@ -88,17 +95,24 @@ const CompraImpactoCard = ({ compra }: { compra: ImpactoRemoverAnexoCompra }) =>
     )
 }
 
+type PassoRemoverAnexo = 'impacto' | 'confirmar'
+
 const FaturaRemoverAnexoModal = ({
     isOpen,
     faturaId,
     tipo = null,
     onClose,
+    onRemoved,
 }: FaturaRemoverAnexoModalProps) => {
     const faturasService = useRef(new FaturasService()).current
     const onCloseRef = useRef(onClose)
     onCloseRef.current = onClose
+    const onRemovedRef = useRef(onRemoved)
+    onRemovedRef.current = onRemoved
 
     const [loading, setLoading] = useState(false)
+    const [saving, setSaving] = useState(false)
+    const [passo, setPasso] = useState<PassoRemoverAnexo>('impacto')
     const [impacto, setImpacto] = useState<ImpactoRemoverAnexo | null>(null)
     const [motivo, setMotivo] = useState<MotivoRemoverAnexo | string | null>(null)
 
@@ -106,13 +120,17 @@ const FaturaRemoverAnexoModal = ({
         if (!isOpen || faturaId == null) {
             setImpacto(null)
             setMotivo(null)
+            setPasso('impacto')
             setLoading(false)
+            setSaving(false)
             return
         }
 
         let cancelled = false
         setLoading(true)
+        setSaving(false)
         setMotivo(null)
+        setPasso('impacto')
         setImpacto(null)
 
         faturasService.getImpactoRemoverAnexo(faturaId)
@@ -144,18 +162,54 @@ const FaturaRemoverAnexoModal = ({
     const podeContinuar = podeContinuarRemoverAnexo(motivo)
     const continuarHint = hintContinuarRemoverAnexo(motivo)
     const subtitulo = subtituloModalRemoverAnexo(impacto)
+    const competencia = impacto?.competencia
+    const busy = loading || saving
+
+    const handleContinuar = () => {
+        if (!podeContinuar || busy) return
+        if (motivo === 'remover') {
+            setPasso('confirmar')
+        }
+    }
+
+    const handleConfirmarRemover = async () => {
+        if (faturaId == null || busy) return
+        setSaving(true)
+        try {
+            const result = await faturasService.removerAnexo({
+                id: Number(faturaId),
+                motivo: 'remover',
+                tipo: tipoParaPostRemoverAnexo(tipo, impacto),
+            })
+            await onRemovedRef.current({
+                ...result,
+                faturas_stub_excluidas: stubsExcluidosComCompetencia(
+                    result.faturas_stub_excluidas,
+                    impacto?.faturas_stub_que_serao_excluidas,
+                ),
+            })
+        } catch (error: unknown) {
+            toast.error(error instanceof Error ? error.message : 'Erro ao remover o anexo')
+        } finally {
+            setSaving(false)
+        }
+    }
+
+    const titulo = passo === 'confirmar'
+        ? tituloConfirmacaoRemoverAnexo(competencia, tipo, impacto)
+        : tituloModalRemoverAnexo(tipo, impacto)
 
     return (
         <Modal
             isOpen={isOpen}
-            toggle={onClose}
+            toggle={busy ? undefined : onClose}
             centered
             size="lg"
             scrollable
             fullscreen="sm"
         >
-            <ModalHeader toggle={onClose}>
-                {tituloModalRemoverAnexo(tipo, impacto)}
+            <ModalHeader toggle={busy ? undefined : onClose}>
+                {titulo}
             </ModalHeader>
             <ModalBody>
                 {loading ? (
@@ -163,6 +217,8 @@ const FaturaRemoverAnexoModal = ({
                         <Spinner color="primary" />
                         <div className="text-muted mt-2">Calculando o impacto da remoção…</div>
                     </div>
+                ) : passo === 'confirmar' ? (
+                    <p className="mb-0">{TEXTO_CONFIRMACAO_REMOVER_ANEXO}</p>
                 ) : impacto ? (
                     <>
                         {subtitulo && (
@@ -282,22 +338,54 @@ const FaturaRemoverAnexoModal = ({
                 ) : null}
             </ModalBody>
             <ModalFooter className="flex-wrap gap-2">
-                <Button type="button" color="light" onClick={onClose} disabled={loading}>
-                    Cancelar
-                </Button>
-                <div className="d-flex flex-column align-items-end">
-                    <Button
-                        type="button"
-                        color="primary"
-                        disabled={!podeContinuar || loading}
-                        title={continuarHint || undefined}
-                    >
-                        Continuar
-                    </Button>
-                    {continuarHint && (
-                        <small className="text-muted mt-1">{continuarHint}</small>
-                    )}
-                </div>
+                {passo === 'confirmar' ? (
+                    <>
+                        <Button
+                            type="button"
+                            color="light"
+                            onClick={() => setPasso('impacto')}
+                            disabled={saving}
+                        >
+                            Voltar
+                        </Button>
+                        <Button
+                            type="button"
+                            color="danger"
+                            outline
+                            onClick={() => { void handleConfirmarRemover() }}
+                            disabled={saving}
+                        >
+                            {saving ? (
+                                <>
+                                    <Spinner size="sm" className="me-2" />
+                                    Removendo…
+                                </>
+                            ) : (
+                                labelConfirmarRemoverAnexo(tipo, impacto)
+                            )}
+                        </Button>
+                    </>
+                ) : (
+                    <>
+                        <Button type="button" color="light" onClick={onClose} disabled={busy}>
+                            Cancelar
+                        </Button>
+                        <div className="d-flex flex-column align-items-end">
+                            <Button
+                                type="button"
+                                color="primary"
+                                disabled={!podeContinuar || busy}
+                                title={continuarHint || undefined}
+                                onClick={handleContinuar}
+                            >
+                                Continuar
+                            </Button>
+                            {continuarHint && (
+                                <small className="text-muted mt-1">{continuarHint}</small>
+                            )}
+                        </div>
+                    </>
+                )}
             </ModalFooter>
         </Modal>
     )

@@ -50,6 +50,7 @@ import {
     resolveSenhaPdfMeta,
     SenhaPdfMeta,
     TipoRemoverAnexo,
+    RemoverAnexoResult,
 } from 'interfaces/Faturas/FaturasInterface'
 import { NumeroListItem, ParserHomologado, PARSERS_HOMOLOGADOS_PADRAO } from 'interfaces/Cartoes/CartoesInterface'
 import { CategoriaLookup, CandidatoConciliacao, ResponsavelLookup, TransacoesList } from 'interfaces/Transacoes/TransacoesInterface'
@@ -65,6 +66,7 @@ import FaturaSelecaoModal, { FaturaSelecaoStep } from 'Components/Faturas/Fatura
 import FaturaTitularModal from 'Components/Faturas/FaturaTitularModal'
 import FaturaParserNaoHomologadoModal from 'Components/Faturas/FaturaParserNaoHomologadoModal'
 import FaturaRemoverAnexoModal from 'Components/Faturas/FaturaRemoverAnexoModal'
+import FaturaComprasRestauradasModal from 'Components/Faturas/FaturaComprasRestauradasModal'
 import ConciliacaoCandidatosModal from 'pages/Pages/Transacoes/ConciliacaoCandidatosModal/ConciliacaoCandidatosModal'
 import FaturaConciliacaoLinha from './FaturaConciliacaoLinha'
 import FaturaTotalizadorPendencias from './FaturaTotalizadorPendencias'
@@ -394,6 +396,7 @@ const FaturasViewPage = () => {
     const [homologModalOpen, setHomologModalOpen] = useState(false)
     const [removerAnexoOpen, setRemoverAnexoOpen] = useState(false)
     const [removerAnexoTipo, setRemoverAnexoTipo] = useState<TipoRemoverAnexo | null>(null)
+    const [comprasRestauradas, setComprasRestauradas] = useState<RemoverAnexoResult | null>(null)
     const homologConfirmRef = useRef<string | null>(null)
 
     const nomeDoResponsavel = (responsavelId?: number | null, responsavelNome?: string | null) => (
@@ -1028,6 +1031,17 @@ const FaturasViewPage = () => {
         setRemoverAnexoOpen(true)
     }
 
+    const handleAnexoRemovido = async (result: RemoverAnexoResult) => {
+        setRemoverAnexoOpen(false)
+        await loadFatura({ silent: true, openSenhaIfNeeded: false })
+        const restauradas = result.compras_que_voltaram_a_conciliar ?? []
+        if (restauradas.length > 0) {
+            setComprasRestauradas(result)
+            return
+        }
+        toast.success(result.message || 'Anexo removido.')
+    }
+
     const handleDownloadAnexo = async (tipo: 'pdf' | 'csv') => {
         if (!id || !fatura) return
         try {
@@ -1570,6 +1584,13 @@ const FaturasViewPage = () => {
                 faturaId={id ?? null}
                 tipo={removerAnexoTipo}
                 onClose={() => setRemoverAnexoOpen(false)}
+                onRemoved={handleAnexoRemovido}
+            />
+            <FaturaComprasRestauradasModal
+                isOpen={comprasRestauradas != null}
+                result={comprasRestauradas}
+                tipo={removerAnexoTipo}
+                onClose={() => setComprasRestauradas(null)}
             />
             <FaturaParserNaoHomologadoModal
                 isOpen={homologModalOpen}

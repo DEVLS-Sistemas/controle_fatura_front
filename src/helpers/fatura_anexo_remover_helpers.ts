@@ -5,8 +5,11 @@ import {
     TipoRemoverAnexo,
 } from 'interfaces/Faturas/FaturasInterface'
 
-/** Etapa 2 liga o POST `/remover-anexo`. Enquanto false, Continuar fica desabilitado. */
-export const POST_REMOVER_ANEXO_HABILITADO = false
+/** Etapa 2: POST `/remover-anexo` com `motivo=remover`. */
+export const POST_REMOVER_ANEXO_HABILITADO = true
+
+/** Etapa 3: POST multipart com `motivo=trocar_pdf`. */
+export const POST_TROCAR_PDF_HABILITADO = false
 
 export const TOOLTIP_REMOVER_ANEXO =
     'Desfaz o extrato deste arquivo: apaga lançamentos importados e parcelas que este PDF criou em outras competências.'
@@ -119,10 +122,82 @@ export const labelStatusConciliacaoImpacto = (status?: string | null): string =>
 }
 
 export const hintContinuarRemoverAnexo = (motivo?: string | null): string => {
-    if (!POST_REMOVER_ANEXO_HABILITADO) return 'Em breve: confirmar remoção'
     if (!motivo) return 'Escolha um motivo para continuar'
+    if (motivo === 'trocar_pdf' && !POST_TROCAR_PDF_HABILITADO) return 'Em breve: trocar o PDF'
+    if (motivo === 'remover' && !POST_REMOVER_ANEXO_HABILITADO) return 'Em breve: confirmar remoção'
     return ''
 }
 
-export const podeContinuarRemoverAnexo = (motivo?: string | null): boolean =>
-    POST_REMOVER_ANEXO_HABILITADO && Boolean(motivo)
+export const podeContinuarRemoverAnexo = (motivo?: string | null): boolean => {
+    if (!motivo) return false
+    if (motivo === 'trocar_pdf') return POST_TROCAR_PDF_HABILITADO
+    if (motivo === 'remover') return POST_REMOVER_ANEXO_HABILITADO
+    return false
+}
+
+export const tipoParaPostRemoverAnexo = (
+    tipo?: TipoRemoverAnexo | null,
+    impacto?: Pick<ImpactoRemoverAnexo, 'tem_pdf' | 'tem_csv'> | null,
+): TipoRemoverAnexo | undefined => {
+    const temPdf = impacto?.tem_pdf === true
+    const temCsv = impacto?.tem_csv === true
+    if (temPdf && temCsv) return tipo ?? 'ambos'
+    return undefined
+}
+
+const rotuloAnexo = (
+    tipo?: TipoRemoverAnexo | null,
+    impacto?: Pick<ImpactoRemoverAnexo, 'tem_pdf' | 'tem_csv'> | null,
+): 'PDF' | 'CSV' | 'anexo' => {
+    if (tipo === 'csv' || (!tipo && impacto?.tem_csv && !impacto?.tem_pdf)) return 'CSV'
+    if (tipo === 'ambos' || (!tipo && impacto?.tem_pdf && impacto?.tem_csv)) return 'anexo'
+    return 'PDF'
+}
+
+export const tituloConfirmacaoRemoverAnexo = (
+    competencia?: string | null,
+    tipo?: TipoRemoverAnexo | null,
+    impacto?: Pick<ImpactoRemoverAnexo, 'tem_pdf' | 'tem_csv'> | null,
+): string => {
+    const rotulo = rotuloAnexo(tipo, impacto)
+    const comp = competencia?.trim()
+    return comp ? `Remover o ${rotulo} de ${comp}?` : `Remover o ${rotulo} desta competência?`
+}
+
+export const TEXTO_CONFIRMACAO_REMOVER_ANEXO =
+    'Isso apaga o extrato importado e as parcelas que este arquivo criou em outras faturas. As compras que você cadastrou não serão apagadas — elas voltam a aparecer para conciliar.'
+
+export const labelConfirmarRemoverAnexo = (
+    tipo?: TipoRemoverAnexo | null,
+    impacto?: Pick<ImpactoRemoverAnexo, 'tem_pdf' | 'tem_csv'> | null,
+): string => {
+    const rotulo = rotuloAnexo(tipo, impacto)
+    if (rotulo === 'CSV') return 'Remover CSV'
+    if (rotulo === 'anexo') return 'Remover anexo'
+    return 'Remover PDF'
+}
+
+export const stubsExcluidosComCompetencia = (
+    excluidas?: Array<number | { id: number; competencia?: string }> | null,
+    preview?: Array<{ id: number; competencia?: string }> | null,
+): Array<{ id: number; competencia: string }> => {
+    if (!excluidas?.length) return []
+    const byId = new Map((preview ?? []).map((s) => [s.id, s.competencia]))
+    return excluidas.map((item) => {
+        if (typeof item === 'number') {
+            return { id: item, competencia: byId.get(item) || String(item) }
+        }
+        return {
+            id: item.id,
+            competencia: item.competencia || byId.get(item.id) || String(item.id),
+        }
+    })
+}
+
+export const textoStubsExcluidos = (competencias: string[]): string | null => {
+    if (!competencias.length) return null
+    if (competencias.length === 1) {
+        return `A competência ${competencias[0]} era só projeção deste PDF e foi removida.`
+    }
+    return `As competências ${competencias.join(', ')} eram só projeção deste PDF e foram removidas.`
+}
