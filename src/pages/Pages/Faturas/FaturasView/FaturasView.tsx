@@ -31,6 +31,11 @@ import {
     compraRestauradaParaReconcilia,
     TOAST_RECONCILIA_AUTO,
 } from 'helpers/fatura_anexo_remover_helpers'
+import {
+    anexoFoiParaOutraFatura,
+    destinoFaturaDoAnexo,
+    mensagemPdfVinculadoCompetencia,
+} from 'helpers/fatura_competencia_pdf_helpers'
 import { isCompraAvista, isEhAssinatura } from 'helpers/assinaturas_helpers'
 import {
     contaNoTotalLinha,
@@ -846,20 +851,51 @@ const FaturasViewPage = () => {
     const handleUploadSuccess = async (result: unknown) => {
         const faturaData = extractFaturaPayload(result)
         const envelope = result as Record<string, any> | null
+        const destino = destinoFaturaDoAnexo(result)
+        const realocado = anexoFoiParaOutraFatura(
+            { id, mes: fatura?.mes, ano: fatura?.ano, competencia: fatura?.competencia },
+            destino,
+        )
         if (fileInputRef.current) fileInputRef.current.value = ''
         pendingUploadFileRef.current = null
 
         if (faturaPrecisaSenhaPdf(faturaData, envelope)) {
             toast.info('Arquivo enviado. Informe a senha do PDF para continuar.')
+            if (realocado && destino?.id != null) {
+                navigate(`/faturas/view/${destino.id}`)
+                return
+            }
             await loadFatura({ silent: true, openSenhaIfNeeded: false })
             openSenhaModal(resolveSenhaPdfMeta(faturaData, envelope))
             return
         }
 
-        toast.success('Arquivo enviado com sucesso')
+        toast.success(realocado
+            ? mensagemPdfVinculadoCompetencia(destino)
+            : (envelope?.message || 'Arquivo enviado com sucesso'))
         const nomeResp = nomeResponsavelPadraoNaoEu(faturaData)
         if (nomeResp) {
             toast.info(`Responsável "${nomeResp}" criado e aplicado nesta fatura.`)
+        }
+        const destinoId = destino?.id ?? id
+        if (precisaPollProcessamentoFatura(faturaData) && destinoId != null) {
+            const seq = ++pollTrocaSeqRef.current
+            const started = Date.now()
+            while (Date.now() - started < POLL_FATURA_MAX_MS) {
+                await new Promise((resolve) => setTimeout(resolve, POLL_FATURA_INTERVAL_MS))
+                if (seq !== pollTrocaSeqRef.current) return
+                try {
+                    const view = await faturasService.getViewFaturas({ id: destinoId })
+                    if (view && faturaProcessamentoTerminou(view.status)) break
+                } catch (error) {
+                    console.error('Erro ao acompanhar o processamento da fatura:', error)
+                }
+            }
+            if (seq !== pollTrocaSeqRef.current) return
+        }
+        if (realocado && destino?.id != null) {
+            navigate(`/faturas/view/${destino.id}`)
+            return
         }
         await loadFatura({ silent: true, openSenhaIfNeeded: false })
         await loadLookups()
@@ -918,7 +954,7 @@ const FaturasViewPage = () => {
                 openSenhaModal(error.senha_pdf ?? null)
                 return
             }
-            toast.error('Erro ao enviar arquivo')
+            toast.error((error as Error)?.message || 'Erro ao enviar arquivo')
         }
     }
 
@@ -988,7 +1024,7 @@ const FaturasViewPage = () => {
                 openSenhaModal(error.senha_pdf ?? null)
                 return
             }
-            toast.error('Erro ao enviar arquivo')
+            toast.error((error as Error)?.message || 'Erro ao enviar arquivo')
         } finally {
             setSelecaoLoading(false)
         }
@@ -2711,7 +2747,7 @@ const FaturasViewPage = () => {
                                                 {TOOLTIP_REMOVER_ANEXO}
                                             </UncontrolledTooltip>
                                         </>
-                                    ) : podeRemover ? (
+                                    ) : podeRemover && (anexo.temPdf || anexo.temCsv) ? (
                                         <>
                                             <span id="btn-remover-anexo-fatura">
                                                 <Button

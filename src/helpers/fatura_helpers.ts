@@ -204,42 +204,8 @@ export const FATURA_FILE_ACCEPT =
 
 export const FATURA_FILE_EXTENSIONS = ['pdf', 'csv'] as const
 
-export type FaturaAnexoTipo = 'pdf' | 'csv' | null
-
-/** Resolve anexos a partir dos campos da API (PDF e CSV podem coexistir). */
-export const resolveFaturaAnexo = (fatura: {
-  tipo_arquivo?: string | null
-  tem_pdf?: boolean
-  tem_csv?: boolean
-  arquivo_pdf?: string | null
-  arquivo_csv?: string | null
-}): { tipo: FaturaAnexoTipo; temPdf: boolean; temCsv: boolean } => {
-  const extPdf = fatura.arquivo_pdf
-    ? (fatura.arquivo_pdf.split('?')[0].split('.').pop() || '').toLowerCase()
-    : ''
-
-  const tipoApi = fatura.tipo_arquivo?.toLowerCase()
-  let temPdf = fatura.tem_pdf === true || Boolean(fatura.arquivo_pdf)
-  let temCsv = fatura.tem_csv === true || Boolean(fatura.arquivo_csv)
-
-  // Legado: CSV guardado em arquivo_pdf (sem arquivo_csv)
-  if (!fatura.arquivo_csv && extPdf === 'csv') {
-    temPdf = false
-    temCsv = true
-  }
-
-  if (!temPdf && !temCsv) {
-    if (tipoApi === 'pdf' || extPdf === 'pdf') temPdf = true
-    else if (tipoApi === 'csv' || extPdf === 'csv') temCsv = true
-  }
-
-  let tipo: FaturaAnexoTipo = null
-  if (tipoApi === 'pdf' || tipoApi === 'csv') tipo = tipoApi
-  else if (temPdf) tipo = 'pdf'
-  else if (temCsv) tipo = 'csv'
-
-  return { tipo, temPdf, temCsv }
-}
+export type { FaturaAnexoTipo } from './fatura_anexo_flags'
+export { resolveFaturaAnexo } from './fatura_anexo_flags'
 
 export type FaturaAnexoDownloadTipo = 'pdf' | 'csv'
 

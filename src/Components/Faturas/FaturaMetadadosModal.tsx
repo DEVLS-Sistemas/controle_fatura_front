@@ -18,6 +18,10 @@ import { SelectList } from 'Components/ComponentController/Selects/Select/Select
 import { AnosSelect } from 'helpers/functions_helpers'
 import { formatCurrency, mesesOptions } from 'helpers/fatura_helpers'
 import {
+    COPY_CONFERIR_COMPETENCIA_PDF,
+    formatCompetenciaMesAno,
+} from 'helpers/fatura_competencia_pdf_helpers'
+import {
     avisoParserOuPadrao,
     isParserChaveHomologada,
     parsersHomologadosOrFallback,
@@ -395,6 +399,7 @@ const FaturaMetadadosModal = ({
     const chipConfianca = confiancaLabel(sugestao?.confianca)
     const finais = sugestao?.ultimos_digitos?.filter(Boolean) ?? []
     const valor = sugestao?.valor_fatura
+    const competenciaLida = formatCompetenciaMesAno({ mes, ano, competencia: null })
     const isNovo = mode === 'novo'
     const cartaoSelecionado = cartoes.find((c) => Number(c.value) === Number(cartaoId))
     const homologacaoCartao = resolveCartaoHomologacao(
@@ -461,6 +466,20 @@ const FaturaMetadadosModal = ({
                     </p>
                 )}
 
+                <Alert color="warning" className="mb-3">
+                    {COPY_CONFERIR_COMPETENCIA_PDF}
+                </Alert>
+                {competenciaLida ? (
+                    <div className="text-center mb-3">
+                        <div className="text-muted small">Competência lida do arquivo</div>
+                        <div className="fs-2 fw-semibold lh-1">{competenciaLida}</div>
+                    </div>
+                ) : (
+                    <p className="text-muted mb-3">
+                        Informe o mês e o ano da fatura. Não usamos o ano corrente como padrão.
+                    </p>
+                )}
+
                 {(chipConfianca || finais.length > 0 || valor != null) && (
                     <Alert color="info" className="mb-3">
                         {chipConfianca && (
@@ -506,7 +525,7 @@ const FaturaMetadadosModal = ({
                     </Col>
                     <Col md={3}>
                         <div className="mb-3">
-                            <Label className="form-label">Ano</Label>
+                            <Label className="form-label">Ano da fatura</Label>
                             <SelectList
                                 name="fatura_metadados_ano"
                                 options={anosOptions}

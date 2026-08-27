@@ -62,6 +62,23 @@ describe('podeRemoverAnexo', () => {
             arquivo_csv: null,
         })).toBe(false)
     })
+
+    it('não trata stub pago / parcela como se tivesse PDF', () => {
+        expect(podeRemoverAnexo({
+            status: 'pendente',
+            tem_pdf: false,
+            tem_csv: false,
+            tipo_arquivo: 'pdf',
+            arquivo_pdf: null,
+            pode_remover_anexo: true,
+        })).toBe(false)
+        expect(podeRemoverAnexo({
+            status: 'processada',
+            tem_pdf: false,
+            tem_csv: false,
+            arquivo_pdf: 'faturas/5/legado.pdf',
+        })).toBe(false)
+    })
 })
 
 describe('labelBotaoRemoverAnexo', () => {

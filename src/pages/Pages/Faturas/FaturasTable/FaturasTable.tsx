@@ -14,6 +14,7 @@ import {
     faturaQuitacaoLabel, faturaQuitacaoColor, VALOR_TEXT_CLASS,
     resolveFaturaAnexo, downloadFaturaAnexo, FaturaAnexoDownloadTipo, FaturaAnexoDownloadMeta,
 } from "helpers/fatura_helpers"
+import { TOOLTIP_ICONE_PDF_LISTAGEM } from "helpers/fatura_competencia_pdf_helpers"
 import { CartaoChip, BandeiraChip, resolveCartaoCores } from "helpers/cartao_helpers"
 import { resolveCartaoHomologacao } from "helpers/parser_homologado_helpers"
 import CartaoPdfHomologacaoBadge from "Components/Cartoes/CartaoPdfHomologacaoBadge"
@@ -331,7 +332,7 @@ export const FaturasTable = ({ data, getData, setPerPage, perPage, filters }: Fa
                                                                                         <button
                                                                                             type="button"
                                                                                             className="btn btn-link p-0 border-0"
-                                                                                            title="Baixar PDF"
+                                                                                            title={TOOLTIP_ICONE_PDF_LISTAGEM}
                                                                                             onClick={() => row.id && handleDownloadAnexo(row.id, 'pdf', anexoDownloadMeta(row))}
                                                                                         >
                                                                                             <i className="mdi mdi-file-pdf-box text-danger fs-4" />

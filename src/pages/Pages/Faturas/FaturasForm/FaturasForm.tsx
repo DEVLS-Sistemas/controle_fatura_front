@@ -10,6 +10,12 @@ import { InputCheckbox } from 'Components/ComponentController/Inputs/Checkbox/In
 import { SelectListControlled } from 'Components/ComponentController/Selects/Select/SelectListControlled'
 import { SelectOptions } from 'interfaces/SystemInterfaces/SelectInterface'
 import { FATURA_FILE_ACCEPT, isValidFaturaFile, mesesOptions, nomeResponsavelPadraoNaoEu } from 'helpers/fatura_helpers'
+import {
+    anexoFoiParaOutraFatura,
+    destinoFaturaDoAnexo,
+    formatCompetenciaMesAno,
+    mensagemPdfVinculadoCompetencia,
+} from 'helpers/fatura_competencia_pdf_helpers'
 import { toBandeiraSelectOption } from 'helpers/cartao_helpers'
 import {
     extractFaturaId,
@@ -340,7 +346,13 @@ const FaturasForm = () => {
     const handleCreateSuccess = (result: unknown) => {
         const faturaData = extractFaturaPayload(result)
         const envelope = result as Record<string, any> | null
-        const newId = extractFaturaId(result)
+        const destino = destinoFaturaDoAnexo(result)
+        const newId = extractFaturaId(result) ?? destino?.id
+        const form = getValues()
+        const realocado = anexoFoiParaOutraFatura(
+            { mes: form.mes, ano: form.ano },
+            destino,
+        )
 
         if (faturaPrecisaSenhaPdf(faturaData, envelope) && newId) {
             toast.info('Fatura cadastrada. Informe a senha do PDF para continuar.')
@@ -348,7 +360,11 @@ const FaturasForm = () => {
             return
         }
 
-        toast.success('Fatura cadastrada com sucesso')
+        toast.success(
+            (Boolean(arquivoFile) || realocado) && formatCompetenciaMesAno(destino)
+                ? mensagemPdfVinculadoCompetencia(destino, 'Fatura cadastrada com sucesso')
+                : 'Fatura cadastrada com sucesso'
+        )
         const nomeResp = nomeResponsavelPadraoNaoEu(faturaData)
         if (nomeResp) {
             toast.info(`Responsável "${nomeResp}" criado e aplicado nesta fatura.`)

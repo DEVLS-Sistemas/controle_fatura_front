@@ -7,6 +7,7 @@ import {
     TipoRemoverAnexo,
 } from 'interfaces/Faturas/FaturasInterface'
 import { CandidatoConciliacao } from 'interfaces/Transacoes/TransacoesInterface'
+import { resolveFaturaAnexo } from './fatura_anexo_flags'
 
 /** Etapa 2: POST `/remover-anexo` com `motivo=remover`. */
 export const POST_REMOVER_ANEXO_HABILITADO = true
@@ -38,13 +39,14 @@ export const podeRemoverAnexo = (fatura: {
     tem_csv?: boolean
     arquivo_pdf?: string | null
     arquivo_csv?: string | null
+    tipo_arquivo?: string | null
     status?: string | null
 }): boolean => {
     if (String(fatura.status ?? '').toLowerCase() === 'processando') return false
+    const { temPdf, temCsv } = resolveFaturaAnexo(fatura)
+    if (!temPdf && !temCsv) return false
     if (typeof fatura.pode_remover_anexo === 'boolean') return fatura.pode_remover_anexo
-    const temPdf = fatura.tem_pdf === true || Boolean(fatura.arquivo_pdf)
-    const temCsv = fatura.tem_csv === true || Boolean(fatura.arquivo_csv)
-    return temPdf || temCsv
+    return true
 }
 
 export const labelBotaoRemoverAnexo = (anexo: {
