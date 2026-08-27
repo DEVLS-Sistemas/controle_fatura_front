@@ -5,7 +5,8 @@ import { setActiveMenu } from 'helpers/system_helpers'
 import { useNavegacao } from 'helpers/functions_helpers'
 import {
     Badge, Breadcrumb, BreadcrumbItem, Button, Card, CardBody, Col, Container,
-    Input, Label, Row, Spinner, Table
+    DropdownItem, DropdownMenu, DropdownToggle, Input, Label, Row, Spinner, Table,
+    UncontrolledDropdown, UncontrolledTooltip,
 } from 'reactstrap'
 import { toast } from 'react-toastify'
 import {
@@ -18,6 +19,11 @@ import {
     FATURA_FILE_ACCEPT, isValidFaturaFile, resolveFaturaAnexo, downloadFaturaAnexo,
     getCategoriaFieldStyle, VALOR_TEXT_CLASS, isMeuResponsavelDisplay, nomeResponsavelPadraoNaoEu,
 } from 'helpers/fatura_helpers'
+import {
+    labelBotaoRemoverAnexo,
+    podeRemoverAnexo,
+    TOOLTIP_REMOVER_ANEXO,
+} from 'helpers/fatura_anexo_remover_helpers'
 import { isCompraAvista, isEhAssinatura } from 'helpers/assinaturas_helpers'
 import {
     contaNoTotalLinha,
@@ -43,6 +49,7 @@ import {
     CartaoLookup,
     resolveSenhaPdfMeta,
     SenhaPdfMeta,
+    TipoRemoverAnexo,
 } from 'interfaces/Faturas/FaturasInterface'
 import { NumeroListItem, ParserHomologado, PARSERS_HOMOLOGADOS_PADRAO } from 'interfaces/Cartoes/CartoesInterface'
 import { CategoriaLookup, CandidatoConciliacao, ResponsavelLookup, TransacoesList } from 'interfaces/Transacoes/TransacoesInterface'
@@ -57,6 +64,7 @@ import FaturaSenhaPdfModal from 'Components/Faturas/FaturaSenhaPdfModal'
 import FaturaSelecaoModal, { FaturaSelecaoStep } from 'Components/Faturas/FaturaSelecaoModal'
 import FaturaTitularModal from 'Components/Faturas/FaturaTitularModal'
 import FaturaParserNaoHomologadoModal from 'Components/Faturas/FaturaParserNaoHomologadoModal'
+import FaturaRemoverAnexoModal from 'Components/Faturas/FaturaRemoverAnexoModal'
 import ConciliacaoCandidatosModal from 'pages/Pages/Transacoes/ConciliacaoCandidatosModal/ConciliacaoCandidatosModal'
 import FaturaConciliacaoLinha from './FaturaConciliacaoLinha'
 import FaturaTotalizadorPendencias from './FaturaTotalizadorPendencias'
@@ -384,6 +392,8 @@ const FaturasViewPage = () => {
     const [parsersHomologados, setParsersHomologados] = useState<ParserHomologado[]>(PARSERS_HOMOLOGADOS_PADRAO)
     const [cartoesLookup, setCartoesLookup] = useState<CartaoLookup[]>([])
     const [homologModalOpen, setHomologModalOpen] = useState(false)
+    const [removerAnexoOpen, setRemoverAnexoOpen] = useState(false)
+    const [removerAnexoTipo, setRemoverAnexoTipo] = useState<TipoRemoverAnexo | null>(null)
     const homologConfirmRef = useRef<string | null>(null)
 
     const nomeDoResponsavel = (responsavelId?: number | null, responsavelNome?: string | null) => (
@@ -1013,6 +1023,11 @@ const FaturasViewPage = () => {
         }
     }
 
+    const handleOpenRemoverAnexo = (tipo: TipoRemoverAnexo) => {
+        setRemoverAnexoTipo(tipo)
+        setRemoverAnexoOpen(true)
+    }
+
     const handleDownloadAnexo = async (tipo: 'pdf' | 'csv') => {
         if (!id || !fatura) return
         try {
@@ -1532,6 +1547,7 @@ const FaturasViewPage = () => {
     const isProcessing = fatura.status === 'pendente' || fatura.status === 'processando'
     const precisaSenhaPdf = faturaPrecisaSenhaPdf(fatura)
     const anexo = resolveFaturaAnexo(fatura)
+    const podeRemover = podeRemoverAnexo(fatura)
     const competenciaAtual = fatura.competencia ?? formatPeriodo(fatura.mes, fatura.ano)
     const bandeiraLabel = fatura.bandeira || fatura.cartao_bandeira
     const coresCartao = resolveCartaoCores({
@@ -1549,6 +1565,12 @@ const FaturasViewPage = () => {
 
     return (
         <React.Fragment>
+            <FaturaRemoverAnexoModal
+                isOpen={removerAnexoOpen}
+                faturaId={id ?? null}
+                tipo={removerAnexoTipo}
+                onClose={() => setRemoverAnexoOpen(false)}
+            />
             <FaturaParserNaoHomologadoModal
                 isOpen={homologModalOpen}
                 cartaoNome={fatura.cartao_nome}
@@ -2504,6 +2526,56 @@ const FaturasViewPage = () => {
                                             Baixar CSV
                                         </Button>
                                     )}
+                                    {podeRemover && anexo.temPdf && anexo.temCsv ? (
+                                        <>
+                                            <span id="btn-remover-anexo-fatura">
+                                                <UncontrolledDropdown>
+                                                    <DropdownToggle
+                                                        color="danger"
+                                                        outline
+                                                        size="sm"
+                                                        caret
+                                                    >
+                                                        <i className="ri-delete-bin-line me-1"></i>
+                                                        Remover anexo…
+                                                    </DropdownToggle>
+                                                    <DropdownMenu end>
+                                                        <DropdownItem onClick={() => handleOpenRemoverAnexo('pdf')}>
+                                                            Remover PDF
+                                                        </DropdownItem>
+                                                        <DropdownItem onClick={() => handleOpenRemoverAnexo('csv')}>
+                                                            Remover CSV
+                                                        </DropdownItem>
+                                                        <DropdownItem onClick={() => handleOpenRemoverAnexo('ambos')}>
+                                                            Remover ambos
+                                                        </DropdownItem>
+                                                    </DropdownMenu>
+                                                </UncontrolledDropdown>
+                                            </span>
+                                            <UncontrolledTooltip placement="top" target="btn-remover-anexo-fatura">
+                                                {TOOLTIP_REMOVER_ANEXO}
+                                            </UncontrolledTooltip>
+                                        </>
+                                    ) : podeRemover ? (
+                                        <>
+                                            <span id="btn-remover-anexo-fatura">
+                                                <Button
+                                                    color="danger"
+                                                    outline
+                                                    size="sm"
+                                                    onClick={() => handleOpenRemoverAnexo(
+                                                        anexo.temCsv && !anexo.temPdf ? 'csv' : 'pdf'
+                                                    )}
+                                                >
+                                                    <i className="ri-delete-bin-line me-1"></i>
+                                                    {labelBotaoRemoverAnexo(anexo)}
+                                                </Button>
+                                            </span>
+                                            <UncontrolledTooltip placement="top" target="btn-remover-anexo-fatura">
+                                                {TOOLTIP_REMOVER_ANEXO}
+                                            </UncontrolledTooltip>
+                                        </>
+                                    ) : null}
                                     {anexo.temPdf && showPdfPreview && pdfBlobUrl && (
                                         <Button
                                             color="light"

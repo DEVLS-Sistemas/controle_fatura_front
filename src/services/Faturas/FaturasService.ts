@@ -10,8 +10,10 @@ import {
     FaturasModel,
     FaturasSearch,
     FaturasView,
+    ImpactoRemoverAnexo,
     LookupsFaturas,
     ProcessarPdfParams,
+    extractImpactoRemoverAnexo,
 } from "interfaces/Faturas/FaturasInterface"
 import { PdfSenhaError } from "../../libs/api/exceptions/PdfSenhaError"
 import { FaturaSelecaoError } from "../../libs/api/exceptions/FaturaSelecaoError"
@@ -319,6 +321,29 @@ export class FaturasService implements FaturasInterface {
                     throw new PdfSenhaError(respBody)
                 }
                 throw new ValidationError(response.body)
+            }
+            default: throw new UnexpectedError(response.message)
+        }
+    }
+
+    async getImpactoRemoverAnexo(id: number | string): Promise<ImpactoRemoverAnexo> {
+        const response = await this.httpClient.get<any>({
+            url: `${this.url}/impacto-remover-anexo/${id}`,
+        })
+        switch (response.statusCode) {
+            case HttpStatusCode.ok: {
+                const payload = extractImpactoRemoverAnexo(response.body)
+                if (!payload) throw new UnexpectedError()
+                return payload
+            }
+            case HttpStatusCode.unauthorized: throw new AccessDeniedError()
+            case HttpStatusCode.invalidForm: throw new ValidationError(response.body)
+            case HttpStatusCode.notFound: {
+                const body = response.body as Record<string, unknown> | undefined
+                const message = response.message
+                    || (typeof body?.message === 'string' ? body.message : null)
+                    || 'Impacto da remoção não encontrado'
+                throw new UnexpectedError(message)
             }
             default: throw new UnexpectedError(response.message)
         }

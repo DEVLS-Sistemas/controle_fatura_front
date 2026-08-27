@@ -65,6 +65,8 @@ export interface FaturaResumo {
     pdf_url?: string | null
     /** URL autenticada para abrir/baixar o CSV */
     csv_url?: string | null
+    /** true se tem PDF ou CSV e status !== processando */
+    pode_remover_anexo?: boolean
     status?: string
     erro_codigo?: string | null
     erro_mensagem?: string | null
@@ -225,6 +227,73 @@ export interface ExcluirTodasFaturasResponse {
     }
 }
 
+export type TipoRemoverAnexo = 'pdf' | 'csv' | 'ambos'
+
+export type MotivoRemoverAnexo = 'remover' | 'trocar_pdf'
+
+export type OrigemRestauracaoAnexo = 'desvinculo' | 'match_exato' | 'sugestao'
+
+export interface ImpactoRemoverAnexoMotivo {
+    value: MotivoRemoverAnexo | string
+    label: string
+}
+
+export interface ImpactoRemoverAnexoTotais {
+    quantidade: number
+    valor_total: number | string
+}
+
+export interface ImpactoRemoverAnexoFaturaAfetada {
+    id: number
+    competencia: string
+    quantidade: number
+    valor_total: number | string
+    ficara_vazia: boolean
+}
+
+export interface ImpactoRemoverAnexoParcelasOutras {
+    quantidade: number
+    valor_total: number | string
+    faturas_afetadas: ImpactoRemoverAnexoFaturaAfetada[]
+}
+
+export interface ImpactoRemoverAnexoCompra {
+    id: number
+    texto_compra: string
+    valor: number | string
+    data: string
+    parcela_atual?: number | null
+    parcelas_total?: number | null
+    fatura_id?: number | null
+    competencia?: string | null
+    status_conciliacao_atual?: string | null
+    status_conciliacao_depois?: string | null
+    origem_restauracao?: OrigemRestauracaoAnexo | string | null
+}
+
+export interface ImpactoRemoverAnexoStub {
+    id: number
+    competencia: string
+}
+
+/** `GET /faturas/impacto-remover-anexo/{id}` */
+export interface ImpactoRemoverAnexo {
+    fatura_id: number
+    competencia?: string | null
+    cartao_nome?: string | null
+    bandeira?: string | null
+    tem_pdf?: boolean
+    tem_csv?: boolean
+    pdf_url?: string | null
+    pode_remover?: boolean
+    motivos?: ImpactoRemoverAnexoMotivo[]
+    lancamentos_deste_anexo?: ImpactoRemoverAnexoTotais | null
+    parcelas_geradas_outras_faturas?: ImpactoRemoverAnexoParcelasOutras | null
+    compras_que_voltam_a_conciliar?: ImpactoRemoverAnexoCompra[]
+    faturas_stub_que_serao_excluidas?: ImpactoRemoverAnexoStub[]
+    avisos?: string[]
+}
+
 export interface FaturasInterface {
     getViewFaturas(params: any): Promise<FaturasView | undefined>
     listFaturasPaginate(params: FaturasSearch): Promise<any>
@@ -251,6 +320,19 @@ export interface FaturasInterface {
         confirmar_titular?: boolean
     }): Promise<any>
     processarPdf(id: number, params?: ProcessarPdfParams): Promise<any>
+    getImpactoRemoverAnexo(id: number | string): Promise<ImpactoRemoverAnexo>
+}
+
+/** Extrai `data` de `GET /impacto-remover-anexo/{id}` */
+export const extractImpactoRemoverAnexo = (result: unknown): ImpactoRemoverAnexo | null => {
+    if (!result || typeof result !== 'object') return null
+    const body = result as Record<string, unknown>
+    const nested = body.data
+    const candidate = (nested && typeof nested === 'object' && !Array.isArray(nested))
+        ? nested as Record<string, unknown>
+        : body
+    if (candidate.fatura_id == null && candidate.lancamentos_deste_anexo == null) return null
+    return candidate as unknown as ImpactoRemoverAnexo
 }
 
 /** Extrai payload de fatura aninhado em respostas `result.fatura` / `fatura.data` */
