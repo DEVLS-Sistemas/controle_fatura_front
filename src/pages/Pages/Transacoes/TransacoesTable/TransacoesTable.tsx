@@ -19,7 +19,7 @@ import {
     isMeuResponsavelDisplay,
     isTransacaoOperacional,
 } from "helpers/fatura_helpers"
-import { pathVisualizacaoDaLinha, tituloListagemCompra } from "helpers/cadastro_manual_compra_helpers"
+import { pathVisualizacaoDaLinha, tituloListagemCompra, precisaConciliarCompra, labelPrecisaConciliar, temSugestaoConciliacao, labelSugestaoConciliacao, conciliadaComManual, labelConciliadaComManual, identificadorCompraManualVinculada, pathVisualizacaoCompra } from "helpers/cadastro_manual_compra_helpers"
 import { CartaoChip } from "helpers/cartao_helpers"
 import { isCompraAvista, isEhAssinatura } from "helpers/assinaturas_helpers"
 import { SelectOptions } from "interfaces/SystemInterfaces/SelectInterface"
@@ -312,16 +312,25 @@ export const TransacoesTable = ({
                                                         <tbody>
                                                             {rows.map((row, index) => {
                                                                 const { titulo, subtitulo } = tituloListagemCompra(row)
+                                                                const precisaConciliar = precisaConciliarCompra(row)
+                                                                const sugestaoConciliacao = temSugestaoConciliacao(row)
+                                                                const conciliada = conciliadaComManual(row)
+                                                                const compraManualPath = identificadorCompraManualVinculada(row)
+                                                                    ? pathVisualizacaoCompra(identificadorCompraManualVinculada(row)!)
+                                                                    : null
                                                                 const visualizarPath = isTransacaoOperacional(row)
                                                                     ? null
-                                                                    : pathVisualizacaoDaLinha(row)
+                                                                    : (compraManualPath || pathVisualizacaoDaLinha(row))
                                                                 const tituloId = `compra-titulo-${row.id ?? index}`
                                                                 const showResponsavelNome = !isMeuResponsavel(
                                                                     row.responsavel_id,
                                                                     row.responsavel_nome
                                                                 )
                                                                 return (
-                                                                    <tr key={row.id ?? index}>
+                                                                    <tr
+                                                                        key={row.id ?? index}
+                                                                        className={precisaConciliar ? 'table-warning' : sugestaoConciliacao ? 'table-info' : undefined}
+                                                                    >
                                                                         <td>{formatDateBr(row.data)}</td>
                                                                         <td className="text-start">
                                                                             {visualizarPath ? (
@@ -342,6 +351,42 @@ export const TransacoesTable = ({
                                                                             )}
                                                                             {subtitulo ? (
                                                                                 <div className="small text-muted">{subtitulo}</div>
+                                                                            ) : null}
+                                                                            {precisaConciliar ? (
+                                                                                <div className="mt-1">
+                                                                                    <Badge
+                                                                                        color="warning"
+                                                                                        className="fw-normal"
+                                                                                        style={{ backgroundColor: '#f59e0b', borderColor: '#f59e0b', color: '#fff' }}
+                                                                                    >
+                                                                                        <i className="ri-alert-line me-1"></i>
+                                                                                        {labelPrecisaConciliar(row)}
+                                                                                    </Badge>
+                                                                                </div>
+                                                                            ) : null}
+                                                                            {sugestaoConciliacao ? (
+                                                                                <div className="mt-1">
+                                                                                    <Badge color="info" className="fw-normal">
+                                                                                        {labelSugestaoConciliacao(row)}
+                                                                                    </Badge>
+                                                                                </div>
+                                                                            ) : null}
+                                                                            {conciliada ? (
+                                                                                <div className="mt-1">
+                                                                                    {compraManualPath ? (
+                                                                                        <Link
+                                                                                            to={compraManualPath}
+                                                                                            className="badge bg-success text-decoration-none fw-normal"
+                                                                                            state={{ from: '/transacoes' }}
+                                                                                        >
+                                                                                            {labelConciliadaComManual(row)}
+                                                                                        </Link>
+                                                                                    ) : (
+                                                                                        <Badge color="success" className="fw-normal">
+                                                                                            {labelConciliadaComManual(row)}
+                                                                                        </Badge>
+                                                                                    )}
+                                                                                </div>
                                                                             ) : null}
                                                                         </td>
                                                                         <td className={VALOR_TEXT_CLASS}>{formatCurrency(row.valor)}</td>

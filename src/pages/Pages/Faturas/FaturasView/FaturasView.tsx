@@ -19,6 +19,17 @@ import {
     getCategoriaFieldStyle, VALOR_TEXT_CLASS, isMeuResponsavelDisplay, nomeResponsavelPadraoNaoEu,
 } from 'helpers/fatura_helpers'
 import { isCompraAvista, isEhAssinatura } from 'helpers/assinaturas_helpers'
+import {
+    contaNoTotalLinha,
+    identificadorCompraManualVinculada,
+    idCompraCandidato,
+    idLancamentoCandidato,
+    pathVisualizacaoCompra,
+    precisaConciliarCompra,
+    temSugestaoConciliacao,
+    tituloLinhaFatura,
+    valorContaNoTotal,
+} from 'helpers/cadastro_manual_compra_helpers'
 import { CartaoChip, BandeiraChip, resolveCartaoCores } from 'helpers/cartao_helpers'
 import { formatParsersHomologadosLista, parsersHomologadosOrFallback, resolveCartaoHomologacao } from 'helpers/parser_homologado_helpers'
 import CartaoPdfHomologacaoBadge from 'Components/Cartoes/CartaoPdfHomologacaoBadge'
@@ -33,7 +44,7 @@ import {
     SenhaPdfMeta,
 } from 'interfaces/Faturas/FaturasInterface'
 import { NumeroListItem, ParserHomologado, PARSERS_HOMOLOGADOS_PADRAO } from 'interfaces/Cartoes/CartoesInterface'
-import { CategoriaLookup, ResponsavelLookup, TransacoesList } from 'interfaces/Transacoes/TransacoesInterface'
+import { CategoriaLookup, CandidatoConciliacao, ResponsavelLookup, TransacoesList } from 'interfaces/Transacoes/TransacoesInterface'
 import { FaturasService } from 'services/Faturas/FaturasService'
 import { TransacoesService } from 'services/Transacoes/TransacoesService'
 import { SubcategoriasService } from 'services/Subcategorias/SubcategoriasService'
@@ -45,6 +56,8 @@ import FaturaSenhaPdfModal from 'Components/Faturas/FaturaSenhaPdfModal'
 import FaturaSelecaoModal, { FaturaSelecaoStep } from 'Components/Faturas/FaturaSelecaoModal'
 import FaturaTitularModal from 'Components/Faturas/FaturaTitularModal'
 import FaturaParserNaoHomologadoModal from 'Components/Faturas/FaturaParserNaoHomologadoModal'
+import ConciliacaoCandidatosModal from 'pages/Pages/Transacoes/ConciliacaoCandidatosModal/ConciliacaoCandidatosModal'
+import FaturaConciliacaoLinha from './FaturaConciliacaoLinha'
 import { PdfSenhaError } from 'libs/api/exceptions/PdfSenhaError'
 import {
     FaturaSelecaoBandeiraOption,
@@ -87,12 +100,10 @@ const compraDestinoDaFatura = (
     mes?: number | null,
     ano?: number | null
 ): string | null => {
-    if (!tx.id || isTransacaoOperacional(tx)) return null
-    const params = new URLSearchParams()
-    if (mes) params.set('mes', String(mes))
-    if (ano) params.set('ano', String(ano))
-    const qs = params.toString()
-    return qs ? `/compras/${tx.id}?${qs}` : `/compras/${tx.id}`
+    if (isTransacaoOperacional(tx)) return null
+    const identificador = identificadorCompraManualVinculada(tx) || tx.compra_grupo_id || tx.id
+    if (identificador == null || String(identificador).trim() === '') return null
+    return pathVisualizacaoCompra(String(identificador), mes, ano)
 }
 
 const OPERACIONAIS_KEY = 'operacionais'
@@ -253,12 +264,12 @@ const groupTransacoesPorFinal = (
         const current = map.get(key)
         if (current) {
             current.items.push(tx)
-            current.subtotal += Number(tx.valor ?? 0)
+            current.subtotal += valorContaNoTotal(tx)
             return
         }
         const created = makeGrupo(key, grupoChave, tx, found)
         created.items.push(tx)
-        created.subtotal = Number(tx.valor ?? 0)
+        created.subtotal = valorContaNoTotal(tx)
         map.set(key, created)
     })
 
@@ -350,6 +361,10 @@ const FaturasViewPage = () => {
     const [rowForCategoriaRapido, setRowForCategoriaRapido] = useState<TransacoesList | null>(null)
     const [rowForSubcategoriaRapido, setRowForSubcategoriaRapido] = useState<TransacoesList | null>(null)
     const [savingIds, setSavingIds] = useState<Record<number, boolean>>({})
+    const [conciliarModal, setConciliarModal] = useState<{
+        origem: 'manual' | 'lancamento'
+        tx: TransacoesList
+    } | null>(null)
     const [valorDrafts, setValorDrafts] = useState<Record<number, string>>({})
     const [observacaoDrafts, setObservacaoDrafts] = useState<Record<number, string>>({})
     /** Finais salvos na sessão “Pagamentos e Financiamentos” — não redistribui até atualizar a tela */
@@ -673,6 +688,108 @@ const FaturasViewPage = () => {
                 return
             }
             toast.error('Erro ao reprocessar fatura')
+        }
+    }
+
+    const marcarSaving = (txId: number, ativo: boolean) => {
+        setSavingIds((prev) => {
+            if (ativo) return { ...prev, [txId]: true }
+            const next = { ...prev }
+            delete next[txId]
+            return next
+        })
+    }
+
+    const recarregarAposConciliacao = async () => {
+        await loadFatura({ silent: true, openSenhaIfNeeded: false })
+    }
+
+    const compraIdDaLinha = (tx: TransacoesList): string | null =>
+        identificadorCompraManualVinculada(tx)
+        || (tx.compra_grupo_id != null && String(tx.compra_grupo_id).trim() !== '' ? String(tx.compra_grupo_id) : null)
+        || (tx.id != null ? String(tx.id) : null)
+
+    const handleConfirmarConciliacao = async (tx: TransacoesList) => {
+        if (!tx.id) return
+        const compraId = identificadorCompraManualVinculada(tx)
+        if (!compraId) {
+            setConciliarModal({ origem: 'lancamento', tx })
+            return
+        }
+        marcarSaving(tx.id, true)
+        try {
+            await transacoesService.conciliarTransacao({ compra_id: compraId, lancamento_id: tx.id })
+            toast.success('Compra conciliada com o lançamento da fatura')
+            await recarregarAposConciliacao()
+        } catch (error: any) {
+            toast.error(error?.message || 'Erro ao conciliar')
+        } finally {
+            marcarSaving(tx.id, false)
+        }
+    }
+
+    const handleEscolherConciliacao = (tx: TransacoesList) => {
+        setConciliarModal({
+            origem: precisaConciliarCompra(tx) ? 'manual' : 'lancamento',
+            tx,
+        })
+    }
+
+    const handleSelectCandidatoFatura = async (item: CandidatoConciliacao) => {
+        const tx = conciliarModal?.tx
+        if (!tx?.id || !conciliarModal) return
+        const compraId = conciliarModal.origem === 'manual'
+            ? compraIdDaLinha(tx)
+            : idCompraCandidato(item)
+        const lancamentoId = conciliarModal.origem === 'manual'
+            ? idLancamentoCandidato(item)
+            : tx.id
+        if (!compraId || !lancamentoId) {
+            toast.error('Não foi possível identificar a compra e o lançamento')
+            return
+        }
+        marcarSaving(tx.id, true)
+        try {
+            await transacoesService.conciliarTransacao({ compra_id: compraId, lancamento_id: lancamentoId })
+            toast.success('Compra conciliada com o lançamento da fatura')
+            setConciliarModal(null)
+            await recarregarAposConciliacao()
+        } catch (error: any) {
+            toast.error(error?.message || 'Erro ao conciliar')
+        } finally {
+            marcarSaving(tx.id, false)
+        }
+    }
+
+    const handleDesvincularConciliacao = async (tx: TransacoesList) => {
+        if (!tx.id) return
+        marcarSaving(tx.id, true)
+        try {
+            await transacoesService.desvincularConciliacao({
+                compra_id: identificadorCompraManualVinculada(tx) ?? tx.id,
+                lancamento_id: tx.id,
+            })
+            toast.success('Compra manual desvinculada do lançamento')
+            await recarregarAposConciliacao()
+        } catch (error: any) {
+            toast.error(error?.message || 'Erro ao desvincular')
+        } finally {
+            marcarSaving(tx.id, false)
+        }
+    }
+
+    const handleRejeitarConciliacao = async (tx: TransacoesList) => {
+        if (!tx.id) return
+        const compraId = identificadorCompraManualVinculada(tx) ?? tx.id
+        marcarSaving(tx.id, true)
+        try {
+            await transacoesService.rejeitarConciliacao({ compra_id: compraId })
+            toast.success('Sugestão rejeitada')
+            await recarregarAposConciliacao()
+        } catch (error: any) {
+            toast.error(error?.message || 'Erro ao rejeitar sugestão')
+        } finally {
+            marcarSaving(tx.id, false)
         }
     }
 
@@ -1340,9 +1457,10 @@ const FaturasViewPage = () => {
         const map = new Map<number, { id: number; nome: string; cor?: string; count: number; total: number }>()
         transacoes.forEach((tx) => {
             if (tx.categoria_id == null) return
+            if (!contaNoTotalLinha(tx)) return
             const fromLookup = categoriasLookup.find((c) => c.id === tx.categoria_id)
             const current = map.get(tx.categoria_id)
-            const valor = Number(tx.valor ?? 0)
+            const valor = valorContaNoTotal(tx)
             if (current) {
                 current.count += 1
                 current.total += valor
@@ -1955,7 +2073,7 @@ const FaturasViewPage = () => {
                                         <thead className="table-light">
                                             <tr>
                                                 <th>Data</th>
-                                                <th>Estabelecimento</th>
+                                                <th>Compra</th>
                                                 <th className={VALOR_TEXT_CLASS} style={{ minWidth: 150, maxWidth: 50 }}>Valor</th>
                                                 <th style={{ width: 90 }}>Parcelas</th>
                                                 <th>Tipo</th>
@@ -1964,7 +2082,7 @@ const FaturasViewPage = () => {
                                                 <th style={{ minWidth: 160 }}>Subcategoria</th>
                                                 <th style={{ minWidth: 250 }}>Observação</th>
                                                 <th style={{ width: 90 }} title="Responsável">Resp.</th>
-                                                <th style={{ width: 90 }}>Compra</th>
+                                                <th style={{ width: 90 }}>Ver</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -2022,6 +2140,15 @@ const FaturasViewPage = () => {
                                                         const selectFinalValue = finalSalvo ?? ''
                                                         const rowKey = tx.id ?? `${grupo.key}_${secao.key}_${idx}`
                                                         const compraTo = compraDestinoDaFatura(tx, fatura.mes, fatura.ano)
+                                                        const { titulo, subtitulo } = tituloLinhaFatura(tx)
+                                                        const precisaConciliar = precisaConciliarCompra(tx)
+                                                        const sugestaoConciliacao = temSugestaoConciliacao(tx)
+                                                        const contaNoTotal = contaNoTotalLinha(tx)
+                                                        const rowClass = precisaConciliar
+                                                            ? 'table-warning'
+                                                            : sugestaoConciliacao
+                                                                ? 'table-info'
+                                                                : undefined
                                                         return (
                                                         <React.Fragment key={rowKey}>
                                                         {isPagamentosGrupo && (
@@ -2064,13 +2191,24 @@ const FaturasViewPage = () => {
                                                                 </td>
                                                             </tr>
                                                         )}
-                                                        <tr>
+                                                        <tr className={rowClass}>
                                                             <td>{formatDateBr(tx.data)}</td>
                                                             <td className="text-start">
-                                                                <div>{tx.estabelecimento_nome ?? tx.estabelecimento ?? '-'}</div>
-                                                                {tx.loja_nome && (
-                                                                    <div className="small text-muted">{tx.loja_nome}</div>
-                                                                )}
+                                                                <div className="fw-medium">{titulo}</div>
+                                                                {subtitulo ? (
+                                                                    <div className="small text-muted">{subtitulo}</div>
+                                                                ) : null}
+                                                                <FaturaConciliacaoLinha
+                                                                    tx={tx}
+                                                                    saving={!!savingIds[tx.id!]}
+                                                                    faturaId={fatura.id}
+                                                                    mes={fatura.mes}
+                                                                    ano={fatura.ano}
+                                                                    onConfirmar={handleConfirmarConciliacao}
+                                                                    onEscolher={handleEscolherConciliacao}
+                                                                    onDesvincular={handleDesvincularConciliacao}
+                                                                    onRejeitar={handleRejeitarConciliacao}
+                                                                />
                                                             </td>
                                                             <td className={VALOR_TEXT_CLASS}>
                                                                 <Input
@@ -2081,6 +2219,7 @@ const FaturasViewPage = () => {
                                                                     min="0"
                                                                     value={tx.id != null ? (valorDrafts[tx.id] ?? '') : ''}
                                                                     disabled={!!savingIds[tx.id!]}
+                                                                    title={!contaNoTotal ? 'Não entra no total até confirmar a conciliação' : undefined}
                                                                     onChange={(e) => {
                                                                         if (!tx.id) return
                                                                         setValorDrafts((prev) => ({
@@ -2095,6 +2234,9 @@ const FaturasViewPage = () => {
                                                                         }
                                                                     }}
                                                                 />
+                                                                {!contaNoTotal ? (
+                                                                    <div className="small text-muted">Não soma no total</div>
+                                                                ) : null}
                                                             </td>
                                                             <td className="text-center text-nowrap">
                                                                 {formatParcelas(tx.parcela_atual, tx.parcelas_total)}
@@ -2244,7 +2386,9 @@ const FaturasViewPage = () => {
                                                                         to={compraTo}
                                                                         state={{ from: `/faturas/view/${fatura.id}` }}
                                                                         className="btn btn-sm btn-soft-primary"
-                                                                        title="Ver detalhes da compra"
+                                                                        title={identificadorCompraManualVinculada(tx)
+                                                                            ? 'Ver compra manual'
+                                                                            : 'Ver detalhes da compra'}
                                                                     >
                                                                         <i className="ri-eye-line me-1"></i>
                                                                         Ver
@@ -2279,6 +2423,21 @@ const FaturasViewPage = () => {
                         currentResponsavelId={rowForResponsavel?.responsavel_id}
                         onResponsaveisChange={setResponsaveisLookup}
                         onConfirm={handleConfirmResponsavel}
+                    />
+
+                    <ConciliacaoCandidatosModal
+                        isOpen={Boolean(conciliarModal)}
+                        identificador={conciliarModal
+                            ? (conciliarModal.origem === 'manual'
+                                ? compraIdDaLinha(conciliarModal.tx)
+                                : (conciliarModal.tx.id ?? null))
+                            : null}
+                        title={conciliarModal?.origem === 'manual'
+                            ? 'Qual lançamento da fatura é esta compra?'
+                            : 'Qual compra manual corresponde a este lançamento?'}
+                        saving={Boolean(conciliarModal?.tx.id && savingIds[conciliarModal.tx.id])}
+                        onClose={() => setConciliarModal(null)}
+                        onSelect={handleSelectCandidatoFatura}
                     />
 
                     <CategoriaRapidoModal

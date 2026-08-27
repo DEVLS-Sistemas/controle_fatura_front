@@ -1,34 +1,26 @@
 import React, { useState } from 'react'
-import { Badge, Button, Card, CardBody, CardHeader, Modal, ModalBody, ModalFooter, ModalHeader, Spinner } from 'reactstrap'
+import { Badge, Button, Card, CardBody, CardHeader } from 'reactstrap'
 import { toast } from 'react-toastify'
 import { formatCurrency, formatDateBr } from 'helpers/fatura_helpers'
 import {
   badgeConciliacaoColor,
   badgeConciliacaoStyle,
+  idLancamentoCandidato,
   identificadorDaCompra,
 } from 'helpers/cadastro_manual_compra_helpers'
 import { CompraVisualizacaoView } from 'interfaces/CompraVisualizacao/CompraVisualizacaoInterface'
-import { CandidatoConciliacao } from 'interfaces/Transacoes/TransacoesInterface'
 import { TransacoesService } from 'services/Transacoes/TransacoesService'
+import ConciliacaoCandidatosModal from 'pages/Pages/Transacoes/ConciliacaoCandidatosModal/ConciliacaoCandidatosModal'
 
 interface CompraVisualizacaoConciliacaoProps {
   compra: CompraVisualizacaoView
   onChanged: () => void | Promise<void>
 }
 
-const labelCandidato = (item: CandidatoConciliacao): string => {
-  const nome = item.descricao_fatura || item.descricao || item.estabelecimento_nome || `Lançamento #${item.id}`
-  const valor = item.valor != null ? formatCurrency(item.valor) : null
-  const data = item.data ? formatDateBr(item.data) : null
-  return [nome, valor, data].filter(Boolean).join(' · ')
-}
-
 const CompraVisualizacaoConciliacao = ({ compra, onChanged }: CompraVisualizacaoConciliacaoProps) => {
   const conciliacao = compra.conciliacao
   const status = String(conciliacao?.status || '').trim()
   const [modalOpen, setModalOpen] = useState(false)
-  const [candidatos, setCandidatos] = useState<CandidatoConciliacao[]>([])
-  const [loadingCandidatos, setLoadingCandidatos] = useState(false)
   const [saving, setSaving] = useState(false)
   const transacoesService = new TransacoesService()
   const compraId = identificadorDaCompra(compra)
@@ -44,26 +36,6 @@ const CompraVisualizacaoConciliacao = ({ compra, onChanged }: CompraVisualizacao
   const podeConciliar = Boolean(compraId) && status !== 'conciliada'
   const podeDesvincular = Boolean(compraId) && (status === 'conciliada' || status === 'pendente')
   const podeRejeitar = Boolean(compraId) && status === 'pendente'
-
-  const abrirCandidatos = async () => {
-    if (!compraId) return
-    setModalOpen(true)
-    setLoadingCandidatos(true)
-    try {
-      const list = await transacoesService.listCandidatosConciliacao(compraId)
-      setCandidatos(
-        [...list].sort((a, b) => {
-          if (Boolean(b.sugestao) !== Boolean(a.sugestao)) return a.sugestao ? -1 : 1
-          return Number(b.score ?? 0) - Number(a.score ?? 0)
-        })
-      )
-    } catch (error: any) {
-      toast.error(error?.message || 'Erro ao carregar lançamentos da fatura')
-      setCandidatos([])
-    } finally {
-      setLoadingCandidatos(false)
-    }
-  }
 
   const conciliar = async (lancamentoId: number) => {
     if (!compraId || saving) return
@@ -151,7 +123,7 @@ const CompraVisualizacaoConciliacao = ({ compra, onChanged }: CompraVisualizacao
 
         <div className="d-flex flex-wrap gap-2">
           {podeConciliar ? (
-            <Button color="primary" outline size="sm" onClick={abrirCandidatos} disabled={saving}>
+            <Button color="primary" outline size="sm" onClick={() => setModalOpen(true)} disabled={saving}>
               <i className="ri-link me-1"></i>
               Conciliar com lançamento
             </Button>
@@ -169,48 +141,16 @@ const CompraVisualizacaoConciliacao = ({ compra, onChanged }: CompraVisualizacao
         </div>
       </CardBody>
 
-      <Modal isOpen={modalOpen} toggle={() => !saving && setModalOpen(false)} centered size="lg">
-        <ModalHeader toggle={() => !saving && setModalOpen(false)}>
-          Conciliar com lançamento da fatura
-        </ModalHeader>
-        <ModalBody>
-          {loadingCandidatos ? (
-            <div className="text-center py-4">
-              <Spinner color="primary" />
-            </div>
-          ) : candidatos.length === 0 ? (
-            <p className="text-muted mb-0">
-              Nenhum lançamento candidato nesta fatura. Importe o PDF da fatura e tente de novo.
-            </p>
-          ) : (
-            <div className="d-flex flex-column gap-2">
-              {candidatos.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  className={`btn text-start border ${item.sugestao ? 'btn-soft-success border-success' : 'btn-light'}`}
-                  disabled={saving}
-                  onClick={() => conciliar(Number(item.lancamento_id ?? item.id))}
-                >
-                  <div className="d-flex justify-content-between gap-2">
-                    <span>{labelCandidato(item)}</span>
-                    {item.sugestao ? (
-                      <Badge color="success" pill>Sugestão</Badge>
-                    ) : item.score != null ? (
-                      <span className="text-muted fs-12">score {item.score}</span>
-                    ) : null}
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
-        </ModalBody>
-        <ModalFooter>
-          <Button color="light" onClick={() => setModalOpen(false)} disabled={saving}>
-            Cancelar
-          </Button>
-        </ModalFooter>
-      </Modal>
+      <ConciliacaoCandidatosModal
+        isOpen={modalOpen}
+        identificador={compraId}
+        saving={saving}
+        onClose={() => setModalOpen(false)}
+        onSelect={(item) => {
+          const lancamentoId = idLancamentoCandidato(item)
+          if (lancamentoId) conciliar(lancamentoId)
+        }}
+      />
     </Card>
   )
 }

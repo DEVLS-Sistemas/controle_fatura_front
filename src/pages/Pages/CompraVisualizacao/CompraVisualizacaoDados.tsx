@@ -12,7 +12,7 @@ import {
   origemCompraColor,
 } from 'helpers/fatura_helpers'
 import { CompraVisualizacaoView } from 'interfaces/CompraVisualizacao/CompraVisualizacaoInterface'
-import { faturaIdDaCompra } from 'helpers/cadastro_manual_compra_helpers'
+import { faturaIdDaCompra, LABEL_ESTABELECIMENTO_VAZIO, textoCompraDaCompra } from 'helpers/cadastro_manual_compra_helpers'
 
 interface CompraVisualizacaoDadosProps {
   compra: CompraVisualizacaoView
@@ -51,8 +51,9 @@ const DadoTile = ({
 }
 
 const CompraVisualizacaoDados = ({ compra }: CompraVisualizacaoDadosProps) => {
-  const estabelecimentoNome = compra.estabelecimento?.nome
+  const estabelecimentoNome = compra.estabelecimento?.nome?.trim() || LABEL_ESTABELECIMENTO_VAZIO
   const lojaNome = compra.estabelecimento?.loja_nome
+  const textoCompra = textoCompraDaCompra(compra)
   const digitos = ultimosDigitosCartao(compra)
   const categoriaStyle = getCategoriaFieldStyle(compra.categoria?.cor)
   const origemLabel = compra.origem_compra_label || compra.origem_compra
@@ -158,8 +159,8 @@ const CompraVisualizacaoDados = ({ compra }: CompraVisualizacaoDadosProps) => {
           <DadoTile
             icon="ri-text"
             tone="primary"
-            label="Descrição"
-            value={compra.descricao}
+            label="O que foi comprado"
+            value={textoCompra || null}
           />
           <DadoTile
             icon="ri-bank-card-line"
@@ -172,9 +173,9 @@ const CompraVisualizacaoDados = ({ compra }: CompraVisualizacaoDadosProps) => {
             tone="warning"
             label="Estabelecimento"
             value={estabelecimentoNome}
-            extra={lojaNome ? `Loja: ${lojaNome}` : null}
+            extra={lojaNome && estabelecimentoNome !== LABEL_ESTABELECIMENTO_VAZIO ? `Loja: ${lojaNome}` : null}
           />
-          {!estabelecimentoNome && lojaNome ? (
+          {estabelecimentoNome === LABEL_ESTABELECIMENTO_VAZIO && lojaNome ? (
             <DadoTile icon="ri-building-2-line" tone="warning" label="Loja" value={lojaNome} />
           ) : null}
           <DadoTile
@@ -223,7 +224,7 @@ const CompraVisualizacaoDados = ({ compra }: CompraVisualizacaoDadosProps) => {
           ) : null}
         </Row>
 
-        {compra.observacoes && compra.observacoes !== compra.descricao ? (
+        {compra.observacoes && compra.observacoes !== textoCompra ? (
           <div className="compra-dados-obs mt-3">
             <span className="compra-dado-tile__label">Observação</span>
             <p className="mb-0 mt-1" style={{ whiteSpace: 'pre-wrap' }}>

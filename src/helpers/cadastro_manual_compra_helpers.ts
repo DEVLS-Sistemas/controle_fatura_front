@@ -82,6 +82,7 @@ export const pathVisualizacaoDaLinha = (row: {
 }
 
 export const tituloListagemCompra = (row: {
+  texto_compra?: string | null
   descricao?: string | null
   observacoes?: string | null
   descricao_fatura?: string | null
@@ -89,21 +90,197 @@ export const tituloListagemCompra = (row: {
   estabelecimento?: string | null
   loja_nome?: string | null
 }): TituloListagemCompra => {
-  const descricao = String(row.descricao ?? '').trim()
-  const observacoes = String(row.observacoes ?? '').trim()
+  const textoCompra = String(row.texto_compra ?? row.observacoes ?? row.descricao ?? '').trim()
   const estabelecimento = String(row.estabelecimento_nome ?? row.estabelecimento ?? '').trim()
   const loja = String(row.loja_nome ?? '').trim()
   const descricaoFatura = String(row.descricao_fatura ?? '').trim()
-  const titulo = descricao || observacoes || estabelecimento || '—'
+  const titulo = textoCompra || estabelecimento || '—'
+  const estabelecimentoLabel = estabelecimento || '—'
 
   const subParts = [
-    descricaoFatura && descricaoFatura !== titulo ? descricaoFatura : null,
-    !descricaoFatura && estabelecimento && estabelecimento !== titulo ? estabelecimento : null,
+    textoCompra ? `Estabelecimento ${estabelecimentoLabel}` : null,
+    !textoCompra && descricaoFatura && descricaoFatura !== titulo ? descricaoFatura : null,
     loja && loja !== estabelecimento && loja !== titulo ? loja : null,
   ].filter(Boolean)
 
   return { titulo, subtitulo: subParts.join(' · ') || null }
 }
+
+export const precisaConciliarCompra = (row?: {
+  precisa_conciliar?: boolean | null
+  compra_manual?: boolean | null
+  importada_pdf?: boolean | null
+  status_conciliacao?: string | null
+} | null): boolean => {
+  if (!row) return false
+  if (row.precisa_conciliar === true) return true
+  if (row.precisa_conciliar === false) return false
+  const status = String(row.status_conciliacao ?? '').trim()
+  if (status === 'conciliada' || status === 'rejeitada') return false
+  const manual = row.compra_manual === true || row.importada_pdf === false
+  if (!manual) return false
+  return status === 'nao_conciliada' || status === 'pendente' || !status
+}
+
+export const labelPrecisaConciliar = (row?: {
+  precisa_conciliar_label?: string | null
+} | null): string =>
+  String(row?.precisa_conciliar_label ?? '').trim() || 'Compra manual · conciliar com a fatura'
+
+export const contaNoTotalLinha = (row?: { conta_no_total?: boolean | null } | null): boolean => {
+  if (!row) return true
+  return row.conta_no_total !== false
+}
+
+export const valorContaNoTotal = (row?: { conta_no_total?: boolean | null; valor?: number | string | null } | null): number =>
+  contaNoTotalLinha(row) ? Number(row?.valor ?? 0) : 0
+
+export const identificadorCompraManualVinculada = (row?: {
+  compra_manual_vinculada?: {
+    id?: number | string | null
+    compra_grupo_id?: string | number | null
+  } | null
+} | null): string | null => {
+  const vinculada = row?.compra_manual_vinculada
+  if (!vinculada) return null
+  const id = vinculada.compra_grupo_id ?? vinculada.id
+  if (id == null || String(id).trim() === '') return null
+  return String(id)
+}
+
+export const conciliadaComManual = (row?: {
+  conciliada_com_manual?: boolean | null
+  compra_manual_vinculada?: { id?: number | string | null } | null
+  status_conciliacao?: string | null
+  compra_manual?: boolean | null
+} | null): boolean => {
+  if (!row) return false
+  if (row.conciliada_com_manual === true) return true
+  if (row.conciliada_com_manual === false) return false
+  if (row.compra_manual === true) return false
+  return Boolean(identificadorCompraManualVinculada(row)) && String(row.status_conciliacao ?? '') === 'conciliada'
+}
+
+export const labelConciliadaComManual = (row?: {
+  conciliada_com_manual_label?: string | null
+} | null): string =>
+  String(row?.conciliada_com_manual_label ?? '').trim() || 'Conciliada com compra manual'
+
+export const temSugestaoConciliacao = (row?: {
+  tem_sugestao_conciliacao?: boolean | null
+  sugestao_conciliacao_label?: string | null
+  status_conciliacao?: string | null
+  compra_manual?: boolean | null
+  precisa_conciliar?: boolean | null
+  importada_pdf?: boolean | null
+} | null): boolean => {
+  if (!row || precisaConciliarCompra(row) || conciliadaComManual(row)) return false
+  if (row.tem_sugestao_conciliacao === true) return true
+  if (row.tem_sugestao_conciliacao === false) return false
+  return String(row.status_conciliacao ?? '') === 'pendente'
+}
+
+export const labelSugestaoConciliacao = (row?: {
+  sugestao_conciliacao_label?: string | null
+  compra_manual_vinculada?: { texto_compra?: string | null; observacoes?: string | null } | null
+} | null): string => {
+  const label = String(row?.sugestao_conciliacao_label ?? '').trim()
+  if (label) return label
+  const texto = String(
+    row?.compra_manual_vinculada?.texto_compra
+    ?? row?.compra_manual_vinculada?.observacoes
+    ?? ''
+  ).trim()
+  return texto
+    ? `Pode ser a compra manual «${texto}»`
+    : 'Pode ser uma compra manual desta fatura'
+}
+
+export const tituloLinhaFatura = (row: {
+  texto_compra?: string | null
+  descricao?: string | null
+  observacoes?: string | null
+  descricao_fatura?: string | null
+  estabelecimento_nome?: string | null
+  estabelecimento?: string | null
+  loja_nome?: string | null
+  compra_manual?: boolean | null
+  precisa_conciliar?: boolean | null
+  importada_pdf?: boolean | null
+  status_conciliacao?: string | null
+  compra_manual_vinculada?: {
+    texto_compra?: string | null
+    observacoes?: string | null
+  } | null
+}): TituloListagemCompra => {
+  if (precisaConciliarCompra(row) || row.compra_manual === true) {
+    return tituloListagemCompra(row)
+  }
+  const estabelecimento = String(
+    row.estabelecimento_nome ?? row.estabelecimento ?? row.descricao_fatura ?? ''
+  ).trim()
+  const textoManual = String(
+    row.compra_manual_vinculada?.texto_compra
+    ?? row.compra_manual_vinculada?.observacoes
+    ?? row.texto_compra
+    ?? row.observacoes
+    ?? ''
+  ).trim()
+  const titulo = estabelecimento || textoManual || String(row.descricao ?? '').trim() || '—'
+  const subtitulo = textoManual && textoManual !== titulo ? textoManual : null
+  return { titulo, subtitulo }
+}
+
+export const idLancamentoCandidato = (item: {
+  lancamento_id?: number | string | null
+  id?: number | string | null
+}): number | null => {
+  const id = item.lancamento_id ?? item.id
+  const n = Number(id)
+  return Number.isFinite(n) && n > 0 ? n : null
+}
+
+export const idCompraCandidato = (item: {
+  compra_id?: number | string | null
+  compra_grupo_id?: string | number | null
+  id?: number | string | null
+}): string | null => {
+  const id = item.compra_grupo_id ?? item.compra_id ?? item.id
+  if (id == null || String(id).trim() === '') return null
+  return String(id)
+}
+
+export const labelCandidatoConciliacao = (item: {
+  texto_compra?: string | null
+  observacoes?: string | null
+  descricao_fatura?: string | null
+  descricao?: string | null
+  estabelecimento_nome?: string | null
+  valor?: number | string | null
+  data?: string | null
+  id?: number | string | null
+}): string => {
+  const nome = String(
+    item.texto_compra
+    ?? item.observacoes
+    ?? item.descricao_fatura
+    ?? item.descricao
+    ?? item.estabelecimento_nome
+    ?? ''
+  ).trim() || `Lançamento #${item.id ?? ''}`
+  return nome
+}
+
+export const textoCompraDaCompra = (compra?: {
+  texto_compra?: string | null
+  observacoes?: string | null
+  descricao?: string | null
+  titulo?: string | null
+} | null): string =>
+  String(compra?.texto_compra ?? compra?.observacoes ?? compra?.descricao ?? compra?.titulo ?? '').trim()
+
+export const LABEL_ESTABELECIMENTO_VAZIO = '—'
+
 
 export const faturaIdDaCompra = (compra?: CompraVisualizacaoView | null): number | null => {
   const id =
@@ -178,12 +355,8 @@ export const compraToEditSource = (compra: CompraVisualizacaoView): Partial<Tran
     responsavel_id: compra.responsavel?.id ?? null,
     responsavel_nome: compra.responsavel?.nome,
     responsavel_tipo: compra.responsavel?.tipo ?? undefined,
-    observacoes: compra.observacoes ?? null,
-    descricao: compra.descricao
-      ?? (compra.titulo_origem === 'descricao' || compra.titulo_origem === 'observacoes'
-        ? compra.titulo
-        : null)
-      ?? null,
+    observacoes: compra.observacoes ?? compra.texto_compra ?? compra.descricao ?? compra.titulo ?? null,
+    descricao: compra.descricao ?? compra.texto_compra ?? compra.observacoes ?? null,
     cartao_nome: compra.cartao?.nome,
   }
 }

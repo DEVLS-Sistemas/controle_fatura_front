@@ -84,6 +84,17 @@ export interface TransacoesList {
     status_conciliacao?: string | null
     status_conciliacao_label?: string | null
     observacoes?: string
+    texto_compra?: string | null
+    compra_manual?: boolean | null
+    precisa_conciliar?: boolean | null
+    precisa_conciliar_label?: string | null
+    tem_sugestao_conciliacao?: boolean | null
+    sugestao_conciliacao_label?: string | null
+    compra_manual_vinculada?: CompraManualVinculada | null
+    conciliada_com_manual?: boolean | null
+    conciliada_com_manual_label?: string | null
+    conta_no_total?: boolean | null
+    importada_pdf?: boolean | null
     /** Repasse do responsável (não confundir com quitação da bandeira) */
     valor_pago_repasse?: number | null
     valor_aberto_repasse?: number | null
@@ -133,6 +144,7 @@ export interface TransacoesModel {
     /** Nome amigável da compra (obrigatório no cadastro manual) */
     descricao?: string | null
     observacoes?: string | null
+    texto_compra?: string | null
 }
 
 export interface CategoriaLookup {
@@ -219,8 +231,8 @@ export interface TransacoesInterface {
     getLookupsTransacoes(): Promise<LookupsTransacoes | undefined>
     exportCsv(params: TransacoesSearch): Promise<Blob>
     listCandidatosConciliacao(identificador: string | number): Promise<CandidatoConciliacao[]>
-    conciliarTransacao(params: { compra_id: string | number; lancamento_id: number }): Promise<any>
-    desvincularConciliacao(params: { compra_id: string | number }): Promise<any>
+    conciliarTransacao(params: ConciliarTransacaoParams): Promise<any>
+    desvincularConciliacao(params: DesvincularConciliacaoParams): Promise<any>
     rejeitarConciliacao(params: { compra_id: string | number }): Promise<any>
     listAnexosTransacao(params: { transacao_id?: number | string; identificador?: string | number }): Promise<CompraAnexo[]>
     uploadAnexosTransacao(params: {
@@ -236,11 +248,34 @@ export interface TransacoesInterface {
 
 export type StatusConciliacao = 'nao_conciliada' | 'pendente' | 'conciliada' | 'rejeitada'
 
+export interface CompraManualVinculada {
+    id?: number | string | null
+    texto_compra?: string | null
+    observacoes?: string | null
+    status_conciliacao?: string | null
+    compra_grupo_id?: string | number | null
+}
+
+export interface ConciliarTransacaoParams {
+    compra_id: string | number
+    lancamento_id: string | number
+}
+
+export interface DesvincularConciliacaoParams {
+    compra_id?: string | number
+    lancamento_id?: string | number
+    id?: string | number
+}
+
 export interface CandidatoConciliacao {
     id: number
     lancamento_id?: number | null
+    compra_id?: number | string | null
+    compra_grupo_id?: string | number | null
     descricao?: string | null
     descricao_fatura?: string | null
+    texto_compra?: string | null
+    observacoes?: string | null
     estabelecimento_nome?: string | null
     valor?: number | string | null
     data?: string | null

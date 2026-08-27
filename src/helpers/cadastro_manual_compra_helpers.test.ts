@@ -1,4 +1,5 @@
 import {
+  contaNoTotalLinha,
   dataCaiForaDaFaturaAberta,
   faturaAbertaDoSource,
   faturaIdDaCompra,
@@ -6,7 +7,10 @@ import {
   mensagemAposCadastro,
   pathVisualizacaoCompra,
   pathVisualizacaoDaLinha,
+  temSugestaoConciliacao,
+  tituloLinhaFatura,
   tituloListagemCompra,
+  valorContaNoTotal,
 } from './cadastro_manual_compra_helpers'
 
 describe('identificadorAposCadastro', () => {
@@ -70,30 +74,28 @@ describe('pathVisualizacaoCompra', () => {
 })
 
 describe('tituloListagemCompra', () => {
-  it('usa descricao como título e o nome da fatura como subtítulo', () => {
-    expect(tituloListagemCompra({
-      descricao: 'Mouse Logitech',
-      observacoes: 'Garantia',
-      descricao_fatura: 'PAG*LOJA XYZ',
-      estabelecimento_nome: 'PAG*LOJA XYZ',
-    })).toEqual({
-      titulo: 'Mouse Logitech',
-      subtitulo: 'PAG*LOJA XYZ',
-    })
-  })
-
-  it('usa observações como título quando não há descricao', () => {
+  it('usa observacoes como título e estabelecimento em traço', () => {
     expect(tituloListagemCompra({
       observacoes: 'Mouse Logitech',
-      estabelecimento_nome: 'PAG*LOJA XYZ',
-      loja_nome: 'Magazine',
+      descricao: 'Mouse Logitech',
     })).toEqual({
       titulo: 'Mouse Logitech',
-      subtitulo: 'PAG*LOJA XYZ · Magazine',
+      subtitulo: 'Estabelecimento —',
     })
   })
 
-  it('cai no estabelecimento quando não há descrição', () => {
+  it('mostra o estabelecimento só depois da conciliação', () => {
+    expect(tituloListagemCompra({
+      texto_compra: 'Mouse Logitech',
+      observacoes: 'Mouse Logitech',
+      estabelecimento_nome: 'PAG*LOJA XYZ',
+    })).toEqual({
+      titulo: 'Mouse Logitech',
+      subtitulo: 'Estabelecimento PAG*LOJA XYZ',
+    })
+  })
+
+  it('cai no estabelecimento quando não há texto da compra', () => {
     expect(tituloListagemCompra({
       estabelecimento_nome: 'Magazine',
       loja_nome: 'Magazine Luiza',
@@ -101,6 +103,49 @@ describe('tituloListagemCompra', () => {
       titulo: 'Magazine',
       subtitulo: 'Magazine Luiza',
     })
+  })
+})
+
+describe('tituloLinhaFatura', () => {
+  it('na compra manual usa o texto da compra', () => {
+    expect(tituloLinhaFatura({
+      compra_manual: true,
+      precisa_conciliar: true,
+      observacoes: 'Mouse Logitech',
+    })).toEqual({
+      titulo: 'Mouse Logitech',
+      subtitulo: 'Estabelecimento —',
+    })
+  })
+
+  it('no lançamento do PDF usa o estabelecimento e a compra manual no subtítulo', () => {
+    expect(tituloLinhaFatura({
+      estabelecimento_nome: 'PAG*LOJA XYZ',
+      compra_manual_vinculada: { texto_compra: 'Mouse Logitech' },
+    })).toEqual({
+      titulo: 'PAG*LOJA XYZ',
+      subtitulo: 'Mouse Logitech',
+    })
+  })
+})
+
+describe('contaNoTotalLinha / temSugestaoConciliacao', () => {
+  it('não conta no total quando a API marca conta_no_total false', () => {
+    expect(contaNoTotalLinha({ conta_no_total: false })).toBe(false)
+    expect(valorContaNoTotal({ conta_no_total: false, valor: 249.9 })).toBe(0)
+    expect(valorContaNoTotal({ valor: 249.9 })).toBe(249.9)
+  })
+
+  it('reconhece sugestão no lançamento do PDF, não na compra manual', () => {
+    expect(temSugestaoConciliacao({
+      tem_sugestao_conciliacao: true,
+      sugestao_conciliacao_label: 'Pode ser a compra manual «Mouse Logitech»',
+    })).toBe(true)
+    expect(temSugestaoConciliacao({
+      compra_manual: true,
+      precisa_conciliar: true,
+      tem_sugestao_conciliacao: true,
+    })).toBe(false)
   })
 })
 

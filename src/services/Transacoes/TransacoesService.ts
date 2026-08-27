@@ -208,7 +208,7 @@ export class TransacoesService implements TransacoesInterface {
         }
     }
 
-    async conciliarTransacao(params: { compra_id: string | number; lancamento_id: number }) {
+    async conciliarTransacao(params: { compra_id: string | number; lancamento_id: string | number }) {
         const response = await this.httpClient.post({
             url: this.url + '/conciliar',
             body: params,
@@ -216,10 +216,18 @@ export class TransacoesService implements TransacoesInterface {
         return unwrapMutation(response, 'Erro ao conciliar')
     }
 
-    async desvincularConciliacao(params: { compra_id: string | number }) {
+    async desvincularConciliacao(params: {
+        compra_id?: string | number
+        lancamento_id?: string | number
+        id?: string | number
+    }) {
+        const body: Record<string, unknown> = {}
+        if (params.compra_id != null) body.compra_id = params.compra_id
+        if (params.lancamento_id != null) body.lancamento_id = params.lancamento_id
+        if (params.id != null) body.id = params.id
         const response = await this.httpClient.post({
             url: this.url + '/desvincular',
-            body: params,
+            body,
         })
         return unwrapMutation(response, 'Erro ao desvincular')
     }

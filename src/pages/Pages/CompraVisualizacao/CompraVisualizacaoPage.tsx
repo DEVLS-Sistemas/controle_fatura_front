@@ -27,6 +27,10 @@ import {
   faturaIdDaCompra,
   badgeConciliacaoColor,
   badgeConciliacaoStyle,
+  precisaConciliarCompra,
+  labelPrecisaConciliar,
+  textoCompraDaCompra,
+  LABEL_ESTABELECIMENTO_VAZIO,
 } from 'helpers/cadastro_manual_compra_helpers'
 import CompraVisualizacaoResumo from './CompraVisualizacaoResumo'
 import CompraVisualizacaoDados from './CompraVisualizacaoDados'
@@ -223,15 +227,16 @@ const CompraVisualizacaoPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [identificador, mesParam, anoParam])
 
-  const titulo = compra?.titulo || compra?.descricao || 'Visualização da compra'
-  const subtituloEstabelecimento =
-    compra?.descricao_fatura
-    && compra.descricao_fatura !== titulo
-      ? compra.descricao_fatura
-      : (compra?.titulo_origem === 'descricao' || compra?.titulo_origem === 'observacoes'
-        ? compra.estabelecimento?.nome || compra.estabelecimento?.loja_nome
-        : null)
+  const titulo = textoCompraDaCompra(compra) || 'Visualização da compra'
+  const estabelecimentoNome = compra?.estabelecimento?.nome?.trim()
+  const subtituloEstabelecimento = `Estabelecimento ${estabelecimentoNome || LABEL_ESTABELECIMENTO_VAZIO}`
   const statusConciliacao = compra?.conciliacao?.status
+  const precisaConciliar = precisaConciliarCompra({
+    precisa_conciliar: compra?.precisa_conciliar,
+    compra_manual: compra?.compra_manual,
+    importada_pdf: compra?.importada_pdf,
+    status_conciliacao: statusConciliacao,
+  })
   const faturaId = faturaIdDaCompra(compra)
   const ehParcelada = Boolean(compra?.compra_grupo_id) && !compra?.avista
 
@@ -268,7 +273,16 @@ const CompraVisualizacaoPage = () => {
                           Quitada
                         </Badge>
                       ) : null}
-                      {compra && compra.importada_pdf === true ? (
+                      {precisaConciliar ? (
+                        <Badge
+                          color="warning"
+                          pill
+                          style={{ backgroundColor: '#f59e0b', borderColor: '#f59e0b', color: '#fff' }}
+                        >
+                          <i className="ri-alert-line me-1"></i>
+                          {labelPrecisaConciliar(compra)}
+                        </Badge>
+                      ) : compra && compra.importada_pdf === true ? (
                         <Badge color="info" pill>
                           Importada da fatura
                         </Badge>
@@ -356,6 +370,17 @@ const CompraVisualizacaoPage = () => {
             </Card>
           ) : compra ? (
             <React.Fragment>
+              {precisaConciliar ? (
+                <div className="alert alert-warning d-flex align-items-start gap-2 mb-3">
+                  <i className="ri-alert-line fs-18 mt-1"></i>
+                  <div>
+                    <strong>{labelPrecisaConciliar(compra)}</strong>
+                    <div className="small mb-0">
+                      Compra lançada à mão. O estabelecimento aparece como {LABEL_ESTABELECIMENTO_VAZIO} até conciliar com o lançamento da fatura.
+                    </div>
+                  </div>
+                </div>
+              ) : null}
               <CompraVisualizacaoResumo compra={compra} />
               <CompraVisualizacaoConciliacao
                 compra={compra}

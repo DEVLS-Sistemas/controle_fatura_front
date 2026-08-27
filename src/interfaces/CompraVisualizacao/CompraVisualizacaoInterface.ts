@@ -136,6 +136,10 @@ export interface CompraVisualizacaoView {
   descricao?: string | null
   descricao_fatura?: string | null
   observacoes?: string | null
+  texto_compra?: string | null
+  compra_manual?: boolean | null
+  precisa_conciliar?: boolean | null
+  precisa_conciliar_label?: string | null
   data_compra?: string | null
   tipo?: string | null
   tipo_label?: string | null

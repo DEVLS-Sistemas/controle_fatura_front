@@ -107,12 +107,10 @@ const TransacoesForm = () => {
             eh_assinatura: source.eh_assinatura != null
                 ? isEhAssinatura(source.eh_assinatura)
                 : source.origem_compra === 'PAGAMENTO_SERVICOS',
-            descricao: source.descricao
-                ?? ((source.tipo ?? 'purchase') === 'purchase' && !source.descricao ? source.observacoes : null)
+            observacoes: source.observacoes
+                ?? source.texto_compra
+                ?? source.descricao
                 ?? null,
-            observacoes: source.descricao
-                ? (source.observacoes ?? null)
-                : ((source.tipo ?? 'purchase') === 'purchase' ? null : (source.observacoes ?? null)),
             valor: toPrecoDigits(source.valor ?? source.valor_compra),
             valor_compra: toPrecoDigits(source.valor_compra ?? source.valor),
             parcelas_total: source.parcelas_total ?? 1,
@@ -181,7 +179,6 @@ const TransacoesForm = () => {
     const parcelasTotalWatch = watch('parcelas_total')
     const origemCompraWatch = watch('origem_compra')
     const faturaIdWatch = watch('fatura_id')
-    const descricaoWatch = watch('descricao')
     const observacoesWatch = watch('observacoes')
     const propagarGrupo = watch('propagar_grupo')
 
@@ -630,11 +627,10 @@ const TransacoesForm = () => {
                 return
             }
 
+            const textoCompra = String(data.observacoes ?? observacoesWatch ?? '').trim()
             const estabelecimentoNome = String(data.estabelecimento ?? '').trim()
-            const descricao = String(data.descricao ?? descricaoWatch ?? '').trim()
-            const observacoes = String(data.observacoes ?? observacoesWatch ?? '').trim()
 
-            if (isCompraFlow && !descricao) {
+            if (isCompraFlow && !textoCompra) {
                 toast.warning('Informe a descrição da compra')
                 return
             }
@@ -647,8 +643,6 @@ const TransacoesForm = () => {
                     cartao_numero_id: data.cartao_numero_id || null,
                     fatura_id: data.fatura_id,
                     data: data.data,
-                    estabelecimento_id: data.estabelecimento_id,
-                    estabelecimento: data.estabelecimento_id ? undefined : (estabelecimentoNome || undefined),
                     valor: toCentavos(data.valor ?? data.valor_compra) / 100,
                     tipo: isCompraFlow ? 'purchase' : data.tipo,
                     origem_compra: data.origem_compra,
@@ -656,12 +650,20 @@ const TransacoesForm = () => {
                     categoria_id: data.categoria_id,
                     subcategoria_id: data.categoria_id ? data.subcategoria_id : null,
                     responsavel_id: data.responsavel_id,
-                    descricao: descricao || undefined,
-                    observacoes: observacoes || undefined,
+                    observacoes: textoCompra || undefined,
+                    descricao: isCompraFlow ? (textoCompra || undefined) : undefined,
                     propagar_grupo: Boolean(data.propagar_grupo && record.compra_grupo_id),
                 }
-                if (payload.estabelecimento_id) {
-                    delete (payload as any).estabelecimento
+                if (isCompraFlow) {
+                    if (record.estabelecimento_id) {
+                        payload.estabelecimento_id = record.estabelecimento_id
+                    }
+                } else {
+                    payload.estabelecimento_id = data.estabelecimento_id
+                    payload.estabelecimento = data.estabelecimento_id ? undefined : (estabelecimentoNome || undefined)
+                    if (payload.estabelecimento_id) {
+                        delete (payload as any).estabelecimento
+                    }
                 }
                 const result = await transacoesService.editTransacoes(payload)
                 toast.success(mensagemAposCadastro(result, 'Compra atualizada com sucesso'))
@@ -695,14 +697,16 @@ const TransacoesForm = () => {
                 categoria_id: data.categoria_id || undefined,
                 subcategoria_id: data.categoria_id ? (data.subcategoria_id || undefined) : undefined,
                 responsavel_id: data.responsavel_id || undefined,
-                descricao: descricao || undefined,
-                observacoes: observacoes || undefined,
+                observacoes: textoCompra || undefined,
+                descricao: textoCompra || undefined,
             }
 
-            if (data.estabelecimento_id) {
-                payload.estabelecimento_id = data.estabelecimento_id
-            } else if (estabelecimentoNome) {
-                payload.estabelecimento = estabelecimentoNome
+            if (!isCompraFlow) {
+                if (data.estabelecimento_id) {
+                    payload.estabelecimento_id = data.estabelecimento_id
+                } else if (estabelecimentoNome) {
+                    payload.estabelecimento = estabelecimentoNome
+                }
             }
 
             if (data.fatura_id) {
@@ -900,17 +904,17 @@ const TransacoesForm = () => {
                                             <Row>
                                                 <Col md={12}>
                                                     <div className="mb-3">
-                                                        <Label htmlFor="descricao" className="form-label">
+                                                        <Label htmlFor="observacoes" className="form-label">
                                                             Descrição da compra
                                                         </Label>
                                                         <textarea
-                                                            {...register('descricao', { required: required })}
+                                                            {...register('observacoes', { required: required })}
                                                             className="form-control"
                                                             rows={2}
                                                             placeholder="Ex.: Mouse Logitech"
                                                         />
                                                         <small className="text-muted">
-                                                            Nome que você reconhece. Não precisa ser o texto da fatura.
+                                                            O que foi comprado. Não é o nome do estabelecimento da fatura — isso entra na conciliação.
                                                         </small>
                                                     </div>
                                                 </Col>
@@ -1024,21 +1028,18 @@ const TransacoesForm = () => {
                                             ) : null}
                                         </Row>
                                         <Row>
+                                            {!isCompraFlow ? (
                                             <Col md={5}>
                                                 <div className="mb-3">
-                                                    <Label htmlFor="estabelecimento_id" className="form-label">
-                                                        Estabelecimento <span className="text-muted fw-normal">(opcional)</span>
-                                                    </Label>
+                                                    <Label htmlFor="estabelecimento_id" className="form-label">Estabelecimento</Label>
                                                     <AsyncSelectListControlled<TransacoesModel>
                                                         callback={searchEstabelecimentos}
                                                         field="estabelecimento_id"
                                                         control={control}
+                                                        required={!String(estabelecimentoTexto ?? '').trim() ? required : undefined}
                                                         defaultValue={estabelecimentoDefault}
                                                         placeholder="Digite para buscar..."
                                                     />
-                                                    <small className="text-muted d-block">
-                                                        Não precisa ser o nome da fatura. Se deixar em branco, usamos a descrição.
-                                                    </small>
                                                     {!estabelecimentoId ? (
                                                         <div className="mt-2">
                                                             <Label htmlFor="estabelecimento" className="form-label small mb-1">
@@ -1048,7 +1049,7 @@ const TransacoesForm = () => {
                                                                 id="estabelecimento"
                                                                 type="text"
                                                                 className="form-control"
-                                                                placeholder="Ex.: Magazine ou Mouse Logitech"
+                                                                placeholder="Nome do estabelecimento"
                                                                 {...register('estabelecimento')}
                                                             />
                                                         </div>
@@ -1064,14 +1065,10 @@ const TransacoesForm = () => {
                                                             Usar um nome novo em vez deste
                                                         </button>
                                                     )}
-                                                    {estabelecimentoId ? null : String(estabelecimentoTexto ?? '').trim() ? (
-                                                        <small className="text-success d-block mt-1">
-                                                            Vai cadastrar: {String(estabelecimentoTexto).trim()}
-                                                        </small>
-                                                    ) : null}
                                                 </div>
                                             </Col>
-                                            <Col md={3}>
+                                            ) : null}
+                                            <Col md={isCompraFlow ? 4 : 3}>
                                                 <div className="mb-3">
                                                     <Label htmlFor="origem_compra" className="form-label">Origem da compra</Label>
                                                     <SelectListControlled<TransacoesModel>
@@ -1097,7 +1094,7 @@ const TransacoesForm = () => {
                                                     ) : null}
                                                 </div>
                                             </Col>
-                                            <Col md={2}>
+                                            <Col md={isCompraFlow ? 4 : 2}>
                                                 <div className="mb-3">
                                                     <Label htmlFor="valor_compra" className="form-label">
                                                         {isEdit ? 'Valor' : 'Valor da compra'}
@@ -1121,7 +1118,7 @@ const TransacoesForm = () => {
                                                     )}
                                                 </div>
                                             </Col>
-                                            <Col md={2}>
+                                            <Col md={isCompraFlow ? 4 : 2}>
                                                 <div className="mb-3">
                                                     <Label className="form-label text-muted">Responsável</Label>
                                                     <div>
@@ -1327,23 +1324,7 @@ const TransacoesForm = () => {
                                             </Row>
                                         )}
 
-                                        {isCompraFlow ? (
-                                        <Row>
-                                            <Col md={12}>
-                                                <div className="mb-3">
-                                                    <Label htmlFor="observacoes" className="form-label">
-                                                        Observações <span className="text-muted fw-normal">(opcional)</span>
-                                                    </Label>
-                                                    <textarea
-                                                        {...register('observacoes')}
-                                                        className="form-control"
-                                                        rows={2}
-                                                        placeholder="Texto extra — não substitui a descrição"
-                                                    />
-                                                </div>
-                                            </Col>
-                                        </Row>
-                                        ) : (
+                                        {!isCompraFlow ? (
                                         <Row>
                                             <Col md={12}>
                                                 <div className="mb-3">
@@ -1357,7 +1338,7 @@ const TransacoesForm = () => {
                                                 </div>
                                             </Col>
                                         </Row>
-                                        )}
+                                        ) : null}
 
                                         {isEdit && record.compra_grupo_id && (
                                             <Row>
@@ -1371,7 +1352,7 @@ const TransacoesForm = () => {
                                                             onChange={(e) => setValue('propagar_grupo', e.target.checked)}
                                                         />
                                                         <Label className="form-check-label" htmlFor="propagar_grupo">
-                                                            Aplicar estabelecimento, origem, final do cartão, categoria, responsável e observação a todas as parcelas da compra
+                                                            Aplicar origem, final do cartão, categoria, responsável e observação a todas as parcelas da compra
                                                         </Label>
                                                     </div>
                                                 </Col>
