@@ -551,6 +551,7 @@ export type ErrosFormularioCompra = Record<string, string>
 export type ValidarFormularioCompraInput = {
   isEdit?: boolean
   validarDescricao?: boolean
+  validarOrigem?: boolean
   observacoes?: string | null
   valor_compra?: string | number | null
   data?: string | null
@@ -564,12 +565,48 @@ export type ValidarFormularioCompraInput = {
 
 const ORDEM_CAMPOS_FORMULARIO_COMPRA = [
   'observacoes',
+  'valor_compra',
+  'data',
+  'parcelas_total',
   'cartao_id',
   'cartao_numero_id',
-  'data',
   'origem_compra',
-  'valor_compra',
 ] as const
+
+export const CAMPOS_DETALHE_COMPRA = [
+  'cartao_numero_id',
+  'origem_compra',
+  'fatura_id',
+  'categoria_id',
+  'subcategoria_id',
+  'parcelas',
+] as const
+
+export const isCampoDetalheCompra = (campo?: string | null): boolean =>
+  Boolean(
+    campo
+    && (
+      (CAMPOS_DETALHE_COMPRA as readonly string[]).includes(campo)
+      || campo.startsWith('parcela_')
+    )
+  )
+
+export const compraTemDetalhePreenchido = (source?: {
+  origem_compra?: string | null
+  cartao_numero_id?: number | string | null
+  categoria_id?: number | string | null
+  subcategoria_id?: number | string | null
+  eh_assinatura?: boolean | number | string | null
+  parcelas?: unknown
+} | null): boolean => {
+  if (!source) return false
+  if (String(source.origem_compra ?? '').trim()) return true
+  if (source.cartao_numero_id != null && String(source.cartao_numero_id).trim() !== '') return true
+  if (source.categoria_id != null && String(source.categoria_id).trim() !== '') return true
+  if (source.subcategoria_id != null && String(source.subcategoria_id).trim() !== '') return true
+  if (source.eh_assinatura === true || source.eh_assinatura === 1 || source.eh_assinatura === '1') return true
+  return Array.isArray(source.parcelas) && source.parcelas.length > 1
+}
 
 const isBlank = (value: unknown): boolean => {
   if (value == null) return true
@@ -637,7 +674,7 @@ export const validarFormularioCompra = (
     erros.cartao_numero_id = MENSAGEM_CAMPO_COMPRA.cartao_numero_id
   }
 
-  if (isBlank(input.origem_compra) || input.origem_compra === '0') {
+  if (input.validarOrigem && (isBlank(input.origem_compra) || input.origem_compra === '0')) {
     erros.origem_compra = MENSAGEM_CAMPO_COMPRA.origem_compra
   }
 
@@ -678,7 +715,7 @@ const CAMPOS_POR_MENSAGEM_API: Record<string, string[]> = {
   'Origem da compra inválida': ['origem_compra'],
   'Selecione o cartão (final) da compra': ['cartao_numero_id'],
   'Cadastre ao menos um final de cartão neste cartão/bandeira': ['cartao_numero_id'],
-  'Cartão (final) inválido para esta compra': ['cartao_numero_id'],
+  'Selecione a bandeira da fatura': ['cartao_numero_id'],
   'Quantidade de parcelas deve ser entre 1 e 36': ['parcelas_total'],
   'Valor inválido': ['valor_compra'],
   'Subcategoria exige categoria informada': ['subcategoria_id', 'categoria_id'],

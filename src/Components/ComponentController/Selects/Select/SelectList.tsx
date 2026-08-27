@@ -111,7 +111,7 @@ export function SelectList(props: SelectProps) {
         return (
             <>
                 <Select
-                    placeholder="Selecione"
+                    placeholder={props.placeholder ?? "Selecione"}
                     styles={selectStyles}
                     options={props.options}
                     value={value}

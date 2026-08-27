@@ -26,7 +26,6 @@ import {
     ErrosFormularioCompra,
     faturaAbertaDoSource,
     identificadorAposCadastro,
-    MENSAGEM_CAMPO_COMPRA,
     mensagemAposCadastro,
     pathVisualizacaoCompra,
     primeiroCampoInvalido,
@@ -135,6 +134,7 @@ const TransacoesForm = () => {
     const [faturasLookup, setFaturasLookup] = useState<FaturaLookup[]>([])
     const [lookupsReady, setLookupsReady] = useState(false)
     const [numerosOptions, setNumerosOptions] = useState<SelectOptions[]>([])
+    const [numerosList, setNumerosList] = useState<NumeroListItem[]>([])
     const [showNumeroSelect, setShowNumeroSelect] = useState(false)
     const [semNumeros, setSemNumeros] = useState(false)
     const [numerosLoading, setNumerosLoading] = useState(false)
@@ -155,6 +155,9 @@ const TransacoesForm = () => {
     const [parcelasValores, setParcelasValores] = useState<string[]>([])
     const [fieldErrors, setFieldErrors] = useState<ErrosFormularioCompra>({})
     const [saving, setSaving] = useState(false)
+    const [parcelasAjustadas, setParcelasAjustadas] = useState(
+        () => Array.isArray(state?.source?.parcelas) && state.source.parcelas.length > 1
+    )
 
     const skipEstabelecimentoEffect = useRef(true)
     const skipCategoriaEffect = useRef(true)
@@ -201,8 +204,22 @@ const TransacoesForm = () => {
     const pageTitle = isEdit
         ? (isCompraFlow ? 'Editar compra' : 'Editar transação')
         : 'Nova compra'
-    const exigeFinalCartao = !semNumeros && !numerosLoading && numerosOptions.length > 1
+    const qtdBandeiras = new Set(
+        numerosList
+            .map((n) => String(n.bandeira ?? n.cartao_bandeira_id ?? '').trim())
+            .filter(Boolean)
+    ).size
+    const exigeFinalCartao = qtdBandeiras > 1
+    const showFinalRapido = isCompraFlow && !isEdit && exigeFinalCartao
+    const showFinalDetalhe = showFinalField && !showFinalRapido
     const hasFieldErrors = Object.keys(fieldErrors).length > 0
+    const optParcelasRapido: SelectOptions[] = parcelasOptions.map((p) => ({
+        value: p.value,
+        label: p.value === 1 ? 'À vista' : `${p.value}x`,
+    }))
+    const previewParcela = nParcelas > 1 && valorCompraCentavos > 0
+        ? splitValorEmParcelas(valorCompraCentavos, nParcelas)[0]
+        : null
 
     const erroCampo = (campo: string) => (
         fieldErrors[campo] ? { message: fieldErrors[campo] } : undefined
@@ -219,7 +236,7 @@ const TransacoesForm = () => {
         cartao_numero_id: data?.cartao_numero_id ?? cartaoNumeroId,
         origem_compra: data?.origem_compra ?? origemCompraWatch,
         exigeFinalCartao,
-        parcelas: !isEdit && nParcelas > 1 ? parcelasValores : undefined,
+        parcelas: !isEdit && nParcelas > 1 && parcelasAjustadas ? parcelasValores : undefined,
     })
 
     const focarCampoInvalido = (campo: string) => {
@@ -349,6 +366,7 @@ const TransacoesForm = () => {
         const { cartao_id, fatura_id, preserveSelection = false, forceShowSelect = false } = opts
         if (!cartao_id && !fatura_id) {
             setNumerosOptions([])
+            setNumerosList([])
             setShowNumeroSelect(false)
             setSemNumeros(false)
             if (!preserveSelection) setValue('cartao_numero_id', null)
@@ -362,6 +380,8 @@ const TransacoesForm = () => {
                 ...(fatura_id ? { fatura_id } : {}),
                 ...(cartao_id && !fatura_id ? { cartao_id } : {}),
             })) ?? []
+
+            setNumerosList(list)
 
             if (list.length === 0) {
                 setNumerosOptions([])
@@ -402,6 +422,7 @@ const TransacoesForm = () => {
         } catch (error) {
             console.error('Erro ao carregar finais do cartão:', error)
             setNumerosOptions([])
+            setNumerosList([])
             setShowNumeroSelect(false)
             setSemNumeros(true)
             if (!preserveSelection) setValue('cartao_numero_id', null)
@@ -489,6 +510,7 @@ const TransacoesForm = () => {
 
     const handleParcelaChange = (index: number, raw: string) => {
         const digits = removeMask(raw)
+        setParcelasAjustadas(true)
         setParcelasValores((prev) => prev.map((v, i) => (i === index ? digits : v)))
     }
 
@@ -604,6 +626,7 @@ const TransacoesForm = () => {
                 label: formatNumeroOptionLabel(n),
             }))
         )
+        setNumerosList(list)
         setSemNumeros(list.length === 0)
         setShowNumeroSelect(isEdit || list.length > 1)
         setNumerosLoading(false)
@@ -665,9 +688,6 @@ const TransacoesForm = () => {
 
     const onSubmit: SubmitHandler<TransacoesModel> = async (data) => {
         const erros = validarFormularioCompra(montarInputValidacao(data))
-        if (semNumeros) {
-            erros.cartao_numero_id = MENSAGEM_CAMPO_COMPRA.sem_finais
-        }
         if (Object.keys(erros).length > 0) {
             aplicarErrosCampos(erros)
             return
@@ -726,19 +746,32 @@ const TransacoesForm = () => {
 
             const payload: TransacoesModel = {
                 cartao_id: data.cartao_id,
-                cartao_numero_id: data.cartao_numero_id || undefined,
                 data: data.data,
                 valor_compra: toBrPayload(data.valor_compra),
                 tipo: 'purchase',
-                origem_compra: data.origem_compra,
-                eh_assinatura: nParcelas <= 1 ? Boolean(data.eh_assinatura) : false,
                 parcelas_total: nParcelas,
-                categoria_id: data.categoria_id || undefined,
-                subcategoria_id: data.categoria_id ? (data.subcategoria_id || undefined) : undefined,
-                responsavel_id: data.responsavel_id || undefined,
                 observacoes: textoCompra || undefined,
                 descricao: textoCompra || undefined,
                 compra_manual: true,
+            }
+
+            if (data.cartao_numero_id) {
+                payload.cartao_numero_id = data.cartao_numero_id
+            }
+            if (data.origem_compra) {
+                payload.origem_compra = data.origem_compra
+            }
+            if (nParcelas <= 1 && data.eh_assinatura) {
+                payload.eh_assinatura = true
+            }
+            if (data.categoria_id) {
+                payload.categoria_id = data.categoria_id
+            }
+            if (data.categoria_id && data.subcategoria_id) {
+                payload.subcategoria_id = data.subcategoria_id
+            }
+            if (data.responsavel_id) {
+                payload.responsavel_id = data.responsavel_id
             }
 
             if (!isCompraFlow) {
@@ -753,7 +786,7 @@ const TransacoesForm = () => {
                 payload.fatura_id = data.fatura_id
             }
 
-            if (nParcelas > 1) {
+            if (nParcelas > 1 && parcelasAjustadas) {
                 payload.parcelas = parcelasValores.map((valor, idx) => ({
                     parcela: idx + 1,
                     valor: toBrPayload(valor),
@@ -858,6 +891,7 @@ const TransacoesForm = () => {
                 return
             }
         }
+        setParcelasAjustadas(false)
         redistributeParcelas(valorCompraWatch, nParcelas)
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [valorCompraWatch, nParcelas, isEdit])
@@ -921,9 +955,6 @@ const TransacoesForm = () => {
         setFieldErrors((prev) => {
             if (Object.keys(prev).length === 0) return prev
             const atuais = validarFormularioCompra(montarInputValidacao(getValues()))
-            if (semNumeros) {
-                atuais.cartao_numero_id = MENSAGEM_CAMPO_COMPRA.sem_finais
-            }
             let changed = false
             const next = { ...prev }
             for (const key of Object.keys(prev)) {
@@ -947,6 +978,7 @@ const TransacoesForm = () => {
         parcelasValores,
         nParcelas,
         exigeFinalCartao,
+        parcelasAjustadas,
         semNumeros,
     ])
 
@@ -985,11 +1017,12 @@ const TransacoesForm = () => {
                                         ) : null}
 
                                         {isCompraFlow ? (
+                                            <>
                                             <Row>
                                                 <Col md={12}>
                                                     <div className="mb-3" data-compra-field="observacoes">
                                                         <Label htmlFor="observacoes" className="form-label">
-                                                            Descrição da compra <span className="text-danger">*</span>
+                                                            O que foi comprado <span className="text-danger">*</span>
                                                         </Label>
                                                         <textarea
                                                             {...register('observacoes')}
@@ -1001,14 +1034,365 @@ const TransacoesForm = () => {
                                                         {fieldErrors.observacoes ? (
                                                             <div className="d-block invalid-feedback">{fieldErrors.observacoes}</div>
                                                         ) : null}
-                                                        <small className="text-muted">
-                                                            O que foi comprado. Não é o nome do estabelecimento da fatura — isso entra na conciliação.
-                                                        </small>
                                                     </div>
                                                 </Col>
                                             </Row>
+                                            <Row>
+                                                <Col md={4}>
+                                                    <div className="mb-3" data-compra-field="valor_compra">
+                                                        <Label htmlFor="valor_compra" className="form-label">
+                                                            Valor <span className="text-danger">*</span>
+                                                        </Label>
+                                                        {isEdit ? (
+                                                            <InputTextControlled<TransacoesModel>
+                                                                field="valor"
+                                                                control={control}
+                                                                errors={erroCampo('valor_compra')}
+                                                                textValor
+                                                                mask="preco"
+                                                            />
+                                                        ) : (
+                                                            <InputTextControlled<TransacoesModel>
+                                                                field="valor_compra"
+                                                                control={control}
+                                                                errors={erroCampo('valor_compra')}
+                                                                textValor
+                                                                mask="preco"
+                                                            />
+                                                        )}
+                                                    </div>
+                                                </Col>
+                                                <Col md={4}>
+                                                    <div className="mb-3" data-compra-field="data">
+                                                        <Label htmlFor="data" className="form-label">
+                                                            Data <span className="text-danger">*</span>
+                                                        </Label>
+                                                        <InputDate<TransacoesModel>
+                                                            field="data"
+                                                            register={register}
+                                                            errors={erroCampo('data')}
+                                                        />
+                                                    </div>
+                                                </Col>
+                                                <Col md={4}>
+                                                    <div className="mb-3" data-compra-field="parcelas_total">
+                                                        <Label htmlFor="parcelas_total" className="form-label">Parcelas</Label>
+                                                        {isEdit ? (
+                                                            <div className="form-control-plaintext">
+                                                                {record.parcelas_total && Number(record.parcelas_total) > 1
+                                                                    ? `${record.parcela_atual ?? 1}/${record.parcelas_total}`
+                                                                    : 'À vista'}
+                                                            </div>
+                                                        ) : (
+                                                            <>
+                                                                <SelectListControlled<TransacoesModel>
+                                                                    options={optParcelasRapido}
+                                                                    field="parcelas_total"
+                                                                    control={control}
+                                                                    errors={erroCampo('parcelas_total')}
+                                                                />
+                                                                {previewParcela ? (
+                                                                    <small className="text-muted">
+                                                                        {nParcelas}x de {centavosToBr(toCentavos(previewParcela))}
+                                                                    </small>
+                                                                ) : null}
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                </Col>
+                                            </Row>
+                                            <Row>
+                                                <Col md={showFinalRapido ? 7 : 12}>
+                                                    <div className="mb-3" data-compra-field="cartao_id">
+                                                        <Label htmlFor="cartao_id" className="form-label">
+                                                            Cartão <span className="text-danger">*</span>
+                                                        </Label>
+                                                        <div className="d-flex gap-2 align-items-start">
+                                                            <div className="flex-grow-1">
+                                                                <SelectListControlled<TransacoesModel>
+                                                                    options={cartoesOptions}
+                                                                    field="cartao_id"
+                                                                    control={control}
+                                                                    disabled={fromFatura && !isEdit}
+                                                                    errors={erroCampo('cartao_id')}
+                                                                />
+                                                            </div>
+                                                            {!(fromFatura && !isEdit) ? (
+                                                                <Button
+                                                                    type="button"
+                                                                    color="light"
+                                                                    className="border flex-shrink-0"
+                                                                    title="Novo cartão"
+                                                                    onClick={() => {
+                                                                        setCartaoRapidoModo('cartao')
+                                                                        setCartaoRapidoOpen(true)
+                                                                    }}
+                                                                >
+                                                                    <i className="ri-add-line me-1"></i>
+                                                                    Nova
+                                                                </Button>
+                                                            ) : null}
+                                                        </div>
+                                                        {fromFatura && !isEdit && (
+                                                            <small className="text-muted">Vinculado à fatura selecionada</small>
+                                                        )}
+                                                    </div>
+                                                </Col>
+                                                {showFinalRapido ? (
+                                                    <Col md={5}>
+                                                        <div className="mb-3" data-compra-field="cartao_numero_id">
+                                                            <Label htmlFor="cartao_numero_id" className="form-label">
+                                                                Final do cartão <span className="text-danger">*</span>
+                                                            </Label>
+                                                            <SelectListControlled<TransacoesModel>
+                                                                options={numerosOptions}
+                                                                field="cartao_numero_id"
+                                                                control={control}
+                                                                errors={erroCampo('cartao_numero_id')}
+                                                                placeholder="Selecione a bandeira/final"
+                                                            />
+                                                        </div>
+                                                    </Col>
+                                                ) : null}
+                                            </Row>
+                                            {!isEdit && primeiraCompetencia ? (
+                                                <div className={`mb-3 small ${caiForaDaFaturaAberta ? 'text-warning' : 'text-muted'}`}>
+                                                    {nParcelas > 1 ? 'Primeira fatura: ' : 'Fatura: '}
+                                                    {labelCompetenciaCompleta(primeiraCompetencia.mes, primeiraCompetencia.ano)}
+                                                    {ultimaCompetencia
+                                                        ? ` · última: ${labelCompetenciaCompleta(ultimaCompetencia.mes, ultimaCompetencia.ano)}`
+                                                        : ''}
+                                                    {cartaoAtual?.nome ? ` · ${cartaoAtual.nome}` : ''}
+                                                    {caiForaDaFaturaAberta && faturaAberta ? (
+                                                        <div className="alert alert-warning mb-0 mt-2 py-2">
+                                                            Esta data cai na fatura de {labelCompetenciaCompleta(primeiraCompetencia.mes, primeiraCompetencia.ano)}, não na fatura aberta ({labelCompetenciaCompleta(faturaAberta.mes, faturaAberta.ano)}).
+                                                        </div>
+                                                    ) : null}
+                                                </div>
+                                            ) : null}
+
+                                            <div className="text-muted text-uppercase fs-11 fw-semibold mb-2">Detalhes</div>
+                                                {showFinalDetalhe ? (
+                                                    <Row>
+                                                        <Col md={6}>
+                                                            <div className="mb-3" data-compra-field="cartao_numero_id">
+                                                                <Label htmlFor="cartao_numero_id" className="form-label">
+                                                                    Final do cartão
+                                                                </Label>
+                                                                {numerosLoading ? (
+                                                                    <div className="form-control-plaintext text-muted">Carregando...</div>
+                                                                ) : semNumeros ? (
+                                                                    <div className="alert alert-warning mb-0 py-2">
+                                                                        Cadastre um final neste cartão se quiser identificar o plástico.{' '}
+                                                                        {cartaoId ? (
+                                                                            <button
+                                                                                type="button"
+                                                                                className="btn btn-link btn-sm p-0 align-baseline"
+                                                                                onClick={() => {
+                                                                                    setCartaoRapidoModo('final')
+                                                                                    setCartaoRapidoOpen(true)
+                                                                                }}
+                                                                            >
+                                                                                Cadastrar final
+                                                                            </button>
+                                                                        ) : null}
+                                                                    </div>
+                                                                ) : (
+                                                                    <SelectListControlled<TransacoesModel>
+                                                                        options={numerosOptions}
+                                                                        field="cartao_numero_id"
+                                                                        control={control}
+                                                                        errors={erroCampo('cartao_numero_id')}
+                                                                        placeholder="Selecione (opcional)"
+                                                                    />
+                                                                )}
+                                                                {!semNumeros && !numerosLoading && (
+                                                                    <small className="text-muted">
+                                                                        {isEdit
+                                                                            ? 'Atribua ou corrija o final quando a compra veio sem cartão identificado'
+                                                                            : 'Qual plástico/virtual fez a compra'}
+                                                                    </small>
+                                                                )}
+                                                            </div>
+                                                        </Col>
+                                                    </Row>
+                                                ) : null}
+                                                <Row>
+                                                    <Col md={4}>
+                                                        <div className="mb-3" data-compra-field="origem_compra">
+                                                            <Label htmlFor="origem_compra" className="form-label">Origem da compra</Label>
+                                                            <SelectListControlled<TransacoesModel>
+                                                                options={origensCompraOptions}
+                                                                field="origem_compra"
+                                                                control={control}
+                                                                errors={erroCampo('origem_compra')}
+                                                                placeholder="Selecione"
+                                                            />
+                                                            {nParcelas <= 1 ? (
+                                                                <div className="form-check form-switch mt-2 mb-0">
+                                                                    <InputCheckbox<TransacoesModel>
+                                                                        field="eh_assinatura"
+                                                                        register={register}
+                                                                        role="switch"
+                                                                    />
+                                                                    <Label className="form-check-label" htmlFor="eh_assinatura">
+                                                                        É assinatura
+                                                                    </Label>
+                                                                </div>
+                                                            ) : null}
+                                                        </div>
+                                                    </Col>
+                                                    <Col md={4}>
+                                                        <div className="mb-3">
+                                                            <Label className="form-label text-muted">Responsável</Label>
+                                                            <Button
+                                                                type="button"
+                                                                color="light"
+                                                                className="border w-100 text-start"
+                                                                onClick={() => setResponsavelModalOpen(true)}
+                                                                title="Definir responsável"
+                                                            >
+                                                                <i className="ri-user-line me-2"></i>
+                                                                {responsavelLabel ?? 'Eu'}
+                                                                <i className="ri-arrow-down-s-line float-end mt-1"></i>
+                                                            </Button>
+                                                            {!responsavelLabel && (
+                                                                <small className="text-muted">Padrão — clique para trocar ou cadastrar outro</small>
+                                                            )}
+                                                        </div>
+                                                    </Col>
+                                                    {!isEdit && faturasOptions.length > 1 ? (
+                                                        <Col md={4}>
+                                                            <div className="mb-3" data-compra-field="fatura_id">
+                                                                <Label htmlFor="fatura_id" className="form-label">Fatura (1ª competência)</Label>
+                                                                <SelectListControlled<TransacoesModel>
+                                                                    options={faturasOptions}
+                                                                    field="fatura_id"
+                                                                    control={control}
+                                                                />
+                                                            </div>
+                                                        </Col>
+                                                    ) : null}
+                                                </Row>
+                                                <Row>
+                                                    <Col md={6}>
+                                                        <div className="mb-3" data-compra-field="categoria_id">
+                                                            <Label htmlFor="categoria_id" className="form-label">Categoria</Label>
+                                                            <div className="d-flex gap-2 align-items-start">
+                                                                <div className="flex-grow-1">
+                                                                    <SelectListControlled<TransacoesModel>
+                                                                        options={categoriasOptions}
+                                                                        field="categoria_id"
+                                                                        control={control}
+                                                                        errors={erroCampo('categoria_id')}
+                                                                    />
+                                                                </div>
+                                                                <Button
+                                                                    type="button"
+                                                                    color="light"
+                                                                    className="border flex-shrink-0"
+                                                                    title="Nova categoria"
+                                                                    onClick={() => setCategoriaRapidoOpen(true)}
+                                                                >
+                                                                    <i className="ri-add-line me-1"></i>
+                                                                    Nova
+                                                                </Button>
+                                                            </div>
+                                                        </div>
+                                                    </Col>
+                                                    <Col md={6}>
+                                                        <div className="mb-3" data-compra-field="subcategoria_id">
+                                                            <Label htmlFor="subcategoria_id" className="form-label">Subcategoria</Label>
+                                                            <div className="d-flex gap-2 align-items-start">
+                                                                <div className="flex-grow-1">
+                                                                    <SelectListControlled<TransacoesModel>
+                                                                        options={subcategoriasOptions}
+                                                                        field="subcategoria_id"
+                                                                        control={control}
+                                                                        disabled={!categoriaId}
+                                                                        errors={erroCampo('subcategoria_id')}
+                                                                    />
+                                                                </div>
+                                                                <Button
+                                                                    type="button"
+                                                                    color="light"
+                                                                    className="border flex-shrink-0"
+                                                                    title={!categoriaId ? 'Selecione uma categoria antes' : 'Nova subcategoria'}
+                                                                    disabled={!categoriaId}
+                                                                    onClick={() => setSubcategoriaRapidoOpen(true)}
+                                                                >
+                                                                    <i className="ri-add-line me-1"></i>
+                                                                    Nova
+                                                                </Button>
+                                                            </div>
+                                                        </div>
+                                                    </Col>
+                                                </Row>
+                                                {!isEdit && nParcelas > 1 ? (
+                                                    <div className={`mb-3 border rounded p-3 ${fieldErrors.parcelas ? 'border-danger' : 'bg-light'}`} data-compra-field="parcelas">
+                                                        <div className="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+                                                            <Label className="form-label mb-0">Valores das parcelas</Label>
+                                                            <span className={`small ${totaisBatem && !fieldErrors.parcelas ? 'text-success' : 'text-muted'}`}>
+                                                                Total: {centavosToBr(totalParcelasCentavos)}
+                                                                {parcelasAjustadas && (!totaisBatem || fieldErrors.parcelas) ? (
+                                                                    <> · esperado {centavosToBr(valorCompraCentavos)}</>
+                                                                ) : null}
+                                                            </span>
+                                                        </div>
+                                                        <Row>
+                                                            {parcelasValores.map((valor, idx) => (
+                                                                <Col md={3} sm={6} key={`parcela-${idx}`}>
+                                                                    <div className="mb-2" data-compra-field={`parcela_${idx + 1}`}>
+                                                                        <Label className="form-label small">
+                                                                            Parcela {idx + 1}/{nParcelas}
+                                                                        </Label>
+                                                                        <input
+                                                                            type="text"
+                                                                            className={`form-control ${VALOR_TEXT_CLASS}${fieldErrors[`parcela_${idx + 1}`] || fieldErrors.parcelas ? ' is-invalid' : ''}`}
+                                                                            value={mask('preco', valor) ?? ''}
+                                                                            onChange={(e) => handleParcelaChange(idx, e.target.value)}
+                                                                        />
+                                                                        {fieldErrors[`parcela_${idx + 1}`] ? (
+                                                                            <div className="d-block invalid-feedback">
+                                                                                {fieldErrors[`parcela_${idx + 1}`]}
+                                                                            </div>
+                                                                        ) : null}
+                                                                    </div>
+                                                                </Col>
+                                                            ))}
+                                                        </Row>
+                                                        {fieldErrors.parcelas ? (
+                                                            <div className="d-block invalid-feedback mt-2">{fieldErrors.parcelas}</div>
+                                                        ) : parcelasAjustadas && !totaisBatem ? (
+                                                            <div className="alert alert-warning mb-0 mt-2 py-2">
+                                                                Ajuste as parcelas até o total coincidir com o valor da compra.
+                                                            </div>
+                                                        ) : (
+                                                            <small className="text-muted">
+                                                                Sem ajuste, o sistema divide o valor igualmente.
+                                                            </small>
+                                                        )}
+                                                    </div>
+                                                ) : null}
+                                                {isEdit && record.compra_grupo_id ? (
+                                                    <div className="form-check mb-3">
+                                                        <input
+                                                            type="checkbox"
+                                                            className="form-check-input"
+                                                            id="propagar_grupo"
+                                                            checked={Boolean(propagarGrupo)}
+                                                            onChange={(e) => setValue('propagar_grupo', e.target.checked)}
+                                                        />
+                                                        <Label className="form-check-label" htmlFor="propagar_grupo">
+                                                            Aplicar origem, final do cartão, categoria, responsável e observação a todas as parcelas da compra
+                                                        </Label>
+                                                    </div>
+                                                ) : null}
+                                            </>
                                         ) : null}
 
+                                        {!isCompraFlow ? (
+                                        <>
                                         <Row>
                                             <Col md={showFinalField ? (isCompraFlow ? 5 : 4) : (isCompraFlow ? 6 : 6)}>
                                                 <div className="mb-3" data-compra-field="cartao_id">
@@ -1465,6 +1849,8 @@ const TransacoesForm = () => {
                                                 </Col>
                                             </Row>
                                         )}
+                                        </>
+                                        ) : null}
 
                                         <hr />
                                         <Row className="mt-3">
@@ -1473,9 +1859,9 @@ const TransacoesForm = () => {
                                                     <button
                                                         type="submit"
                                                         className="btn btn-primary"
-                                                        disabled={saving || numerosLoading}
+                                                        disabled={saving || (isEdit && numerosLoading)}
                                                     >
-                                                        {saving ? 'Salvando...' : 'Salvar'}
+                                                        {saving ? 'Salvando...' : (isCompraFlow && !isEdit ? 'Salvar compra' : 'Salvar')}
                                                     </button>
                                                     <button
                                                         type="button"

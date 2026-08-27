@@ -1,6 +1,7 @@
 import {
   aplicarErrosMensagemApiCompra,
   camposPorMensagemApiCompra,
+  compraTemDetalhePreenchido,
   contaNoTotalLinha,
   dataCaiForaDaFaturaAberta,
   faturaAbertaDoSource,
@@ -333,16 +334,26 @@ describe('validarFormularioCompra', () => {
     origem_compra: 'CREDITO',
   }
 
-  it('marca todos os obrigatórios vazios de uma vez', () => {
+  it('no modo rápido marca só descrição, valor, data e cartão', () => {
     const erros = validarFormularioCompra({})
     expect(erros).toEqual({
       observacoes: MENSAGEM_CAMPO_COMPRA.observacoes,
       valor_compra: MENSAGEM_CAMPO_COMPRA.valor_compra,
       data: MENSAGEM_CAMPO_COMPRA.data,
       cartao_id: MENSAGEM_CAMPO_COMPRA.cartao_id,
-      origem_compra: MENSAGEM_CAMPO_COMPRA.origem_compra,
     })
+    expect(erros.origem_compra).toBeUndefined()
+    expect(erros.cartao_numero_id).toBeUndefined()
     expect(primeiroCampoInvalido(erros)).toBe('observacoes')
+  })
+
+  it('não exige origem nem final no cadastro mínimo válido', () => {
+    expect(validarFormularioCompra({
+      observacoes: 'Mouse Logitech',
+      valor_compra: '24990',
+      data: '2026-08-27',
+      cartao_id: 3,
+    })).toEqual({})
   })
 
   it('trata descrição só com espaços e valor zero como inválidos', () => {
@@ -410,5 +421,21 @@ describe('validarFormularioCompra', () => {
       cartao_id: 'Cartão é obrigatório',
     })
     expect(camposPorMensagemApiCompra('Algo inesperado')).toEqual([])
+  })
+
+  it('só exige origem quando validarOrigem está ligado', () => {
+    expect(validarFormularioCompra(valido).origem_compra).toBeUndefined()
+    expect(validarFormularioCompra({
+      ...valido,
+      origem_compra: null,
+      validarOrigem: true,
+    }).origem_compra).toBe(MENSAGEM_CAMPO_COMPRA.origem_compra)
+  })
+
+  it('abre Mais detalhes quando já veio origem, final ou parcelas customizadas', () => {
+    expect(compraTemDetalhePreenchido(null)).toBe(false)
+    expect(compraTemDetalhePreenchido({})).toBe(false)
+    expect(compraTemDetalhePreenchido({ origem_compra: 'CREDITO' })).toBe(true)
+    expect(compraTemDetalhePreenchido({ parcelas: [{ parcela: 1, valor: '10' }, { parcela: 2, valor: '10' }] })).toBe(true)
   })
 })
