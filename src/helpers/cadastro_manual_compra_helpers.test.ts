@@ -1,4 +1,6 @@
 import {
+  aplicarErrosMensagemApiCompra,
+  camposPorMensagemApiCompra,
   contaNoTotalLinha,
   dataCaiForaDaFaturaAberta,
   faturaAbertaDoSource,
@@ -6,14 +8,18 @@ import {
   identificadorAposCadastro,
   isCompraManual,
   mensagemAposCadastro,
+  MENSAGEM_CAMPO_COMPRA,
   origemLancamentoCompra,
   pathVisualizacaoCompra,
   pathVisualizacaoDaLinha,
   precisaConciliarCompra,
+  primeiroCampoInvalido,
   temSugestaoConciliacao,
   totaisConciliacaoFatura,
   tituloLinhaFatura,
   tituloListagemCompra,
+  validarFormularioCompra,
+  valorCompraEstaInformado,
   valorContaNoTotal,
 } from './cadastro_manual_compra_helpers'
 
@@ -315,5 +321,94 @@ describe('totaisConciliacaoFatura', () => {
       temComprasNaoConciliadas: true,
       labelNaoConciliadas: 'Compras ainda não conciliadas',
     })
+  })
+})
+
+describe('validarFormularioCompra', () => {
+  const valido = {
+    observacoes: 'Mouse Logitech',
+    valor_compra: '24990',
+    data: '2026-08-27',
+    cartao_id: 3,
+    origem_compra: 'CREDITO',
+  }
+
+  it('marca todos os obrigatórios vazios de uma vez', () => {
+    const erros = validarFormularioCompra({})
+    expect(erros).toEqual({
+      observacoes: MENSAGEM_CAMPO_COMPRA.observacoes,
+      valor_compra: MENSAGEM_CAMPO_COMPRA.valor_compra,
+      data: MENSAGEM_CAMPO_COMPRA.data,
+      cartao_id: MENSAGEM_CAMPO_COMPRA.cartao_id,
+      origem_compra: MENSAGEM_CAMPO_COMPRA.origem_compra,
+    })
+    expect(primeiroCampoInvalido(erros)).toBe('observacoes')
+  })
+
+  it('trata descrição só com espaços e valor zero como inválidos', () => {
+    expect(valorCompraEstaInformado('0')).toBe(false)
+    expect(valorCompraEstaInformado('0,00')).toBe(false)
+    expect(valorCompraEstaInformado('249,90')).toBe(true)
+    expect(validarFormularioCompra({
+      ...valido,
+      observacoes: '   ',
+      valor_compra: '0,00',
+    })).toMatchObject({
+      observacoes: MENSAGEM_CAMPO_COMPRA.observacoes,
+      valor_compra: MENSAGEM_CAMPO_COMPRA.valor_compra,
+    })
+  })
+
+  it('não exige cartão quando já há fatura_id', () => {
+    expect(validarFormularioCompra({
+      ...valido,
+      cartao_id: null,
+      fatura_id: 10,
+    }).cartao_id).toBeUndefined()
+  })
+
+  it('exige final só com 2+ cartões e nada selecionado', () => {
+    expect(validarFormularioCompra({ ...valido, exigeFinalCartao: false }).cartao_numero_id).toBeUndefined()
+    expect(validarFormularioCompra({
+      ...valido,
+      exigeFinalCartao: true,
+      cartao_numero_id: null,
+    }).cartao_numero_id).toBe(MENSAGEM_CAMPO_COMPRA.cartao_numero_id)
+    expect(validarFormularioCompra({
+      ...valido,
+      exigeFinalCartao: true,
+      cartao_numero_id: 8,
+    }).cartao_numero_id).toBeUndefined()
+  })
+
+  it('marca parcela sem valor e soma diferente do total', () => {
+    const erros = validarFormularioCompra({
+      ...valido,
+      valor_compra: '10000',
+      parcelas: ['4000', '', '4000'],
+    })
+    expect(erros.parcela_2).toBe('Valor da parcela 2 é obrigatório')
+    expect(erros.parcelas).toBe(MENSAGEM_CAMPO_COMPRA.soma_parcelas)
+    expect(primeiroCampoInvalido(erros)).toBe('parcela_2')
+  })
+
+  it('não revalida parcelas no edit', () => {
+    expect(validarFormularioCompra({
+      ...valido,
+      isEdit: true,
+      parcelas: ['', ''],
+    })).toEqual({})
+  })
+
+  it('mapeia message 422 para o campo correspondente', () => {
+    expect(camposPorMensagemApiCompra('Origem da compra é obrigatória')).toEqual(['origem_compra'])
+    expect(camposPorMensagemApiCompra('Valor da parcela 3 é obrigatório')).toEqual(['parcela_3'])
+    expect(camposPorMensagemApiCompra(
+      'A soma das parcelas (R$ 10,00) deve ser igual ao valor da compra (R$ 20,00)'
+    )).toEqual(['parcelas', 'valor_compra'])
+    expect(aplicarErrosMensagemApiCompra('Cartão é obrigatório')).toEqual({
+      cartao_id: 'Cartão é obrigatório',
+    })
+    expect(camposPorMensagemApiCompra('Algo inesperado')).toEqual([])
   })
 })

@@ -531,3 +531,192 @@ export const formatTamanhoAnexo = (bytes?: number | null): string => {
 export const ANEXO_ACCEPT = '.pdf,.jpg,.jpeg,.png,.webp,.gif'
 export const ANEXO_MAX_BYTES = 10 * 1024 * 1024
 
+export const MENSAGEM_CAMPO_COMPRA = {
+  observacoes: 'Informe a descrição da compra',
+  valor_compra: 'Valor da compra é obrigatório',
+  data: 'Informe a data da compra',
+  cartao_id: 'Cartão é obrigatório',
+  cartao_numero_id: 'Selecione o cartão (final) da compra',
+  origem_compra: 'Origem da compra é obrigatória',
+  soma_parcelas: 'A soma das parcelas deve ser igual ao valor da compra',
+  parcelas_total: 'Quantidade de parcelas deve ser entre 1 e 36',
+  sem_finais: 'Cadastre ao menos um final de cartão neste cartão/bandeira',
+} as const
+
+export const mensagemParcelaObrigatoria = (n: number): string =>
+  `Valor da parcela ${n} é obrigatório`
+
+export type ErrosFormularioCompra = Record<string, string>
+
+export type ValidarFormularioCompraInput = {
+  isEdit?: boolean
+  validarDescricao?: boolean
+  observacoes?: string | null
+  valor_compra?: string | number | null
+  data?: string | null
+  cartao_id?: string | number | null
+  fatura_id?: string | number | null
+  cartao_numero_id?: string | number | null
+  origem_compra?: string | null
+  exigeFinalCartao?: boolean
+  parcelas?: Array<string | number | null | undefined>
+}
+
+const ORDEM_CAMPOS_FORMULARIO_COMPRA = [
+  'observacoes',
+  'cartao_id',
+  'cartao_numero_id',
+  'data',
+  'origem_compra',
+  'valor_compra',
+] as const
+
+const isBlank = (value: unknown): boolean => {
+  if (value == null) return true
+  if (typeof value === 'number') return Number.isNaN(value)
+  return String(value).trim() === ''
+}
+
+const isBlankId = (value: unknown): boolean => {
+  if (isBlank(value)) return true
+  return value === 0 || value === '0'
+}
+
+/** Mesma regra de `toCentavos` em fatura_helpers, sem importar axios. */
+const centavosDoValor = (value: string | number | null | undefined): number => {
+  if (value == null || value === '') return 0
+  if (typeof value === 'number') return Math.round(value * 100)
+
+  const str = String(value).trim()
+  if (!str) return 0
+
+  if (str.includes(',')) {
+    const n = parseFloat(str.replace(/\./g, '').replace(',', '.'))
+    return Math.round((Number.isNaN(n) ? 0 : n) * 100)
+  }
+
+  if (str.includes('.')) {
+    const n = parseFloat(str)
+    return Math.round((Number.isNaN(n) ? 0 : n) * 100)
+  }
+
+  const digits = str.replace(/\D/g, '')
+  return parseInt(digits || '0', 10)
+}
+
+export const valorCompraEstaInformado = (value: unknown): boolean => {
+  if (value == null || value === '') return false
+  if (typeof value === 'string' && value.trim() === '') return false
+  const cents = centavosDoValor(value as string | number)
+  return Number.isFinite(cents) && cents > 0
+}
+
+export const validarFormularioCompra = (
+  input: ValidarFormularioCompraInput
+): ErrosFormularioCompra => {
+  const erros: ErrosFormularioCompra = {}
+  const validarDescricao = input.validarDescricao !== false
+
+  if (validarDescricao && isBlank(input.observacoes)) {
+    erros.observacoes = MENSAGEM_CAMPO_COMPRA.observacoes
+  }
+
+  if (!valorCompraEstaInformado(input.valor_compra)) {
+    erros.valor_compra = MENSAGEM_CAMPO_COMPRA.valor_compra
+  }
+
+  if (isBlank(input.data)) {
+    erros.data = MENSAGEM_CAMPO_COMPRA.data
+  }
+
+  if (isBlankId(input.cartao_id) && isBlankId(input.fatura_id)) {
+    erros.cartao_id = MENSAGEM_CAMPO_COMPRA.cartao_id
+  }
+
+  if (input.exigeFinalCartao && isBlankId(input.cartao_numero_id)) {
+    erros.cartao_numero_id = MENSAGEM_CAMPO_COMPRA.cartao_numero_id
+  }
+
+  if (isBlank(input.origem_compra) || input.origem_compra === '0') {
+    erros.origem_compra = MENSAGEM_CAMPO_COMPRA.origem_compra
+  }
+
+  if (!input.isEdit && Array.isArray(input.parcelas) && input.parcelas.length > 1) {
+    input.parcelas.forEach((valor, idx) => {
+      if (!valorCompraEstaInformado(valor)) {
+        erros[`parcela_${idx + 1}`] = mensagemParcelaObrigatoria(idx + 1)
+      }
+    })
+    const soma = input.parcelas.reduce((acc, valor) => acc + centavosDoValor(valor), 0)
+    const total = centavosDoValor(input.valor_compra)
+    if (Math.abs(soma - total) > 1) {
+      erros.parcelas = MENSAGEM_CAMPO_COMPRA.soma_parcelas
+    }
+  }
+
+  return erros
+}
+
+export const primeiroCampoInvalido = (erros: ErrosFormularioCompra): string | null => {
+  for (const campo of ORDEM_CAMPOS_FORMULARIO_COMPRA) {
+    if (erros[campo]) return campo
+  }
+  const parcelas = Object.keys(erros)
+    .filter((key) => /^parcela_\d+$/.test(key))
+    .sort((a, b) => Number(a.slice(8)) - Number(b.slice(8)))
+  if (parcelas[0]) return parcelas[0]
+  if (erros.parcelas) return 'parcelas'
+  if (erros.parcelas_total) return 'parcelas_total'
+  return Object.keys(erros)[0] ?? null
+}
+
+const CAMPOS_POR_MENSAGEM_API: Record<string, string[]> = {
+  'Cartão é obrigatório': ['cartao_id'],
+  'Informe a descrição da compra': ['observacoes'],
+  'Valor da compra é obrigatório': ['valor_compra'],
+  'Origem da compra é obrigatória': ['origem_compra'],
+  'Origem da compra inválida': ['origem_compra'],
+  'Selecione o cartão (final) da compra': ['cartao_numero_id'],
+  'Cadastre ao menos um final de cartão neste cartão/bandeira': ['cartao_numero_id'],
+  'Cartão (final) inválido para esta compra': ['cartao_numero_id'],
+  'Quantidade de parcelas deve ser entre 1 e 36': ['parcelas_total'],
+  'Valor inválido': ['valor_compra'],
+  'Subcategoria exige categoria informada': ['subcategoria_id', 'categoria_id'],
+  'Subcategoria não está vinculada à categoria informada': ['subcategoria_id'],
+}
+
+export const camposPorMensagemApiCompra = (message?: string | null): string[] => {
+  const msg = String(message ?? '').trim()
+  if (!msg) return []
+  if (CAMPOS_POR_MENSAGEM_API[msg]) return CAMPOS_POR_MENSAGEM_API[msg]
+
+  const parcela = msg.match(/^Valor da parcela (\d+) é obrigatório$/)
+  if (parcela) return [`parcela_${parcela[1]}`]
+
+  if (/^A soma das parcelas/.test(msg) && /deve ser igual ao valor da compra/.test(msg)) {
+    return ['parcelas', 'valor_compra']
+  }
+
+  if (
+    /^Parcela \d+ duplicada$/.test(msg)
+    || /^Parcela \d+ não informada$/.test(msg)
+    || msg === 'Número da parcela inválido'
+    || msg === 'A quantidade de parcelas informadas deve ser igual a parcelas_total'
+  ) {
+    return ['parcelas']
+  }
+
+  return []
+}
+
+export const aplicarErrosMensagemApiCompra = (
+  message?: string | null
+): ErrosFormularioCompra => {
+  const msg = String(message ?? '').trim()
+  const erros: ErrosFormularioCompra = {}
+  for (const campo of camposPorMensagemApiCompra(msg)) {
+    erros[campo] = msg
+  }
+  return erros
+}
+

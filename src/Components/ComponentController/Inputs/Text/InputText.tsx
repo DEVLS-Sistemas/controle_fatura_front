@@ -57,6 +57,7 @@ export const InputText = <T extends Record<keyof T, any>>(
                 onKeyUp={onKeyUp}
                 style={uppercase ? { textTransform: 'uppercase' } : undefined}
             />
+            {errors && <div className="d-block invalid-feedback text-danger">{errors.message}</div>}
         </>
     )
 }
