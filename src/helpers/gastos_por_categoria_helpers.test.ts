@@ -16,8 +16,11 @@ import {
   percentualFatia,
   buildGastosPorCategoriaSearchParams,
   buildPageSearchParams,
+  centroValorOrigem,
   cleanGastosPorCategoriaParams,
+  coresFatiasOrigem,
   deveAvisarSemCategoria,
+  fatiasOrigem,
   isOrigemValida,
   origemCor,
   persistGastosPorCategoriaSearch,
@@ -29,6 +32,7 @@ import {
   rotuloAnoCalendario,
   rotuloJanelaMeses,
   rotuloPeriodoFiltro,
+  tituloOrigem,
 } from './gastos_por_categoria_helpers'
 
 describe('resolveGastosPorCategoriaSearch', () => {
@@ -245,6 +249,11 @@ describe('avisos e origem', () => {
     expect(isOrigemValida('COMPRAS_ONLINE')).toBe(true)
     expect(isOrigemValida(null)).toBe(false)
     expect(origemCor(null)).toBe('#9ca3af')
+    expect(origemCor('COMPRAS_ONLINE')).toBe('#3b82f6')
+    expect(origemCor('COMPRAS_PRESENCIAL')).toBe('#22c55e')
+    expect(origemCor('PAGAMENTO_SERVICOS')).toBe('#f59e0b')
+    expect(origemCor('PAGAMENTO_FATURA')).toBe('#8b5cf6')
+    expect(origemCor(null, 'sem-origem')).toBe('#9ca3af')
     expect(barraPercentual(156)).toBe(100)
     expect(barraPercentual(-4)).toBe(0)
   })
@@ -434,7 +443,25 @@ describe('seleção Power BI', () => {
     expect(resolveKpis(data, cat)).toMatchObject({ valor_total: 3200, label: 'Em Alimentação' })
     expect(resolveKpis(data, sub)).toMatchObject({ valor_total: 1800, label: 'Em Delivery' })
     expect(resolvePorOrigemSelecao(data, cat)[0].origem_compra).toBe('COMPRAS_ONLINE')
+    expect(resolvePorOrigemSelecao(data, sub)[0].origem_compra).toBe('COMPRAS_ONLINE')
     expect(resolvePorOrigemSelecao(data, GastosPorCategoriaSelecaoVazia)[0].origem_compra).toBe('COMPRAS_PRESENCIAL')
+    expect(tituloOrigem(null)).toBe('Origem')
+    expect(tituloOrigem('Alimentação')).toBe('Origem em Alimentação')
+    expect(centroValorOrigem(data, GastosPorCategoriaSelecaoVazia)).toEqual({
+      valor: 10000,
+      label: 'Total',
+    })
+    expect(centroValorOrigem(data, sub)).toEqual({
+      valor: 3200,
+      label: 'Em Alimentação',
+    })
+    expect(
+      fatiasOrigem([
+        { origem_compra: 'COMPRAS_ONLINE', valor_total: 10 },
+        { origem_compra: 'COMPRAS_PRESENCIAL', valor_total: 0 },
+      ])
+    ).toEqual([{ origem_compra: 'COMPRAS_ONLINE', valor_total: 10 }])
+    expect(coresFatiasOrigem([{ origem_compra: 'COMPRAS_ONLINE', valor_total: 10 }], null)[0]).toBe('#3b82f6')
   })
 
   it('não coloca categoria_id no GET ao persistir a seleção na URL', () => {

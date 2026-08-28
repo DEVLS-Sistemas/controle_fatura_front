@@ -1,4 +1,4 @@
-# Prompt — Frontend: Gastos por categoria (duas pizzas reativas)
+# Prompt — Frontend: Gastos por categoria (três roscas reativas)
 
 Use este prompt no repositório do frontend para criar a tela **Gastos por categoria**.
 
@@ -6,8 +6,11 @@ Backend já implementado. **Ponto-chave do produto:** dois gráficos de **pizza*
 
 1. **Pizza de categorias** (mestre)
 2. **Pizza de subcategorias** (escrava — **segue o clique** da primeira)
+3. **Rosca de origem** (tipo de compra — filtros da tela + fatia de categoria)
 
-Esses dois gráficos **não são opcionais**. Sem eles a tela está incompleta. Não substituir por barras, ranking, lista de cards nem pelo pizza do dashboard resumo.
+Esses três gráficos **não são opcionais**. Sem eles a tela está incompleta. Não substituir por barras, ranking, lista de cards nem pelo pizza do dashboard resumo.
+
+Rosca de origem (doughnut): [`frontend-prompt-gastos-por-categoria-origem.md`](frontend-prompt-gastos-por-categoria-origem.md).
 
 Clicar numa fatia **não navega** e **não chama a API de novo**. A outra pizza, os KPIs e os tipos de compra se ajustam no cliente. Um GET só quando muda período / cartão / responsável / origem.
 
@@ -21,7 +24,7 @@ A tela responde, no período:
 
 1. **Como o gasto se reparte entre categorias?** — pizza mestre
 2. **E entre subcategorias?** — pizza escrava (todas, ou só da categoria clicada)
-3. Os demais blocos **acompanham a fatia selecionada**
+3. Os demais blocos **acompanham a fatia selecionada** (incluindo a **rosca de Origem**)
 
 Não confundir com:
 
@@ -29,7 +32,7 @@ Não confundir com:
 |------|-------|
 | Dashboard / resumo | **Uma** pizza plana por competência da fatura — **não reusar esse componente como esta tela** |
 | Gastos críticos | Lugar, frequência, alertas |
-| Esta tela | **Duas pizzas** lado a lado: categoria → subcategoria, reativas |
+| Esta tela | **Três roscas**: categoria → subcategoria, origem (tipo de compra) |
 
 ---
 
@@ -38,7 +41,7 @@ Não confundir com:
 **Gastos por categoria**  
 Rota: `/gastos-por-categoria`
 
-Menu visível. Deep-link: `/gastos-por-categoria?meses=3`.
+Menu visível. Deep-link: `/gastos-por-categoria?meses=3` · `/gastos-por-categoria?ano=2026&mes=8` · `/gastos-por-categoria?data_inicio=2026-01-01&data_fim=2026-12-31`.
 
 Query **da página** (estado de seleção, não filtro duro da API):
 
@@ -63,9 +66,9 @@ Envelope: `{ data, status, message }`. **Um fetch por mudança de período/filtr
 
 | Param | Default | Front |
 |-------|---------|-------|
-| `meses` | `3` | Chips 1 / 3 / 6 / 12 |
-| `data_inicio` / `data_fim` | — | Intervalo avançado |
-| `mes` + `ano` | — | Mês calendário — **não** enviar `meses` junto |
+| `meses` | `3` | Atalho **Últimos N meses** (janela até hoje). **Não** é ano calendário |
+| `data_inicio` / `data_fim` | — | Ano todo ou intervalo De/Até no mesmo ano |
+| `mes` + `ano` | — | Um mês calendário (De = Até). **Não** enviar `meses` junto |
 | `cartao_id` | — | Select opcional |
 | `responsavel_id` | — | Select opcional |
 | `origem_compra` | — | Chip de tipo (filtro **global**, aí sim refetch) |
@@ -78,6 +81,7 @@ Envelope: `{ data, status, message }`. **Um fetch por mudança de período/filtr
 |--------|--------|---------|
 | Pizza **categorias** (mestre) | `data.categorias` | `slice(0, data.dashboards.limite)` → **10** fatias + “Outros” se sobrar |
 | Pizza **subcategorias** (escrava) | `data.subcategorias` | ver regra do escravo abaixo |
+| Rosca **origem** | `data.por_origem` / `categoria.por_origem` | [`frontend-prompt-gastos-por-categoria-origem.md`](frontend-prompt-gastos-por-categoria-origem.md) |
 | Snapshot inicial (opcional) | `data.dashboards.categorias` / `data.dashboards.subcategorias` | já vêm com 10; usar no estado **sem seleção** |
 
 `dashboards.limite` = `10`. Não hardcodar se o campo existir.
@@ -109,6 +113,7 @@ Fatia = `valor_total`. Percentual no label/tooltip = `percentual_gasto` (não re
         "nome": "Delivery",
         "categoria_id": 2,
         "categoria_nome": "Alimentação",
+        "cor": "#fcd34d",
         "categoria_cor": "#f59e0b",
         "valor_total": 1800.0,
         "compras": 20,
@@ -137,18 +142,19 @@ Filtros de período / cartão / responsável
 
 KPIs (total, compras, ticket)              ← reagem à fatia
 
-┌─────────────────────────────┐  ┌─────────────────────────────┐
-│  Categorias                 │  │  Subcategorias              │
-│  [  PIZZA  ]   legenda      │→ │  [  PIZZA  ]   legenda      │
-│  MESTRE                     │  │  ESCRAVA                    │
-└─────────────────────────────┘  └─────────────────────────────┘
+┌──────────────┐  ┌──────────────┐  ┌──────────────┐
+│ Categorias   │  │ Subcategorias│  │ Origem       │
+│  [ ROSCA ]   │→ │  [ ROSCA ]   │  │  [ ROSCA ]   │
+│  MESTRE      │  │  ESCRAVA     │  │  tipo compra │
+└──────────────┘  └──────────────┘  └──────────────┘
 
-Tipos de compra                            ← reagem à fatia
 Evolução                                   ← reage à fatia
 ```
 
-Desktop: **duas colunas iguais**, mesma altura, pizzas lado a lado.  
-Mobile: pizza de categorias em cima, pizza de subcategorias **logo abaixo** (nunca esconder a escrava numa aba).
+Desktop: **três colunas iguais**, mesma altura.  
+Mobile: categorias → subcategorias → origem (nunca esconder a escrava nem a origem numa aba).
+
+Detalhe da terceira rosca: [`frontend-prompt-gastos-por-categoria-origem.md`](frontend-prompt-gastos-por-categoria-origem.md).
 
 Hero (`destaque.frase`) pode ser uma linha acima. **Não substitui** as pizzas.
 
@@ -166,8 +172,9 @@ Tipo: **doughnut** (rosca) preferível à pizza cheia — o centro mostra o tota
 - Se houver mais itens na fonte, **uma fatia “Outros”** (cinza) com a soma do restante, para a pizza fechar 100%. “Outros” **não é clicável** (não vira seleção).
 - Se houver 10 ou menos, **não** criar “Outros”.
 - Ângulo da fatia = `valor_total`.
-- Cor da pizza de **categoria** = `cor` (cinza se `null` — “Sem categoria”).
-- Cor da pizza de **subcategoria** = `categoria_cor` da pai. Se duas subs da mesma categoria ficarem iguais, variar leve a luminosidade (não inventar paleta nova; parta da `categoria_cor`).
+- Cor da pizza de **categoria** = `cor` salva no cadastro. Cadastrada sem cor → **preto** `#000000`. Bucket “Sem categoria” → `#9ca3af`. **Não** usar paleta default da lib.
+- Cor da pizza de **subcategoria** = `cor` da própria sub (tonalidade **mais clara** que o tema da pai). Enquanto a API não mandar `cor` (antes da etapa 2 de [`frontend-prompt-cores-tema.md`](frontend-prompt-cores-tema.md)), fallback `categoria_cor`. **Não** inventar rainbow.
+- Fatia “Outros” → `#d1d5db`.
 - Ordem das fatias = ordem da API (maior gasto primeiro).
 
 ### Labels / legenda
@@ -224,7 +231,7 @@ fatias = top N (dashboards.limite) de base
 Os percentuais **visuais** da pizza escrava passam a ser vs o total **da categoria** (`percentual_da_categoria`). O tooltip usa esse % (“fatia de Alimentação”). Não usar `percentual_gasto` global depois do filtro.
 
 6. KPIs → números da categoria (`categorias.find`).
-7. Tipos de compra → `categoria.por_origem`.
+7. Origem → `categoria.por_origem` (rosca; sem GET).
 8. Evolução → `evolucao.por_categoria` daquela categoria se existir.
 9. Título da escrava: “Subcategorias de Alimentação”. 3 subs → 3 fatias (sem vazios).
 
@@ -235,7 +242,7 @@ A escrava **não recorta** a pizza mestre: as fatias de categoria **permanecem**
 1. Toggle da fatia de sub (`selecao.subcategoria_id`).
 2. Se ainda não houver categoria selecionada: setar `selecao.categoria_id` da pai **e** destacar a sub. A pizza mestre só **ilumina** a categoria pai.
 3. KPIs → números da **subcategoria**.
-4. Tipos → `por_origem` da categoria pai (a API não quebra origem por sub).
+4. Origem → `por_origem` da categoria pai (a API não quebra origem por sub).
 5. Duplo clique **ou** “Ver compras” no tooltip → `atalho`. Clique simples **não** sai da tela.
 
 ### Clique no vazio / Limpar filtro
@@ -244,7 +251,7 @@ A escrava **não recorta** a pizza mestre: as fatias de categoria **permanecem**
 
 - Escrava volta ao top 10 global (`data.dashboards.subcategorias` ou `data.subcategorias.slice(0, limite)` + Outros)
 - KPIs → `data.totais`
-- Tipos → `data.por_origem`
+- Origem → `data.por_origem`
 - Nenhuma fatia destacada
 
 ### Clique em tipo de compra
@@ -270,20 +277,24 @@ Label: “No período” / “Em Alimentação” / “Em Delivery”.
 
 ## Tipos de compra e evolução
 
-**Abaixo** das duas pizzas — não no lugar delas.
+**Abaixo** das três roscas — a evolução não no lugar delas.
 
-- Tipos: chips/barras com `label` + `percentual_gasto`. Seguem a seleção (global vs `categoria.por_origem`).
+- **Origem** = a terceira **rosca** (doughnut). Não usar chips/barras como visual principal. Prompt: [`frontend-prompt-gastos-por-categoria-origem.md`](frontend-prompt-gastos-por-categoria-origem.md).
 - Evolução: `evolucao.por_mes`. Mês `parcial: true` → “mês em andamento”. Com categoria selecionada, usar `evolucao.por_categoria[]`.
 
 ---
 
 ## Filtros de faixa (topo)
 
-- Chips **1 / 3 / 6 / 12** → `?meses=` → **refetch** e **zera** `selecao`
-- Selects cartão / responsável → refetch e zera seleção
-- Não misturar `meses` com `mes`+`ano`
+**Não** usar chips `1 / 3 / 6 / 12` sem texto. UX obrigatória: [`frontend-prompt-ajustes-ux-cores-periodo.md`](frontend-prompt-ajustes-ux-cores-periodo.md) item 4.
 
-`localStorage` `gastos_por_categoria_meses = 3`. Não persistir a fatia clicada.
+- Selects **Ano / De / Até** (igual Dashboard). De “Ano todo (jan – dez)” → `data_inicio`/`data_fim` daquele ano. De = Até → `mes`+`ano`. Intervalo no mesmo ano → `data_inicio`/`data_fim`.
+- Atalhos **Último mês / Últimos 3 / 6 / 12 meses** → `?meses=` (janela até hoje). “12 meses” ≠ jan–dez.
+- Subtítulo: `periodo.label` **e** `periodo.inicio` → `periodo.fim`.
+- Cartão / responsável → refetch e zera `selecao`.
+- Não misturar `meses` com `mes`+`ano` nem com datas.
+
+`localStorage`: modo rolling vs calendário. Não persistir a fatia clicada.
 
 ---
 
@@ -303,36 +314,36 @@ Clique simples na fatia = filtro cruzado. Não abrir a listagem.
 
 - `totais.compras === 0`: empty da página
 - Pizza escrava sem fatias após filtrar: “Nenhuma subcategoria nesta categoria” (a pizza mestre continua)
-- Loading: **dois** skeletons de pizza lado a lado
+- Loading: **três** skeletons de rosca lado a lado
 - 422/500: `message`
 
 ---
 
 ## Regras de UI (não negociar)
 
-- **Duas pizzas** (doughnut) na primeira dobra: categorias | subcategorias
-- Pizza de subcategorias é **escrava** da de categorias
+- **Três roscas** na primeira dobra: categorias | subcategorias | origem
+- Pizza de subcategorias é **escrava** da de categorias; origem segue a categoria (e os filtros do topo)
 - Clique **filtra os outros visuais no cliente** — sem GET
 - **Não** mandar `categoria_id` na API por causa do clique
 - **Não** barras no lugar das pizzas
 - **Não** uma pizza só (isso é o resumo)
 - **Não** esconder a pizza escrava
 - Moeda BRL; % com 1 casa como veio
-- Mobile: empilhar as duas pizzas, mesma interação
+- Mobile: empilhar as três roscas, mesma interação
 
 ---
 
 ## Critérios de aceite
 
-- [ ] Duas pizzas visíveis na carga (categoria e subcategoria), lado a lado no desktop
-- [ ] Clique numa fatia de categoria: a pizza de subs passa a mostrar as subs **daquela** categoria; KPIs e tipos acompanham; a pizza mestre só destaca a fatia
+- [ ] Três roscas visíveis na carga (categoria, subcategoria, **origem**), lado a lado no desktop
+- [ ] Clique numa fatia de categoria: a pizza de subs e a **rosca de origem** passam a ser daquela categoria; KPIs acompanham; a pizza mestre só destaca a fatia
 - [ ] Clique de novo na mesma fatia: limpa (toggle)
 - [ ] Clique numa fatia de sub: destaca; não recorta a pizza de categorias
 - [ ] Limpar filtro restaura a pizza de subs global
 - [ ] Zero request no clique das pizzas
 - [ ] Duplo clique / “Ver compras” usa `atalho`
 - [ ] Chips de período refetch e zeram seleção
-- [ ] Empty / loading (2 pizzas) / responsivo
+- [ ] Empty / loading (3 roscas) / responsivo
 
 ---
 
@@ -346,5 +357,7 @@ Clique simples na fatia = filtro cruzado. Não abrir a listagem.
 ---
 
 Spec: [`docs/modules/gastos-por-categoria.md`](modules/gastos-por-categoria.md)  
+Rosca de origem: [`frontend-prompt-gastos-por-categoria-origem.md`](frontend-prompt-gastos-por-categoria-origem.md)  
+Cores tema (quadrados + sub + default preto): [`frontend-prompt-cores-tema.md`](frontend-prompt-cores-tema.md)  
 Gastos críticos (não copiar): [`frontend-prompt-gastos-criticos.md`](frontend-prompt-gastos-criticos.md)  
 Compras (só no atalho): [`frontend-prompt-compras.md`](frontend-prompt-compras.md)

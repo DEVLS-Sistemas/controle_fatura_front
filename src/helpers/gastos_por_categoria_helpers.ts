@@ -187,18 +187,31 @@ export const resolverIntervaloCalendario = (
 }
 
 export const ORIGEM_CORES: Record<string, string> = {
-  COMPRAS_ONLINE: '#0dcaf0',
-  COMPRAS_PRESENCIAL: '#405189',
-  PAGAMENTO_SERVICOS: '#f7b84b',
-  PAGAMENTO_FATURA: '#6b7280',
+  COMPRAS_ONLINE: '#3b82f6',
+  COMPRAS_PRESENCIAL: '#22c55e',
+  PAGAMENTO_SERVICOS: '#f59e0b',
+  PAGAMENTO_FATURA: '#8b5cf6',
+  'sem-origem': '#9ca3af',
 }
 
 export const ORIGEM_COR_SEM = COR_SEM_CATEGORIA
 
-export const origemCor = (origem?: string | null): string => {
-  if (!origem) return ORIGEM_COR_SEM
+export const origemCor = (origem?: string | null, chave?: string | null): string => {
+  if (chave && ORIGEM_CORES[chave]) return ORIGEM_CORES[chave]
+  if (!origem || origem === 'sem-origem') return ORIGEM_COR_SEM
   return ORIGEM_CORES[origem] ?? ORIGEM_COR_SEM
 }
+
+export const chaveOrigem = (item?: GastosPorCategoriaOrigemItem | null): string => {
+  if (item?.chave) return String(item.chave)
+  if (item?.origem_compra) return String(item.origem_compra)
+  return 'sem-origem'
+}
+
+export const fatiasOrigem = (
+  itens?: GastosPorCategoriaOrigemItem[] | null
+): GastosPorCategoriaOrigemItem[] =>
+  (Array.isArray(itens) ? itens : []).filter((item) => Number(item.valor_total ?? 0) > 0)
 
 export const isOrigemValida = (value?: string | null): value is GastosPorCategoriaOrigem =>
   GASTOS_POR_CATEGORIA_ORIGENS.includes(value as GastosPorCategoriaOrigem)
@@ -776,6 +789,36 @@ export const encontrarCategoria = (
   const daLista = (data?.categorias ?? []).find((item) => mesmaCategoria(item, selecao))
   if (daLista) return daLista
   return fonteCategorias(data).find((item) => mesmaCategoria(item, selecao)) ?? null
+}
+
+export const coresFatiasOrigem = (
+  fatias: GastosPorCategoriaOrigemItem[],
+  selecionadaChave?: string | null
+): string[] =>
+  fatias.map((item) => {
+    const cor = origemCor(item.origem_compra, item.chave)
+    const ativa = Boolean(selecionadaChave) && selecionadaChave === chaveOrigem(item)
+    return corBarraDim(cor, Boolean(selecionadaChave) && !ativa)
+  })
+
+export const tituloOrigem = (categoriaNome?: string | null): string =>
+  categoriaNome ? `Origem em ${categoriaNome}` : 'Origem'
+
+export const centroValorOrigem = (
+  data?: GastosPorCategoriaView | null,
+  selecao?: GastosPorCategoriaSelecao | null
+): { valor: number | null; label: string } => {
+  const cat = encontrarCategoria(data, selecao)
+  if (cat) {
+    return {
+      valor: cat.valor_total ?? null,
+      label: cat.nome ? `Em ${cat.nome}` : 'Total',
+    }
+  }
+  return {
+    valor: data?.totais?.valor_total ?? null,
+    label: 'Total',
+  }
 }
 
 export const encontrarSubcategoria = (

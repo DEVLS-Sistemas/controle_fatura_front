@@ -1,18 +1,22 @@
-import React, { useRef } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import ReactApexChart from 'react-apexcharts'
 import { Card, CardBody, Col, Row } from 'reactstrap'
 import { formatCurrency, VALOR_TEXT_CLASS } from 'helpers/fatura_helpers'
 import { formatPercentualApi } from 'helpers/gastos_criticos_helpers'
 import {
   chaveCategoria,
+  chaveOrigem,
   coresFatiasCategoria,
+  coresFatiasOrigem,
   coresFatiasSubcategoria,
   corCategoria,
   isFatiaOutros,
+  isOrigemValida,
   percentualFatia,
 } from 'helpers/gastos_por_categoria_helpers'
 import {
   GastosPorCategoriaDashboardBarra,
+  GastosPorCategoriaOrigemItem,
   GastosPorCategoriaSubcategoriaBarra,
 } from 'interfaces/GastosPorCategoria/GastosPorCategoriaInterface'
 
@@ -36,6 +40,7 @@ interface PizzaProps {
   centroLabel?: string
   onClique: (item: FatiaPizza) => void
   onDuploClique: (item: FatiaPizza) => void
+  dicaClique?: string
 }
 
 const PizzaChart = ({
@@ -48,6 +53,7 @@ const PizzaChart = ({
   centroLabel,
   onClique,
   onDuploClique,
+  dicaClique = 'Clique filtra · duplo clique abre compras',
 }: PizzaProps) => {
   const lastClickRef = useRef(0)
   const lastIndexRef = useRef(-1)
@@ -171,7 +177,7 @@ const PizzaChart = ({
                   ${
                     isFatiaOutros(item)
                       ? ''
-                      : '<div class="text-muted fs-11 mt-1">Clique filtra · duplo clique abre compras</div>'
+                      : `<div class="text-muted fs-11 mt-1">${escapeHtml(dicaClique)}</div>`
                   }
                 </div>`
               },
@@ -226,17 +232,24 @@ const PizzaChart = ({
 interface GastosPorCategoriaDashboardsProps {
   categorias: GastosPorCategoriaDashboardBarra[]
   subcategorias: GastosPorCategoriaSubcategoriaBarra[]
+  origens: GastosPorCategoriaOrigemItem[]
   categoriaSelecionadaChave?: string | null
   subcategoriaSelecionadaId?: number | null
+  origemAtiva?: string | null
   tituloSubcategorias: string
+  tituloOrigem: string
   centroValor?: number | null
   centroLabel?: string
+  centroValorOrigem?: number | null
+  centroLabelOrigem?: string
   categoriaFiltrada?: boolean
   loading?: boolean
   onCliqueCategoria: (item: GastosPorCategoriaDashboardBarra) => void
   onCliqueSubcategoria: (item: GastosPorCategoriaSubcategoriaBarra) => void
   onDuploCliqueCategoria: (item: GastosPorCategoriaDashboardBarra) => void
   onDuploCliqueSubcategoria: (item: GastosPorCategoriaSubcategoriaBarra) => void
+  onDuploCliqueOrigem: (item: GastosPorCategoriaOrigemItem) => void
+  onFiltrarOrigem: (origem: string | null) => void
   onLimpar: () => void
 }
 
@@ -250,26 +263,62 @@ const ChartSkeleton = () => (
 const GastosPorCategoriaDashboards = ({
   categorias,
   subcategorias,
+  origens,
   categoriaSelecionadaChave,
   subcategoriaSelecionadaId,
+  origemAtiva,
   tituloSubcategorias,
+  tituloOrigem,
   centroValor,
   centroLabel,
+  centroValorOrigem,
+  centroLabelOrigem,
   categoriaFiltrada,
   loading,
   onCliqueCategoria,
   onCliqueSubcategoria,
   onDuploCliqueCategoria,
   onDuploCliqueSubcategoria,
+  onDuploCliqueOrigem,
+  onFiltrarOrigem,
   onLimpar,
 }: GastosPorCategoriaDashboardsProps) => {
+  const [origemLocal, setOrigemLocal] = useState<string | null>(null)
+  const origemDestacada = origemAtiva || origemLocal
   const temSelecao = Boolean(categoriaSelecionadaChave) || subcategoriaSelecionadaId != null
   const coresCat = coresFatiasCategoria(categorias, categoriaSelecionadaChave)
   const coresSub = coresFatiasSubcategoria(subcategorias, subcategoriaSelecionadaId)
+  const coresOrigem = coresFatiasOrigem(origens, origemDestacada)
+  const fatiasOrigemChart: FatiaPizza[] = origens.map((item) => ({
+    ...item,
+    nome: item.label || 'Sem origem',
+    chave: chaveOrigem(item),
+  }))
+
+  useEffect(() => {
+    setOrigemLocal(null)
+  }, [categoriaSelecionadaChave, origemAtiva])
+
+  const handleCliqueOrigem = (item: FatiaPizza) => {
+    const origem = origens.find((o) => chaveOrigem(o) === item.chave)
+    if (!origem) return
+    const chave = chaveOrigem(origem)
+    const enumVal = origem.origem_compra ?? null
+    if (origemDestacada === chave) {
+      if (!origemAtiva && enumVal && isOrigemValida(enumVal)) {
+        onFiltrarOrigem(enumVal)
+        return
+      }
+      if (!origemAtiva) setOrigemLocal(null)
+      return
+    }
+    setOrigemLocal(chave)
+  }
 
   return (
+    <>
     <Row className="g-3 mb-3">
-      <Col md={6}>
+      <Col xs={12} md={6}>
         <Card className="mb-0 h-100">
           <CardBody>
             <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
@@ -306,7 +355,7 @@ const GastosPorCategoriaDashboards = ({
           </CardBody>
         </Card>
       </Col>
-      <Col md={6}>
+      <Col xs={12} md={6}>
         <Card className="mb-0 h-100">
           <CardBody>
             <h5 className="card-title mb-3">{tituloSubcategorias}</h5>
@@ -354,6 +403,46 @@ const GastosPorCategoriaDashboards = ({
         </Card>
       </Col>
     </Row>
+    <Row className="g-3 mb-3">
+      <Col xs={12}>
+        <Card className="mb-0">
+          <CardBody>
+            <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+              <div>
+                <h5 className="card-title mb-0">{tituloOrigem}</h5>
+                <p className="text-muted mb-0 fs-12">Tipo de compra</p>
+              </div>
+              {origemAtiva ? (
+                <button type="button" className="btn btn-soft-secondary btn-sm" onClick={() => onFiltrarOrigem(null)}>
+                  Limpar origem
+                </button>
+              ) : null}
+            </div>
+            {loading ? (
+              <ChartSkeleton />
+            ) : origens.length === 0 ? (
+              <p className="text-muted mb-0">Sem origem neste recorte</p>
+            ) : (
+              <PizzaChart
+                fatias={fatiasOrigemChart}
+                cores={coresOrigem}
+                selecionada={(item) => Boolean(origemDestacada) && item.chave === origemDestacada}
+                percentualDe={(item) => percentualFatia(item, Boolean(categoriaFiltrada))}
+                centroValor={centroValorOrigem ?? centroValor}
+                centroLabel={centroLabelOrigem || 'Total'}
+                dicaClique="Clique destaca · duplo clique abre compras"
+                onClique={handleCliqueOrigem}
+                onDuploClique={(item) => {
+                  const origem = origens.find((o) => chaveOrigem(o) === item.chave)
+                  if (origem) onDuploCliqueOrigem(origem)
+                }}
+              />
+            )}
+          </CardBody>
+        </Card>
+      </Col>
+    </Row>
+    </>
   )
 }
 

@@ -19,24 +19,26 @@ import {
   atalhoToPath,
   atalhoToPeriodoState,
   fatiasCategoria,
+  fatiasOrigem,
   fatiasSubcategoria,
   barrasCategoria,
   barrasSubcategoria,
   buildPageSearchParams,
   buildSelectOptions,
+  centroValorOrigem,
   encontrarCategoria,
   persistGastosPorCategoriaSearch,
   resolveGastosPorCategoriaSearch,
   resolveGastosPorCategoriaSelecao,
   resolveKpis,
   resolvePorOrigemSelecao,
+  tituloOrigem,
 } from 'helpers/gastos_por_categoria_helpers'
 import GastosPorCategoriaHeader from './GastosPorCategoriaHeader/GastosPorCategoriaHeader'
 import GastosPorCategoriaHero from './GastosPorCategoriaHero/GastosPorCategoriaHero'
 import GastosPorCategoriaKpis from './GastosPorCategoriaKpis/GastosPorCategoriaKpis'
 import GastosPorCategoriaDashboards from './GastosPorCategoriaDashboards/GastosPorCategoriaDashboards'
 import GastosPorCategoriaBarras from './GastosPorCategoriaBarras/GastosPorCategoriaBarras'
-import GastosPorCategoriaTipos from './GastosPorCategoriaTipos/GastosPorCategoriaTipos'
 import GastosPorCategoriaLista from './GastosPorCategoriaLista/GastosPorCategoriaLista'
 import GastosPorCategoriaEvolucao from './GastosPorCategoriaEvolucao/GastosPorCategoriaEvolucao'
 import GastosPorCategoriaSemCategoria from './GastosPorCategoriaSemCategoria/GastosPorCategoriaSemCategoria'
@@ -158,11 +160,16 @@ const GastosPorCategoriaPage = () => {
   const subcategoriasChart = useMemo(() => fatiasSubcategoria(data, selecao), [data, selecao])
   const categoriasBarras = useMemo(() => barrasCategoria(data), [data])
   const subcategoriasBarras = useMemo(() => barrasSubcategoria(data, selecao), [data, selecao])
-  const porOrigem = useMemo(() => resolvePorOrigemSelecao(data, selecao), [data, selecao])
+  const porOrigem = useMemo(
+    () => fatiasOrigem(resolvePorOrigemSelecao(data, selecao)),
+    [data, selecao]
+  )
   const categoriaSelecionada = useMemo(() => encontrarCategoria(data, selecao), [data, selecao])
+  const origemCentro = useMemo(() => centroValorOrigem(data, selecao), [data, selecao])
   const tituloSubcategorias = selecao.categoria_chave
     ? `Subcategorias de ${categoriaSelecionada?.nome || 'categoria'}`
     : 'Subcategorias'
+  const tituloOrigemCard = tituloOrigem(selecao.categoria_chave ? categoriaSelecionada?.nome : null)
 
   return (
     <React.Fragment>
@@ -228,17 +235,24 @@ const GastosPorCategoriaPage = () => {
               <GastosPorCategoriaDashboards
                 categorias={categoriasChart}
                 subcategorias={subcategoriasChart}
+                origens={porOrigem}
                 categoriaSelecionadaChave={selecao.categoria_chave}
                 subcategoriaSelecionadaId={selecao.subcategoria_id}
+                origemAtiva={lastFiltersRef.current.origem_compra}
                 tituloSubcategorias={tituloSubcategorias}
+                tituloOrigem={tituloOrigemCard}
                 centroValor={kpis.valor_total}
                 centroLabel={kpis.label}
+                centroValorOrigem={origemCentro.valor}
+                centroLabelOrigem={origemCentro.label}
                 categoriaFiltrada={Boolean(selecao.categoria_chave)}
                 loading={skeleton}
                 onCliqueCategoria={(item) => aplicarSelecao(aplicarCliqueCategoria(selecao, item))}
                 onCliqueSubcategoria={(item) => aplicarSelecao(aplicarCliqueSubcategoria(selecao, item))}
                 onDuploCliqueCategoria={(item) => abrirAtalho(item.atalho)}
                 onDuploCliqueSubcategoria={(item) => abrirAtalho(item.atalho)}
+                onDuploCliqueOrigem={(item) => abrirAtalho(item.atalho)}
+                onFiltrarOrigem={handleOrigem}
                 onLimpar={() => aplicarSelecao({ ...GastosPorCategoriaSelecaoVazia })}
               />
               <GastosPorCategoriaBarras
@@ -258,11 +272,6 @@ const GastosPorCategoriaPage = () => {
               {skeleton ? <GastosPorCategoriaLista loading /> : null}
               {data ? (
                 <>
-                  <GastosPorCategoriaTipos
-                    itens={porOrigem}
-                    origemAtiva={lastFiltersRef.current.origem_compra}
-                    onFiltrar={handleOrigem}
-                  />
                   <GastosPorCategoriaLista categorias={data.categorias} />
                   <GastosPorCategoriaEvolucao
                     meses={data.evolucao?.por_mes}

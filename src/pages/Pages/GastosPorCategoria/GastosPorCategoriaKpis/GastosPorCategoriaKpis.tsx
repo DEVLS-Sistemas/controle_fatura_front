@@ -13,8 +13,8 @@ interface GastosPorCategoriaKpisProps {
 const KpiSkeleton = () => (
   <Row className="g-3 mb-3">
     {[0, 1, 2].map((idx) => (
-      <Col md={4} key={idx}>
-        <Card className="mb-0">
+      <Col md={4} key={idx} className="d-flex">
+        <Card className="mb-0 w-100">
           <CardBody>
             <div className="placeholder-glow">
               <span className="placeholder col-6 mb-2"></span>
@@ -47,24 +47,28 @@ const GastosPorCategoriaKpis = ({ kpis, loading, onVerCompras }: GastosPorCatego
   ]
 
   return (
-    <Row className="g-3 mb-3">
+    <Row className="g-3 mb-3 align-items-stretch">
       {cards.map((card) => (
-        <Col md={4} key={card.title}>
-          <Card className="mb-0 card-animate">
-            <CardBody>
+        <Col md={4} key={card.title} className="d-flex">
+          <Card className="mb-0 card-animate w-100">
+            <CardBody className="d-flex flex-column">
               <p className="text-uppercase fw-medium text-muted mb-1 fs-12">{card.title}</p>
               <h4 className={`fs-22 fw-semibold ff-secondary mb-1 ${card.money ? VALOR_TEXT_CLASS : ''}`}>
                 {card.value}
               </h4>
-              <p className="text-muted mb-0 fs-13">{kpis.label}</p>
-              {card.title === 'Gasto' && kpis.mostrarVariacao && variacao ? (
-                <span className={`badge bg-${variacao.color}-subtle text-${variacao.color} mt-2`}>
-                  {variacao.label}
-                </span>
-              ) : null}
-              {card.title === 'Gasto' && kpis.mostrarVariacao && kpis.variacao_valor_percentual == null ? (
-                <span className="badge bg-info-subtle text-info mt-2">Novo</span>
-              ) : null}
+              <div className="mt-auto">
+                <p className="text-muted mb-0 fs-13">{kpis.label}</p>
+                <div className="mt-2" style={{ minHeight: '1.4rem' }}>
+                  {card.title === 'Gasto' && kpis.mostrarVariacao && variacao ? (
+                    <span className={`badge bg-${variacao.color}-subtle text-${variacao.color}`}>
+                      {variacao.label}
+                    </span>
+                  ) : null}
+                  {card.title === 'Gasto' && kpis.mostrarVariacao && kpis.variacao_valor_percentual == null ? (
+                    <span className="badge bg-info-subtle text-info">Novo</span>
+                  ) : null}
+                </div>
+              </div>
             </CardBody>
           </Card>
         </Col>

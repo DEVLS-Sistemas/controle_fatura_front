@@ -161,11 +161,13 @@ export interface GastosPorCategoriaOutras {
 }
 
 export interface GastosPorCategoriaOrigemItem {
+  chave?: string | null
   origem_compra?: string | null
   label?: string | null
   valor_total?: number | null
   compras?: number | null
   percentual_gasto?: number | null
+  percentual_da_categoria?: number | null
   frase?: string | null
   atalho?: GastosPorCategoriaAtalho | null
 }
