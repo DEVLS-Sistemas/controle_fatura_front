@@ -90,6 +90,7 @@ export interface AssinaturaItem {
   categoria_cor?: string | null
   subcategoria_id?: number | null
   subcategoria_nome?: string | null
+  subcategoria_cor?: string | null
   responsavel_id?: number | null
   responsavel_nome?: string | null
   origem_compra_predominante?: string | null

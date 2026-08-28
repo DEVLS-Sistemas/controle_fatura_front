@@ -11,6 +11,7 @@ import {
   subtituloRanking,
   tituloRanking,
 } from 'helpers/gastos_criticos_helpers'
+import { corCategoria, corSubcategoria } from 'helpers/cores_tema_helpers'
 import {
   GastosCriticosDimensao,
   GastosCriticosRankingCriterio,
@@ -50,6 +51,11 @@ const RankingLinha = ({
   const subtitulo = isEstabelecimento
     ? (item.nome && item.nome !== titulo ? item.nome : null)
     : subtituloRanking(item)
+  const cor = isSubcategoria
+    ? corSubcategoria({ cor: item.cor, categoria_cor: item.categoria_cor })
+    : isCategoria
+      ? corCategoria({ cor: item.categoria_cor, categoria_id: item.categoria_id })
+      : null
 
   return (
     <div
@@ -86,13 +92,13 @@ const RankingLinha = ({
           <div className="d-flex flex-wrap align-items-start justify-content-between gap-2 mb-1">
             <div style={{ minWidth: 0 }}>
               <h6 className="mb-0 text-truncate d-flex align-items-center gap-2">
-                {(isCategoria || isSubcategoria) && item.categoria_cor ? (
+                {cor ? (
                   <span
                     className="rounded-circle d-inline-block flex-shrink-0"
                     style={{
                       width: 10,
                       height: 10,
-                      backgroundColor: item.categoria_cor,
+                      backgroundColor: cor,
                     }}
                   />
                 ) : null}
@@ -115,7 +121,13 @@ const RankingLinha = ({
             )}
           </div>
 
-          <Progress value={barra} className="mb-2" style={{ height: 6 }} color="primary" />
+          <Progress
+            value={barra}
+            className="mb-2"
+            style={{ height: 6 }}
+            color={cor ? undefined : 'primary'}
+            barStyle={cor ? { backgroundColor: cor } : undefined}
+          />
 
           <div className="d-flex flex-wrap gap-3 text-muted fs-13">
             <CurrencyValue value={item.valor_total} />

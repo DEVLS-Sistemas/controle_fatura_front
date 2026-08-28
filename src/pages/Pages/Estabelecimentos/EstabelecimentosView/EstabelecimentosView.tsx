@@ -17,6 +17,7 @@ import {
 } from 'interfaces/Estatisticas/EstatisticasCompraInterface'
 import { EstabelecimentosView } from 'interfaces/Estabelecimentos/EstabelecimentosInterface'
 import { EstabelecimentosService } from 'services/Estabelecimentos/EstabelecimentosService'
+import { corCategoria, corSubcategoria } from 'helpers/cores_tema_helpers'
 
 const EstabelecimentosViewPage = () => {
     const { state } = useLocation()
@@ -144,11 +145,53 @@ const EstabelecimentosViewPage = () => {
                                         </Col>
                                         <Col md={4} className="mb-3">
                                             <Label className="form-label fw-semibold">Categoria padrão</Label>
-                                            <p className="text-muted mb-0">{record.categoria_padrao_nome || '-'}</p>
+                                            <p className="text-muted mb-0 d-flex align-items-center gap-2">
+                                                {record.categoria_padrao_nome ? (
+                                                    <>
+                                                        <span
+                                                            className="d-inline-block rounded-circle"
+                                                            title={corCategoria({
+                                                                cor: record.categoria_padrao_cor,
+                                                                categoria_id: record.categoria_padrao_id,
+                                                            })}
+                                                            style={{
+                                                                width: 10,
+                                                                height: 10,
+                                                                backgroundColor: corCategoria({
+                                                                    cor: record.categoria_padrao_cor,
+                                                                    categoria_id: record.categoria_padrao_id,
+                                                                }),
+                                                            }}
+                                                        />
+                                                        {record.categoria_padrao_nome}
+                                                    </>
+                                                ) : '-'}
+                                            </p>
                                         </Col>
                                         <Col md={4} className="mb-3">
                                             <Label className="form-label fw-semibold">Subcategoria padrão</Label>
-                                            <p className="text-muted mb-0">{record.subcategoria_padrao_nome || '-'}</p>
+                                            <p className="text-muted mb-0 d-flex align-items-center gap-2">
+                                                {record.subcategoria_padrao_nome ? (
+                                                    <>
+                                                        <span
+                                                            className="d-inline-block rounded-circle"
+                                                            title={corSubcategoria({
+                                                                cor: record.subcategoria_padrao_cor,
+                                                                categoria_cor: record.categoria_padrao_cor,
+                                                            })}
+                                                            style={{
+                                                                width: 10,
+                                                                height: 10,
+                                                                backgroundColor: corSubcategoria({
+                                                                    cor: record.subcategoria_padrao_cor,
+                                                                    categoria_cor: record.categoria_padrao_cor,
+                                                                }),
+                                                            }}
+                                                        />
+                                                        {record.subcategoria_padrao_nome}
+                                                    </>
+                                                ) : '-'}
+                                            </p>
                                         </Col>
                                         <Col md={4} className="mb-3">
                                             <Label className="form-label fw-semibold">Ativo</Label>

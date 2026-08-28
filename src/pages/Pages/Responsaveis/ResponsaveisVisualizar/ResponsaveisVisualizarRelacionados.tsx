@@ -11,6 +11,7 @@ import {
     getCategoriaFieldStyle,
     VALOR_TEXT_CLASS,
 } from 'helpers/fatura_helpers'
+import { corCategoria } from 'helpers/cores_tema_helpers'
 import {
     buildComprasAtalhoPath,
     buildCompraVisualizarPath,
@@ -139,7 +140,14 @@ const ResponsaveisVisualizarRelacionados = ({ data }: ResponsaveisVisualizarRela
                             {porCategoria.map((categoria) => {
                                 const pct = Math.round((Number(categoria.valor_total || 0) / maxCategoria) * 100)
                                 const nome = categoria.nome || 'Sem categoria'
-                                const style = getCategoriaFieldStyle(categoria.cor)
+                                const hex = corCategoria({
+                                    cor: categoria.cor,
+                                    categoria_id: categoria.categoria_id,
+                                })
+                                const style = getCategoriaFieldStyle({
+                                    cor: categoria.cor,
+                                    categoria_id: categoria.categoria_id,
+                                })
                                 const comprasPath = buildComprasAtalhoPath(
                                     atalhos?.compras,
                                     data.id,
@@ -148,20 +156,19 @@ const ResponsaveisVisualizarRelacionados = ({ data }: ResponsaveisVisualizarRela
                                 const inner = (
                                     <div
                                         className="rounded px-3 py-2"
-                                        style={style || { backgroundColor: 'var(--vz-light, #f3f6f9)' }}
+                                        style={style}
                                     >
                                         <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-1">
                                             <div className="d-flex align-items-center gap-2">
-                                                {categoria.cor ? (
-                                                    <span
-                                                        className="rounded-circle flex-shrink-0"
-                                                        style={{
-                                                            width: 12,
-                                                            height: 12,
-                                                            backgroundColor: categoria.cor,
-                                                        }}
-                                                    />
-                                                ) : null}
+                                                <span
+                                                    className="rounded-circle flex-shrink-0"
+                                                    title={hex}
+                                                    style={{
+                                                        width: 12,
+                                                        height: 12,
+                                                        backgroundColor: hex,
+                                                    }}
+                                                />
                                                 <span className="fw-medium">{nome}</span>
                                                 <span className="text-muted fs-13">
                                                     {categoria.compras === 1 ? '1 compra' : `${categoria.compras} compras`}
@@ -169,7 +176,13 @@ const ResponsaveisVisualizarRelacionados = ({ data }: ResponsaveisVisualizarRela
                                             </div>
                                             <CurrencyValue value={categoria.valor_total} className="fw-semibold" />
                                         </div>
-                                        <Progress value={pct} color="primary" style={{ height: 6 }} className="mb-0" />
+                                        <Progress
+                                            value={pct}
+                                            color="primary"
+                                            style={{ height: 6 }}
+                                            className="mb-0"
+                                            barStyle={{ backgroundColor: hex }}
+                                        />
                                     </div>
                                 )
                                 return comprasPath ? (

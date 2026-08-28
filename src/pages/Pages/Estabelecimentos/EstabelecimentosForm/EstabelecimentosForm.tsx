@@ -9,6 +9,7 @@ import { required } from 'Components/ComponentController/ValidatorForm/Validator
 import { InputTextControlled } from 'Components/ComponentController/Inputs/Text/InputTextControlled'
 import { SelectListControlled } from 'Components/ComponentController/Selects/Select/SelectListControlled'
 import { SelectOptions } from 'interfaces/SystemInterfaces/SelectInterface'
+import { corCategoria, corSubcategoria } from 'helpers/cores_tema_helpers'
 import {
     EstabelecimentosDefaultValues,
     EstabelecimentosModel,
@@ -71,6 +72,7 @@ const EstabelecimentosForm = () => {
                 (list ?? []).map((c: any) => ({
                     value: c.id,
                     label: c.nome ?? `#${c.id}`,
+                    cor: corCategoria({ cor: c.cor, categoria_id: c.id }),
                 }))
             )
         } catch (error) {
@@ -89,7 +91,7 @@ const EstabelecimentosForm = () => {
                 (list ?? []).map((s) => ({
                     value: s.id!,
                     label: s.nome ?? `#${s.id}`,
-                    cor: s.cor ?? null,
+                    cor: corSubcategoria({ cor: s.cor }),
                 }))
             )
         } catch (error) {

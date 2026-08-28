@@ -23,6 +23,7 @@ import {
     formatCurrency,
     formatDateBr,
     getCategoriaFieldStyle,
+    getSubcategoriaFieldStyle,
     origemCompraLabel,
     statusRepasseBadgeClass,
     statusRepasseLabel,
@@ -33,6 +34,7 @@ import {
 } from 'helpers/fatura_helpers'
 import { isCompraAvista, isEhAssinatura } from 'helpers/assinaturas_helpers'
 import { SelectOptions } from 'interfaces/SystemInterfaces/SelectInterface'
+import { corCategoria } from 'helpers/cores_tema_helpers'
 import { ResponsaveisView } from 'interfaces/Responsaveis/ResponsaveisInterface'
 import { buildResponsavelVisualizarPath } from 'helpers/responsavel_visualizar_helpers'
 import {
@@ -283,6 +285,7 @@ const FaturaResponsavelView = () => {
                 (lookups.categorias ?? []).map((c) => ({
                     value: c.id!,
                     label: c.nome ?? `#${c.id}`,
+                    cor: corCategoria({ cor: c.cor, categoria_id: c.id }),
                 }))
             )
             setResponsaveisLookup(lookups.responsaveis ?? [])
@@ -556,6 +559,7 @@ const FaturaResponsavelView = () => {
             | 'categoria_cor'
             | 'subcategoria_id'
             | 'subcategoria_nome'
+            | 'subcategoria_cor'
             | 'responsavel_id'
             | 'valor'
             | 'observacoes'
@@ -630,13 +634,16 @@ const FaturaResponsavelView = () => {
                         if (rowPatch.subcategoria_id === undefined && rowPatch.categoria_id !== item.categoria_id) {
                             next.subcategoria_id = null
                             next.subcategoria_nome = undefined
+                            next.subcategoria_cor = undefined
                         }
                     }
                     if (rowPatch.subcategoria_id !== undefined) {
                         const opts = categoriaId ? (subcategoriasByCategoria[categoriaId] ?? []) : []
-                        next.subcategoria_nome =
-                            rowPatch.subcategoria_nome
-                            ?? opts.find((o) => Number(o.value) === rowPatch.subcategoria_id)?.label
+                        const opt = opts.find((o) => Number(o.value) === rowPatch.subcategoria_id)
+                        next.subcategoria_nome = rowPatch.subcategoria_nome ?? opt?.label
+                        next.subcategoria_cor = rowPatch.subcategoria_id
+                            ? (rowPatch.subcategoria_cor ?? opt?.cor ?? null)
+                            : null
                     }
                     if (rowPatch.origem_compra !== undefined) {
                         next.origem_compra_label =
@@ -807,10 +814,10 @@ const FaturaResponsavelView = () => {
         setCategoriasOptions((prev) => {
             if (prev.some((o) => Number(o.value) === Number(cat.id))) {
                 return prev.map((o) =>
-                    Number(o.value) === Number(cat.id) ? { ...o, label: cat.nome } : o
+                    Number(o.value) === Number(cat.id) ? { ...o, label: cat.nome, cor: corCategoria({ cor: cat.cor, categoria_id: cat.id }) } : o
                 )
             }
-            return [...prev, { value: cat.id, label: cat.nome }]
+            return [...prev, { value: cat.id, label: cat.nome, cor: corCategoria({ cor: cat.cor, categoria_id: cat.id }) }]
         })
         await loadSubcategoriasForCategoria(cat.id)
         await saveTransacao(rowForCategoriaRapido, {
@@ -827,12 +834,13 @@ const FaturaResponsavelView = () => {
         if (!rowForSubcategoriaRapido?.id || !rowForSubcategoriaRapido.categoria_id) return
         const sub = result.data
         const catId = Number(rowForSubcategoriaRapido.categoria_id)
+        const subCor = sub.cor ?? sub.categorias?.find((c) => Number(c.id) === catId)?.cor ?? null
         setSubcategoriasByCategoria((prev) => {
             const current = prev[catId] ?? []
             const exists = current.some((o) => Number(o.value) === Number(sub.id))
             const nextOpts = exists
-                ? current.map((o) => (Number(o.value) === Number(sub.id) ? { ...o, label: sub.nome } : o))
-                : [...current, { value: sub.id, label: sub.nome }]
+                ? current.map((o) => (Number(o.value) === Number(sub.id) ? { ...o, label: sub.nome, cor: subCor ?? o.cor } : o))
+                : [...current, { value: sub.id, label: sub.nome, cor: subCor }]
             return { ...prev, [catId]: nextOpts }
         })
         loadedSubcategoriasRef.current.add(catId)
@@ -840,6 +848,7 @@ const FaturaResponsavelView = () => {
             categoria_id: catId,
             subcategoria_id: sub.id,
             subcategoria_nome: sub.nome,
+            subcategoria_cor: subCor,
             propagar_grupo: result.propagar_grupo,
         })
         setRowForSubcategoriaRapido(null)
@@ -1331,10 +1340,11 @@ const FaturaResponsavelView = () => {
                                                                                     onChange={(e) => handleUpdateSelect(tx, 'categoria_id', e.target.value)}
                                                                                     style={
                                                                                         tx.categoria_id
-                                                                                            ? (getCategoriaFieldStyle(
-                                                                                                tx.categoria_cor
-                                                                                                ?? categoriasLookup.find((c) => c.id === tx.categoria_id)?.cor
-                                                                                            ) ?? undefined)
+                                                                                            ? getCategoriaFieldStyle({
+                                                                                                cor: tx.categoria_cor
+                                                                                                    ?? categoriasLookup.find((c) => c.id === tx.categoria_id)?.cor,
+                                                                                                categoria_id: tx.categoria_id,
+                                                                                            })
                                                                                             : undefined
                                                                                     }
                                                                                 >
@@ -1364,6 +1374,15 @@ const FaturaResponsavelView = () => {
                                                                                     value={tx.subcategoria_id ?? ''}
                                                                                     disabled={!tx.categoria_id || !!savingIds[tx.id!]}
                                                                                     onChange={(e) => handleUpdateSelect(tx, 'subcategoria_id', e.target.value)}
+                                                                                    style={
+                                                                                        tx.subcategoria_id
+                                                                                            ? getSubcategoriaFieldStyle({
+                                                                                                cor: tx.subcategoria_cor
+                                                                                                    ?? subOptions.find((o) => Number(o.value) === Number(tx.subcategoria_id))?.cor,
+                                                                                                categoria_cor: tx.categoria_cor,
+                                                                                            })
+                                                                                            : undefined
+                                                                                    }
                                                                                 >
                                                                                     <option value="">Sem subcategoria</option>
                                                                                     {subOptions.map((opt) => (

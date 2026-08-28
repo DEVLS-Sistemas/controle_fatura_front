@@ -1,5 +1,6 @@
 import { getApiBaseUrl } from 'libs/api/ApiConfig'
 import { getAuthToken, handleUnauthorizedSession } from 'helpers/auth_session'
+import { corCategoria, corSubcategoria, CorCategoriaItem } from 'helpers/cores_tema_helpers'
 
 /** Classe CSS para alinhar valores monetários à direita */
 export const VALOR_TEXT_CLASS = 'text-valor'
@@ -181,17 +182,22 @@ const hexToRgba = (hex: string, alpha: number): string => {
 
 /** Estilo de fundo com a cor cadastrada da categoria (texto permanece legível) */
 export const getCategoriaFieldStyle = (
-  cor?: string | null
-): { backgroundColor: string; borderColor: string; borderLeftWidth: number; borderLeftStyle: 'solid'; color: string } | null => {
-  if (!cor) return null
+  cor?: string | null | CorCategoriaItem
+): { backgroundColor: string; borderColor: string; borderLeftWidth: number; borderLeftStyle: 'solid'; color: string } => {
+  const hex = corCategoria(cor)
   return {
-    backgroundColor: hexToRgba(cor, 0.28),
-    borderColor: cor,
+    backgroundColor: hexToRgba(hex, 0.28),
+    borderColor: hex,
     borderLeftWidth: 4,
     borderLeftStyle: 'solid',
     color: '#212529',
   }
 }
+
+export const getSubcategoriaFieldStyle = (item?: {
+  cor?: string | null
+  categoria_cor?: string | null
+}) => getCategoriaFieldStyle(corSubcategoria(item))
 
 export const mesesOptions = Array.from({ length: 12 }, (_, i) => ({
   value: i + 1,

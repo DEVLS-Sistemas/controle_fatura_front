@@ -20,7 +20,7 @@ import {
     isTransacaoOperacional,
 } from "helpers/fatura_helpers"
 import { pathVisualizacaoDaLinha, tituloListagemCompra, precisaConciliarCompra, labelPrecisaConciliar, temSugestaoConciliacao, labelSugestaoConciliacao, conciliadaComManual, labelConciliadaComManual, identificadorCompraManualVinculada, pathVisualizacaoCompra } from "helpers/cadastro_manual_compra_helpers"
-import { CartaoChip } from "helpers/cartao_helpers"
+import { corCategoria, corSubcategoria } from "helpers/cores_tema_helpers"
 import { isCompraAvista, isEhAssinatura } from "helpers/assinaturas_helpers"
 import { SelectOptions } from "interfaces/SystemInterfaces/SelectInterface"
 import {
@@ -411,21 +411,47 @@ export const TransacoesTable = ({
                                                                         <td>
                                                                             {row.categoria_nome ? (
                                                                                 <span className="d-inline-flex align-items-center gap-1">
-                                                                                    {row.categoria_cor && (
-                                                                                        <span
-                                                                                            className="d-inline-block rounded-circle"
-                                                                                            style={{
-                                                                                                width: 10,
-                                                                                                height: 10,
-                                                                                                backgroundColor: row.categoria_cor,
-                                                                                            }}
-                                                                                        />
-                                                                                    )}
+                                                                                    <span
+                                                                                        className="d-inline-block rounded-circle"
+                                                                                        title={corCategoria({
+                                                                                            cor: row.categoria_cor,
+                                                                                            categoria_id: row.categoria_id,
+                                                                                        })}
+                                                                                        style={{
+                                                                                            width: 10,
+                                                                                            height: 10,
+                                                                                            backgroundColor: corCategoria({
+                                                                                                cor: row.categoria_cor,
+                                                                                                categoria_id: row.categoria_id,
+                                                                                            }),
+                                                                                        }}
+                                                                                    />
                                                                                     {row.categoria_nome}
                                                                                 </span>
                                                                             ) : '-'}
                                                                         </td>
-                                                                        <td>{row.subcategoria_nome ?? '-'}</td>
+                                                                        <td>
+                                                                            {row.subcategoria_nome ? (
+                                                                                <span className="d-inline-flex align-items-center gap-1">
+                                                                                    <span
+                                                                                        className="d-inline-block rounded-circle"
+                                                                                        title={corSubcategoria({
+                                                                                            cor: row.subcategoria_cor,
+                                                                                            categoria_cor: row.categoria_cor,
+                                                                                        })}
+                                                                                        style={{
+                                                                                            width: 10,
+                                                                                            height: 10,
+                                                                                            backgroundColor: corSubcategoria({
+                                                                                                cor: row.subcategoria_cor,
+                                                                                                categoria_cor: row.categoria_cor,
+                                                                                            }),
+                                                                                        }}
+                                                                                    />
+                                                                                    {row.subcategoria_nome}
+                                                                                </span>
+                                                                            ) : '-'}
+                                                                        </td>
                                                                         <td>
                                                                             <Button
                                                                                 type="button"

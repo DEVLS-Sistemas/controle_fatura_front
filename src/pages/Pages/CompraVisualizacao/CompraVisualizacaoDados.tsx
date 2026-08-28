@@ -11,6 +11,7 @@ import {
   getCategoriaFieldStyle,
   origemCompraColor,
 } from 'helpers/fatura_helpers'
+import { corSubcategoria } from 'helpers/cores_tema_helpers'
 import { CompraVisualizacaoView } from 'interfaces/CompraVisualizacao/CompraVisualizacaoInterface'
 import { faturaIdDaCompra, LABEL_ESTABELECIMENTO_VAZIO, origemLancamentoCompra, textoCompraDaCompra } from 'helpers/cadastro_manual_compra_helpers'
 
@@ -55,7 +56,18 @@ const CompraVisualizacaoDados = ({ compra }: CompraVisualizacaoDadosProps) => {
   const lojaNome = compra.estabelecimento?.loja_nome
   const textoCompra = textoCompraDaCompra(compra)
   const digitos = ultimosDigitosCartao(compra)
-  const categoriaStyle = getCategoriaFieldStyle(compra.categoria?.cor)
+  const categoriaStyle = compra.categoria
+    ? getCategoriaFieldStyle({
+        cor: compra.categoria.cor,
+        categoria_id: compra.categoria.id,
+      })
+    : undefined
+  const subcategoriaHex = compra.subcategoria
+    ? corSubcategoria({
+        cor: compra.subcategoria.cor,
+        categoria_cor: compra.categoria?.cor,
+      })
+    : null
   const origemLabel = compra.origem_compra_label || compra.origem_compra
   const origemTone = origemCompraColor[compra.origem_compra || ''] || 'secondary'
   const ehEu = isResponsavelEu(compra)
@@ -195,8 +207,23 @@ const CompraVisualizacaoDados = ({ compra }: CompraVisualizacaoDadosProps) => {
             tone="secondary"
             label="Categoria"
             value={compra.categoria?.nome}
-            extra={compra.subcategoria?.nome}
-            style={categoriaStyle || undefined}
+            extra={
+              compra.subcategoria?.nome ? (
+                <span className="d-inline-flex align-items-center gap-1">
+                  <span
+                    className="d-inline-block rounded-circle"
+                    title={subcategoriaHex}
+                    style={{
+                      width: 8,
+                      height: 8,
+                      backgroundColor: subcategoriaHex,
+                    }}
+                  />
+                  {compra.subcategoria.nome}
+                </span>
+              ) : null
+            }
+            style={categoriaStyle}
           />
           {!compra.categoria?.nome && compra.subcategoria?.nome ? (
             <DadoTile
@@ -204,6 +231,11 @@ const CompraVisualizacaoDados = ({ compra }: CompraVisualizacaoDadosProps) => {
               tone="secondary"
               label="Subcategoria"
               value={compra.subcategoria.nome}
+              style={
+                subcategoriaHex
+                  ? { borderLeft: `4px solid ${subcategoriaHex}` }
+                  : undefined
+              }
             />
           ) : null}
           <DadoTile

@@ -12,6 +12,7 @@ import {
 } from 'interfaces/RankingParceladas/RankingParceladasInterface'
 import { RankingParceladasService } from 'services/RankingParceladas/RankingParceladasService'
 import { TransacoesService } from 'services/Transacoes/TransacoesService'
+import { corCategoria } from 'helpers/cores_tema_helpers'
 import {
   buildTotaisRanking,
   enriquecerRankingView,
@@ -135,7 +136,13 @@ const RankingParceladasPage = () => {
       const result = await transacoesService.getLookupsTransacoes()
       if (result) {
         setCartoesOptions(buildSelectOptions(result.cartoes))
-        setCategoriasOptions(buildSelectOptions(result.categorias))
+        setCategoriasOptions(
+          buildSelectOptions(result.categorias).map((opt) =>
+            opt.value === ''
+              ? opt
+              : { ...opt, cor: corCategoria({ cor: opt.cor, categoria_id: Number(opt.value) }) }
+          )
+        )
         setResponsaveisOptions(buildSelectOptions(result.responsaveis))
       }
     } catch (error) {

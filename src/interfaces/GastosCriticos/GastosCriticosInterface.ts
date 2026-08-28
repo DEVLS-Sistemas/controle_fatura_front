@@ -164,6 +164,7 @@ export interface GastosCriticosRankingItem {
   categoria_cor?: string | null
   subcategoria_id?: number | null
   subcategoria_nome?: string | null
+  cor?: string | null
   atalho?: GastosCriticosAtalho | null
 }
 

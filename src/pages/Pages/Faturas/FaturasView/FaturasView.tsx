@@ -17,7 +17,7 @@ import {
     origemCompraLabel,
     isTransacaoOperacional,
     FATURA_FILE_ACCEPT, isValidFaturaFile, resolveFaturaAnexo, downloadFaturaAnexo,
-    getCategoriaFieldStyle, VALOR_TEXT_CLASS, isMeuResponsavelDisplay, nomeResponsavelPadraoNaoEu,
+    getCategoriaFieldStyle, getSubcategoriaFieldStyle, VALOR_TEXT_CLASS, isMeuResponsavelDisplay, nomeResponsavelPadraoNaoEu,
 } from 'helpers/fatura_helpers'
 import {
     labelBotaoRemoverAnexo,
@@ -50,6 +50,7 @@ import {
     valorContaNoTotal,
 } from 'helpers/cadastro_manual_compra_helpers'
 import { CartaoChip, BandeiraChip, resolveCartaoCores } from 'helpers/cartao_helpers'
+import { corCategoria } from 'helpers/cores_tema_helpers'
 import { formatParsersHomologadosLista, parsersHomologadosOrFallback, resolveCartaoHomologacao } from 'helpers/parser_homologado_helpers'
 import CartaoPdfHomologacaoBadge from 'Components/Cartoes/CartaoPdfHomologacaoBadge'
 import { SelectOptions } from 'interfaces/SystemInterfaces/SelectInterface'
@@ -547,6 +548,7 @@ const FaturasViewPage = () => {
                     lookups.categorias.map((c) => ({
                         value: c.id!,
                         label: c.nome ?? `#${c.id}`,
+                        cor: corCategoria({ cor: c.cor, categoria_id: c.id }),
                     }))
                 )
             }
@@ -1236,6 +1238,7 @@ const FaturasViewPage = () => {
             | 'categoria_cor'
             | 'subcategoria_id'
             | 'subcategoria_nome'
+            | 'subcategoria_cor'
             | 'responsavel_id'
             | 'valor'
             | 'observacoes'
@@ -1296,13 +1299,16 @@ const FaturasViewPage = () => {
                         if (rowPatch.subcategoria_id === undefined && rowPatch.categoria_id !== item.categoria_id) {
                             next.subcategoria_id = null
                             next.subcategoria_nome = undefined
+                            next.subcategoria_cor = undefined
                         }
                     }
                     if (rowPatch.subcategoria_id !== undefined) {
                         const opts = categoriaId ? (subcategoriasByCategoria[categoriaId] ?? []) : []
-                        next.subcategoria_nome =
-                            rowPatch.subcategoria_nome
-                            ?? opts.find((o) => Number(o.value) === rowPatch.subcategoria_id)?.label
+                        const opt = opts.find((o) => Number(o.value) === rowPatch.subcategoria_id)
+                        next.subcategoria_nome = rowPatch.subcategoria_nome ?? opt?.label
+                        next.subcategoria_cor = rowPatch.subcategoria_id
+                            ? (rowPatch.subcategoria_cor ?? opt?.cor ?? null)
+                            : null
                     }
                     if (rowPatch.origem_compra !== undefined) {
                         next.origem_compra_label =
@@ -1556,10 +1562,10 @@ const FaturasViewPage = () => {
         setCategoriasOptions((prev) => {
             if (prev.some((o) => Number(o.value) === Number(cat.id))) {
                 return prev.map((o) =>
-                    Number(o.value) === Number(cat.id) ? { ...o, label: cat.nome } : o
+                    Number(o.value) === Number(cat.id) ? { ...o, label: cat.nome, cor: corCategoria({ cor: cat.cor, categoria_id: cat.id }) } : o
                 )
             }
-            return [...prev, { value: cat.id, label: cat.nome }]
+            return [...prev, { value: cat.id, label: cat.nome, cor: corCategoria({ cor: cat.cor, categoria_id: cat.id }) }]
         })
         await loadSubcategoriasForCategoria(cat.id)
         await saveTransacao(rowForCategoriaRapido, {
@@ -1576,12 +1582,13 @@ const FaturasViewPage = () => {
         if (!rowForSubcategoriaRapido?.id || !rowForSubcategoriaRapido.categoria_id) return
         const sub = result.data
         const catId = Number(rowForSubcategoriaRapido.categoria_id)
+        const subCor = sub.cor ?? sub.categorias?.find((c) => Number(c.id) === catId)?.cor ?? null
         setSubcategoriasByCategoria((prev) => {
             const current = prev[catId] ?? []
             const exists = current.some((o) => Number(o.value) === Number(sub.id))
             const nextOpts = exists
-                ? current.map((o) => (Number(o.value) === Number(sub.id) ? { ...o, label: sub.nome } : o))
-                : [...current, { value: sub.id, label: sub.nome }]
+                ? current.map((o) => (Number(o.value) === Number(sub.id) ? { ...o, label: sub.nome, cor: subCor ?? o.cor } : o))
+                : [...current, { value: sub.id, label: sub.nome, cor: subCor }]
             return { ...prev, [catId]: nextOpts }
         })
         loadedSubcategoriasRef.current.add(catId)
@@ -1589,6 +1596,7 @@ const FaturasViewPage = () => {
             categoria_id: catId,
             subcategoria_id: sub.id,
             subcategoria_nome: sub.nome,
+            subcategoria_cor: subCor,
             propagar_grupo: result.propagar_grupo,
         })
         setRowForSubcategoriaRapido(null)
@@ -1670,7 +1678,7 @@ const FaturasViewPage = () => {
         return {
             labels: withTotal.map((c) => c.nome),
             series: withTotal.map((c) => Number(c.total.toFixed(2))),
-            colors: withTotal.map((c) => c.cor || '#6b7280'),
+            colors: withTotal.map((c) => corCategoria({ cor: c.cor, categoria_id: c.id })),
         }
     }, [categoriasResumo])
 
@@ -2133,35 +2141,31 @@ const FaturasViewPage = () => {
                                             <span className="text-muted">Nenhuma categoria vinculada ainda.</span>
                                         ) : (
                                             <div className="d-flex flex-wrap gap-2">
-                                                {categoriasResumo.map((cat) => (
+                                                {categoriasResumo.map((cat) => {
+                                                    const hex = corCategoria({ cor: cat.cor, categoria_id: cat.id })
+                                                    return (
                                                     <span
                                                         key={cat.id}
                                                         className="d-inline-flex align-items-center gap-2 border rounded px-2 py-1"
-                                                        style={{
-                                                            backgroundColor: cat.cor ? `${cat.cor}22` : '#f8f9fa',
-                                                            borderColor: cat.cor || '#dee2e6',
-                                                            borderLeftWidth: 4,
-                                                            borderLeftStyle: 'solid',
-                                                            borderLeftColor: cat.cor || '#adb5bd',
-                                                        }}
+                                                        style={getCategoriaFieldStyle({ cor: cat.cor, categoria_id: cat.id })}
                                                         title={`${cat.count} transação(ões) · ${formatCurrency(cat.total)}`}
                                                     >
-                                                        {cat.cor && (
-                                                            <span
-                                                                className="rounded-circle border"
-                                                                style={{
-                                                                    width: 12,
-                                                                    height: 12,
-                                                                    backgroundColor: cat.cor,
-                                                                    flexShrink: 0,
-                                                                }}
-                                                            />
-                                                        )}
+                                                        <span
+                                                            className="rounded-circle border"
+                                                            title={hex}
+                                                            style={{
+                                                                width: 12,
+                                                                height: 12,
+                                                                backgroundColor: hex,
+                                                                flexShrink: 0,
+                                                            }}
+                                                        />
                                                         <span className="fw-medium">{cat.nome}</span>
                                                         <span className="text-muted small">{cat.count}x</span>
                                                         <span className={`text-muted small ${VALOR_TEXT_CLASS}`}>{formatCurrency(cat.total)}</span>
                                                     </span>
-                                                ))}
+                                                    )
+                                                })}
                                             </div>
                                         )}
                                     </div>
@@ -2510,10 +2514,11 @@ const FaturasViewPage = () => {
                                                                         onChange={(e) => handleUpdateSelect(tx, 'categoria_id', e.target.value)}
                                                                         style={
                                                                             tx.categoria_id
-                                                                                ? (getCategoriaFieldStyle(
-                                                                                    tx.categoria_cor
-                                                                                    ?? categoriasLookup.find((c) => c.id === tx.categoria_id)?.cor
-                                                                                ) ?? undefined)
+                                                                                ? getCategoriaFieldStyle({
+                                                                                    cor: tx.categoria_cor
+                                                                                        ?? categoriasLookup.find((c) => c.id === tx.categoria_id)?.cor,
+                                                                                    categoria_id: tx.categoria_id,
+                                                                                })
                                                                                 : undefined
                                                                         }
                                                                     >
@@ -2543,6 +2548,15 @@ const FaturasViewPage = () => {
                                                                         value={tx.subcategoria_id ?? ''}
                                                                         disabled={!tx.categoria_id || !!savingIds[tx.id!]}
                                                                         onChange={(e) => handleUpdateSelect(tx, 'subcategoria_id', e.target.value)}
+                                                                        style={
+                                                                            tx.subcategoria_id
+                                                                                ? getSubcategoriaFieldStyle({
+                                                                                    cor: tx.subcategoria_cor
+                                                                                        ?? subOptions.find((o) => Number(o.value) === Number(tx.subcategoria_id))?.cor,
+                                                                                    categoria_cor: tx.categoria_cor,
+                                                                                })
+                                                                                : undefined
+                                                                        }
                                                                     >
                                                                         <option value="">Sem subcategoria</option>
                                                                         {subOptions.map((opt) => (

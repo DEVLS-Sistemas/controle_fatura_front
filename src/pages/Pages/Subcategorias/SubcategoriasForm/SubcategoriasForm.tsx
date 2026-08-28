@@ -17,7 +17,7 @@ import {
 import { SubcategoriasService } from 'services/Subcategorias/SubcategoriasService'
 import { CategoriasService } from 'services/Categorias/CategoriasService'
 import { CorTemaPreview } from 'Components/CoresTema/CorTemaSwatches'
-import { corSubcategoria } from 'helpers/cores_tema_helpers'
+import { corCategoria, corSubcategoria } from 'helpers/cores_tema_helpers'
 
 const buildRecordFromSource = (source: any): SubcategoriasModel => {
     const categoriaIds =
@@ -69,6 +69,7 @@ const SubcategoriasForm = () => {
                 (list ?? []).map((c: any) => ({
                     value: c.id,
                     label: c.nome ?? `#${c.id}`,
+                    cor: corCategoria({ cor: c.cor, categoria_id: c.id }),
                 }))
             )
         } catch (error) {

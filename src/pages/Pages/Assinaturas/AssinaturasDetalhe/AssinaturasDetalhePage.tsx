@@ -33,6 +33,7 @@ import {
   statusAssinaturaBadge,
   subtittleMaquininha,
 } from 'helpers/assinaturas_helpers'
+import { corCategoria } from 'helpers/cores_tema_helpers'
 import AssinaturasAcoes from '../AssinaturasAcoes/AssinaturasAcoes'
 
 const MESES_ABREV = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
@@ -276,11 +277,12 @@ const AssinaturasDetalhePage = () => {
                           <Badge
                             color="light"
                             className="text-body"
-                            style={
-                              assinatura.categoria_cor
-                                ? { borderLeft: `3px solid ${assinatura.categoria_cor}` }
-                                : undefined
-                            }
+                            style={{
+                              borderLeft: `3px solid ${corCategoria({
+                                cor: assinatura.categoria_cor,
+                                categoria_id: assinatura.categoria_id,
+                              })}`,
+                            }}
                           >
                             {assinatura.categoria_nome}
                           </Badge>

@@ -59,6 +59,7 @@ export interface CompraCategoriaRef {
 export interface CompraSubcategoriaRef {
   id: number
   nome: string
+  cor?: string | null
 }
 
 export interface CompraResponsavelRef {

@@ -57,6 +57,7 @@ export interface TransacoesList {
     categoria_cor?: string
     subcategoria_id?: number | null
     subcategoria_nome?: string
+    subcategoria_cor?: string | null
     responsavel_id?: number | null
     responsavel_nome?: string
     responsavel_tipo?: string
@@ -159,6 +160,7 @@ export interface SubcategoriaLookup {
     id?: number
     nome?: string
     categoria_id?: number | null
+    cor?: string | null
 }
 
 export interface EstabelecimentoLookup {

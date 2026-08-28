@@ -13,6 +13,7 @@ import {
   statusAssinaturaBadge,
   subtittleMaquininha,
 } from 'helpers/assinaturas_helpers'
+import { corCategoria } from 'helpers/cores_tema_helpers'
 import AssinaturasAcoes from '../AssinaturasAcoes/AssinaturasAcoes'
 
 type AssinaturaCardVariant = 'oficial' | 'candidata' | 'ignorada'
@@ -149,7 +150,12 @@ const AssinaturaCard = ({
                 <Badge
                   color="light"
                   className="text-body"
-                  style={item.categoria_cor ? { borderLeft: `3px solid ${item.categoria_cor}` } : undefined}
+                  style={{
+                    borderLeft: `3px solid ${corCategoria({
+                      cor: item.categoria_cor,
+                      categoria_id: item.categoria_id,
+                    })}`,
+                  }}
                 >
                   {item.categoria_nome}
                 </Badge>

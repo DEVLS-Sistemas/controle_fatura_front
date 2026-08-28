@@ -9,6 +9,7 @@ import { PaginateInterface, PaginateSearch, PerPageProps } from "interfaces/Syst
 import CustomModal from "Components/ComponentController/Modal/CustomModal"
 import TableActionsDropdown from "Components/Common/TableActionsDropdown"
 import { formatCurrency, VALOR_TEXT_CLASS } from "helpers/fatura_helpers"
+import { corCategoria, corSubcategoria } from "helpers/cores_tema_helpers"
 import { extraEstatisticasLinha, frequenciaLabel } from "helpers/estatisticas_helpers"
 import { pickEstatisticas, pickPeriodoFiltro } from "interfaces/Estatisticas/EstatisticasCompraInterface"
 import { EstabelecimentosList, EstabelecimentosSearch } from "interfaces/Estabelecimentos/EstabelecimentosInterface"
@@ -181,8 +182,50 @@ export const EstabelecimentosTable = ({ data, getData, setPerPage, perPage, filt
                                                                     </td>
                                                                     <td className={VALOR_TEXT_CLASS}>{formatCurrency(stats.valor_total)}</td>
                                                                     <td className="text-start fw-medium">{frequenciaLabel(stats)}</td>
-                                                                    <td>{row.categoria_padrao_nome ?? '-'}</td>
-                                                                    <td>{row.subcategoria_padrao_nome ?? '-'}</td>
+                                                                    <td>
+                                                                        {row.categoria_padrao_nome ? (
+                                                                            <span className="d-inline-flex align-items-center gap-1">
+                                                                                <span
+                                                                                    className="d-inline-block rounded-circle"
+                                                                                    title={corCategoria({
+                                                                                        cor: row.categoria_padrao_cor,
+                                                                                        categoria_id: row.categoria_padrao_id,
+                                                                                    })}
+                                                                                    style={{
+                                                                                        width: 10,
+                                                                                        height: 10,
+                                                                                        backgroundColor: corCategoria({
+                                                                                            cor: row.categoria_padrao_cor,
+                                                                                            categoria_id: row.categoria_padrao_id,
+                                                                                        }),
+                                                                                    }}
+                                                                                />
+                                                                                {row.categoria_padrao_nome}
+                                                                            </span>
+                                                                        ) : '-'}
+                                                                    </td>
+                                                                    <td>
+                                                                        {row.subcategoria_padrao_nome ? (
+                                                                            <span className="d-inline-flex align-items-center gap-1">
+                                                                                <span
+                                                                                    className="d-inline-block rounded-circle"
+                                                                                    title={corSubcategoria({
+                                                                                        cor: row.subcategoria_padrao_cor,
+                                                                                        categoria_cor: row.categoria_padrao_cor,
+                                                                                    })}
+                                                                                    style={{
+                                                                                        width: 10,
+                                                                                        height: 10,
+                                                                                        backgroundColor: corSubcategoria({
+                                                                                            cor: row.subcategoria_padrao_cor,
+                                                                                            categoria_cor: row.categoria_padrao_cor,
+                                                                                        }),
+                                                                                    }}
+                                                                                />
+                                                                                {row.subcategoria_padrao_nome}
+                                                                            </span>
+                                                                        ) : '-'}
+                                                                    </td>
                                                                     <td>
                                                                         <span className={`badge bg-${row.ativo ? 'success' : 'danger'}`}>
                                                                             {row.ativo ? 'Ativo' : 'Inativo'}

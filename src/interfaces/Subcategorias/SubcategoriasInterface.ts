@@ -52,6 +52,7 @@ export interface SubcategoriaRapidoPayload {
 export interface SubcategoriaRapidoData {
     id: number
     nome: string
+    cor?: string | null
     ativo?: boolean
     categorias?: SubcategoriaCategoriaVinculo[]
     categoria_ids?: number[]

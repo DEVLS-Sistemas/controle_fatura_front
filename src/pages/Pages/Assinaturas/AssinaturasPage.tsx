@@ -13,6 +13,7 @@ import {
 } from 'interfaces/Assinaturas/AssinaturasInterface'
 import { AssinaturasService } from 'services/Assinaturas/AssinaturasService'
 import { TransacoesService } from 'services/Transacoes/TransacoesService'
+import { corCategoria } from 'helpers/cores_tema_helpers'
 import {
   idLookupToSelectOptions,
   lookupToSelectOptions,
@@ -147,7 +148,13 @@ const AssinaturasPage = () => {
         const tx: any = transacoesLookups
         const txData = tx.cartoes || tx.categorias ? tx : tx.data
         setCartoesOptions(idLookupToSelectOptions(txData?.cartoes))
-        setCategoriasOptions(idLookupToSelectOptions(txData?.categorias))
+        setCategoriasOptions(
+          idLookupToSelectOptions(txData?.categorias).map((opt) =>
+            opt.value === ''
+              ? opt
+              : { ...opt, cor: corCategoria({ cor: opt.cor, categoria_id: Number(opt.value) }) }
+          )
+        )
         setResponsaveisOptions(idLookupToSelectOptions(txData?.responsaveis))
       }
     } catch (error) {

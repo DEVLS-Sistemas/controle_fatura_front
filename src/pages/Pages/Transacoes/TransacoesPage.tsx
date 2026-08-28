@@ -11,6 +11,7 @@ import {
 } from 'interfaces/Transacoes/TransacoesInterface'
 import { TransacoesService } from 'services/Transacoes/TransacoesService'
 import { origemCompraLabel, tipoTransacaoLabel } from 'helpers/fatura_helpers'
+import { corCategoria } from 'helpers/cores_tema_helpers'
 import TransacoesFilter from './TransacoesFilter/TransacoesFilter'
 import TransacoesTable from './TransacoesTable/TransacoesTable'
 
@@ -155,7 +156,16 @@ const TransacoesPage = () => {
             const result = await transacoesService.getLookupsTransacoes()
             if (result) {
                 setCartoesOptions(buildSelectOptions(result.cartoes))
-                setCategoriasOptions(buildSelectOptions(result.categorias))
+                setCategoriasOptions(
+                    buildSelectOptions(result.categorias).map((opt) =>
+                        opt.value === ''
+                            ? opt
+                            : {
+                                ...opt,
+                                cor: corCategoria({ cor: opt.cor, categoria_id: Number(opt.value) }),
+                            }
+                    )
+                )
                 setResponsaveisOptions(buildSelectOptions(result.responsaveis))
                 setResponsaveisLookup(result.responsaveis ?? [])
                 setDefaultResponsavelId(result.default_responsavel_id ?? null)

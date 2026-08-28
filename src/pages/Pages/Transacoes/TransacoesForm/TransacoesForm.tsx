@@ -13,6 +13,7 @@ import {
     isMeuResponsavelDisplay,
     nomeResponsavelPadraoNaoEu,
 } from 'helpers/fatura_helpers'
+import { corCategoria, corSubcategoria } from 'helpers/cores_tema_helpers'
 import { isEhAssinatura } from 'helpers/assinaturas_helpers'
 import {
     adicionarMesesCompetencia,
@@ -348,7 +349,7 @@ const TransacoesForm = () => {
                 (list ?? []).map((s) => ({
                     value: s.id!,
                     label: s.nome ?? `#${s.id}`,
-                    cor: s.cor ?? null,
+                    cor: corSubcategoria({ cor: s.cor }),
                 }))
             )
         } catch (error) {
@@ -468,6 +469,7 @@ const TransacoesForm = () => {
                     lookups.categorias.map((c) => ({
                         value: c.id!,
                         label: c.nome ?? `#${c.id}`,
+                        cor: corCategoria({ cor: c.cor, categoria_id: c.id }),
                     }))
                 )
             }
@@ -527,20 +529,20 @@ const TransacoesForm = () => {
             if (prev.some((o) => Number(o.value) === Number(cat.id))) {
                 return prev.map((o) =>
                     Number(o.value) === Number(cat.id)
-                        ? { ...o, label: cat.nome ?? o.label }
+                        ? { ...o, label: cat.nome ?? o.label, cor: corCategoria({ cor: cat.cor, categoria_id: cat.id }) }
                         : o
                 )
             }
-            return [...prev, { value: cat.id!, label: cat.nome ?? `#${cat.id}` }]
+            return [...prev, { value: cat.id!, label: cat.nome ?? `#${cat.id}`, cor: corCategoria({ cor: cat.cor, categoria_id: cat.id }) }]
         })
     }
 
-    const upsertSubcategoriaOption = (id: number, nome: string) => {
+    const upsertSubcategoriaOption = (id: number, nome: string, cor?: string | null) => {
         setSubcategoriasOptions((prev) => {
             if (prev.some((o) => Number(o.value) === Number(id))) {
-                return prev.map((o) => (Number(o.value) === Number(id) ? { ...o, label: nome } : o))
+                return prev.map((o) => (Number(o.value) === Number(id) ? { ...o, label: nome, cor: corSubcategoria({ cor, categoria_cor: o.cor }) } : o))
             }
-            return [...prev, { value: id, label: nome }]
+            return [...prev, { value: id, label: nome, cor: corSubcategoria({ cor }) }]
         })
     }
 
@@ -575,7 +577,11 @@ const TransacoesForm = () => {
     const handleConfirmSubcategoriaRapido = async (result: SubcategoriaRapidoConfirm) => {
         const sub = result.data
         if (!categoriaId) return
-        upsertSubcategoriaOption(sub.id, sub.nome)
+        upsertSubcategoriaOption(
+            sub.id,
+            sub.nome,
+            sub.cor ?? sub.categorias?.find((c) => Number(c.id) === Number(categoriaId))?.cor
+        )
         setValue('subcategoria_id', sub.id)
 
         if (isEdit) {

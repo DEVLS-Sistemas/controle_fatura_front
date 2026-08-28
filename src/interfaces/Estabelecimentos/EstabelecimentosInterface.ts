@@ -18,8 +18,10 @@ export interface EstabelecimentosList {
     nome?: string
     categoria_padrao_id?: number | null
     categoria_padrao_nome?: string | null
+    categoria_padrao_cor?: string | null
     subcategoria_padrao_id?: number | null
     subcategoria_padrao_nome?: string | null
+    subcategoria_padrao_cor?: string | null
     loja_id?: number | null
     loja_nome?: string | null
     ativo?: boolean
@@ -49,7 +51,7 @@ export interface EstabelecimentoLookup {
 }
 
 export interface LookupsEstabelecimentos {
-    categorias?: { id?: number; nome?: string }[]
+    categorias?: { id?: number; nome?: string; cor?: string | null }[]
 }
 
 /** Resposta de `DELETE /estabelecimentos/excluir-todos` */
