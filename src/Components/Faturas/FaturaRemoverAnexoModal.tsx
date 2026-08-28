@@ -39,8 +39,11 @@ import {
 } from 'interfaces/Faturas/FaturasInterface'
 import { FaturasService } from 'services/Faturas/FaturasService'
 import { PdfSenhaError } from 'libs/api/exceptions/PdfSenhaError'
+import { FaturaAnexoDuplicadoError } from 'libs/api/exceptions/FaturaAnexoDuplicadoError'
 import FaturaSenhaPdfModal, { FaturaSenhaUnlockPayload } from 'Components/Faturas/FaturaSenhaPdfModal'
 import FaturaTrocarAnexoPasso from 'Components/Faturas/FaturaTrocarAnexoPasso'
+import FaturaAnexoDuplicadoModal from 'Components/Faturas/FaturaAnexoDuplicadoModal'
+import { anexoDuplicadoRetryFields } from 'helpers/fatura_anexo_duplicado_helpers'
 
 export type FaturaRemoverAnexoModalProps = {
     isOpen: boolean
@@ -49,6 +52,8 @@ export type FaturaRemoverAnexoModalProps = {
     onClose: () => void
     onRemoved: (result: RemoverAnexoResult) => void | Promise<void>
     onTrocado: (result: RemoverAnexoResult) => void | Promise<void>
+    /** 422 `anexo_duplicado` resolvido via upload na fatura existente (não cria outra linha) */
+    onAnexoDuplicadoResolvido?: (result: unknown) => void | Promise<void>
 }
 
 const badgeStatusColor = (status?: string | null): string => {
@@ -121,6 +126,7 @@ const FaturaRemoverAnexoModal = ({
     onClose,
     onRemoved,
     onTrocado,
+    onAnexoDuplicadoResolvido,
 }: FaturaRemoverAnexoModalProps) => {
     const faturasService = useRef(new FaturasService()).current
     const onCloseRef = useRef(onClose)
@@ -129,6 +135,8 @@ const FaturaRemoverAnexoModal = ({
     onRemovedRef.current = onRemoved
     const onTrocadoRef = useRef(onTrocado)
     onTrocadoRef.current = onTrocado
+    const onAnexoDuplicadoResolvidoRef = useRef(onAnexoDuplicadoResolvido)
+    onAnexoDuplicadoResolvidoRef.current = onAnexoDuplicadoResolvido
 
     const [loading, setLoading] = useState(false)
     const [saving, setSaving] = useState(false)
@@ -138,6 +146,8 @@ const FaturaRemoverAnexoModal = ({
     const [arquivoNovo, setArquivoNovo] = useState<File | null>(null)
     const [senhaModalOpen, setSenhaModalOpen] = useState(false)
     const [senhaModalMeta, setSenhaModalMeta] = useState<SenhaPdfMeta | null>(null)
+    const [anexoDuplicadoOpen, setAnexoDuplicadoOpen] = useState(false)
+    const [anexoDuplicadoError, setAnexoDuplicadoError] = useState<FaturaAnexoDuplicadoError | null>(null)
 
     useEffect(() => {
         if (!isOpen || faturaId == null) {
@@ -149,6 +159,8 @@ const FaturaRemoverAnexoModal = ({
             setArquivoNovo(null)
             setSenhaModalOpen(false)
             setSenhaModalMeta(null)
+            setAnexoDuplicadoOpen(false)
+            setAnexoDuplicadoError(null)
             return
         }
 
@@ -243,8 +255,72 @@ const FaturaRemoverAnexoModal = ({
                 if (senha) throw error
                 return
             }
+            if (error instanceof FaturaAnexoDuplicadoError) {
+                setAnexoDuplicadoError(error)
+                setAnexoDuplicadoOpen(true)
+                return
+            }
             toast.error(error instanceof Error ? error.message : 'Erro ao trocar o PDF')
             if (senha) throw error
+        } finally {
+            setSaving(false)
+        }
+    }
+
+    const handleAnexoDuplicadoSubstituir = async () => {
+        const existingId = anexoDuplicadoError?.fatura_existente?.id
+        if (existingId == null || !arquivoNovo || busy) return
+        const retry = anexoDuplicadoRetryFields('substituir', existingId)
+        setSaving(true)
+        try {
+            const result = await faturasService.uploadPdf({
+                id: existingId,
+                arquivo_pdf: arquivoNovo,
+                processar_automatico: true,
+                ...retry,
+            })
+            setAnexoDuplicadoOpen(false)
+            if (onAnexoDuplicadoResolvidoRef.current) {
+                await onAnexoDuplicadoResolvidoRef.current(result)
+            } else {
+                toast.success('Anexo substituído na fatura que já existia.')
+                onCloseRef.current()
+            }
+        } catch (error: unknown) {
+            if (error instanceof FaturaAnexoDuplicadoError) {
+                setAnexoDuplicadoError(error)
+                return
+            }
+            toast.error(error instanceof Error ? error.message : 'Erro ao substituir o anexo')
+        } finally {
+            setSaving(false)
+        }
+    }
+
+    const handleAnexoDuplicadoManter = async () => {
+        const existingId = anexoDuplicadoError?.fatura_existente?.id
+        if (existingId == null || busy) return
+        const retry = anexoDuplicadoRetryFields('manter', existingId)
+        setSaving(true)
+        try {
+            const result = await faturasService.uploadPdf({
+                id: existingId,
+                processar_automatico: true,
+                ...retry,
+            })
+            setAnexoDuplicadoOpen(false)
+            if (onAnexoDuplicadoResolvidoRef.current) {
+                await onAnexoDuplicadoResolvidoRef.current(result)
+            } else {
+                toast.success('Anexo mantido. Nenhuma fatura nova foi criada.')
+                onCloseRef.current()
+            }
+        } catch (error: unknown) {
+            if (error instanceof FaturaAnexoDuplicadoError) {
+                setAnexoDuplicadoError(error)
+                return
+            }
+            toast.error(error instanceof Error ? error.message : 'Erro ao manter o anexo')
         } finally {
             setSaving(false)
         }
@@ -488,6 +564,14 @@ const FaturaRemoverAnexoModal = ({
             submitLabel="Usar senha e enviar"
             onClose={() => setSenhaModalOpen(false)}
             onUnlock={handleTrocarPdf}
+        />
+        <FaturaAnexoDuplicadoModal
+            isOpen={anexoDuplicadoOpen}
+            error={anexoDuplicadoError}
+            loading={saving}
+            onClose={() => setAnexoDuplicadoOpen(false)}
+            onSubstituir={handleAnexoDuplicadoSubstituir}
+            onManter={handleAnexoDuplicadoManter}
         />
         </>
     )

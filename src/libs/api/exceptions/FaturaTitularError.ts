@@ -93,6 +93,9 @@ export class FaturaTitularError extends Error {
         if (body.precisa_cartao_do_titular === true || codigo === 'precisa_cartao_do_titular') {
             return false
         }
+        if (body.anexo_duplicado === true || codigo === 'anexo_duplicado') {
+            return false
+        }
         return (
             body.precisa_confirmar_titular === true
             || codigo === FATURA_TITULAR_CODIGO

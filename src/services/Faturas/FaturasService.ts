@@ -26,6 +26,7 @@ import { FaturaSelecaoError } from "../../libs/api/exceptions/FaturaSelecaoError
 import { FaturaMetadadosError } from "../../libs/api/exceptions/FaturaMetadadosError"
 import { FaturaTitularError } from "../../libs/api/exceptions/FaturaTitularError"
 import { FaturaCartaoTitularError } from "../../libs/api/exceptions/FaturaCartaoTitularError"
+import { FaturaAnexoDuplicadoError } from "../../libs/api/exceptions/FaturaAnexoDuplicadoError"
 
 export class FaturasService implements FaturasInterface {
     private readonly url: string
@@ -121,6 +122,9 @@ export class FaturasService implements FaturasInterface {
                 if (FaturaCartaoTitularError.isCartaoTitularBody(body)) {
                     throw new FaturaCartaoTitularError(body)
                 }
+                if (FaturaAnexoDuplicadoError.isAnexoDuplicadoBody(body)) {
+                    throw new FaturaAnexoDuplicadoError(body)
+                }
                 if (FaturaSelecaoError.isSelecaoBody(body)) {
                     throw new FaturaSelecaoError(body)
                 }
@@ -212,7 +216,7 @@ export class FaturasService implements FaturasInterface {
 
     async uploadPdf(params: {
         id: number
-        arquivo_pdf: File
+        arquivo_pdf?: File
         processar_automatico?: boolean
         senha_pdf?: string
         salvar_senha_pdf?: boolean
@@ -226,10 +230,14 @@ export class FaturasService implements FaturasInterface {
         pessoa_nome?: string | null
         pessoa_sobrenome?: string | null
         confirmar_titular?: boolean
+        confirmar_anexo_duplicado?: 'substituir' | 'manter'
+        fatura_duplicada_id?: number | string
     }) {
         const form = new FormData()
         form.append('id', String(params.id))
-        form.append('arquivo_pdf', params.arquivo_pdf)
+        if (params.arquivo_pdf instanceof File) {
+            form.append('arquivo_pdf', params.arquivo_pdf)
+        }
         if (params.processar_automatico !== undefined) {
             form.append('processar_automatico', String(params.processar_automatico))
         }
@@ -269,6 +277,12 @@ export class FaturasService implements FaturasInterface {
         if (params.confirmar_titular !== undefined) {
             form.append('confirmar_titular', params.confirmar_titular ? '1' : '0')
         }
+        if (params.confirmar_anexo_duplicado) {
+            form.append('confirmar_anexo_duplicado', params.confirmar_anexo_duplicado)
+        }
+        if (params.fatura_duplicada_id != null && params.fatura_duplicada_id !== '') {
+            form.append('fatura_duplicada_id', String(params.fatura_duplicada_id))
+        }
         const response = await this.httpClient.post({
             url: this.url + '/upload-pdf',
             body: form,
@@ -285,6 +299,9 @@ export class FaturasService implements FaturasInterface {
                 }
                 if (FaturaCartaoTitularError.isCartaoTitularBody(body)) {
                     throw new FaturaCartaoTitularError(body)
+                }
+                if (FaturaAnexoDuplicadoError.isAnexoDuplicadoBody(body)) {
+                    throw new FaturaAnexoDuplicadoError(body)
                 }
                 if (FaturaSelecaoError.isSelecaoBody(body)) {
                     throw new FaturaSelecaoError(body)
@@ -387,6 +404,9 @@ export class FaturasService implements FaturasInterface {
                 ) {
                     throw new PdfSenhaError(respBody)
                 }
+                if (FaturaAnexoDuplicadoError.isAnexoDuplicadoBody(respBody)) {
+                    throw new FaturaAnexoDuplicadoError(respBody)
+                }
                 throw new ValidationError(response.body)
             }
             case HttpStatusCode.notFound: {
@@ -436,6 +456,12 @@ export class FaturasService implements FaturasInterface {
         }
         if (params.senha_pdf_regra != null && params.senha_pdf_regra !== '') {
             form.append('senha_pdf_regra', params.senha_pdf_regra)
+        }
+        if (params.confirmar_anexo_duplicado) {
+            form.append('confirmar_anexo_duplicado', params.confirmar_anexo_duplicado)
+        }
+        if (params.fatura_duplicada_id != null && params.fatura_duplicada_id !== '') {
+            form.append('fatura_duplicada_id', String(params.fatura_duplicada_id))
         }
         return form
     }

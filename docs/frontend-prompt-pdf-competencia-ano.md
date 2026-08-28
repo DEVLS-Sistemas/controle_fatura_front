@@ -1,8 +1,8 @@
-# Prompt — Frontend: PDF na competência certa (mês **e** ano)
+# Prompt — Frontend: ícone PDF só onde existe anexo
 
 Use este prompt no repositório do **frontend**. Copie o arquivo inteiro para o chat do front.
 
-O **backend já está atualizado**. Não invente rotas. Não calcule competência no front a partir da data de hoje.
+O **backend já está atualizado**. Não invente rotas.
 
 Prompts relacionados (não substituir; complementar):
 
@@ -15,23 +15,55 @@ Base: `/api/v1/faturas` (Bearer Sanctum).
 
 ---
 
-## Problema que isso resolve
+## Problema principal — `pago` ≠ tem PDF
 
-A listagem mostra um stub por competência (incluindo parcelas futuras). Mês 7 aparece **várias vezes** em anos diferentes (`07/2024` e `07/2026`).
+Importar o PDF de **agosto** cria/atualiza a fatura de **julho** (parcelas + quitação). Isso é correto:
 
-O que acontecia:
+- julho pode aparecer como **Paga** (`pago: true`) porque o pagamento vem no extrato de agosto
+- julho pode ter transações (parcelas `2/10` etc.)
 
-1. Usuário anexava o PDF de **julho/2024**.
-2. O ícone de PDF aparecia em **julho/2026** (mesmo mês, ano errado).
-3. O back caía no stub do ano corrente, ou o front preenchia `ano` com `new Date().getFullYear()` no modal.
+Isso **não** significa que julho tem arquivo. **Não** mostrar:
 
-O back agora:
+- ícone de PDF na listagem
+- “Ver PDF” / preview
+- “Remover PDF”
 
-- lê **mês e ano do arquivo** (não chuta o ano atual);
-- se o usuário clicar no stub de `07/2026` e enviar um PDF de `07/2024`, **vincula na fatura de 07/2024** (cria se não existir) e **não** marca `tem_pdf` em 07/2026;
-- a resposta 200 traz a fatura **onde o arquivo ficou** (`data.id`, `data.mes`, `data.ano`) — pode ser **outra** da que foi clicada.
+nesses casos.
 
-O front precisa acompanhar isso: não assumir ano corrente, não pollar o id clicado se a API devolveu outro, e avisar o usuário.
+| Campo | Significa | UI de anexo |
+|-------|-----------|-------------|
+| `pago` | Quitação pelos pagamentos de F+1 | **Não** |
+| `status: processada` | Esta competência teve extrato importado | **Não** sozinho |
+| `tem_pdf === true` | Existe arquivo PDF **nesta** fatura | Ícone + preview + remover |
+| `pode_remover_anexo === true` | Tem PDF ou CSV e não está `processando` | Botão remover |
+
+Regra: **só** `tem_pdf` / `tem_csv` / `pode_remover_anexo` / `pdf_url`. Nunca `pago`, nunca `status`, nunca “tem transação”.
+
+```json
+{
+  "competencia": "07/2026",
+  "status": "pendente",
+  "tem_pdf": false,
+  "tem_csv": false,
+  "pdf_url": null,
+  "pode_remover_anexo": false,
+  "pago": true,
+  "valor_pago": 2274.33,
+  "valor_restante": 0
+}
+```
+
+Julho paga, **sem** PDF: ícone cinza/“—”, sem preview, sem remover. Badge **Paga** continua.
+
+O back deixou de restaurar PDF de fatura apagada quando agosto recria o stub de julho. Depois do deploy, um refetch da listagem já deve vir com `tem_pdf: false` nesse caso. Se o front hoje mostra PDF com base em `pago` ou `processada`, isso é bug do front.
+
+---
+
+## Problema extra — mês certo, ano errado
+
+A listagem tem stubs por competência. Mês 7 existe em anos diferentes (`07/2024` e `07/2026`).
+
+O back lê **mês e ano do arquivo** (não chuta o ano atual). Se clicar no stub de `07/2026` e enviar PDF de `07/2024`, vincula em **07/2024**. A resposta 200 traz a fatura **onde o arquivo ficou** (`data.id`, `data.mes`, `data.ano`).
 
 ---
 
@@ -131,6 +163,8 @@ O back **pode ignorar esse `id` como competência** se o PDF for de outro mês/a
 
 Não trate 200 como “anexei nesta linha”. Sempre leia `data.id` / `data.mes` / `data.ano`.
 
+`POST /cadastrar` só com o arquivo (sem cartão/mês/ano) também anexa no stub se o PDF identificar **um** cartão + competência que já existe sem anexo — **200**, sem `precisa_confirmar_metadados`.
+
 ---
 
 ## 4) Erro 422 — competência do PDF já tem anexo
@@ -187,10 +221,13 @@ Competência na linha: sempre `competencia` (`07/2026`) ou `mes`+`ano`. Nunca s�
 
 ## Checklist de aceite
 
+- [ ] Ícone PDF / preview / remover **somente** se `tem_pdf` (ou `tem_csv`) nesta fatura — nunca por `pago` ou `status`
+- [ ] Julho pode estar `pago: true` e `tem_pdf: false` ao mesmo tempo (pagamento veio no PDF de agosto)
 - [ ] Modal de metadados **não** preenche ano com o ano corrente se `sugestao.ano` vier vazio
 - [ ] Modal mostra competência completa (`07/2024`), mês e ano editáveis
 - [ ] Retry envia o `ano` do modal (o valor confirmado, não `Date.now`)
 - [ ] Após `cadastrar` / `upload-pdf`, poll e navegação usam `data.id` da resposta
+- [ ] Cadastro só com PDF em stub existente (mesmo cartão/competência, sem anexo) → 200, anexa nessa fatura
 - [ ] Toast se a competência da resposta ≠ linha clicada (“vinculado à 07/2024”)
 - [ ] Listagem: ícone some da linha errada e aparece na competência do arquivo (refetch)
 - [ ] No detalhe da linha clicada, se o PDF foi para outra fatura: não ficar como se tivesse anexo

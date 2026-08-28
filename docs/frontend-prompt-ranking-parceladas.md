@@ -25,16 +25,17 @@ No backend, uma compra parcelada são N linhas em `transacoes` com o mesmo `comp
 - Título: **`observacoes`** se existir; senão **estabelecimento**
 - À vista não entra
 - Ativa na referência enquanto `ultima_parcela` ≥ mês filtrado (última no mês atual **aparece**; no mês anterior **some**)
+- **Clique na compra** abre a tela de [visualização da compra](frontend-prompt-visualizacao-compra.md)
 
-### Ordenação (fixa)
+### Ordenação (fixa no backend)
 
-**Menor percentual de conclusão no topo.** O % é o mesmo do card (`percentual_pago`).
+**Menor percentual de conclusão no topo.** Ex.: `10%` → `25%` → `80%`.  
+`quitada: true` / `100%` sempre no **final**.
 
-Exemplo: `NUV*VOOLT3D` **1/10 · 10%** fica **acima** de `MP *ALIEXPRESS` **3/12 · 25%**.
-
-- O front **reordena** `itens` por `percentual_pago` crescente **antes de renderizar** (lista e competências)
-- Sem select de ordenação na tela — a ordem do ranking é sempre essa
-- `100%` fica no final (maior percentual)
+- A API **força** `percentual_asc` (ignora `restantes_desc` e outros legados)
+- O front **não deve reordenar** `data.itens` — respeitar a ordem da API
+- Confirmar com `data.ordenar_aplicada`
+- Única alternativa aceita na query: `ordenar=percentual_desc`
 
 ---
 
@@ -175,6 +176,7 @@ Mantém a UX de ranking em cards:
 - **Progress bar simples** (0–100%) — pode continuar 1 cor
 - Texto: **Termina em {estimativa_termino}**
 - Quitadas: badge “Quitada” / “100%” e visualmente no fim da lista
+- **Clicável** → navega para `/compras/{compra_grupo_id}?mes={referencia.mes}&ano={referencia.ano}`
 
 ---
 
@@ -226,6 +228,8 @@ Regras de desenho:
 
 Mobile: horizontal scroll na grade **ou** stack (info em cima, barra full-width embaixo com labels início/fim).
 
+Clique na linha (área da compra ou da barra) também abre a visualização da compra, com o mesmo `compra_grupo_id` + `mes`/`ano`.
+
 #### Voltar à lista
 
 Botão **“Lista”** no mesmo toggle — esconde a grade e volta aos cards, **sem perder** filtros/`mes`/`ano`.
@@ -242,15 +246,16 @@ Botão **“Lista”** no mesmo toggle — esconde a grade e volta aos cards, **
 - [ ] Texto de estimativa de término (`estimativa_termino`)
 - [ ] Itens com `quitada: true` / 100% **sempre no final** do ranking
 - [ ] Última parcela no mês atual aparece; no mês anterior some
-- [ ] Ordenação: menor `percentual_pago` no topo (10% acima de 25%); o front reordena ao exibir
+- [ ] Ordenação default: menor `percentual_pago` primeiro (ex.: 10% acima de 25%); quitadas no fim
 - [ ] Título via observação ou estabelecimento
+- [ ] Clique no card/linha abre a visualização da compra (`/compras/{compra_grupo_id}`) passando `mes`/`ano`
 - [ ] Empty / loading / erro / responsivo
 
 ---
 
 ## Fora de escopo
 
-- Editar compra nesta tela
+- Editar compra nesta tela (detalhe é somente leitura — ver visualização da compra)
 - Mais de 13 colunas visíveis ao mesmo tempo
 - Drag da barra / edição de parcelas
 
@@ -263,4 +268,5 @@ GET /api/v1/dashboard/ranking-parceladas
 ```
 
 Service: `App\Services\Dashboard\RankingParceladasService`  
-Docs: [`docs/modules/dashboard.md`](modules/dashboard.md)
+Docs: [`docs/modules/dashboard.md`](modules/dashboard.md)  
+Visualização da compra (destino do clique): [`docs/frontend-prompt-visualizacao-compra.md`](frontend-prompt-visualizacao-compra.md)

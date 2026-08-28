@@ -103,6 +103,8 @@ export class FaturaMetadadosError extends Error {
             || codigo === 'precisa_confirmar_titular'
             || body.precisa_cartao_do_titular === true
             || codigo === 'precisa_cartao_do_titular'
+            || body.anexo_duplicado === true
+            || codigo === 'anexo_duplicado'
         ) {
             return false
         }

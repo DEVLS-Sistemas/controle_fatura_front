@@ -37,6 +37,7 @@ Cartão (grupo) ………… ex.: "Sofisa"
 | Campo | Tipo | Obs |
 |-------|------|-----|
 | user_id | FK users | Multiusuário |
+| pessoa_id | FK pessoas nullable | Titular do cartão |
 | nome | string | Ex.: Sofisa, Nubank |
 | banco | string nullable | |
 | dia_limite_fatura | tinyint 1-31 | Fechamento do ciclo |
@@ -56,8 +57,10 @@ SoftDeletes + timestamps.
 | Campo | Tipo | Obs |
 |-------|------|-----|
 | cartao_id | FK cartoes | |
-| bandeira | string | Visa, Mastercard, Elo, Amex, Hipercard, Outra |
+| bandeira | string | Visa, Mastercard, Elo, American Express, Hipercard, Diners Club, Discover, JCB, UnionPay, Maestro, Banricompras, Aura, Cabal, Sorocred, Outra (`Amex` legado aceito) |
 | limite_credito | decimal(12,2) nullable | Limite **desta** bandeira |
+| cor_principal | string nullable | HEX da cor principal da bandeira (auto no create) |
+| cor_secundaria | string nullable | HEX da cor secundária |
 | ativo | boolean | default true |
 
 SoftDeletes + timestamps.  
@@ -127,11 +130,25 @@ Continua no **grupo** (`cartoes`):
 
 CRUD padrão no **grupo**, com bandeiras e números aninhados no payload.
 
+```http
+POST /api/v1/cartoes/cadastrar-rapido
+```
+
+Find-or-create para o formulário de compra: `{ nome, bandeira, ultimos_digitos, dia_limite_fatura, dia_vencimento_fatura }`. Reutiliza grupo com o mesmo nome; devolve `cartao_id` + `cartao_numero_id`. Prompt: [`frontend-prompt-cadastro-rapido-cartao.md`](../frontend-prompt-cadastro-rapido-cartao.md).
+
 ### Lookups
 
-- `bandeiras` — Visa, Mastercard, Elo, Amex, Hipercard, Outra
+- `bandeiras` — Visa, Mastercard, Elo, American Express, Hipercard, Diners Club, Discover, JCB, UnionPay, Maestro, Banricompras, Aura, Cabal, Sorocred, Outra (`Amex` válido no POST)
+- `presets_bandeiras` / `pares_cores_bandeiras` / `cor_padrao_bandeira` — cores oficiais (principal + secundária); Outra = `#e5e7eb` / `#9ca3af`
 - `tipos_numero` — fisico, virtual, adicional
-- `cores_fundo` / `cores_texto` / `pares_cores`
+- `cores_fundo` / `cores_texto` / `pares_cores` / `presets_cores` / `cor_padrao`
+  - `pares_cores`: swatches (Padrão cinza + um chip por banco)
+  - `cor_personalizada`: chip extra `{ chave: "personalizada", label: "Cor personalizada", cor_fundo: null, cor_texto: null }` — **não** entra em `pares_cores`. Se só `cor_fundo` vier no create, o back calcula `cor_texto` pelo contraste (luminância ≥ 0.179 → `#111827`, senão `#ffffff`)
+  - `presets_cores`: aliases para auto-aplicar ao digitar nome/banco
+  - `cor_padrao`: `#e5e7eb` / `#111827` quando o cartão não está no catálogo
+  - No **create**, se `cor_fundo`/`cor_texto` vierem vazios, o backend aplica o preset (ou o cinza)
+  - `importacao_pdf_homologada` / `parser_homologado` em `presets_cores[]` e `pares_cores[]` — cor oficial **não** implica parser testado
+- `parsers_homologados` — Nubank, Inter, C6, Sofisa, PicPay, Itaú (nota: Click)
 - `dias` (1..31)
 - `senhas_pdf_regras` — regras de senha de PDF (`value`, `label`, `orientacao`, `digitos`, `bancos_sugeridos`)
 
@@ -143,7 +160,7 @@ CRUD padrão no **grupo**, com bandeiras e números aninhados no payload.
   "banco": "Sofisa",
   "dia_limite_fatura": 5,
   "dia_vencimento_fatura": 12,
-  "cor_fundo": "#8b5cf6",
+  "cor_fundo": "#008f5a",
   "cor_texto": "#ffffff",
   "ativo": true,
   "senha_pdf": "123456",
@@ -192,7 +209,17 @@ Cada grupo retorna `bandeiras[]` com `numeros[]`, `qtd_bandeiras`, `qtd_numeros`
 
 ### Async select (`cartoes-list`)
 
-Continua listando o **grupo**. Cada item inclui `qtd_numeros` e `tem_numeros` (para o front abrir o modal de bandeira/final no cadastro de fatura quando `tem_numeros === false`). Para selects que precisam da bandeira (fatura/compra), usar:
+Continua listando o **grupo**. Cada item inclui `qtd_numeros`, `tem_numeros`, **`pessoa_id`**, **`pessoa_nome`** e **`pessoa_eh_principal`** (titular do plástico).
+
+Filtro opcional:
+
+```http
+GET /api/v1/cartoes/cartoes-list?pessoa_id=1
+```
+
+Só os cartões daquela pessoa. Sem `pessoa_id` = todos os cartões ativos da conta (dois Nubank de titulares diferentes vêm os dois — o front **deve** filtrar no simulador).
+
+Cada item inclui `qtd_numeros` e `tem_numeros` (para o front abrir o modal de bandeira/final no cadastro de fatura quando `tem_numeros === false`). Também `importacao_pdf_homologada` e `parser_homologado` (leitura de PDF testada). Para selects que precisam da bandeira (fatura/compra), usar:
 
 ```http
 GET /api/v1/cartoes/bandeiras-list?cartao_id=1
@@ -264,4 +291,8 @@ Para cada `cartoes` antigo:
 ## Prompt do front
 
 [`docs/frontend-prompt-cartoes.md`](../frontend-prompt-cartoes.md)  
+Cores oficiais dos bancos: [`docs/frontend-prompt-cores-cartoes.md`](../frontend-prompt-cores-cartoes.md)  
+Cor personalizada (seletor HEX, **sem** remover os presets) — etapa 4: [`cores-tema.md`](cores-tema.md) · [`../frontend-prompt-cores-tema.md`](../frontend-prompt-cores-tema.md)  
+Cartões homologados (PDF): [`docs/frontend-prompt-fatura-parser-homologado.md`](../frontend-prompt-fatura-parser-homologado.md)  
+Cores oficiais das bandeiras: [`docs/frontend-prompt-cores-bandeiras.md`](../frontend-prompt-cores-bandeiras.md)  
 Senha de PDF + modal: [`docs/frontend-prompt-senha-pdf-fatura.md`](../frontend-prompt-senha-pdf-fatura.md)

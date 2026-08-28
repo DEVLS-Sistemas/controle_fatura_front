@@ -215,6 +215,9 @@ export interface FaturasModel {
     pessoa_nome?: string | null
     pessoa_sobrenome?: string | null
     confirmar_titular?: boolean
+    /** Retry 422 `anexo_duplicado`: `substituir` reprocessa na fatura existente; `manter` não cria outra */
+    confirmar_anexo_duplicado?: 'substituir' | 'manter' | null
+    fatura_duplicada_id?: number | string | null
 }
 
 export interface ProcessarPdfParams {
@@ -341,6 +344,8 @@ export interface RemoverAnexoParams {
     senha_pdf?: string
     salvar_senha_pdf?: boolean
     senha_pdf_regra?: string | null
+    confirmar_anexo_duplicado?: 'substituir' | 'manter'
+    fatura_duplicada_id?: number | string
 }
 
 /** `POST /faturas/remover-anexo` — etapas 2 (`remover`) e 3 (`trocar_pdf`) */
@@ -388,7 +393,7 @@ export interface FaturasInterface {
     getLookupsFaturas(): Promise<LookupsFaturas | undefined>
     uploadPdf(params: {
         id: number
-        arquivo_pdf: File
+        arquivo_pdf?: File
         processar_automatico?: boolean
         senha_pdf?: string
         salvar_senha_pdf?: boolean
@@ -401,6 +406,8 @@ export interface FaturasInterface {
         pessoa_nome?: string | null
         pessoa_sobrenome?: string | null
         confirmar_titular?: boolean
+        confirmar_anexo_duplicado?: 'substituir' | 'manter'
+        fatura_duplicada_id?: number | string
     }): Promise<any>
     processarPdf(id: number, params?: ProcessarPdfParams): Promise<any>
     getImpactoRemoverAnexo(id: number | string): Promise<ImpactoRemoverAnexo>

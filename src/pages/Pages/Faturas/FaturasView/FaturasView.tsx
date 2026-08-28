@@ -36,6 +36,10 @@ import {
     destinoFaturaDoAnexo,
     mensagemPdfVinculadoCompetencia,
 } from 'helpers/fatura_competencia_pdf_helpers'
+import {
+    anexoDuplicadoRetryFields,
+    extractFaturaMessage,
+} from 'helpers/fatura_anexo_duplicado_helpers'
 import { isCompraAvista, isEhAssinatura } from 'helpers/assinaturas_helpers'
 import {
     contaNoTotalLinha,
@@ -80,6 +84,7 @@ import PlataformaRapidoModal, { PlataformaRapidoConfirm } from 'pages/Pages/Tran
 import FaturaSenhaPdfModal from 'Components/Faturas/FaturaSenhaPdfModal'
 import FaturaSelecaoModal, { FaturaSelecaoStep } from 'Components/Faturas/FaturaSelecaoModal'
 import FaturaTitularModal from 'Components/Faturas/FaturaTitularModal'
+import FaturaAnexoDuplicadoModal from 'Components/Faturas/FaturaAnexoDuplicadoModal'
 import FaturaParserNaoHomologadoModal from 'Components/Faturas/FaturaParserNaoHomologadoModal'
 import FaturaRemoverAnexoModal from 'Components/Faturas/FaturaRemoverAnexoModal'
 import FaturaComprasRestauradasModal from 'Components/Faturas/FaturaComprasRestauradasModal'
@@ -100,6 +105,7 @@ import {
     FaturaTitularRetryPayload,
     FaturaTitularSugestao,
 } from 'libs/api/exceptions/FaturaTitularError'
+import { FaturaAnexoDuplicadoError } from 'libs/api/exceptions/FaturaAnexoDuplicadoError'
 import { getApiBaseUrl } from 'libs/api/ApiConfig'
 import { getAuthToken, handleUnauthorizedSession } from 'helpers/auth_session'
 
@@ -372,6 +378,9 @@ const FaturasViewPage = () => {
     const [titularPessoas, setTitularPessoas] = useState<FaturaTitularPessoaOption[]>([])
     const [titularSugestao, setTitularSugestao] = useState<FaturaTitularSugestao | null>(null)
     const [titularOrientacao, setTitularOrientacao] = useState<string | null>(null)
+    const [anexoDuplicadoModalOpen, setAnexoDuplicadoModalOpen] = useState(false)
+    const [anexoDuplicadoLoading, setAnexoDuplicadoLoading] = useState(false)
+    const [anexoDuplicadoError, setAnexoDuplicadoError] = useState<FaturaAnexoDuplicadoError | null>(null)
     const [categoriasOptions, setCategoriasOptions] = useState<SelectOptions[]>([])
     const [categoriasLookup, setCategoriasLookup] = useState<CategoriaLookup[]>([])
     const [subcategoriasByCategoria, setSubcategoriasByCategoria] = useState<Record<number, SelectOptions[]>>({})
@@ -888,9 +897,10 @@ const FaturasViewPage = () => {
             return
         }
 
-        toast.success(realocado
+        const apiMessage = extractFaturaMessage(result)
+        toast.success(apiMessage || (realocado
             ? mensagemPdfVinculadoCompetencia(destino)
-            : (envelope?.message || 'Arquivo enviado com sucesso'))
+            : 'Arquivo enviado com sucesso'))
         const nomeResp = nomeResponsavelPadraoNaoEu(faturaData)
         if (nomeResp) {
             toast.info(`Responsável "${nomeResp}" criado e aplicado nesta fatura.`)
@@ -961,6 +971,11 @@ const FaturasViewPage = () => {
                 setTitularSugestao(error.sugestao)
                 setTitularOrientacao(error.orientacao ?? error.message ?? null)
                 setTitularModalOpen(true)
+                return
+            }
+            if (error instanceof FaturaAnexoDuplicadoError) {
+                setAnexoDuplicadoError(error)
+                setAnexoDuplicadoModalOpen(true)
                 return
             }
             if (error instanceof FaturaSelecaoError) {
@@ -1036,6 +1051,12 @@ const FaturasViewPage = () => {
                 setTitularModalOpen(true)
                 return
             }
+            if (error instanceof FaturaAnexoDuplicadoError) {
+                setSelecaoModalOpen(false)
+                setAnexoDuplicadoError(error)
+                setAnexoDuplicadoModalOpen(true)
+                return
+            }
             if (error instanceof PdfSenhaError) {
                 setSelecaoModalOpen(false)
                 await loadFatura({ silent: true, openSenhaIfNeeded: false })
@@ -1081,6 +1102,12 @@ const FaturasViewPage = () => {
                 setTitularOrientacao(error.orientacao ?? error.message ?? null)
                 return
             }
+            if (error instanceof FaturaAnexoDuplicadoError) {
+                setTitularModalOpen(false)
+                setAnexoDuplicadoError(error)
+                setAnexoDuplicadoModalOpen(true)
+                return
+            }
             if (error instanceof PdfSenhaError) {
                 setTitularModalOpen(false)
                 await loadFatura({ silent: true, openSenhaIfNeeded: false })
@@ -1090,6 +1117,87 @@ const FaturasViewPage = () => {
             toast.error((error as Error)?.message || 'Erro ao enviar arquivo')
         } finally {
             setTitularLoading(false)
+        }
+    }
+
+    const handleAnexoDuplicadoSubstituir = async () => {
+        const file = pendingUploadFileRef.current ?? fileInputRef.current?.files?.[0]
+        const existingId = anexoDuplicadoError?.fatura_existente?.id
+        if (!file || existingId == null) {
+            toast.warning('Selecione um arquivo PDF ou CSV')
+            return
+        }
+        const retry = anexoDuplicadoRetryFields('substituir', existingId)
+        setAnexoDuplicadoLoading(true)
+        try {
+            const result = await faturasService.uploadPdf({
+                id: existingId,
+                arquivo_pdf: file,
+                processar_automatico: processarAuto,
+                ...pendingSelecaoRef.current,
+                ...pendingTitularRef.current,
+                ...retry,
+            })
+            setAnexoDuplicadoModalOpen(false)
+            await handleUploadSuccess(result)
+        } catch (error) {
+            if (error instanceof FaturaAnexoDuplicadoError) {
+                setAnexoDuplicadoError(error)
+                return
+            }
+            if (error instanceof FaturaTitularError) {
+                setAnexoDuplicadoModalOpen(false)
+                setTitularTitulares(error.titulares)
+                setTitularNomeNoCartao(error.nome_no_cartao ?? null)
+                setTitularPessoas(error.pessoas)
+                setTitularSugestao(error.sugestao)
+                setTitularOrientacao(error.orientacao ?? error.message ?? null)
+                setTitularModalOpen(true)
+                return
+            }
+            if (error instanceof FaturaSelecaoError) {
+                setAnexoDuplicadoModalOpen(false)
+                openSelecaoModal(error)
+                return
+            }
+            if (error instanceof PdfSenhaError) {
+                setAnexoDuplicadoModalOpen(false)
+                await loadFatura({ silent: true, openSenhaIfNeeded: false })
+                openSenhaModal(error.senha_pdf ?? null)
+                return
+            }
+            toast.error((error as Error)?.message || 'Erro ao substituir o anexo')
+        } finally {
+            setAnexoDuplicadoLoading(false)
+        }
+    }
+
+    const handleAnexoDuplicadoManter = async () => {
+        const existingId = anexoDuplicadoError?.fatura_existente?.id
+        if (existingId == null) {
+            toast.error('Não foi possível identificar a fatura que já tem este arquivo.')
+            return
+        }
+        const retry = anexoDuplicadoRetryFields('manter', existingId)
+        setAnexoDuplicadoLoading(true)
+        try {
+            const result = await faturasService.uploadPdf({
+                id: existingId,
+                processar_automatico: processarAuto,
+                ...pendingSelecaoRef.current,
+                ...pendingTitularRef.current,
+                ...retry,
+            })
+            setAnexoDuplicadoModalOpen(false)
+            await handleUploadSuccess(result)
+        } catch (error) {
+            if (error instanceof FaturaAnexoDuplicadoError) {
+                setAnexoDuplicadoError(error)
+                return
+            }
+            toast.error((error as Error)?.message || 'Erro ao manter o anexo')
+        } finally {
+            setAnexoDuplicadoLoading(false)
         }
     }
 
@@ -1812,6 +1920,10 @@ const FaturasViewPage = () => {
                 onClose={() => setRemoverAnexoOpen(false)}
                 onRemoved={handleAnexoRemovido}
                 onTrocado={handleAnexoTrocado}
+                onAnexoDuplicadoResolvido={async (result) => {
+                    setRemoverAnexoOpen(false)
+                    await handleUploadSuccess(result)
+                }}
             />
             <FaturaComprasRestauradasModal
                 isOpen={processandoTroca != null || comprasRestauradas != null}
@@ -1895,6 +2007,14 @@ const FaturasViewPage = () => {
                     pendingUploadFileRef.current = null
                 }}
                 onConfirm={handleTitularConfirm}
+            />
+            <FaturaAnexoDuplicadoModal
+                isOpen={anexoDuplicadoModalOpen}
+                error={anexoDuplicadoError}
+                loading={anexoDuplicadoLoading}
+                onClose={() => setAnexoDuplicadoModalOpen(false)}
+                onSubstituir={handleAnexoDuplicadoSubstituir}
+                onManter={handleAnexoDuplicadoManter}
             />
             <div className="page-content">
                 <Container fluid>

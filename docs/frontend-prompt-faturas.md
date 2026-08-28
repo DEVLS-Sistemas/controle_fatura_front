@@ -17,7 +17,11 @@ A tela de faturas deve:
 7. No detalhe, repetir o bloco financeiro e **agrupar transações pelo final do cartão** (`ultimos_digitos`)
 8. No detalhe, navegar **fatura anterior / próxima** da mesma bandeira
 
-Melhorias recentes (anexos, quitação, navegação): [`frontend-prompt-melhorias-faturas.md`](frontend-prompt-melhorias-faturas.md).
+Melhorias recentes (anexos, quitação, navegação): [`frontend-prompt-melhorias-faturas.md`](frontend-prompt-melhorias-faturas.md).  
+Remover / trocar PDF (desfazer extrato errado, etapas 1–4): [`frontend-prompt-remover-pdf-fatura.md`](frontend-prompt-remover-pdf-fatura.md).  
+PDF no ano certo (07/2024 ≠ 07/2026): [`frontend-prompt-pdf-competencia-ano.md`](frontend-prompt-pdf-competencia-ano.md).  
+Listagem: botão **Ir para Mês Atual** (default ligado, selects de mês/ano sincronizados): [`frontend-prompt-fatura-mes-atual.md`](frontend-prompt-fatura-mes-atual.md).  
+Mesmo PDF importado de novo (hash, substituir ou manter): [`frontend-prompt-fatura-anexo-duplicado.md`](frontend-prompt-fatura-anexo-duplicado.md).
 
 Hierarquia de cartões: ver [`frontend-prompt-cartoes.md`](frontend-prompt-cartoes.md).
 
@@ -59,7 +63,9 @@ Authorization: Bearer {token}
 
 **Paginação é por fatura** (`perPage` = faturas). A página vem reagrupada por cartão em `data[]` (um cartão pode aparecer só com as faturas daquela página).
 
-Filtros: `cartao_id`, `cartao_bandeira_id`, `mes`, `ano`, `status`, `palavra_chave`, `page`, `perPage`.
+Filtros: `cartao_id`, `cartao_bandeira_id`, `mes`, `ano`, `mes_atual`, `status`, `palavra_chave`, `page`, `perPage`.
+
+A listagem **não** assume o mês atual sozinha. O front envia `mes`+`ano` (ou `mes_atual=1`) no load. Sem esses params, vêm todas as competências. Meta na resposta: `competencia_atual`, `filtros.mes_atual_ativo`. Prompt: [`frontend-prompt-fatura-mes-atual.md`](frontend-prompt-fatura-mes-atual.md).
 
 #### Resposta (`data`)
 
@@ -163,6 +169,7 @@ GET /api/v1/faturas/listar/{id}
   "tem_pdf": true,
   "tem_csv": false,
   "pdf_url": "http://localhost:5000/api/v1/faturas/pdf/73",
+  "pode_remover_anexo": true,
   "fatura_anterior_id": 72,
   "fatura_proxima_id": 74,
   "fatura_anterior_competencia": "05/2026",
@@ -188,13 +195,16 @@ GET /api/v1/transacoes/listar?fatura_id={id}&perPage=50
 
 | Método | Rota | Uso |
 |--------|------|-----|
-| GET | `/lookups` | status, cartões (grupos), meses |
+| GET | `/lookups` | status, cartões (grupos), meses, anos, `competencia_atual` |
 | POST | `/cadastrar` | multipart: `cartao_id`, `cartao_bandeira_id`, `mes`, `ano`, `arquivo_pdf?` (PDF/CSV), `processar_automatico?`; retry modal: `bandeira`, `cartao_numero_id`, `ultimos_digitos` |
 | PUT | `/editar` | altera período/status/valor |
 | DELETE | `/excluir/{id}` | soft-delete fatura + transações |
-| POST | `/upload-pdf` | anexa PDF ou CSV (+ mesmos campos do modal) |
+| POST | `/upload-pdf` | anexa PDF ou CSV (+ mesmos campos do modal). A competência pode ser a do **arquivo**, não a da linha clicada — [`frontend-prompt-pdf-competencia-ano.md`](frontend-prompt-pdf-competencia-ano.md) |
 | POST | `/processar/{id}` | reprocessa arquivo |
 | GET | `/pdf/{id}` | visualiza/baixa o anexo |
+| GET | `/impacto-remover-anexo/{id}` | etapa 1: preview ao remover/trocar PDF — [`frontend-prompt-remover-pdf-fatura.md`](frontend-prompt-remover-pdf-fatura.md) |
+| POST | `/remover-anexo` | etapa 2: `{ id, motivo: "remover" }`; etapa 3: multipart `motivo=trocar_pdf` + `arquivo_pdf` |
+| GET | `/compras-para-reconcilia/{id}` | etapa 4: compras a conciliar no PDF certo — [`frontend-prompt-remover-pdf-fatura.md`](frontend-prompt-remover-pdf-fatura.md) |
 | GET | `/faturas-list` | select assíncrono |
 
 Bandeiras do cartão:
@@ -394,7 +404,7 @@ Espírito igual ao modal de senha do PDF: o back devolve **422** com `codigo` e 
 
 ### Tela de listagem
 
-1. Filtros: cartão (grupo), bandeira (opcional), mês, ano, status do arquivo, busca
+1. Filtros: cartão (grupo), bandeira (opcional), mês, ano, **Ir para Mês Atual**, status do arquivo, busca. Default: mês/ano de hoje já preenchidos — [`frontend-prompt-fatura-mes-atual.md`](frontend-prompt-fatura-mes-atual.md)
 2. Para cada grupo da página:
    - Cabeçalho com chip (`background: cor_fundo; color: cor_texto`), nome, “Fecha dia X · Vence dia Y”
    - Subtotal do grupo (`valor_total` do grupo)
@@ -537,7 +547,8 @@ PUT /api/v1/transacoes/editar
 - [ ] Listagem: coluna de anexo com ícones PDF/CSV (`tem_pdf` / `tem_csv`); bandeira só como chip se houver > 1
 - [ ] Upload aceita apenas PDF e CSV
 - [ ] Cadastro: formulário inicial sem obrigatoriedade; sem anexo → cartão/mês/ano obrigatórios
-- [ ] Cadastro só com PDF: modal `precisa_confirmar_metadados` (ver `frontend-prompt-cadastro-fatura-metadados.md`)
+- [ ] Cadastro só com PDF: modal `precisa_confirmar_metadados` (ver `frontend-prompt-cadastro-fatura-metadados.md`); ano do PDF, nunca o ano corrente por default
+- [ ] Upload/cadastro: ícone PDF e poll usam `data.id` da resposta (competência do arquivo) — [`frontend-prompt-pdf-competencia-ano.md`](frontend-prompt-pdf-competencia-ano.md)
 - [ ] Cadastro: select de bandeira **só** quando o cartão tem finais e mais de uma bandeira
 - [ ] Cadastro: com 1 bandeira e finais, envia `cartao_bandeira_id` automaticamente
 - [ ] Cartão sem finais + PDF/CSV: modal `precisa_selecionar_bandeira` (select com `bandeiras[]`)
@@ -561,4 +572,6 @@ PUT /api/v1/transacoes/editar
 - [ ] `perPage` = quantidade de **faturas** (resposta agrupada por cartão)
 - [ ] Detalhe busca transações só sob demanda (`fatura_id`)
 - [ ] Filtros `cartao_id`, `mes`, `ano`, `status` funcionam
+- [ ] Botão **Ir para Mês Atual**: [`frontend-prompt-fatura-mes-atual.md`](frontend-prompt-fatura-mes-atual.md)
 - [ ] Upload/processamento de anexo continua acessível a partir da fatura
+- [ ] Remover/trocar PDF: ver [`frontend-prompt-remover-pdf-fatura.md`](frontend-prompt-remover-pdf-fatura.md)

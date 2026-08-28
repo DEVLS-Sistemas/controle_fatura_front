@@ -2,8 +2,6 @@
 
 Prompt correspondente do front (mesmas etapas): [`../frontend-prompt-auth.md`](../frontend-prompt-auth.md).
 
-Specs do front por etapa: [1 cadastro](../frontend-prompt-auth-01-cadastro.md) · [2 isolamento](../frontend-prompt-auth-02-isolamento.md) · [3 recuperar senha](../frontend-prompt-auth-03-recuperar-senha.md) · [4 lembrar-me](../frontend-prompt-auth-04-lembrar-me.md).
-
 Implementar **uma etapa por vez**, na ordem. O front usa o mesmo número de etapa.
 
 | Etapa | Tema | Back hoje | Trabalho desta spec |
@@ -22,7 +20,8 @@ Implementar **uma etapa por vez**, na ordem. O front usa o mesmo número de etap
 | POST | `/register` | Não | 1 | Cadastro + token + seed de categorias/responsáveis |
 | POST | `/login` | Não | 1 / 4 | Login + token Sanctum (`lembrar_me` na etapa 4) |
 | POST | `/logout` | Sim | 1 | Revoga o token atual |
-| GET | `/me` | Sim | 1 | Dados do usuário autenticado |
+| GET | `/me` | Sim | 1 | Dados do usuário autenticado (`name`, `sobrenome`, `cpf_cnpj`, `email`) |
+| PUT | `/perfil` | Sim | perfil | Atualiza dados do usuário logado — [`perfil.md`](perfil.md) |
 | POST | `/recuperar-senha` | Não | 3 | Solicita código de 6 dígitos (não revela se o e-mail existe) |
 | POST | `/verificar-codigo` | Não | 3 | Valida o código informado |
 | POST | `/redefinir-senha` | Não | 3 | Troca a senha com e-mail + código válidos |
@@ -92,7 +91,7 @@ Mensagens:
 {
   "auth": {
     "data": {
-      "user": { "id": 1, "name": "Leonardo", "email": "leo@email.com" },
+      "user": { "id": 1, "name": "Leonardo", "sobrenome": null, "cpf_cnpj": null, "email": "leo@email.com" },
       "token": "...",
       "token_type": "Bearer"
     },
@@ -111,6 +110,8 @@ Mensagens:
 3. Faz seed **somente daquele usuário**:
 
 Categorias: Alimentação, Transporte, Empresa, Lazer, Moradia, Saúde, Outros (com cores atuais do `AuthService::seedDefaults`).
+
+Plataformas: Loja Física, Mercado Livre, Shopee, Amazon, AliExpress, iFood, Magalu, Shein, Site da loja, Outros.
 
 Responsáveis: `Eu` (pessoal) e `Empresa` (empresa).
 
@@ -139,7 +140,19 @@ Revoga **somente** o token atual. 401 se não autenticado.
 
 ### `GET /me` (Bearer)
 
-Devolve o usuário autenticado. 401 se não autenticado.
+Devolve o usuário autenticado no envelope `auth`. 401 se não autenticado.
+
+```json
+{
+  "auth": {
+    "data": {
+      "user": { "id": 1, "name": "Leonardo", "sobrenome": null, "cpf_cnpj": null, "email": "leo@email.com" }
+    },
+    "status": true,
+    "message": "Usuário autenticado"
+  }
+}
+```
 
 ## Fora de escopo desta etapa
 
@@ -149,11 +162,14 @@ Devolve o usuário autenticado. 401 se não autenticado.
 
 ## Checklist back — etapa 1
 
-- [ ] `POST /register` devolve `user` + `token` + `token_type`
-- [ ] Front consegue persistir o token e chamar rotas autenticadas sem novo login
-- [ ] Seed de categorias/responsáveis usa o `user_id` do recém-criado
-- [ ] E-mail duplicado retorna 422 sem criar segundo usuário
-- [ ] `GET /me` e `POST /logout` funcionam com o token do cadastro
+- [x] `POST /register` devolve `user` + `token` + `token_type`
+- [x] Front consegue persistir o token e chamar rotas autenticadas sem novo login
+- [x] Seed de categorias/responsáveis usa o `user_id` do recém-criado
+- [x] E-mail duplicado retorna 422 sem criar segundo usuário
+- [x] `GET /me` e `POST /logout` funcionam com o token do cadastro
+- [x] `password_confirmation` validada quando enviada (`A confirmação da senha não confere`)
+- [x] Payload de `user` com `id`, `name`, `sobrenome`, `cpf_cnpj`, `email` (sem senha; extras podem ser `null`)
+- [x] `GET /me` no envelope `auth` (`data.user`)
 
 ---
 
@@ -213,14 +229,23 @@ Percorrer services e confirmar `->where('user_id', Auth::id())` (ou equivalente 
 
 Se algum endpoint listar sem filtro de usuário, **corrigir nesta etapa** antes de seguir.
 
+## Implementação (back)
+
+- Trait `App\Models\Concerns\BelongsToUser` nas entidades com dono: `user_id` não vai no JSON; scopes `forUser` / `forAuthUser`.
+- `RequestDataService::fromRequest()` remove `user_id` do payload. Controllers autenticados passam por aí — o client **não** escolhe o dono.
+- Download/processamento de PDF/CSV só aceita path `faturas/{user_id}/...`.
+- Job da fatura usa `fatura.user_id` (sem sessão) e valida o final padrão contra o cartão do dono.
+
 ## Checklist back — etapa 2
 
-- [ ] Nenhuma listagem autenticada devolve registro de outro `user_id`
-- [ ] Detalhe/`listar/{id}` de ID alheio → 404 (não 403 com vazamento de existência, salvo padrão já usado no módulo)
-- [ ] Cadastro grava `user_id = Auth::id()`
-- [ ] FK de outro usuário → 422 (`Cartão inválido`, `Categoria inválida`, etc.)
-- [ ] PDF/CSV e jobs respeitam o dono da fatura
-- [ ] Resets de teste não atravessam usuários
+- [x] Nenhuma listagem autenticada devolve registro de outro `user_id`
+- [x] Detalhe/`listar/{id}` de ID alheio → 404 (não 403 com vazamento de existência, salvo padrão já usado no módulo)
+- [x] Cadastro grava `user_id = Auth::id()`
+- [x] FK de outro usuário → 422 (`Cartão inválido`, `Categoria inválida`, etc.)
+- [x] PDF/CSV e jobs respeitam o dono da fatura
+- [x] Resets de teste não atravessam usuários
+- [x] `user_id` enviado pelo client é ignorado (`RequestDataService`)
+- [x] `user_id` não sai no JSON das entidades (`BelongsToUser`)
 
 ---
 
@@ -373,13 +398,13 @@ Mensagem sugerida: `Senha redefinida com sucesso!`
 
 ## Checklist back — etapa 3
 
-- [ ] Migration `password_reset_codes`
-- [ ] `POST /recuperar-senha` sempre 200 com a mensagem genérica (e-mail existente ou não)
-- [ ] E-mail enviado só quando o usuário existe
-- [ ] Código de 6 dígitos, hashed, expira em 15 min, throttle 60s
-- [ ] `POST /verificar-codigo` e `POST /redefinir-senha` não vazam existência do e-mail
-- [ ] Após redefinir: senha nova, tokens antigos revogados, novo token na resposta
-- [ ] Mailable testável com Mailpit em local
+- [x] Migration `password_reset_codes`
+- [x] `POST /recuperar-senha` sempre 200 com a mensagem genérica (e-mail existente ou não)
+- [x] E-mail enviado só quando o usuário existe
+- [x] Código de 6 dígitos, hashed, expira em 15 min, throttle 60s
+- [x] `POST /verificar-codigo` e `POST /redefinir-senha` não vazam existência do e-mail
+- [x] Após redefinir: senha nova, tokens antigos revogados, novo token na resposta
+- [x] Mailable testável com Mailpit em local
 
 ---
 
@@ -412,9 +437,9 @@ Resposta: **idêntica** à etapa 1, com ou sem `lembrar_me`.
 
 ## Checklist back — etapa 4
 
-- [ ] Login aceita `lembrar_me` sem erro de validação
-- [ ] Presença/ausência do campo não muda token, expiração nem o usuário retornado
-- [ ] Credenciais inválidas continuam 401 `Credenciais inválidas`
+- [x] Login aceita `lembrar_me` sem erro de validação
+- [x] Presença/ausência do campo não muda token, expiração nem o usuário retornado
+- [x] Credenciais inválidas continuam 401 `Credenciais inválidas`
 
 ---
 
@@ -427,3 +452,5 @@ cadastro     isolamento   recuperar     lembrar-me
 ```
 
 Não iniciar a etapa 3 no back sem a 1 estável (o e-mail do cadastro é o destino do código). A etapa 2 pode ser auditada em paralelo à 1, mas precisa estar fechada antes de tratar o sistema como multi-usuário de verdade.
+
+Depois das 4 etapas: tela **Perfil** (`PUT /perfil`, sem papéis) — [`perfil.md`](perfil.md).

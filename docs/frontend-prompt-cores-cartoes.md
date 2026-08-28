@@ -29,6 +29,7 @@ Campos novos / atualizados:
 | `cor_padrao` | Fallback cinza claro (`chave: "padrao"`, `padrao: true`) |
 | `presets_cores[]` | Catálogo para match no front (`chave`, `label`, `aliases`, `cor_fundo`, `cor_texto`) |
 | `pares_cores[]` | Swatches do formulário: **Padrão primeiro**, depois um chip por banco |
+| `cor_personalizada` | Título da seção “Cor personalizada” — **dois** seletores (Fundo e Texto), não um chip só. Ver [`frontend-prompt-ajustes-ux-cores-periodo.md`](frontend-prompt-ajustes-ux-cores-periodo.md) item 1 |
 | `cores_fundo[]` / `cores_texto[]` | HEX únicos (se ainda houver picker separado) |
 
 Exemplo:
@@ -66,6 +67,8 @@ HEX sempre em minúsculo (`#820ad1`).
 Nubank `#820ad1`/`#ffffff` · Inter `#ff7a00`/`#ffffff` · C6 Bank `#111111`/`#ffffff` · Sofisa `#008f5a`/`#ffffff` · Itaú `#003b70`/`#ffffff` · Santander `#ec0000`/`#ffffff` · Bradesco `#cc092f`/`#ffffff` · Banco do Brasil `#f8d117`/`#003da5` · Caixa `#005ca9`/`#ffffff` · PicPay `#21c25e`/`#000000` · Mercado Pago `#009ee3`/`#ffffff` · Neon `#00e676`/`#000000` · BTG `#001e62`/`#ffffff` · XP `#111111`/`#ffffff` · PagBank `#ffb800`/`#000000` · PAN `#00aeef`/`#ffffff` · Will Bank `#6c2bd9`/`#ffffff` · Original `#00a859`/`#ffffff` · Next `#00a859`/`#ffffff` · Amazon Card `#146eb4`/`#ffffff` · Sam's Club `#0067a0`/`#ffffff` · Pão de Açúcar `#00843d`/`#ffffff` · Carrefour `#004b93`/`#ffffff` · Magalu `#0086ff`/`#ffffff` · Renner `#d71920`/`#ffffff` · Riachuelo `#e30613`/`#ffffff` · Americanas `#e60012`/`#ffffff` · Shopee `#ee4d2d`/`#ffffff` · **Padrão** `#e5e7eb`/`#111827`
 
 C6 e XP compartilham o preto; Original e Next compartilham o verde — **dois chips**, labels diferentes.
+
+**PDF homologado ≠ ter cor.** Nubank/Inter/C6/Sofisa/PicPay/Itaú Click têm `importacao_pdf_homologada: true` no chip; Santander/Bradesco etc. têm cor e `false`. UI: [`frontend-prompt-fatura-parser-homologado.md`](frontend-prompt-fatura-parser-homologado.md).
 
 ---
 
@@ -156,7 +159,7 @@ Não precisa reimplementar se só consumir `presets_cores` com `includes` no nom
 
 - Recolorir cartões já cadastrados automaticamente
 - Cor por bandeira/número (a cor é do **grupo**)
-- Color picker livre (hex custom) — só se já existir; se existir, manter e marcar `coresManuais`
+- Color picker livre (hex custom) — **dois** blocos (fundo e texto): [`frontend-prompt-ajustes-ux-cores-periodo.md`](frontend-prompt-ajustes-ux-cores-periodo.md) item 1. **Não** remover os presets desta spec.
 
 ---
 

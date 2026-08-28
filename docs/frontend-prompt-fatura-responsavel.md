@@ -1,6 +1,6 @@
 # Prompt — Frontend: Fatura do Responsável (por competência)
 
-Use este prompt no repositório do frontend para criar a tela **Fatura do Responsável**, acessível a partir da **Projeção** (detalhe / clique no responsável).
+Use este prompt no repositório do frontend para criar a tela **Fatura do Responsável**, acessível a partir da **Projeção** (detalhe / clique no responsável) e do hub **[Visualizar responsável](frontend-prompt-visualizacao-responsavel.md)** (card “Neste mês”).
 
 Espelho visual da [tela de fatura (view)](frontend-prompt-faturas.md), mas o escopo é outro:
 
@@ -91,7 +91,7 @@ Cada linha já traz metadados para agrupar e espelhar a fatura view:
 | `cartao_numero_id`, `ultimos_digitos`, `cartao_numero_*` | final dentro do cartão |
 | `fatura_id`, `fatura_mes`, `fatura_ano` | link “abrir fatura do cartão” |
 | `data`, `estabelecimento`, `valor`, `parcela_atual`/`parcelas_total` | linha |
-| `categoria_*`, `subcategoria_*`, `origem_compra`, `observacoes` | igual compras/fatura |
+| `categoria_*`, `subcategoria_*`, `origem_compra`, `plataforma_*`, `observacoes` | igual compras/fatura |
 
 Ordenação sem `fatura_id`: `data` desc. No front, **reordene/agrupe** por `cartao_nome` → `ultimos_digitos` → `data` (a API não ordena por cartão nesse filtro).
 

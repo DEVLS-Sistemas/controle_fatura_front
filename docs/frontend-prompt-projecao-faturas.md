@@ -407,7 +407,7 @@ POST /api/v1/transacoes/cadastrar
 
 Com isso, a projeção mostra as parcelas futuras como **realizado** (já cadastradas nas faturas dos meses seguintes), não como `projetado`.
 
-O import de PDF parcelado também **materializa** as parcelas restantes — anteriores e futuras — (faturas `pendente` sem anexo + transação da competência, ligadas por `compra_grupo_id`). A projeção virtual fica só para legado sem grupo.
+O import de PDF parcelado também **materializa** as parcelas restantes — anteriores e futuras — (faturas `pendente` sem anexo + transação da competência, ligadas por `compra_grupo_id`). Essas linhas são **automáticas** (`compra_manual: false`) e **não** pedem conciliação. A projeção virtual fica só para legado sem grupo.
 
 Quando o PDF da fatura for processado, a compra manual do mês é **mesclada** (mantém responsável, categoria, observações).
 
@@ -418,7 +418,7 @@ Quando o PDF da fatura for processado, a compra manual do mês é **mesclada** (
 - Item de menu: **Projeção** ou **Previsão de faturas**
 - Pode ficar junto ao Dashboard ou em Relatórios
 - Clique no responsável (linha ou célula do mês) → tela **Fatura do Responsável** (todas as compras daquele responsável na competência, em todos os cartões). Prompt: [`frontend-prompt-fatura-responsavel.md`](frontend-prompt-fatura-responsavel.md)
-- **Simular uma compra** (menu separado, reusa esta matriz): [`frontend-prompt-simulador-compra.md`](frontend-prompt-simulador-compra.md). Deep-link sugerido a partir desta tela: `/simulador?cartao_id=&responsavel_id=&pessoa_id=`
+- **Posso comprar?** (menu separado, reusa esta matriz + veredito 🟢🟡🔴): [`frontend-prompt-simulador-compra.md`](frontend-prompt-simulador-compra.md) · [`frontend-prompt-posso-comprar.md`](frontend-prompt-posso-comprar.md). Deep-link: `/simulador?cartao_id=&responsavel_id=&pessoa_id=`
 
 ---
 

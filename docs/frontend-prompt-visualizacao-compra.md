@@ -13,7 +13,7 @@ Permitir que o usuário veja, em um só lugar:
 - O que foi comprado (título, estabelecimento, loja)
 - Quando (data da compra)
 - Onde caiu (cartão, bandeira, final, nome no cartão)
-- Classificação (categoria, subcategoria, responsável, origem)
+- Classificação (categoria, subcategoria, plataforma, responsável, origem)
 - Valores (total, parcela, pago, aberto, %)
 - **Parcelas já pagas** vs competência atual vs em aberto
 - Repasse do responsável por parcela (se houver)
@@ -27,7 +27,9 @@ Não é tela de edição.
 
 No backend, uma compra parcelada são N linhas em `transacoes` com o mesmo `compra_grupo_id`. À vista é 1 linha (`compra_grupo_id = null`).
 
-- Título: **`observacoes`** se existir; senão **estabelecimento**
+- Título: **`observacoes` / `texto_compra`** (o que foi comprado); senão `descricao`; senão estabelecimento. Se `estabelecimento` for `null`, mostrar **—**
+- Compra manual pendente: `compra_manual === true` **e** `precisa_conciliar` + badge `precisa_conciliar_label`. Parcelas automáticas (`compra_manual === false`) **não** mostram esse badge, mesmo em fatura `pendente`
+- Conciliação e anexos vêm em `data.conciliacao` e `data.anexos` — ver [`frontend-prompt-cadastro-manual-compra.md`](frontend-prompt-cadastro-manual-compra.md)
 - **Paga / aberta** usa a competência da fatura vs `mes`/`ano` da query (igual ao ranking)
   - competência **anterior** à referência → `status_parcela = paga`
   - **igual** à referência → `atual` (conta como paga no progresso, igual ao ranking)
@@ -74,7 +76,11 @@ Authorization: Bearer {token}
   "tipo_label": "Compra",
   "origem_compra": "COMPRAS_PRESENCIAL",
   "origem_compra_label": "Compras presencial",
+  "plataforma": { "id": 1, "nome": "Loja Física", "cor": "#22c55e" },
+  "eh_assinatura": false,
   "importada_pdf": true,
+  "compra_manual": false,
+  "precisa_conciliar": false,
   "parcelas_total": 12,
   "parcela_atual": 3,
   "parcelas_pagas": 3,
@@ -172,7 +178,7 @@ Cabeçalho:
 
 1. Botão **Voltar** (histórico; fallback `/parceladas`)
 2. Título da compra (`titulo`)
-3. Se `titulo_origem === 'observacoes'` e houver estabelecimento, subtítulo com o estabelecimento / loja
+3. Se houver estabelecimento, subtítulo com o estabelecimento / loja; se `estabelecimento === null`, subtítulo **—** + badge `precisa_conciliar_label` quando `precisa_conciliar`
 4. Badge `parcela_atual/parcelas_total` (ou “À vista” se `avista`)
 5. Badge **Quitada** se `quitada`
 
@@ -198,11 +204,19 @@ Bloco **dados da compra** (grid de pares rótulo/valor; omitir linha se null):
 | Nome no cartão | `cartao_numero.nome_no_cartao` |
 | Categoria | pill com `categoria.cor` + `categoria.nome` |
 | Subcategoria | `subcategoria.nome` |
-| Estabelecimento | `estabelecimento.nome` |
+| Estabelecimento | `estabelecimento.nome` ou **—** se `estabelecimento` for `null` |
 | Loja | `estabelecimento.loja_nome` |
 | Responsável | `responsavel.nome` |
 | Origem | `origem_compra_label` |
-| Observação | `observacoes` (bloco de texto) |
+| Plataforma | `plataforma.nome` (pill com `plataforma.cor`; omitir se `plataforma` for `null`) |
+| Assinatura | `eh_assinatura` (sim/não) |
+| Observação | `observacoes` / `texto_compra` (o que foi comprado — bloco em destaque, não esconder) |
+
+Se `compra_manual_vinculada` existir (você abriu o **lançamento do PDF** conciliado):
+
+- Badge `conciliada_com_manual_label` ou `sugestao_conciliacao_label`
+- Link **Ver compra manual** → na prática já está nesta tela se o GET foi pelo id da compra; se veio pelo id do PDF, usar `compra_manual_vinculada.id` para editar/desvincular
+- Ações: editar a compra manual, desvincular (`POST /desvincular` com `lancamento_id` ou `compra_id`), ver anexos (`data.anexos` já vêm da compra manual)
 
 Bloco **parcelas** (tabela; esconder se `avista` **ou** mostrar 1 linha — preferir mostrar sempre):
 
@@ -239,23 +253,23 @@ Mobile: tabela vira lista de cards por parcela.
 
 - [ ] Clique no ranking (lista e competências) abre esta tela com o `compra_grupo_id`
 - [ ] `mes`/`ano` da referência do ranking vão na query (progresso igual ao ranking)
-- [ ] Tela concentra: data, cartão/bandeira/final, categoria/sub, estabelecimento/loja, responsável, origem, observação
+- [ ] Tela concentra: data, cartão/bandeira/final, categoria/sub, plataforma, estabelecimento/loja, responsável, origem, observação
 - [ ] Resumo: total, pago, aberto, %, parcelas pagas/restantes, término
 - [ ] Lista de parcelas com status paga / atual / aberta
 - [ ] Repasse visível quando houver pagamento
 - [ ] À vista funciona se o identificador for o `id` da transação
-- [ ] Ações **Editar** / **Excluir** / **Ver fatura** navegam para o form existente ou `DELETE` — sem edição inline
+- [ ] Somente leitura (sem editar nesta tela)
 - [ ] Voltar preserva o contexto do ranking
 - [ ] Loading / 404 / responsivo
 
 ---
 
-## Fora de escopo
+## Fora de escopo desta tela (somente leitura)
 
-- Editar campos inline nesta tela (usar o formulário `/transacoes/edit/:id`)
+Editar, anexos, conciliar e excluir ficam no prompt de [cadastro manual](frontend-prompt-cadastro-manual-compra.md) (podem ser ações nesta mesma rota).
+
 - Registrar repasse (continuar na tela de repasses)
-- Upload / PDF da fatura
-- Anexos da compra e conciliação compra ↔ lançamento
+- Upload / PDF da **fatura** (anexo da compra é outro endpoint)
 
 ---
 

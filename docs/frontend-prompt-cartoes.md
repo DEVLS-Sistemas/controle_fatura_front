@@ -48,16 +48,46 @@ GET /api/v1/cartoes/numeros-list?cartao_bandeira_id={id}
 
 ```json
 {
-  "bandeiras": ["Visa", "Mastercard", "Elo", "Amex", "Hipercard", "Outra"],
+  "bandeiras": ["Visa", "Mastercard", "Elo", "American Express", "Hipercard", "Diners Club", "Discover", "JCB", "UnionPay", "Maestro", "Banricompras", "Aura", "Cabal", "Sorocred", "Outra"],
+  "presets_bandeiras": [
+    { "chave": "visa", "label": "Visa", "aliases": ["visa"], "cor_principal": "#1a1f71", "cor_secundaria": "#f7b600" }
+  ],
+  "pares_cores_bandeiras": [
+    { "chave": "visa", "label": "Visa", "cor_principal": "#1a1f71", "cor_secundaria": "#f7b600", "padrao": false }
+  ],
+  "cor_padrao_bandeira": {
+    "chave": "outra",
+    "label": "Outra",
+    "cor_principal": "#e5e7eb",
+    "cor_secundaria": "#9ca3af",
+    "padrao": true
+  },
   "tipos_numero": [
     { "value": "fisico", "label": "Físico" },
     { "value": "virtual", "label": "Virtual" },
     { "value": "adicional", "label": "Adicional" }
   ],
-  "cores_fundo": ["#ef4444", "#f59e0b", "#22c55e", "#3b82f6", "#8b5cf6"],
-  "cores_texto": ["#ffffff", "#0f172a", "#111827", "#f8fafc"],
+  "cor_padrao": {
+    "chave": "padrao",
+    "label": "Padrão",
+    "cor_fundo": "#e5e7eb",
+    "cor_texto": "#111827",
+    "padrao": true
+  },
+  "cores_fundo": ["#e5e7eb", "#820ad1", "#ff7a00"],
+  "cores_texto": ["#111827", "#ffffff", "#000000", "#003da5"],
   "pares_cores": [
-    { "cor_fundo": "#8b5cf6", "cor_texto": "#ffffff", "label": "Roxo" }
+    { "chave": "padrao", "label": "Padrão", "cor_fundo": "#e5e7eb", "cor_texto": "#111827", "padrao": true },
+    { "chave": "nubank", "label": "Nubank", "cor_fundo": "#820ad1", "cor_texto": "#ffffff", "padrao": false }
+  ],
+  "cor_personalizada": {
+    "chave": "personalizada",
+    "label": "Cor personalizada",
+    "cor_fundo": null,
+    "cor_texto": null
+  },
+  "presets_cores": [
+    { "chave": "nubank", "label": "Nubank", "aliases": ["nubank", "nu bank"], "cor_fundo": "#820ad1", "cor_texto": "#ffffff" }
   ],
   "dias": [{ "value": 1, "label": "01" }]
 }
@@ -71,7 +101,7 @@ GET /api/v1/cartoes/numeros-list?cartao_bandeira_id={id}
   "banco": "Sofisa",
   "dia_limite_fatura": 5,
   "dia_vencimento_fatura": 12,
-  "cor_fundo": "#8b5cf6",
+  "cor_fundo": "#008f5a",
   "cor_texto": "#ffffff",
   "ativo": true,
   "bandeiras": [
@@ -131,7 +161,7 @@ Obrigatoriedade no create: `nome`, `dia_limite_fatura`, `dia_vencimento_fatura`.
   "banco": "Sofisa",
   "dia_limite_fatura": 5,
   "dia_vencimento_fatura": 12,
-  "cor_fundo": "#8b5cf6",
+  "cor_fundo": "#008f5a",
   "cor_texto": "#ffffff",
   "ativo": true,
   "qtd_bandeiras": 2,
@@ -163,7 +193,8 @@ Campos do **grupo**:
 - Banco
 - Dia limite da fatura (1–31) + ajuda: “Compras até este dia entram na fatura do mês”
 - Dia de vencimento (1–31) + ajuda: “Data limite para pagamento”
-- Par de cores (`pares_cores` ou swatches manuais) + preview do chip
+- Par de cores (`pares_cores`: Padrão + bancos oficiais) + seção **Personalizada** com **dois** seletores (Fundo e Texto). Auto-aplica ao digitar nome/banco se o usuário não escolheu na mão. Ver [`frontend-prompt-cores-cartoes.md`](frontend-prompt-cores-cartoes.md) e item 1 em [`frontend-prompt-ajustes-ux-cores-periodo.md`](frontend-prompt-ajustes-ux-cores-periodo.md).
+- Badge / texto de **PDF homologado** vs não — cor oficial não significa parser testado. Ver [`frontend-prompt-fatura-parser-homologado.md`](frontend-prompt-fatura-parser-homologado.md).
 - Ativo
 - **Senha do PDF** + **regra de senha** — ver prompt dedicado [`frontend-prompt-senha-pdf-fatura.md`](frontend-prompt-senha-pdf-fatura.md) (input password com olho, select de regra, orientação C6 = 6 dígitos do CPF/CNPJ)
 
@@ -174,7 +205,7 @@ Campos do **grupo**:
 Seção **“Cartões deste grupo”** (ou “Números / bandeiras”):
 
 1. Linha de inclusão:
-   - Select **Bandeira** (`lookups.bandeiras`)
+   - Select **Bandeira** (`lookups.bandeiras` / `pares_cores_bandeiras`) com **chip duas cores**. Ver [`frontend-prompt-cores-bandeiras.md`](frontend-prompt-cores-bandeiras.md).
    - Input **Final** — **opcional** (se preenchido: exatamente 4 dígitos; se vazio, adiciona só a bandeira)
    - Input **Nome no cartão** — opcional (nome impresso, ex.: `LEONARDO S FERREIRA`)
    - Select **Tipo** (físico / virtual / adicional) — opcional
@@ -253,6 +284,7 @@ Sem cartão identificado
 - Select de cartão continua no **grupo**; em seguida select do **final** (`cartao_numero_id`) — ver [`frontend-prompt-compras.md`](frontend-prompt-compras.md).
 - A bandeira da fatura é derivada do número escolhido (mostrar select de bandeira só se o fluxo exigir e houver > 1).
 - `GET /cartoes/numeros-list` aceita `cartao_bandeira_id`, `cartao_id` ou `fatura_id`.
+- `cartoes-list` e o detalhe trazem `pessoa_id` / `pessoa_nome`. Query `?pessoa_id=` filtra pelo titular.
 - Na projeção (`projecao-faturas`), o limite do **grupo** é a soma dos limites das bandeiras ativas. Cada cartão expõe **Limite / Em uso / Livre** (valor + %) via `uso_limite`, além do split **Eu vs Outros** — ver [`frontend-prompt-projecao-faturas.md`](frontend-prompt-projecao-faturas.md).
 
 ---
@@ -267,5 +299,8 @@ Sem cartão identificado
 - [ ] Payload aninhado `bandeiras[].numeros[]` + arrays de remoção
 - [ ] Listagem mostra qtd bandeiras/números
 - [ ] Remover uso dos campos flat `bandeira` / `ultimos_digitos` / `limite_credito` no root
-- [ ] Lookups: `bandeiras`, `tipos_numero`, cores, dias
+- [ ] Lookups: `bandeiras`, `pares_cores_bandeiras` / `presets_bandeiras`, `tipos_numero`, `pares_cores` / `presets_cores` / `cor_padrao` / `cor_personalizada`, dias
+- [ ] Cores oficiais dos bancos no seletor + auto-apply (ver [`frontend-prompt-cores-cartoes.md`](frontend-prompt-cores-cartoes.md))
+- [ ] Badge de importação PDF homologada (`importacao_pdf_homologada`) — ver [`frontend-prompt-fatura-parser-homologado.md`](frontend-prompt-fatura-parser-homologado.md)
+- [ ] Cores oficiais das bandeiras no select + chip duas cores (ver [`frontend-prompt-cores-bandeiras.md`](frontend-prompt-cores-bandeiras.md))
 - [ ] Integrar regra de bandeira no cadastro de fatura e agrupamento por final na view

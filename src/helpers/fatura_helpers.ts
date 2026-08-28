@@ -286,6 +286,38 @@ export const downloadFaturaAnexo = async (
   URL.revokeObjectURL(url)
 }
 
+/** Abre o anexo autenticado em nova aba (Bearer, igual ao preview do detalhe). */
+export const openFaturaAnexoInNewTab = async (
+  id: number | string,
+  tipo: FaturaAnexoDownloadTipo = 'pdf',
+  meta?: FaturaAnexoDownloadMeta,
+): Promise<void> => {
+  const token = getAuthToken()
+  const base = getApiBaseUrl()
+  const res = await fetch(`${base}faturas/${tipo}/${id}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  })
+  if (res.status === 401) {
+    handleUnauthorizedSession()
+    throw new Error('Sessão expirada')
+  }
+  if (!res.ok) {
+    throw new Error(tipo === 'pdf' ? 'PDF não disponível' : 'CSV não disponível')
+  }
+  const blob = await res.blob()
+  const url = URL.createObjectURL(blob)
+  const opened = window.open(url, '_blank', 'noopener,noreferrer')
+  if (!opened) {
+    const a = document.createElement('a')
+    a.href = url
+    a.download = buildFaturaAnexoFilename(tipo, meta)
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+  }
+  window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
+}
+
 export const isValidFaturaFile = (file: File): boolean => {
   const ext = file.name.split('.').pop()?.toLowerCase() || ''
   if ((FATURA_FILE_EXTENSIONS as readonly string[]).includes(ext)) {
