@@ -404,8 +404,61 @@ const normalizeCorBusca = (value?: string | null): string =>
         .replace(/\s+/g, ' ')
         .trim()
 
+export const COR_TEXTO_CARTAO_CLARO = '#ffffff'
+export const COR_TEXTO_CARTAO_ESCURO = '#111827'
+/** Limiar WCAG: fundo claro (≥) usa texto escuro. */
+export const LIMIAR_LUMINANCIA_TEXTO_CARTAO = 0.179
+
 export const normalizeHexCor = (value?: string | null): string =>
     String(value ?? '').trim().toLowerCase()
+
+const hexCartaoToRgb = (value?: string | null): { r: number; g: number; b: number } | null => {
+    const raw = String(value ?? '').trim().toLowerCase()
+    const hex = (raw.startsWith('#') ? raw.slice(1) : raw).replace(/[^0-9a-f]/g, '')
+    const full = hex.length === 3 ? hex.split('').map((c) => c + c).join('') : hex
+    if (full.length !== 6) return null
+    const r = parseInt(full.slice(0, 2), 16)
+    const g = parseInt(full.slice(2, 4), 16)
+    const b = parseInt(full.slice(4, 6), 16)
+    if ([r, g, b].some((n) => Number.isNaN(n))) return null
+    return { r, g, b }
+}
+
+const canalSrgbLinear = (channel: number): number => {
+    const s = channel / 255
+    return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4)
+}
+
+export const toInputColorHex = (value?: string | null, fallback = '#e5e7eb'): string => {
+    const rgb = hexCartaoToRgb(value)
+    if (!rgb) return fallback.startsWith('#') ? fallback.toLowerCase() : `#${fallback.toLowerCase()}`
+    const hex = [rgb.r, rgb.g, rgb.b]
+        .map((n) => n.toString(16).padStart(2, '0'))
+        .join('')
+    return `#${hex}`
+}
+
+export const hexesCartaoIguais = (a?: string | null, b?: string | null): boolean => {
+    const left = hexCartaoToRgb(a)
+    const right = hexCartaoToRgb(b)
+    return Boolean(left && right && left.r === right.r && left.g === right.g && left.b === right.b)
+}
+
+export const luminanciaRelativaHex = (value?: string | null): number => {
+    const rgb = hexCartaoToRgb(value)
+    if (!rgb) return 0
+    return 0.2126 * canalSrgbLinear(rgb.r) + 0.7152 * canalSrgbLinear(rgb.g) + 0.0722 * canalSrgbLinear(rgb.b)
+}
+
+export const corTextoPorContraste = (corFundo?: string | null): string =>
+    luminanciaRelativaHex(corFundo) >= LIMIAR_LUMINANCIA_TEXTO_CARTAO
+        ? COR_TEXTO_CARTAO_ESCURO
+        : COR_TEXTO_CARTAO_CLARO
+
+export const parCorCasaComFundo = (
+    corFundo?: string | null,
+    pares: ParCorLookup[] = []
+): boolean => pares.some((par) => hexesCartaoIguais(par.cor_fundo, corFundo))
 
 /** Encontra o preset cujo alias/label casa com nome ou banco (alias mais longo vence). */
 export const matchPresetCorCartao = (

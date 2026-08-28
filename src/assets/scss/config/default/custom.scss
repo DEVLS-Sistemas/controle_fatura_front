@@ -416,6 +416,54 @@ input[type="number"].text-valor {
   }
 }
 
+.cartao-cor-personalizada {
+  &__chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.4rem 0.75rem;
+    border: 1px dashed #adb5bd;
+    border-radius: 0.7rem;
+    background: transparent;
+    color: var(--vz-body-color, #212529);
+    font-size: 0.8125rem;
+    font-weight: 600;
+
+    &:hover {
+      background: var(--vz-light, #f3f6f9);
+    }
+
+    &.is-selected {
+      border-style: solid;
+      border-color: #405189;
+      background: rgba(64, 81, 137, 0.08);
+      box-shadow: 0 0 0 2px rgba(64, 81, 137, 0.18);
+    }
+  }
+
+  &__plus {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.1rem;
+    height: 1.1rem;
+    border-radius: 4px;
+    border: 1px solid currentColor;
+    font-size: 0.85rem;
+    line-height: 1;
+  }
+
+  &__input {
+    width: 44px;
+    height: 32px;
+    padding: 0;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    background: transparent;
+    cursor: pointer;
+  }
+}
+
 .cor-tema-swatches {
   display: flex;
   flex-wrap: wrap;
