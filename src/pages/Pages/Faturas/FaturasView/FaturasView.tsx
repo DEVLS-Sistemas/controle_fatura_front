@@ -2033,6 +2033,21 @@ const FaturasViewPage = () => {
                                     <BreadcrumbItem active>Detalhe</BreadcrumbItem>
                                 </Breadcrumb>
                             </div>
+                            <div className="d-flex justify-content-end mb-3">
+                                <Link
+                                    to="/faturas/add"
+                                    className="btn btn-primary"
+                                    state={{
+                                        source: {
+                                            cartao_id: fatura.cartao_id ?? null,
+                                            cartao_bandeira_id: fatura.cartao_bandeira_id ?? null,
+                                        },
+                                    }}
+                                >
+                                    <i className="ri-add-circle-line align-middle me-1"></i>
+                                    Adicionar Fatura
+                                </Link>
+                            </div>
                         </Col>
                     </Row>
 
@@ -2077,19 +2092,21 @@ const FaturasViewPage = () => {
                     <Card className="mb-4">
                         <CardBody>
                             <div
-                                className="d-flex flex-wrap align-items-center justify-content-between gap-3"
+                                className="d-flex flex-column flex-md-row align-items-start justify-content-between gap-3 overflow-hidden"
                             >
-                                <div className="d-flex align-items-center gap-3 min-w-0">
-                                    <CartaoChip
-                                        cor_fundo={coresCartao.cor_fundo}
-                                        cor_texto={coresCartao.cor_texto}
-                                        label={fatura.cartao_nome || 'Cartão'}
-                                        className="fs-5 px-3 py-2"
-                                    />
-                                    <CartaoPdfHomologacaoBadge
-                                        homologacao={homologacaoCartao}
-                                        targetId={`fatura-view-pdf-homolog-${fatura.id ?? id ?? 'x'}`}
-                                    />
+                                <div className="d-flex flex-column gap-2 min-w-0 w-100">
+                                    <div className="d-flex flex-wrap align-items-center gap-2">
+                                        <CartaoChip
+                                            cor_fundo={coresCartao.cor_fundo}
+                                            cor_texto={coresCartao.cor_texto}
+                                            label={fatura.cartao_nome || 'Cartão'}
+                                            className="fs-5 px-3 py-2 flex-shrink-0"
+                                        />
+                                        <CartaoPdfHomologacaoBadge
+                                            homologacao={homologacaoCartao}
+                                            targetId={`fatura-view-pdf-homolog-${fatura.id ?? id ?? 'x'}`}
+                                        />
+                                    </div>
                                     <div className="min-w-0">
                                         {(fatura.bandeira || fatura.cartao_bandeira) && (
                                             <div>
@@ -2103,21 +2120,24 @@ const FaturasViewPage = () => {
                                             </div>
                                         )}
                                         {fatura.pessoa_nome && (
-                                            <div className="small text-muted mt-1">
+                                            <div className="small text-muted mt-1 text-break">
                                                 <i className="ri-user-line me-1"></i>
                                                 {fatura.pessoa_nome}
                                             </div>
                                         )}
                                         {fatura.responsavel_nome && (
                                             <div className="mt-1">
-                                                <span className="badge bg-primary-subtle text-primary">
+                                                <span
+                                                    className="badge bg-primary-subtle text-primary text-wrap text-start"
+                                                    style={{ whiteSpace: 'normal', maxWidth: '100%' }}
+                                                >
                                                     Responsável padrão: {fatura.responsavel_nome}
                                                 </span>
                                             </div>
                                         )}
                                     </div>
                                 </div>
-                                <div className="text-md-end">
+                                <div className="text-md-end flex-shrink-0">
                                     <div className="text-muted text-uppercase small fw-semibold mb-1">
                                         Competência
                                     </div>

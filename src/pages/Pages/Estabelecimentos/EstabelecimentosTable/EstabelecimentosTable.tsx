@@ -8,6 +8,7 @@ import {
 import { PaginateInterface, PaginateSearch, PerPageProps } from "interfaces/SystemInterfaces/PaginateInterface"
 import CustomModal from "Components/ComponentController/Modal/CustomModal"
 import TableActionsDropdown from "Components/Common/TableActionsDropdown"
+import TablePagination from "Components/Common/TablePagination"
 import { formatCurrency, VALOR_TEXT_CLASS } from "helpers/fatura_helpers"
 import { corCategoria, corPlataforma, corSubcategoria } from "helpers/cores_tema_helpers"
 import { extraEstatisticasLinha, frequenciaLabel } from "helpers/estatisticas_helpers"
@@ -284,36 +285,18 @@ export const EstabelecimentosTable = ({ data, getData, setPerPage, perPage, filt
                                             </Col>
                                         </Row>
 
-                                        <Row className="align-items-center mt-2 g-3 text-center text-sm-start">
-                                            <Col sm="12">
-                                                <div className="text-muted">
+                                        <TablePagination
+                                            currentPage={data.current_page}
+                                            lastPage={data.last_page}
+                                            links={data.links}
+                                            onNavigate={handleThisRoute}
+                                            summary={
+                                                <>
                                                     Exibindo <span className="fw-semibold ms-1">{data.per_page}</span> de
                                                     <span className="fw-semibold"> {data.total}</span> Resultados
-                                                </div>
-                                            </Col>
-                                            <Col sm="12" className="d-none d-sm-flex justify-content-end gap-2 flex-wrap">
-                                                <ul className="pagination pagination-md mb-0">
-                                                    <li className={data.current_page === 1 ? "page-item disabled" : "page-item"}>
-                                                        <Link to="#" className="page-link" onClick={() => handleThisRoute(data.links[0].url)}>Anterior</Link>
-                                                    </li>
-                                                </ul>
-                                                <ul className="pagination pagination-md mb-0 flex-wrap">
-                                                    {data.links.map((item, key) => {
-                                                        if (key === 0 || key === data.links.length - 1) return null
-                                                        return (
-                                                            <li key={item.label} className={`page-item ${item.active ? 'active' : ''}`}>
-                                                                <Link to="#" className="page-link" onClick={() => handleThisRoute(item.url)}>{item.label}</Link>
-                                                            </li>
-                                                        )
-                                                    })}
-                                                </ul>
-                                                <ul className="pagination pagination-md mb-0">
-                                                    <li className={data.current_page === data.last_page ? "page-item disabled" : "page-item"}>
-                                                        <Link to="#" className="page-link" onClick={() => handleThisRoute(data.links[data.links.length - 1].url)}>Próximo</Link>
-                                                    </li>
-                                                </ul>
-                                            </Col>
-                                        </Row>
+                                                </>
+                                            }
+                                        />
                                     </>
                                 )}
                             </div>

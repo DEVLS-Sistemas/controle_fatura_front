@@ -142,6 +142,7 @@ input[type="number"].text-valor {
   gap: 0.4rem;
   vertical-align: middle;
   line-height: 1;
+  max-width: 100%;
 
   &__circles {
     position: relative;
@@ -172,6 +173,7 @@ input[type="number"].text-valor {
 
   &__label {
     font-weight: 600;
+    overflow-wrap: anywhere;
   }
 }
 
