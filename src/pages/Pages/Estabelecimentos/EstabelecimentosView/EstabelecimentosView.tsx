@@ -17,7 +17,7 @@ import {
 } from 'interfaces/Estatisticas/EstatisticasCompraInterface'
 import { EstabelecimentosView } from 'interfaces/Estabelecimentos/EstabelecimentosInterface'
 import { EstabelecimentosService } from 'services/Estabelecimentos/EstabelecimentosService'
-import { corCategoria, corSubcategoria } from 'helpers/cores_tema_helpers'
+import { corCategoria, corPlataforma, corSubcategoria } from 'helpers/cores_tema_helpers'
 
 const EstabelecimentosViewPage = () => {
     const { state } = useLocation()
@@ -189,6 +189,31 @@ const EstabelecimentosViewPage = () => {
                                                             }}
                                                         />
                                                         {record.subcategoria_padrao_nome}
+                                                    </>
+                                                ) : '-'}
+                                            </p>
+                                        </Col>
+                                        <Col md={4} className="mb-3">
+                                            <Label className="form-label fw-semibold">Plataforma padrão</Label>
+                                            <p className="text-muted mb-0 d-flex align-items-center gap-2">
+                                                {record.plataforma_padrao_nome ? (
+                                                    <>
+                                                        <span
+                                                            className="d-inline-block rounded-circle"
+                                                            title={corPlataforma({
+                                                                cor: record.plataforma_padrao_cor,
+                                                                plataforma_id: record.plataforma_padrao_id,
+                                                            })}
+                                                            style={{
+                                                                width: 10,
+                                                                height: 10,
+                                                                backgroundColor: corPlataforma({
+                                                                    cor: record.plataforma_padrao_cor,
+                                                                    plataforma_id: record.plataforma_padrao_id,
+                                                                }),
+                                                            }}
+                                                        />
+                                                        {record.plataforma_padrao_nome}
                                                     </>
                                                 ) : '-'}
                                             </p>

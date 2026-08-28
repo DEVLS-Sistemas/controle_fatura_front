@@ -9,6 +9,7 @@ export interface EstabelecimentosSearch extends PeriodoFiltro {
     nome?: string | null
     ativo?: string | boolean | null
     categoria_padrao_id?: string | number | null
+    plataforma_padrao_id?: string | number | null
     loja_id?: string | number | null
     palavra_chave?: string | null | unknown
 }
@@ -22,6 +23,9 @@ export interface EstabelecimentosList {
     subcategoria_padrao_id?: number | null
     subcategoria_padrao_nome?: string | null
     subcategoria_padrao_cor?: string | null
+    plataforma_padrao_id?: number | null
+    plataforma_padrao_nome?: string | null
+    plataforma_padrao_cor?: string | null
     loja_id?: number | null
     loja_nome?: string | null
     ativo?: boolean
@@ -36,6 +40,7 @@ export interface EstabelecimentosModel {
     nome?: string | null
     categoria_padrao_id?: number | string | null
     subcategoria_padrao_id?: number | string | null
+    plataforma_padrao_id?: number | string | null
     loja_id?: number | string | null
     loja_nome?: string | null
     ativo?: boolean
@@ -46,12 +51,14 @@ export interface EstabelecimentoLookup {
     nome?: string
     categoria_padrao_id?: number | null
     subcategoria_padrao_id?: number | null
+    plataforma_padrao_id?: number | null
     loja_id?: number | null
     loja_nome?: string | null
 }
 
 export interface LookupsEstabelecimentos {
     categorias?: { id?: number; nome?: string; cor?: string | null }[]
+    plataformas?: { id?: number; nome?: string; cor?: string | null }[]
 }
 
 /** Resposta de `DELETE /estabelecimentos/excluir-todos` */
@@ -88,6 +95,7 @@ export const EstabelecimentosDefaultValues: EstabelecimentosModel = {
     nome: null,
     categoria_padrao_id: null,
     subcategoria_padrao_id: null,
+    plataforma_padrao_id: null,
     loja_id: null,
     loja_nome: null,
     ativo: true,

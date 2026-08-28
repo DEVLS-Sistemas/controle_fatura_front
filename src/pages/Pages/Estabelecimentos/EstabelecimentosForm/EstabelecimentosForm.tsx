@@ -9,7 +9,7 @@ import { required } from 'Components/ComponentController/ValidatorForm/Validator
 import { InputTextControlled } from 'Components/ComponentController/Inputs/Text/InputTextControlled'
 import { SelectListControlled } from 'Components/ComponentController/Selects/Select/SelectListControlled'
 import { SelectOptions } from 'interfaces/SystemInterfaces/SelectInterface'
-import { corCategoria, corSubcategoria } from 'helpers/cores_tema_helpers'
+import { corCategoria, corPlataforma, corSubcategoria } from 'helpers/cores_tema_helpers'
 import {
     EstabelecimentosDefaultValues,
     EstabelecimentosModel,
@@ -17,6 +17,7 @@ import {
 import { EstabelecimentosService } from 'services/Estabelecimentos/EstabelecimentosService'
 import { CategoriasService } from 'services/Categorias/CategoriasService'
 import { SubcategoriasService } from 'services/Subcategorias/SubcategoriasService'
+import { PlataformasService } from 'services/Plataformas/PlataformasService'
 import LojaModal, { LojaModalResult } from '../LojaModal/LojaModal'
 
 const buildRecordFromSource = (source: any): EstabelecimentosModel => ({
@@ -27,8 +28,8 @@ const buildRecordFromSource = (source: any): EstabelecimentosModel => ({
 })
 
 /**
- * Alterar categoria/subcategoria padrão do estabelecimento NÃO reescreve
- * categorias de compras antigas — apenas influencia pré-seleção em novas compras.
+ * Alterar categoria/subcategoria/plataforma padrão do estabelecimento NÃO reescreve
+ * compras antigas — apenas influencia pré-seleção em novas compras.
  */
 const EstabelecimentosForm = () => {
     const { state } = useLocation()
@@ -49,9 +50,11 @@ const EstabelecimentosForm = () => {
     const estabelecimentosService = new EstabelecimentosService()
     const categoriasService = new CategoriasService()
     const subcategoriasService = new SubcategoriasService()
+    const plataformasService = new PlataformasService()
 
     const [categoriasOptions, setCategoriasOptions] = useState<SelectOptions[]>([])
     const [subcategoriasOptions, setSubcategoriasOptions] = useState<SelectOptions[]>([])
+    const [plataformasOptions, setPlataformasOptions] = useState<SelectOptions[]>([])
     const [lojaModalOpen, setLojaModalOpen] = useState(false)
 
     const isEditing = !!(record.estabelecimento_id || record.id || paramId)
@@ -77,6 +80,21 @@ const EstabelecimentosForm = () => {
             )
         } catch (error) {
             console.error('Erro ao carregar categorias:', error)
+        }
+    }
+
+    const loadPlataformas = async () => {
+        try {
+            const list = await plataformasService.AsyncListPlataformas({})
+            setPlataformasOptions(
+                (list ?? []).map((p) => ({
+                    value: p.id!,
+                    label: p.nome ?? `#${p.id}`,
+                    cor: corPlataforma({ cor: p.cor, plataforma_id: p.id }),
+                }))
+            )
+        } catch (error) {
+            console.error('Erro ao carregar plataformas:', error)
         }
     }
 
@@ -117,16 +135,20 @@ const EstabelecimentosForm = () => {
 
     const onSubmit: SubmitHandler<EstabelecimentosModel> = async (data) => {
         try {
-            const payload = {
+            const payload: EstabelecimentosModel = {
                 ...data,
                 id: record.id ?? record.estabelecimento_id,
                 estabelecimento_id: record.estabelecimento_id ?? record.id,
                 subcategoria_padrao_id: data.categoria_padrao_id ? data.subcategoria_padrao_id : null,
             }
             if (isEditing) {
+                payload.plataforma_padrao_id = data.plataforma_padrao_id || null
                 await estabelecimentosService.editEstabelecimentos(payload)
                 toast.success('Estabelecimento atualizado com sucesso!')
             } else {
+                if (!payload.plataforma_padrao_id) {
+                    delete payload.plataforma_padrao_id
+                }
                 await estabelecimentosService.createEstabelecimentos(payload)
                 toast.success('Estabelecimento cadastrado com sucesso!')
             }
@@ -140,6 +162,7 @@ const EstabelecimentosForm = () => {
     useEffect(() => {
         setActiveMenu('/estabelecimentos')
         loadCategorias()
+        loadPlataformas()
     }, [])
 
     useEffect(() => {
@@ -233,7 +256,7 @@ const EstabelecimentosForm = () => {
                                             </Col>
                                         </Row>
                                         <Row>
-                                            <Col md={6}>
+                                            <Col md={4}>
                                                 <div className="mb-3">
                                                     <Label htmlFor="categoria_padrao_id" className="form-label">Categoria padrão</Label>
                                                     <SelectListControlled<EstabelecimentosModel>
@@ -243,7 +266,7 @@ const EstabelecimentosForm = () => {
                                                     />
                                                 </div>
                                             </Col>
-                                            <Col md={6}>
+                                            <Col md={4}>
                                                 <div className="mb-3">
                                                     <Label htmlFor="subcategoria_padrao_id" className="form-label">Subcategoria padrão</Label>
                                                     <SelectListControlled<EstabelecimentosModel>
@@ -252,6 +275,20 @@ const EstabelecimentosForm = () => {
                                                         control={control}
                                                         disabled={!categoriaPadraoId}
                                                     />
+                                                </div>
+                                            </Col>
+                                            <Col md={4}>
+                                                <div className="mb-3">
+                                                    <Label htmlFor="plataforma_padrao_id" className="form-label">Plataforma padrão</Label>
+                                                    <SelectListControlled<EstabelecimentosModel>
+                                                        options={plataformasOptions}
+                                                        field="plataforma_padrao_id"
+                                                        control={control}
+                                                        placeholder="Selecione / inferir pelo nome"
+                                                    />
+                                                    <small className="text-muted">
+                                                        Vazio no cadastro: o sistema infere pelo nome (ex.: Mercadolivre*Mercadol)
+                                                    </small>
                                                 </div>
                                             </Col>
                                         </Row>

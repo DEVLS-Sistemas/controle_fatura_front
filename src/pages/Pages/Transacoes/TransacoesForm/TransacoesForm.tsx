@@ -80,8 +80,9 @@ const formatNumeroOptionLabel = (n: NumeroListItem): string => {
 
 /**
  * UX: ao trocar o estabelecimento, a UI sempre reaplica
- * categoria_padrao_id e subcategoria_padrao_id do estabelecimento selecionado.
- * Editar categoria/subcategoria na compra NÃO atualiza o estabelecimento.
+ * categoria_padrao_id, subcategoria_padrao_id e plataforma_padrao_id
+ * do estabelecimento selecionado.
+ * Editar categoria/subcategoria/plataforma na compra NÃO atualiza o estabelecimento.
  *
  * Create: valor_compra + select 1..36; sem parcela_atual.
  * Parcelado: N inputs editáveis; total deve bater com valor_compra.
@@ -957,45 +958,64 @@ const TransacoesForm = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [valorCompraWatch, nParcelas, isEdit])
 
+    const resolverEstabelecimento = async (
+        id: number | string
+    ): Promise<EstabelecimentoLookup | undefined> => {
+        let est = estabelecimentosCache.current.get(Number(id))
+        if (est) return est
+        try {
+            const view = await estabelecimentosService.getViewEstabelecimentos({ id })
+            if (view?.id == null) return undefined
+            est = {
+                id: view.id,
+                nome: view.nome,
+                categoria_padrao_id: view.categoria_padrao_id ?? null,
+                subcategoria_padrao_id: view.subcategoria_padrao_id ?? null,
+                plataforma_padrao_id: view.plataforma_padrao_id ?? null,
+            }
+            estabelecimentosCache.current.set(Number(view.id), est)
+            return est
+        } catch (error) {
+            console.error('Erro ao carregar estabelecimento:', error)
+            return undefined
+        }
+    }
+
+    const aplicarPadroesEstabelecimento = (
+        est: EstabelecimentoLookup,
+        opts?: { onlyEmptyPlataforma?: boolean }
+    ) => {
+        if (opts?.onlyEmptyPlataforma) {
+            if (!getValues('plataforma_id') && est.plataforma_padrao_id) {
+                setValue('plataforma_id', est.plataforma_padrao_id)
+            }
+            return
+        }
+
+        applyingEstabelecimentoDefaults.current = true
+        setValue('categoria_id', est.categoria_padrao_id ?? null)
+        setValue('subcategoria_id', est.subcategoria_padrao_id ?? null)
+        setValue('plataforma_id', est.plataforma_padrao_id ?? null)
+        setValue('estabelecimento', null)
+        loadSubcategorias(est.categoria_padrao_id)
+    }
+
     // Reaplica padrões ao trocar estabelecimento
     useEffect(() => {
         if (skipEstabelecimentoEffect.current) {
             skipEstabelecimentoEffect.current = false
+            if (estabelecimentoId && !getValues('plataforma_id')) {
+                resolverEstabelecimento(estabelecimentoId).then((est) => {
+                    if (est) aplicarPadroesEstabelecimento(est, { onlyEmptyPlataforma: true })
+                })
+            }
             return
         }
         if (!estabelecimentoId) return
 
-        const applyDefaults = async () => {
-            let est = estabelecimentosCache.current.get(Number(estabelecimentoId))
-            if (!est) {
-                try {
-                    const view = await estabelecimentosService.getViewEstabelecimentos({
-                        id: estabelecimentoId,
-                    })
-                    if (view?.id != null) {
-                        est = {
-                            id: view.id,
-                            nome: view.nome,
-                            categoria_padrao_id: view.categoria_padrao_id ?? null,
-                            subcategoria_padrao_id: view.subcategoria_padrao_id ?? null,
-                        }
-                        estabelecimentosCache.current.set(Number(view.id), est)
-                    }
-                } catch (error) {
-                    console.error('Erro ao carregar estabelecimento:', error)
-                    return
-                }
-            }
-            if (!est) return
-
-            applyingEstabelecimentoDefaults.current = true
-            setValue('categoria_id', est.categoria_padrao_id ?? null)
-            setValue('subcategoria_id', est.subcategoria_padrao_id ?? null)
-            setValue('estabelecimento', null)
-            loadSubcategorias(est.categoria_padrao_id)
-        }
-
-        applyDefaults()
+        resolverEstabelecimento(estabelecimentoId).then((est) => {
+            if (est) aplicarPadroesEstabelecimento(est)
+        })
     }, [estabelecimentoId])
 
     useEffect(() => {

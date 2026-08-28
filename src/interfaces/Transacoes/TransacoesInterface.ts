@@ -179,6 +179,7 @@ export interface EstabelecimentoLookup {
     nome?: string
     categoria_padrao_id?: number | null
     subcategoria_padrao_id?: number | null
+    plataforma_padrao_id?: number | null
 }
 
 export interface ResponsavelLookup {

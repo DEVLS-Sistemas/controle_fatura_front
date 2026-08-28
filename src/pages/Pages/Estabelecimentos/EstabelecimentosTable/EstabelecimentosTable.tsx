@@ -9,7 +9,7 @@ import { PaginateInterface, PaginateSearch, PerPageProps } from "interfaces/Syst
 import CustomModal from "Components/ComponentController/Modal/CustomModal"
 import TableActionsDropdown from "Components/Common/TableActionsDropdown"
 import { formatCurrency, VALOR_TEXT_CLASS } from "helpers/fatura_helpers"
-import { corCategoria, corSubcategoria } from "helpers/cores_tema_helpers"
+import { corCategoria, corPlataforma, corSubcategoria } from "helpers/cores_tema_helpers"
 import { extraEstatisticasLinha, frequenciaLabel } from "helpers/estatisticas_helpers"
 import { pickEstatisticas, pickPeriodoFiltro } from "interfaces/Estatisticas/EstatisticasCompraInterface"
 import { EstabelecimentosList, EstabelecimentosSearch } from "interfaces/Estabelecimentos/EstabelecimentosInterface"
@@ -145,6 +145,7 @@ export const EstabelecimentosTable = ({ data, getData, setPerPage, perPage, filt
                                                                 <th scope="col" className="text-start">Frequência</th>
                                                                 <th scope="col">Categoria padrão</th>
                                                                 <th scope="col">Subcategoria padrão</th>
+                                                                <th scope="col">Plataforma padrão</th>
                                                                 <th scope="col">Ativo</th>
                                                                 <th scope="col" style={{ width: "150px" }}>Ações</th>
                                                             </tr>
@@ -223,6 +224,28 @@ export const EstabelecimentosTable = ({ data, getData, setPerPage, perPage, filt
                                                                                     }}
                                                                                 />
                                                                                 {row.subcategoria_padrao_nome}
+                                                                            </span>
+                                                                        ) : '-'}
+                                                                    </td>
+                                                                    <td>
+                                                                        {row.plataforma_padrao_nome ? (
+                                                                            <span className="d-inline-flex align-items-center gap-1">
+                                                                                <span
+                                                                                    className="d-inline-block rounded-circle"
+                                                                                    title={corPlataforma({
+                                                                                        cor: row.plataforma_padrao_cor,
+                                                                                        plataforma_id: row.plataforma_padrao_id,
+                                                                                    })}
+                                                                                    style={{
+                                                                                        width: 10,
+                                                                                        height: 10,
+                                                                                        backgroundColor: corPlataforma({
+                                                                                            cor: row.plataforma_padrao_cor,
+                                                                                            plataforma_id: row.plataforma_padrao_id,
+                                                                                        }),
+                                                                                    }}
+                                                                                />
+                                                                                {row.plataforma_padrao_nome}
                                                                             </span>
                                                                         ) : '-'}
                                                                     </td>
