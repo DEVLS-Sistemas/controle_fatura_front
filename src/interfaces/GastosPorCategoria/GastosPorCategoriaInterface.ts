@@ -90,8 +90,46 @@ export interface GastosPorCategoriaSubDestaque {
   nome?: string | null
   valor_total?: number | null
   compras?: number | null
+  ticket_medio?: number | null
   percentual_da_categoria?: number | null
   atalho?: GastosPorCategoriaAtalho | null
+}
+
+export interface GastosPorCategoriaDashboardBarra {
+  chave?: string | null
+  categoria_id?: number | null
+  nome?: string | null
+  cor?: string | null
+  valor_total?: number | null
+  compras?: number | null
+  ticket_medio?: number | null
+  percentual_gasto?: number | null
+  atalho?: GastosPorCategoriaAtalho | null
+}
+
+export interface GastosPorCategoriaSubcategoriaBarra extends GastosPorCategoriaDashboardBarra {
+  subcategoria_id?: number | null
+  categoria_nome?: string | null
+  categoria_cor?: string | null
+  percentual_da_categoria?: number | null
+}
+
+export interface GastosPorCategoriaDashboards {
+  limite?: number | null
+  categorias?: GastosPorCategoriaDashboardBarra[] | null
+  subcategorias?: GastosPorCategoriaSubcategoriaBarra[] | null
+}
+
+export interface GastosPorCategoriaSelecao {
+  categoria_id: number | null
+  categoria_chave: string | null
+  subcategoria_id: number | null
+}
+
+export const GastosPorCategoriaSelecaoVazia: GastosPorCategoriaSelecao = {
+  categoria_id: null,
+  categoria_chave: null,
+  subcategoria_id: null,
 }
 
 export interface GastosPorCategoriaDestaqueCategoria {
@@ -135,6 +173,7 @@ export interface GastosPorCategoriaItem {
   cor?: string | null
   valor_total?: number | null
   compras?: number | null
+  ticket_medio?: number | null
   percentual_gasto?: number | null
   variacao_valor_percentual?: number | null
   frase?: string | null
@@ -178,6 +217,8 @@ export interface GastosPorCategoriaView {
   totais?: GastosPorCategoriaTotais | null
   destaque?: GastosPorCategoriaDestaque | null
   categorias?: GastosPorCategoriaItem[] | null
+  subcategorias?: GastosPorCategoriaSubcategoriaBarra[] | null
+  dashboards?: GastosPorCategoriaDashboards | null
   por_origem?: GastosPorCategoriaOrigemItem[] | null
   evolucao?: GastosPorCategoriaEvolucao | null
 }

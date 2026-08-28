@@ -284,7 +284,7 @@ const DashboardsHome = () => {
                                 dataPointSelection: (_event, _ctx, config) => {
                                   const item = resumo?.por_categoria?.[config.dataPointIndex]
                                   if (item?.categoria_id) {
-                                    navigate(`/gastos-por-categoria?categoria_id=${item.categoria_id}`)
+                                    navigate(`/gastos-por-categoria?selecao_categoria=${item.categoria_id}`)
                                     return
                                   }
                                   navigate('/gastos-por-categoria')

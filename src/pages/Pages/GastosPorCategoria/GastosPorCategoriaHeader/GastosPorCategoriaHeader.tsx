@@ -6,9 +6,7 @@ import UiContent from 'Components/Common/UiContent'
 import { SelectListControlled } from 'Components/ComponentController/Selects/Select/SelectListControlled'
 import { SelectOptions } from 'interfaces/SystemInterfaces/SelectInterface'
 import { AnosSelect, mesesSelect } from 'helpers/functions_helpers'
-import { formatCurrency } from 'helpers/fatura_helpers'
-import { formatVariacao } from 'helpers/gastos_criticos_helpers'
-import { MESES_OPCOES } from 'helpers/gastos_por_categoria_helpers'
+import { MESES_OPCOES, resolverMesAnoCalendario } from 'helpers/gastos_por_categoria_helpers'
 import {
   GastosPorCategoriaDefaultValues,
   GastosPorCategoriaMeses,
@@ -19,13 +17,9 @@ interface GastosPorCategoriaHeaderProps {
   defaultValues?: GastosPorCategoriaSearch
   cartoesOptions: SelectOptions[]
   responsaveisOptions: SelectOptions[]
-  categoriasOptions: SelectOptions[]
   periodoLabel?: string | null
   periodoInicio?: string | null
   periodoFim?: string | null
-  valorTotal?: number | null
-  variacaoPercentual?: number | null
-  periodoAnteriorLabel?: string | null
   onChange: (filters: GastosPorCategoriaSearch) => void
 }
 
@@ -33,23 +27,19 @@ const GastosPorCategoriaHeader = ({
   defaultValues = GastosPorCategoriaDefaultValues,
   cartoesOptions,
   responsaveisOptions,
-  categoriasOptions,
   periodoLabel,
   periodoInicio,
   periodoFim,
-  valorTotal,
-  variacaoPercentual,
-  periodoAnteriorLabel,
   onChange,
 }: GastosPorCategoriaHeaderProps) => {
   const { control, watch, setValue, getValues } = useForm<GastosPorCategoriaSearch>({
-    defaultValues,
+    defaultValues: {
+      ...defaultValues,
+      ano: defaultValues.ano ?? new Date().getFullYear(),
+    },
   })
   const hasAdvancedDefault = Boolean(
-    defaultValues.cartao_id ||
-      defaultValues.responsavel_id ||
-      defaultValues.categoria_id ||
-      defaultValues.mes
+    defaultValues.cartao_id || defaultValues.responsavel_id || defaultValues.mes
   )
   const [showAdvanced, setShowAdvanced] = useState(hasAdvancedDefault)
 
@@ -60,7 +50,6 @@ const GastosPorCategoriaHeader = ({
   const mesesAtivo = usaCalendario ? null : (Number(mesesWatch ?? 3) as GastosPorCategoriaMeses)
   const intervalo =
     periodoInicio && periodoFim ? `${periodoInicio} → ${periodoFim}` : periodoInicio || periodoFim || null
-  const variacao = formatVariacao(variacaoPercentual)
   const optAnos = AnosSelect()
   const optMeses = mesesSelect()
 
@@ -88,36 +77,29 @@ const GastosPorCategoriaHeader = ({
   }
 
   const handleAplicar = () => {
-    const mes = Number(getValues('mes'))
-    const ano = Number(getValues('ano'))
-    const calendario = Number.isFinite(mes) && mes >= 1 && mes <= 12 && Number.isFinite(ano) && ano > 2000
+    const calendario = resolverMesAnoCalendario(getValues('mes'), getValues('ano'))
     if (calendario) {
       setValue('meses', null)
+      setValue('mes', calendario.mes)
+      setValue('ano', calendario.ano)
       emitChange({
         meses: null,
-        mes,
-        ano,
+        mes: calendario.mes,
+        ano: calendario.ano,
         data_inicio: null,
         data_fim: null,
       })
       return
     }
+
+    setValue('mes', null)
     emitChange({
       mes: null,
       ano: null,
     })
   }
 
-  const partesSubtitulo = [
-    periodoLabel,
-    valorTotal != null ? formatCurrency(valorTotal) : null,
-    variacaoPercentual != null
-      ? `${variacao.label} vs ${periodoAnteriorLabel || 'período anterior'}`
-      : variacao.novo && periodoAnteriorLabel
-        ? `Novo vs ${periodoAnteriorLabel}`
-        : null,
-    intervalo,
-  ].filter(Boolean)
+  const partesSubtitulo = [periodoLabel, intervalo].filter(Boolean)
 
   return (
     <React.Fragment>
@@ -211,24 +193,6 @@ const GastosPorCategoriaHeader = ({
                   </Col>
                   <Col md={6} lg={3}>
                     <div className="mb-0">
-                      <Label htmlFor="categoria_id" className="form-label">
-                        Categoria
-                      </Label>
-                      <SelectListControlled<GastosPorCategoriaSearch>
-                        field="categoria_id"
-                        control={control}
-                        options={categoriasOptions}
-                      />
-                    </div>
-                  </Col>
-                  <Col md={6} lg={3}>
-                    <button type="button" className="btn btn-success w-100" onClick={handleAplicar}>
-                      <i className="ri-search-line align-middle me-1"></i>
-                      Aplicar filtros
-                    </button>
-                  </Col>
-                  <Col md={6} lg={3}>
-                    <div className="mb-0">
                       <Label htmlFor="mes" className="form-label">
                         Mês calendário
                       </Label>
@@ -247,9 +211,15 @@ const GastosPorCategoriaHeader = ({
                       <SelectListControlled<GastosPorCategoriaSearch>
                         field="ano"
                         control={control}
-                        options={[{ value: '', label: '—' }, ...optAnos]}
+                        options={optAnos}
                       />
                     </div>
+                  </Col>
+                  <Col xs={12}>
+                    <button type="button" className="btn btn-success" onClick={handleAplicar}>
+                      <i className="ri-search-line align-middle me-1"></i>
+                      Aplicar filtros
+                    </button>
                   </Col>
                 </Row>
               </Collapse>
