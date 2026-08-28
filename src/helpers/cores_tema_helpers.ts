@@ -1,12 +1,20 @@
 import { CategoriaTemaLookup, LookupsCategorias } from 'interfaces/Categorias/CategoriasInterface'
+import { LookupsPlataformas } from 'interfaces/Plataformas/PlataformasInterface'
 
 export const COR_TEMA_PADRAO = '#000000'
 export const COR_SEM_CATEGORIA = '#9ca3af'
 export const COR_FATIA_OUTROS = '#d1d5db'
 
+export type PaletaTemaLookup = LookupsCategorias | LookupsPlataformas | null | undefined
+
 export type CorCategoriaItem = {
   cor?: string | null
   categoria_id?: number | null
+}
+
+export type CorPlataformaItem = {
+  cor?: string | null
+  plataforma_id?: number | null
 }
 
 export const TEMAS_CATEGORIA_FALLBACK: CategoriaTemaLookup[] = [
@@ -36,13 +44,13 @@ export const hexesTemaIguais = (a?: string | null, b?: string | null): boolean =
   return Boolean(left) && left === right
 }
 
-export const corTemaPadrao = (lookups?: LookupsCategorias | null): string =>
+export const corTemaPadrao = (lookups?: PaletaTemaLookup): string =>
   normalizeHexTema(lookups?.cor_padrao) || COR_TEMA_PADRAO
 
 const temaConhecido = (hex?: string | null): CategoriaTemaLookup | undefined =>
   TEMAS_CATEGORIA_FALLBACK.find((tema) => hexesTemaIguais(tema.hex, hex))
 
-export const resolverTemasCategoria = (lookups?: LookupsCategorias | null): CategoriaTemaLookup[] => {
+export const resolverTemasCategoria = (lookups?: PaletaTemaLookup): CategoriaTemaLookup[] => {
   if (lookups?.temas && lookups.temas.length > 0) {
     return lookups.temas.map((tema, index) => {
       const hex = normalizeHexTema(tema.hex) || tema.hex
@@ -92,6 +100,17 @@ export const corCategoria = (item?: string | null | CorCategoriaItem): string =>
     return normalizeHexTema(item) || COR_TEMA_PADRAO
   }
   const id = Number(item.categoria_id)
+  if (!Number.isFinite(id) || id <= 0) {
+    return normalizeHexTema(item.cor) || COR_SEM_CATEGORIA
+  }
+  return normalizeHexTema(item.cor) || COR_TEMA_PADRAO
+}
+
+export const corPlataforma = (item?: string | null | CorPlataformaItem): string => {
+  if (item == null || typeof item === 'string') {
+    return normalizeHexTema(item) || COR_SEM_CATEGORIA
+  }
+  const id = Number(item.plataforma_id)
   if (!Number.isFinite(id) || id <= 0) {
     return normalizeHexTema(item.cor) || COR_SEM_CATEGORIA
   }

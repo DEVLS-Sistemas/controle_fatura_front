@@ -244,6 +244,19 @@ const CompraVisualizacaoDados = ({ compra }: CompraVisualizacaoDadosProps) => {
             label="Origem"
             value={origemLabel}
           />
+          {compra.plataforma?.nome ? (
+            <DadoTile
+              icon="ri-shopping-bag-3-line"
+              tone="secondary"
+              label="Plataforma"
+              value={compra.plataforma.nome}
+              style={
+                compra.plataforma.cor
+                  ? { borderLeft: `4px solid ${compra.plataforma.cor}` }
+                  : undefined
+              }
+            />
+          ) : null}
           {compra.eh_assinatura ? (
             <DadoTile
               icon="ri-refresh-line"

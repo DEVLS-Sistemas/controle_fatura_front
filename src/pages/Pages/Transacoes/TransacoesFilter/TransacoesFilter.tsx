@@ -23,6 +23,7 @@ export interface TransacoesFilterProps {
     getRemoteTransacoesList: (data: any) => void
     cartoesOptions: SelectOptions[]
     categoriasOptions: SelectOptions[]
+    plataformasOptions: SelectOptions[]
     responsaveisOptions: SelectOptions[]
     tiposOptions: SelectOptions[]
     origensCompraOptions: SelectOptions[]
@@ -35,6 +36,7 @@ const TransacoesFilter = ({
     getRemoteTransacoesList,
     cartoesOptions,
     categoriasOptions,
+    plataformasOptions,
     responsaveisOptions,
     tiposOptions,
     origensCompraOptions,
@@ -318,6 +320,16 @@ const TransacoesFilter = ({
                                                             field="subcategoria_id"
                                                             control={control}
                                                             disabled={!categoriaId}
+                                                        />
+                                                    </div>
+                                                </Col>
+                                                <Col md={2}>
+                                                    <div className="mb-3">
+                                                        <Label htmlFor="plataforma_id" className="form-label">Plataforma</Label>
+                                                        <SelectListControlled<TransacoesSearch>
+                                                            options={plataformasOptions}
+                                                            field="plataforma_id"
+                                                            control={control}
                                                         />
                                                     </div>
                                                 </Col>

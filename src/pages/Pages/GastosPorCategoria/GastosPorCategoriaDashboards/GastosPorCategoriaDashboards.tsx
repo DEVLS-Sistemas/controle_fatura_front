@@ -6,8 +6,10 @@ import { formatPercentualApi } from 'helpers/gastos_criticos_helpers'
 import {
   chaveCategoria,
   chaveOrigem,
+  chavePlataforma,
   coresFatiasCategoria,
   coresFatiasOrigem,
+  coresFatiasPlataforma,
   coresFatiasSubcategoria,
   corCategoria,
   isFatiaOutros,
@@ -17,6 +19,7 @@ import {
 import {
   GastosPorCategoriaDashboardBarra,
   GastosPorCategoriaOrigemItem,
+  GastosPorCategoriaPlataformaItem,
   GastosPorCategoriaSubcategoriaBarra,
 } from 'interfaces/GastosPorCategoria/GastosPorCategoriaInterface'
 
@@ -233,15 +236,20 @@ interface GastosPorCategoriaDashboardsProps {
   categorias: GastosPorCategoriaDashboardBarra[]
   subcategorias: GastosPorCategoriaSubcategoriaBarra[]
   origens: GastosPorCategoriaOrigemItem[]
+  plataformas: GastosPorCategoriaPlataformaItem[]
   categoriaSelecionadaChave?: string | null
   subcategoriaSelecionadaId?: number | null
   origemAtiva?: string | null
+  plataformaAtiva?: number | string | null
   tituloSubcategorias: string
   tituloOrigem: string
+  tituloPlataforma: string
   centroValor?: number | null
   centroLabel?: string
   centroValorOrigem?: number | null
   centroLabelOrigem?: string
+  centroValorPlataforma?: number | null
+  centroLabelPlataforma?: string
   categoriaFiltrada?: boolean
   loading?: boolean
   onCliqueCategoria: (item: GastosPorCategoriaDashboardBarra) => void
@@ -249,7 +257,9 @@ interface GastosPorCategoriaDashboardsProps {
   onDuploCliqueCategoria: (item: GastosPorCategoriaDashboardBarra) => void
   onDuploCliqueSubcategoria: (item: GastosPorCategoriaSubcategoriaBarra) => void
   onDuploCliqueOrigem: (item: GastosPorCategoriaOrigemItem) => void
+  onDuploCliquePlataforma: (item: GastosPorCategoriaPlataformaItem) => void
   onFiltrarOrigem: (origem: string | null) => void
+  onFiltrarPlataforma: (plataformaId: number | null) => void
   onLimpar: () => void
 }
 
@@ -264,15 +274,20 @@ const GastosPorCategoriaDashboards = ({
   categorias,
   subcategorias,
   origens,
+  plataformas,
   categoriaSelecionadaChave,
   subcategoriaSelecionadaId,
   origemAtiva,
+  plataformaAtiva,
   tituloSubcategorias,
   tituloOrigem,
+  tituloPlataforma,
   centroValor,
   centroLabel,
   centroValorOrigem,
   centroLabelOrigem,
+  centroValorPlataforma,
+  centroLabelPlataforma,
   categoriaFiltrada,
   loading,
   onCliqueCategoria,
@@ -280,24 +295,38 @@ const GastosPorCategoriaDashboards = ({
   onDuploCliqueCategoria,
   onDuploCliqueSubcategoria,
   onDuploCliqueOrigem,
+  onDuploCliquePlataforma,
   onFiltrarOrigem,
+  onFiltrarPlataforma,
   onLimpar,
 }: GastosPorCategoriaDashboardsProps) => {
   const [origemLocal, setOrigemLocal] = useState<string | null>(null)
+  const [plataformaLocal, setPlataformaLocal] = useState<string | null>(null)
   const origemDestacada = origemAtiva || origemLocal
+  const plataformaAtivaChave = plataformaAtiva != null && plataformaAtiva !== ''
+    ? `plataforma-${plataformaAtiva}`
+    : null
+  const plataformaDestacada = plataformaAtivaChave || plataformaLocal
   const temSelecao = Boolean(categoriaSelecionadaChave) || subcategoriaSelecionadaId != null
   const coresCat = coresFatiasCategoria(categorias, categoriaSelecionadaChave)
   const coresSub = coresFatiasSubcategoria(subcategorias, subcategoriaSelecionadaId)
   const coresOrigem = coresFatiasOrigem(origens, origemDestacada)
+  const coresPlataforma = coresFatiasPlataforma(plataformas, plataformaDestacada)
   const fatiasOrigemChart: FatiaPizza[] = origens.map((item) => ({
     ...item,
     nome: item.label || 'Sem origem',
     chave: chaveOrigem(item),
   }))
+  const fatiasPlataformaChart: FatiaPizza[] = plataformas.map((item) => ({
+    ...item,
+    nome: item.nome || 'Sem plataforma',
+    chave: chavePlataforma(item),
+  }))
 
   useEffect(() => {
     setOrigemLocal(null)
-  }, [categoriaSelecionadaChave, origemAtiva])
+    setPlataformaLocal(null)
+  }, [categoriaSelecionadaChave, origemAtiva, plataformaAtiva])
 
   const handleCliqueOrigem = (item: FatiaPizza) => {
     const origem = origens.find((o) => chaveOrigem(o) === item.chave)
@@ -313,6 +342,23 @@ const GastosPorCategoriaDashboards = ({
       return
     }
     setOrigemLocal(chave)
+  }
+
+  const handleCliquePlataforma = (item: FatiaPizza) => {
+    const plataforma = plataformas.find((p) => chavePlataforma(p) === item.chave)
+    if (!plataforma) return
+    const chave = chavePlataforma(plataforma)
+    const id = Number(plataforma.plataforma_id)
+    const idValido = Number.isFinite(id) && id > 0 ? id : null
+    if (plataformaDestacada === chave) {
+      if (!plataformaAtivaChave && idValido) {
+        onFiltrarPlataforma(idValido)
+        return
+      }
+      if (!plataformaAtivaChave) setPlataformaLocal(null)
+      return
+    }
+    setPlataformaLocal(chave)
   }
 
   return (
@@ -404,8 +450,8 @@ const GastosPorCategoriaDashboards = ({
       </Col>
     </Row>
     <Row className="g-3 mb-3">
-      <Col xs={12}>
-        <Card className="mb-0">
+      <Col xs={12} md={6}>
+        <Card className="mb-0 h-100">
           <CardBody>
             <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
               <div>
@@ -435,6 +481,43 @@ const GastosPorCategoriaDashboards = ({
                 onDuploClique={(item) => {
                   const origem = origens.find((o) => chaveOrigem(o) === item.chave)
                   if (origem) onDuploCliqueOrigem(origem)
+                }}
+              />
+            )}
+          </CardBody>
+        </Card>
+      </Col>
+      <Col xs={12} md={6}>
+        <Card className="mb-0 h-100">
+          <CardBody>
+            <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+              <div>
+                <h5 className="card-title mb-0">{tituloPlataforma}</h5>
+                <p className="text-muted mb-0 fs-12">Onde a compra foi feita</p>
+              </div>
+              {plataformaAtivaChave ? (
+                <button type="button" className="btn btn-soft-secondary btn-sm" onClick={() => onFiltrarPlataforma(null)}>
+                  Limpar plataforma
+                </button>
+              ) : null}
+            </div>
+            {loading ? (
+              <ChartSkeleton />
+            ) : plataformas.length === 0 ? (
+              <p className="text-muted mb-0">Sem plataforma neste recorte</p>
+            ) : (
+              <PizzaChart
+                fatias={fatiasPlataformaChart}
+                cores={coresPlataforma}
+                selecionada={(item) => Boolean(plataformaDestacada) && item.chave === plataformaDestacada}
+                percentualDe={(item) => percentualFatia(item, Boolean(categoriaFiltrada))}
+                centroValor={centroValorPlataforma ?? centroValor}
+                centroLabel={centroLabelPlataforma || 'Total'}
+                dicaClique="Clique destaca · duplo clique abre compras"
+                onClique={handleCliquePlataforma}
+                onDuploClique={(item) => {
+                  const plataforma = plataformas.find((p) => chavePlataforma(p) === item.chave)
+                  if (plataforma) onDuploCliquePlataforma(plataforma)
                 }}
               />
             )}

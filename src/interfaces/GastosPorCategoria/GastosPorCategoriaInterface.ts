@@ -28,6 +28,7 @@ export interface GastosPorCategoriaSearch {
   responsavel_id?: number | string | null
   categoria_id?: number | string | null
   origem_compra?: string | null
+  plataforma_id?: number | string | null
 }
 
 export interface GastosPorCategoriaAtalhoQuery {
@@ -38,6 +39,7 @@ export interface GastosPorCategoriaAtalhoQuery {
   categoria_id?: number | string | null
   subcategoria_id?: number | string | null
   origem_compra?: string | null
+  plataforma_id?: number | string | null
   cartao_id?: number | string | null
   responsavel_id?: number | string | null
   [key: string]: string | number | null | undefined
@@ -172,6 +174,18 @@ export interface GastosPorCategoriaOrigemItem {
   atalho?: GastosPorCategoriaAtalho | null
 }
 
+export interface GastosPorCategoriaPlataformaItem {
+  chave?: string | null
+  plataforma_id?: number | null
+  nome?: string | null
+  cor?: string | null
+  valor_total?: number | null
+  compras?: number | null
+  percentual_gasto?: number | null
+  percentual_da_categoria?: number | null
+  atalho?: GastosPorCategoriaAtalho | null
+}
+
 export interface GastosPorCategoriaItem {
   chave?: string | null
   categoria_id?: number | null
@@ -188,6 +202,7 @@ export interface GastosPorCategoriaItem {
   outras_subcategorias?: GastosPorCategoriaOutras | null
   sem_subcategoria?: GastosPorCategoriaSemCategoria | null
   por_origem?: GastosPorCategoriaOrigemItem[] | null
+  por_plataforma?: GastosPorCategoriaPlataformaItem[] | null
   atalho?: GastosPorCategoriaAtalho | null
 }
 
@@ -226,6 +241,7 @@ export interface GastosPorCategoriaView {
   subcategorias?: GastosPorCategoriaSubcategoriaBarra[] | null
   dashboards?: GastosPorCategoriaDashboards | null
   por_origem?: GastosPorCategoriaOrigemItem[] | null
+  por_plataforma?: GastosPorCategoriaPlataformaItem[] | null
   evolucao?: GastosPorCategoriaEvolucao | null
 }
 
@@ -245,4 +261,5 @@ export const GastosPorCategoriaDefaultValues: GastosPorCategoriaSearch = {
   responsavel_id: null,
   categoria_id: null,
   origem_compra: null,
+  plataforma_id: null,
 }

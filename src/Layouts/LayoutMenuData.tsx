@@ -17,7 +17,7 @@ const Navdata = () => {
     const isAnalisesActive = pathIn(path, ["/raio-x", "/gastos-criticos", "/gastos-por-categoria", "/relatorios"]);
     const isPlanejamentoActive = pathIn(path, ["/projecao-faturas", "/simulador", "/parceladas", "/assinaturas", "/compras"]);
     const isLancamentosActive = pathIn(path, ["/cartoes", "/faturas", "/transacoes"]);
-    const isCadastrosActive = pathIn(path, ["/categorias", "/subcategorias", "/estabelecimentos", "/lojas", "/pessoas", "/responsaveis"]);
+    const isCadastrosActive = pathIn(path, ["/categorias", "/subcategorias", "/plataformas", "/estabelecimentos", "/lojas", "/pessoas", "/responsaveis"]);
 
     function updateIconSidebar(e: any) {
         if (e && e.target && e.target.getAttribute("sub-items")) {
@@ -61,7 +61,7 @@ const Navdata = () => {
             setIsCadastros(false);
             return;
         }
-        if (pathIn(path, ["/categorias", "/subcategorias", "/estabelecimentos", "/lojas", "/pessoas", "/responsaveis"])) {
+        if (pathIn(path, ["/categorias", "/subcategorias", "/plataformas", "/estabelecimentos", "/lojas", "/pessoas", "/responsaveis"])) {
             setIscurrentState("Cadastros");
             setIsCadastros(true);
             setIsAnalises(false);
@@ -181,6 +181,7 @@ const Navdata = () => {
             subItems: [
                 { id: "categorias", label: "Categorias", link: "/categorias", parentId: "cadastros", isActive: pathIn(path, ["/categorias"]) },
                 { id: "subcategorias", label: "Subcategorias", link: "/subcategorias", parentId: "cadastros", isActive: pathIn(path, ["/subcategorias"]) },
+                { id: "plataformas", label: "Plataformas", link: "/plataformas", parentId: "cadastros", isActive: pathIn(path, ["/plataformas"]) },
                 { id: "estabelecimentos", label: "Estabelecimentos", link: "/estabelecimentos", parentId: "cadastros", isActive: pathIn(path, ["/estabelecimentos"]) },
                 { id: "lojas", label: "Lojas", link: "/lojas", parentId: "cadastros", isActive: pathIn(path, ["/lojas"]) },
                 { id: "pessoas", label: "Pessoas", link: "/pessoas", parentId: "cadastros", isActive: pathIn(path, ["/pessoas"]) },

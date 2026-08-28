@@ -6,6 +6,7 @@ export interface TransacoesSearch {
     cartao_id?: string | number | null
     categoria_id?: string | number | null
     subcategoria_id?: string | number | null
+    plataforma_id?: string | number | null
     estabelecimento_id?: string | number | null
     loja_id?: string | number | null
     responsavel_id?: string | number | null
@@ -58,6 +59,9 @@ export interface TransacoesList {
     subcategoria_id?: number | null
     subcategoria_nome?: string
     subcategoria_cor?: string | null
+    plataforma_id?: number | null
+    plataforma_nome?: string | null
+    plataforma_cor?: string | null
     responsavel_id?: number | null
     responsavel_nome?: string
     responsavel_tipo?: string
@@ -142,6 +146,7 @@ export interface TransacoesModel {
     eh_assinatura?: boolean | null
     categoria_id?: number | string | null
     subcategoria_id?: number | string | null
+    plataforma_id?: number | string | null
     responsavel_id?: number | string | null
     /** Nome amigável da compra (obrigatório no cadastro manual) */
     descricao?: string | null
@@ -160,6 +165,12 @@ export interface SubcategoriaLookup {
     id?: number
     nome?: string
     categoria_id?: number | null
+    cor?: string | null
+}
+
+export interface PlataformaLookup {
+    id?: number
+    nome?: string
     cor?: string | null
 }
 
@@ -218,6 +229,7 @@ export interface LookupsTransacoes {
     status_conciliacao?: StatusConciliacaoLookup[]
     categorias?: CategoriaLookup[]
     subcategorias?: SubcategoriaLookup[]
+    plataformas?: PlataformaLookup[]
     responsaveis?: ResponsavelLookup[]
     faturas?: FaturaLookup[]
     cartoes?: CartaoLookup[]
@@ -325,6 +337,7 @@ export const TransacoesDefaultValues: TransacoesModel = {
     eh_assinatura: false,
     categoria_id: null,
     subcategoria_id: null,
+    plataforma_id: null,
     responsavel_id: null,
     descricao: null,
     observacoes: null,

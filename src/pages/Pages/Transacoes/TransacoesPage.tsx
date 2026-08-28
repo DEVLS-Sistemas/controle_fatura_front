@@ -11,7 +11,7 @@ import {
 } from 'interfaces/Transacoes/TransacoesInterface'
 import { TransacoesService } from 'services/Transacoes/TransacoesService'
 import { origemCompraLabel, tipoTransacaoLabel } from 'helpers/fatura_helpers'
-import { corCategoria } from 'helpers/cores_tema_helpers'
+import { corCategoria, corPlataforma } from 'helpers/cores_tema_helpers'
 import TransacoesFilter from './TransacoesFilter/TransacoesFilter'
 import TransacoesTable from './TransacoesTable/TransacoesTable'
 
@@ -81,6 +81,7 @@ const TransacoesPage = () => {
         cartao_id: parseQueryNumber(searchParams.get('cartao_id')),
         categoria_id: parseQueryNumber(searchParams.get('categoria_id')),
         subcategoria_id: parseQueryNumber(searchParams.get('subcategoria_id')),
+        plataforma_id: parseQueryNumber(searchParams.get('plataforma_id')),
         estabelecimento_id: parseQueryNumber(searchParams.get('estabelecimento_id')),
         responsavel_id: parseQueryNumber(searchParams.get('responsavel_id')),
         fatura_id: parseQueryNumber(searchParams.get('fatura_id')),
@@ -98,6 +99,7 @@ const TransacoesPage = () => {
             || searchParams.get('tipo')
             || searchParams.get('categoria_id')
             || searchParams.get('subcategoria_id')
+            || searchParams.get('plataforma_id')
             || searchParams.get('estabelecimento_id')
             || searchParams.get('data_inicio')
             || searchParams.get('data_fim')
@@ -113,6 +115,7 @@ const TransacoesPage = () => {
 
     const [cartoesOptions, setCartoesOptions] = useState<SelectOptions[]>([{ value: '', label: 'Todos' }])
     const [categoriasOptions, setCategoriasOptions] = useState<SelectOptions[]>([{ value: '', label: 'Todos' }])
+    const [plataformasOptions, setPlataformasOptions] = useState<SelectOptions[]>([{ value: '', label: 'Todas' }])
     const [responsaveisOptions, setResponsaveisOptions] = useState<SelectOptions[]>([{ value: '', label: 'Todos' }])
     const [tiposOptions, setTiposOptions] = useState<SelectOptions[]>(defaultTiposOptions)
     const [origensCompraOptions, setOrigensCompraOptions] = useState<SelectOptions[]>(defaultOrigensCompraOptions)
@@ -127,6 +130,7 @@ const TransacoesPage = () => {
         transacoesContext.cartao_id = data.cartao_id
         transacoesContext.categoria_id = data.categoria_id
         transacoesContext.subcategoria_id = data.subcategoria_id
+        transacoesContext.plataforma_id = data.plataforma_id
         transacoesContext.estabelecimento_id = data.estabelecimento_id
         transacoesContext.responsavel_id = data.responsavel_id
         transacoesContext.fatura_id = data.fatura_id
@@ -163,6 +167,16 @@ const TransacoesPage = () => {
                             : {
                                 ...opt,
                                 cor: corCategoria({ cor: opt.cor, categoria_id: Number(opt.value) }),
+                            }
+                    )
+                )
+                setPlataformasOptions(
+                    buildSelectOptions(result.plataformas, 'Todas').map((opt) =>
+                        opt.value === ''
+                            ? opt
+                            : {
+                                ...opt,
+                                cor: corPlataforma({ cor: opt.cor, plataforma_id: Number(opt.value) }),
                             }
                     )
                 )
@@ -220,6 +234,7 @@ const TransacoesPage = () => {
                             getRemoteTransacoesList={getRemoteTransacoesList}
                             cartoesOptions={cartoesOptions}
                             categoriasOptions={categoriasOptions}
+                            plataformasOptions={plataformasOptions}
                             responsaveisOptions={responsaveisOptions}
                             tiposOptions={tiposOptions}
                             origensCompraOptions={origensCompraOptions}

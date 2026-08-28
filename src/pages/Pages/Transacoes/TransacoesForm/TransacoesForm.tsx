@@ -13,7 +13,7 @@ import {
     isMeuResponsavelDisplay,
     nomeResponsavelPadraoNaoEu,
 } from 'helpers/fatura_helpers'
-import { corCategoria, corSubcategoria } from 'helpers/cores_tema_helpers'
+import { corCategoria, corSubcategoria, corPlataforma } from 'helpers/cores_tema_helpers'
 import { isEhAssinatura } from 'helpers/assinaturas_helpers'
 import {
     adicionarMesesCompetencia,
@@ -48,6 +48,7 @@ import {
     CategoriaLookup,
     EstabelecimentoLookup,
     FaturaLookup,
+    PlataformaLookup,
     ResponsavelLookup,
     TransacoesDefaultValues,
     TransacoesModel,
@@ -61,6 +62,7 @@ import { toCartaoSelectOption } from 'helpers/cartao_helpers'
 import ResponsavelModal from '../ResponsavelModal/ResponsavelModal'
 import CategoriaRapidoModal, { CategoriaRapidoConfirm } from '../CategoriaRapidoModal/CategoriaRapidoModal'
 import SubcategoriaRapidoModal, { SubcategoriaRapidoConfirm } from '../SubcategoriaRapidoModal/SubcategoriaRapidoModal'
+import PlataformaRapidoModal, { PlataformaRapidoConfirm } from '../PlataformaRapidoModal/PlataformaRapidoModal'
 import CartaoRapidoModal, { CartaoRapidoConfirm, CartaoRapidoModo } from '../CartaoRapidoModal/CartaoRapidoModal'
 
 const formatNumeroOptionLabel = (n: NumeroListItem): string => {
@@ -109,6 +111,7 @@ const TransacoesForm = () => {
             estabelecimento_id: source.estabelecimento_id ?? null,
             estabelecimento: source.estabelecimento_id ? null : (source.estabelecimento ?? null),
             subcategoria_id: source.subcategoria_id ?? null,
+            plataforma_id: source.plataforma_id ?? null,
             origem_compra: source.origem_compra ?? null,
             eh_assinatura: source.eh_assinatura != null
                 ? isEhAssinatura(source.eh_assinatura)
@@ -141,6 +144,7 @@ const TransacoesForm = () => {
     const [numerosLoading, setNumerosLoading] = useState(false)
     const [categoriasOptions, setCategoriasOptions] = useState<SelectOptions[]>([])
     const [subcategoriasOptions, setSubcategoriasOptions] = useState<SelectOptions[]>([])
+    const [plataformasOptions, setPlataformasOptions] = useState<SelectOptions[]>([])
     const defaultOrigensCompraOptions: SelectOptions[] = Object.entries(origemCompraLabel).map(
         ([value, label]) => ({ value, label })
     )
@@ -150,6 +154,7 @@ const TransacoesForm = () => {
     const [responsavelModalOpen, setResponsavelModalOpen] = useState(false)
     const [categoriaRapidoOpen, setCategoriaRapidoOpen] = useState(false)
     const [subcategoriaRapidoOpen, setSubcategoriaRapidoOpen] = useState(false)
+    const [plataformaRapidoOpen, setPlataformaRapidoOpen] = useState(false)
     const [cartaoRapidoOpen, setCartaoRapidoOpen] = useState(false)
     const [cartaoRapidoModo, setCartaoRapidoModo] = useState<CartaoRapidoModo>('cartao')
     const [categoriasLookup, setCategoriasLookup] = useState<CategoriaLookup[]>([])
@@ -473,6 +478,15 @@ const TransacoesForm = () => {
                     }))
                 )
             }
+            if (lookups?.plataformas) {
+                setPlataformasOptions(
+                    lookups.plataformas.map((p) => ({
+                        value: p.id!,
+                        label: p.nome ?? `#${p.id}`,
+                        cor: corPlataforma({ cor: p.cor, plataforma_id: p.id }),
+                    }))
+                )
+            }
             if (lookups?.origens_compra?.length) {
                 setOrigensCompraOptions(
                     lookups.origens_compra.map((o) => ({
@@ -546,6 +560,20 @@ const TransacoesForm = () => {
         })
     }
 
+    const upsertPlataformaOption = (plat: PlataformaLookup) => {
+        if (!plat.id) return
+        setPlataformasOptions((prev) => {
+            if (prev.some((o) => Number(o.value) === Number(plat.id))) {
+                return prev.map((o) =>
+                    Number(o.value) === Number(plat.id)
+                        ? { ...o, label: plat.nome ?? o.label, cor: corPlataforma({ cor: plat.cor, plataforma_id: plat.id }) }
+                        : o
+                )
+            }
+            return [...prev, { value: plat.id!, label: plat.nome ?? `#${plat.id}`, cor: corPlataforma({ cor: plat.cor, plataforma_id: plat.id }) }]
+        })
+    }
+
     const handleConfirmCategoriaRapido = async (result: CategoriaRapidoConfirm) => {
         const cat = result.data
         upsertCategoriaOption({ id: cat.id, nome: cat.nome, cor: cat.cor ?? undefined })
@@ -598,6 +626,28 @@ const TransacoesForm = () => {
             } catch (error) {
                 console.error('Erro ao vincular subcategoria na transação:', error)
                 toast.error('Subcategoria cadastrada, mas falhou ao salvar na compra')
+            }
+        }
+    }
+
+    const handleConfirmPlataformaRapido = async (result: PlataformaRapidoConfirm) => {
+        const plat = result.data
+        upsertPlataformaOption({ id: plat.id, nome: plat.nome, cor: plat.cor ?? undefined })
+        setValue('plataforma_id', plat.id)
+
+        if (isEdit) {
+            const txId = record.id ?? record.transacao_id
+            if (!txId) return
+            try {
+                await transacoesService.editTransacoes({
+                    id: txId,
+                    transacao_id: txId,
+                    plataforma_id: plat.id,
+                    propagar_grupo: result.propagar_grupo || undefined,
+                } as TransacoesModel)
+            } catch (error) {
+                console.error('Erro ao vincular plataforma na transação:', error)
+                toast.error('Plataforma cadastrada, mas falhou ao salvar na compra')
             }
         }
     }
@@ -720,6 +770,7 @@ const TransacoesForm = () => {
                     eh_assinatura: nParcelas <= 1 ? Boolean(data.eh_assinatura) : false,
                     categoria_id: data.categoria_id,
                     subcategoria_id: data.categoria_id ? data.subcategoria_id : null,
+                    plataforma_id: data.plataforma_id || null,
                     responsavel_id: data.responsavel_id,
                     observacoes: textoCompra || undefined,
                     descricao: isCompraFlow ? (textoCompra || undefined) : undefined,
@@ -776,6 +827,9 @@ const TransacoesForm = () => {
             }
             if (data.categoria_id && data.subcategoria_id) {
                 payload.subcategoria_id = data.subcategoria_id
+            }
+            if (data.plataforma_id) {
+                payload.plataforma_id = data.plataforma_id
             }
             if (data.responsavel_id) {
                 payload.responsavel_id = data.responsavel_id
@@ -1282,7 +1336,7 @@ const TransacoesForm = () => {
                                                     ) : null}
                                                 </Row>
                                                 <Row>
-                                                    <Col md={6}>
+                                                    <Col md={4}>
                                                         <div className="mb-3" data-compra-field="categoria_id">
                                                             <Label htmlFor="categoria_id" className="form-label">Categoria</Label>
                                                             <div className="d-flex gap-2 align-items-start">
@@ -1307,7 +1361,7 @@ const TransacoesForm = () => {
                                                             </div>
                                                         </div>
                                                     </Col>
-                                                    <Col md={6}>
+                                                    <Col md={4}>
                                                         <div className="mb-3" data-compra-field="subcategoria_id">
                                                             <Label htmlFor="subcategoria_id" className="form-label">Subcategoria</Label>
                                                             <div className="d-flex gap-2 align-items-start">
@@ -1327,6 +1381,31 @@ const TransacoesForm = () => {
                                                                     title={!categoriaId ? 'Selecione uma categoria antes' : 'Nova subcategoria'}
                                                                     disabled={!categoriaId}
                                                                     onClick={() => setSubcategoriaRapidoOpen(true)}
+                                                                >
+                                                                    <i className="ri-add-line me-1"></i>
+                                                                    Nova
+                                                                </Button>
+                                                            </div>
+                                                        </div>
+                                                    </Col>
+                                                    <Col md={4}>
+                                                        <div className="mb-3" data-compra-field="plataforma_id">
+                                                            <Label htmlFor="plataforma_id" className="form-label">Plataforma</Label>
+                                                            <div className="d-flex gap-2 align-items-start">
+                                                                <div className="flex-grow-1">
+                                                                    <SelectListControlled<TransacoesModel>
+                                                                        options={plataformasOptions}
+                                                                        field="plataforma_id"
+                                                                        control={control}
+                                                                        placeholder="Selecione"
+                                                                    />
+                                                                </div>
+                                                                <Button
+                                                                    type="button"
+                                                                    color="light"
+                                                                    className="border flex-shrink-0"
+                                                                    title="Nova plataforma"
+                                                                    onClick={() => setPlataformaRapidoOpen(true)}
                                                                 >
                                                                     <i className="ri-add-line me-1"></i>
                                                                     Nova
@@ -1729,6 +1808,31 @@ const TransacoesForm = () => {
                                                 </div>
                                             </Col>
                                             <Col md={4}>
+                                                <div className="mb-3" data-compra-field="plataforma_id">
+                                                    <Label htmlFor="plataforma_id" className="form-label">Plataforma</Label>
+                                                    <div className="d-flex gap-2 align-items-start">
+                                                        <div className="flex-grow-1">
+                                                            <SelectListControlled<TransacoesModel>
+                                                                options={plataformasOptions}
+                                                                field="plataforma_id"
+                                                                control={control}
+                                                                placeholder="Selecione"
+                                                            />
+                                                        </div>
+                                                        <Button
+                                                            type="button"
+                                                            color="light"
+                                                            className="border flex-shrink-0"
+                                                            title="Nova plataforma"
+                                                            onClick={() => setPlataformaRapidoOpen(true)}
+                                                        >
+                                                            <i className="ri-add-line me-1"></i>
+                                                            Nova
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            </Col>
+                                            <Col md={4}>
                                                 <div className="mb-3" data-compra-field="parcelas_total">
                                                     <Label htmlFor="parcelas_total" className="form-label">Parcelamento</Label>
                                                     {isEdit ? (
@@ -1925,6 +2029,13 @@ const TransacoesForm = () => {
                 categoriaCor={categoriaAtual?.cor}
                 showPropagarGrupo={isEdit && Boolean(record.compra_grupo_id)}
                 onConfirm={handleConfirmSubcategoriaRapido}
+            />
+
+            <PlataformaRapidoModal
+                isOpen={plataformaRapidoOpen}
+                toggle={() => setPlataformaRapidoOpen(false)}
+                showPropagarGrupo={isEdit && Boolean(record.compra_grupo_id)}
+                onConfirm={handleConfirmPlataformaRapido}
             />
         </React.Fragment>
     )

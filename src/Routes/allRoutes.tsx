@@ -50,6 +50,10 @@ import LojasViewPage from "pages/Pages/Lojas/LojasView/LojasView";
 import SubcategoriasPage from "pages/Pages/Subcategorias/SubcategoriasPage";
 import SubcategoriasForm from "pages/Pages/Subcategorias/SubcategoriasForm/SubcategoriasForm";
 
+import PlataformasPage from "pages/Pages/Plataformas/PlataformasPage";
+import PlataformasForm from "pages/Pages/Plataformas/PlataformasForm/PlataformasForm";
+import PlataformasViewPage from "pages/Pages/Plataformas/PlataformasView/PlataformasView";
+
 import RelatoriosPage from "pages/Pages/Relatorios/RelatoriosPage";
 import ProjecaoFaturasPage from "pages/Pages/ProjecaoFaturas/ProjecaoFaturasPage";
 import SimuladorCompraPage from "pages/Pages/SimuladorCompra/SimuladorCompraPage";
@@ -115,6 +119,11 @@ const authProtectedRoutes = [
   { path: "/subcategorias", component: <SubcategoriasPage /> },
   { path: "/subcategorias/add", component: <SubcategoriasForm /> },
   { path: "/subcategorias/edit/:id", component: <SubcategoriasForm /> },
+
+  { path: "/plataformas", component: <PlataformasPage /> },
+  { path: "/plataformas/add", component: <PlataformasForm /> },
+  { path: "/plataformas/edit/:id", component: <PlataformasForm /> },
+  { path: "/plataformas/view/:id", component: <PlataformasViewPage /> },
 
   { path: "/relatorios", component: <RelatoriosPage /> },
   { path: "/raio-x", component: <RaioXPage /> },

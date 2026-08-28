@@ -436,6 +436,7 @@ describe('validarFormularioCompra', () => {
     expect(compraTemDetalhePreenchido(null)).toBe(false)
     expect(compraTemDetalhePreenchido({})).toBe(false)
     expect(compraTemDetalhePreenchido({ origem_compra: 'CREDITO' })).toBe(true)
+    expect(compraTemDetalhePreenchido({ plataforma_id: 6 })).toBe(true)
     expect(compraTemDetalhePreenchido({ parcelas: [{ parcela: 1, valor: '10' }, { parcela: 2, valor: '10' }] })).toBe(true)
   })
 })

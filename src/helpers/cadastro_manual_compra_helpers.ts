@@ -460,6 +460,9 @@ export const compraToEditSource = (compra: CompraVisualizacaoView): Partial<Tran
     categoria_nome: compra.categoria?.nome,
     subcategoria_id: compra.subcategoria?.id ?? null,
     subcategoria_nome: compra.subcategoria?.nome,
+    plataforma_id: compra.plataforma?.id ?? null,
+    plataforma_nome: compra.plataforma?.nome,
+    plataforma_cor: compra.plataforma?.cor,
     responsavel_id: compra.responsavel?.id ?? null,
     responsavel_nome: compra.responsavel?.nome,
     responsavel_tipo: compra.responsavel?.tipo ?? undefined,
@@ -579,6 +582,7 @@ export const CAMPOS_DETALHE_COMPRA = [
   'fatura_id',
   'categoria_id',
   'subcategoria_id',
+  'plataforma_id',
   'parcelas',
 ] as const
 
@@ -596,6 +600,7 @@ export const compraTemDetalhePreenchido = (source?: {
   cartao_numero_id?: number | string | null
   categoria_id?: number | string | null
   subcategoria_id?: number | string | null
+  plataforma_id?: number | string | null
   eh_assinatura?: boolean | number | string | null
   parcelas?: unknown
 } | null): boolean => {
@@ -604,6 +609,7 @@ export const compraTemDetalhePreenchido = (source?: {
   if (source.cartao_numero_id != null && String(source.cartao_numero_id).trim() !== '') return true
   if (source.categoria_id != null && String(source.categoria_id).trim() !== '') return true
   if (source.subcategoria_id != null && String(source.subcategoria_id).trim() !== '') return true
+  if (source.plataforma_id != null && String(source.plataforma_id).trim() !== '') return true
   if (source.eh_assinatura === true || source.eh_assinatura === 1 || source.eh_assinatura === '1') return true
   return Array.isArray(source.parcelas) && source.parcelas.length > 1
 }

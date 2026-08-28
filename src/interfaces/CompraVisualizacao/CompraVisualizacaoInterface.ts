@@ -163,6 +163,7 @@ export interface CompraVisualizacaoView {
   estabelecimento?: CompraEstabelecimentoRef | null
   categoria?: CompraCategoriaRef | null
   subcategoria?: CompraSubcategoriaRef | null
+  plataforma?: CompraCategoriaRef | null
   responsavel?: CompraResponsavelRef | null
   cartao?: CompraCartaoRef | null
   bandeira?: CompraBandeiraRef | null

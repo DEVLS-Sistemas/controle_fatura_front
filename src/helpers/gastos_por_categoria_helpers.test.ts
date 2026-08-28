@@ -19,8 +19,10 @@ import {
   centroValorOrigem,
   cleanGastosPorCategoriaParams,
   coresFatiasOrigem,
+  coresFatiasPlataforma,
   deveAvisarSemCategoria,
   fatiasOrigem,
+  fatiasPlataforma,
   isOrigemValida,
   origemCor,
   persistGastosPorCategoriaSearch,
@@ -28,11 +30,13 @@ import {
   resolveGastosPorCategoriaSelecao,
   resolveKpis,
   resolvePorOrigemSelecao,
+  resolvePorPlataformaSelecao,
   resolverMesAnoCalendario,
   rotuloAnoCalendario,
   rotuloJanelaMeses,
   rotuloPeriodoFiltro,
   tituloOrigem,
+  tituloPlataforma,
 } from './gastos_por_categoria_helpers'
 
 describe('resolveGastosPorCategoriaSearch', () => {
@@ -89,12 +93,13 @@ describe('resolveGastosPorCategoriaSearch', () => {
 
   it('lê filtros da query sem mandar categoria_id para a API', () => {
     const search = resolveGastosPorCategoriaSearch(
-      new URLSearchParams('meses=3&cartao_id=4&responsavel_id=9&categoria_id=2&origem_compra=COMPRAS_ONLINE')
+      new URLSearchParams('meses=3&cartao_id=4&responsavel_id=9&categoria_id=2&origem_compra=COMPRAS_ONLINE&plataforma_id=6')
     )
     expect(search.cartao_id).toBe(4)
     expect(search.responsavel_id).toBe(9)
     expect(search.categoria_id).toBeNull()
     expect(search.origem_compra).toBe('COMPRAS_ONLINE')
+    expect(search.plataforma_id).toBe(6)
   })
 
   it('ignora origem_compra inválida', () => {
@@ -215,10 +220,12 @@ describe('buildGastosPorCategoriaSearchParams / cleanGastosPorCategoriaParams', 
         meses: 3,
         categoria_id: 2,
         origem_compra: 'COMPRAS_PRESENCIAL',
+        plataforma_id: 6,
       })
     ).toEqual({
       meses: 3,
       origem_compra: 'COMPRAS_PRESENCIAL',
+      plataforma_id: 6,
     })
   })
 })
@@ -294,6 +301,7 @@ describe('seleção Power BI', () => {
         compras: 42,
         ticket_medio: 76.19,
         por_origem: [{ origem_compra: 'COMPRAS_ONLINE', label: 'Compras online', valor_total: 2100 }],
+        por_plataforma: [{ plataforma_id: 6, nome: 'iFood', cor: '#ea1d2c', valor_total: 540 }],
         top_subcategorias: [
           { subcategoria_id: 10, nome: 'Delivery', valor_total: 1800, compras: 20, percentual_da_categoria: 56.3 },
           { subcategoria_id: 11, nome: 'Supermercado', valor_total: 1000, compras: 12, percentual_da_categoria: 31.3 },
@@ -313,6 +321,7 @@ describe('seleção Power BI', () => {
       { chave: 'subcategoria-20', subcategoria_id: 20, nome: 'Uber', categoria_id: 3, valor_total: 900, compras: 5 },
     ],
     por_origem: [{ origem_compra: 'COMPRAS_PRESENCIAL', label: 'Compras presencial', valor_total: 7000 }],
+    por_plataforma: [{ plataforma_id: 1, nome: 'Loja Física', cor: '#22c55e', valor_total: 4000 }],
   }
 
   it('lê selecao da query e trata categoria_id legado como seleção, não filtro da API', () => {
@@ -462,6 +471,18 @@ describe('seleção Power BI', () => {
       ])
     ).toEqual([{ origem_compra: 'COMPRAS_ONLINE', valor_total: 10 }])
     expect(coresFatiasOrigem([{ origem_compra: 'COMPRAS_ONLINE', valor_total: 10 }], null)[0]).toBe('#3b82f6')
+    expect(resolvePorPlataformaSelecao(data, cat)[0].nome).toBe('iFood')
+    expect(resolvePorPlataformaSelecao(data, sub)[0].nome).toBe('iFood')
+    expect(resolvePorPlataformaSelecao(data, GastosPorCategoriaSelecaoVazia)[0].nome).toBe('Loja Física')
+    expect(tituloPlataforma(null)).toBe('Plataforma')
+    expect(tituloPlataforma('Alimentação')).toBe('Plataforma em Alimentação')
+    expect(
+      fatiasPlataforma([
+        { plataforma_id: 6, nome: 'iFood', valor_total: 10 },
+        { plataforma_id: null, nome: 'Sem plataforma', valor_total: 0 },
+      ])
+    ).toEqual([{ plataforma_id: 6, nome: 'iFood', valor_total: 10 }])
+    expect(coresFatiasPlataforma([{ plataforma_id: 6, nome: 'iFood', cor: '#ea1d2c', valor_total: 10 }], null)[0]).toBe('#ea1d2c')
   })
 
   it('não coloca categoria_id no GET ao persistir a seleção na URL', () => {

@@ -20,7 +20,7 @@ import {
     isTransacaoOperacional,
 } from "helpers/fatura_helpers"
 import { pathVisualizacaoDaLinha, tituloListagemCompra, precisaConciliarCompra, labelPrecisaConciliar, temSugestaoConciliacao, labelSugestaoConciliacao, conciliadaComManual, labelConciliadaComManual, identificadorCompraManualVinculada, pathVisualizacaoCompra } from "helpers/cadastro_manual_compra_helpers"
-import { corCategoria, corSubcategoria } from "helpers/cores_tema_helpers"
+import { corCategoria, corSubcategoria, corPlataforma } from "helpers/cores_tema_helpers"
 import { isCompraAvista, isEhAssinatura } from "helpers/assinaturas_helpers"
 import { SelectOptions } from "interfaces/SystemInterfaces/SelectInterface"
 import {
@@ -218,6 +218,7 @@ export const TransacoesTable = ({
                 cartao_id: new_url.searchParams.get('cartao_id') ?? filters.cartao_id,
                 categoria_id: new_url.searchParams.get('categoria_id') ?? filters.categoria_id,
                 subcategoria_id: new_url.searchParams.get('subcategoria_id') ?? filters.subcategoria_id,
+                plataforma_id: new_url.searchParams.get('plataforma_id') ?? filters.plataforma_id,
                 estabelecimento_id: new_url.searchParams.get('estabelecimento_id') ?? filters.estabelecimento_id,
                 responsavel_id: new_url.searchParams.get('responsavel_id') ?? filters.responsavel_id,
                 fatura_id: new_url.searchParams.get('fatura_id') ?? filters.fatura_id,
@@ -302,6 +303,7 @@ export const TransacoesTable = ({
                                                                 <th scope="col">Origem</th>
                                                                 <th scope="col">Categoria</th>
                                                                 <th scope="col">Subcategoria</th>
+                                                                <th scope="col">Plataforma</th>
                                                                 <th scope="col" style={{ width: "100px" }} title="Responsável">Resp.</th>
                                                                 <th scope="col">Fatura / Cartão</th>
                                                                 <th scope="col">Final</th>
@@ -451,6 +453,28 @@ export const TransacoesTable = ({
                                                                                     {row.subcategoria_nome}
                                                                                 </span>
                                                                             ) : '-'}
+                                                                        </td>
+                                                                        <td>
+                                                                            {row.plataforma_nome ? (
+                                                                                <span className="d-inline-flex align-items-center gap-1">
+                                                                                    <span
+                                                                                        className="d-inline-block rounded-circle"
+                                                                                        title={corPlataforma({
+                                                                                            cor: row.plataforma_cor,
+                                                                                            plataforma_id: row.plataforma_id,
+                                                                                        })}
+                                                                                        style={{
+                                                                                            width: 10,
+                                                                                            height: 10,
+                                                                                            backgroundColor: corPlataforma({
+                                                                                                cor: row.plataforma_cor,
+                                                                                                plataforma_id: row.plataforma_id,
+                                                                                            }),
+                                                                                        }}
+                                                                                    />
+                                                                                    {row.plataforma_nome}
+                                                                                </span>
+                                                                            ) : null}
                                                                         </td>
                                                                         <td>
                                                                             <Button

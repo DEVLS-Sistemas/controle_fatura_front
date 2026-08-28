@@ -17,7 +17,7 @@ import {
     origemCompraLabel,
     isTransacaoOperacional,
     FATURA_FILE_ACCEPT, isValidFaturaFile, resolveFaturaAnexo, downloadFaturaAnexo,
-    getCategoriaFieldStyle, getSubcategoriaFieldStyle, VALOR_TEXT_CLASS, isMeuResponsavelDisplay, nomeResponsavelPadraoNaoEu,
+    getCategoriaFieldStyle, getSubcategoriaFieldStyle, getPlataformaFieldStyle, VALOR_TEXT_CLASS, isMeuResponsavelDisplay, nomeResponsavelPadraoNaoEu,
 } from 'helpers/fatura_helpers'
 import {
     labelBotaoRemoverAnexo,
@@ -50,7 +50,7 @@ import {
     valorContaNoTotal,
 } from 'helpers/cadastro_manual_compra_helpers'
 import { CartaoChip, BandeiraChip, resolveCartaoCores } from 'helpers/cartao_helpers'
-import { corCategoria } from 'helpers/cores_tema_helpers'
+import { corCategoria, corPlataforma } from 'helpers/cores_tema_helpers'
 import { formatParsersHomologadosLista, parsersHomologadosOrFallback, resolveCartaoHomologacao } from 'helpers/parser_homologado_helpers'
 import CartaoPdfHomologacaoBadge from 'Components/Cartoes/CartaoPdfHomologacaoBadge'
 import { SelectOptions } from 'interfaces/SystemInterfaces/SelectInterface'
@@ -68,7 +68,7 @@ import {
     ImpactoRemoverAnexoCompra,
 } from 'interfaces/Faturas/FaturasInterface'
 import { NumeroListItem, ParserHomologado, PARSERS_HOMOLOGADOS_PADRAO } from 'interfaces/Cartoes/CartoesInterface'
-import { CategoriaLookup, CandidatoConciliacao, ResponsavelLookup, TransacoesList } from 'interfaces/Transacoes/TransacoesInterface'
+import { CategoriaLookup, PlataformaLookup, CandidatoConciliacao, ResponsavelLookup, TransacoesList } from 'interfaces/Transacoes/TransacoesInterface'
 import { FaturasService } from 'services/Faturas/FaturasService'
 import { TransacoesService } from 'services/Transacoes/TransacoesService'
 import { SubcategoriasService } from 'services/Subcategorias/SubcategoriasService'
@@ -76,6 +76,7 @@ import { CartoesService } from 'services/Cartoes/CartoesService'
 import ResponsavelModal from 'pages/Pages/Transacoes/ResponsavelModal/ResponsavelModal'
 import CategoriaRapidoModal, { CategoriaRapidoConfirm } from 'pages/Pages/Transacoes/CategoriaRapidoModal/CategoriaRapidoModal'
 import SubcategoriaRapidoModal, { SubcategoriaRapidoConfirm } from 'pages/Pages/Transacoes/SubcategoriaRapidoModal/SubcategoriaRapidoModal'
+import PlataformaRapidoModal, { PlataformaRapidoConfirm } from 'pages/Pages/Transacoes/PlataformaRapidoModal/PlataformaRapidoModal'
 import FaturaSenhaPdfModal from 'Components/Faturas/FaturaSenhaPdfModal'
 import FaturaSelecaoModal, { FaturaSelecaoStep } from 'Components/Faturas/FaturaSelecaoModal'
 import FaturaTitularModal from 'Components/Faturas/FaturaTitularModal'
@@ -379,6 +380,8 @@ const FaturasViewPage = () => {
     const [origensCompraOptions, setOrigensCompraOptions] = useState<SelectOptions[]>(
         () => Object.entries(origemCompraLabel).map(([value, label]) => ({ value, label }))
     )
+    const [plataformasOptions, setPlataformasOptions] = useState<SelectOptions[]>([])
+    const [plataformasLookup, setPlataformasLookup] = useState<PlataformaLookup[]>([])
     const [numerosOptions, setNumerosOptions] = useState<SelectOptions[]>([])
     const [numerosLoading, setNumerosLoading] = useState(false)
     const [defaultResponsavelId, setDefaultResponsavelId] = useState<number | null>(null)
@@ -386,8 +389,10 @@ const FaturasViewPage = () => {
     const [rowForResponsavel, setRowForResponsavel] = useState<TransacoesList | null>(null)
     const [categoriaRapidoOpen, setCategoriaRapidoOpen] = useState(false)
     const [subcategoriaRapidoOpen, setSubcategoriaRapidoOpen] = useState(false)
+    const [plataformaRapidoOpen, setPlataformaRapidoOpen] = useState(false)
     const [rowForCategoriaRapido, setRowForCategoriaRapido] = useState<TransacoesList | null>(null)
     const [rowForSubcategoriaRapido, setRowForSubcategoriaRapido] = useState<TransacoesList | null>(null)
+    const [rowForPlataformaRapido, setRowForPlataformaRapido] = useState<TransacoesList | null>(null)
     const [savingIds, setSavingIds] = useState<Record<number, boolean>>({})
     const [conciliarModal, setConciliarModal] = useState<{
         origem: 'manual' | 'lancamento'
@@ -569,6 +574,16 @@ const FaturasViewPage = () => {
                     lookups.origens_compra.map((o) => ({
                         value: o.value ?? '',
                         label: o.label ?? o.value ?? '',
+                    }))
+                )
+            }
+            if (lookups?.plataformas) {
+                setPlataformasLookup(lookups.plataformas)
+                setPlataformasOptions(
+                    lookups.plataformas.map((p) => ({
+                        value: p.id!,
+                        label: p.nome ?? `#${p.id}`,
+                        cor: corPlataforma({ cor: p.cor, plataforma_id: p.id }),
                     }))
                 )
             }
@@ -1244,6 +1259,9 @@ const FaturasViewPage = () => {
             | 'observacoes'
             | 'origem_compra'
             | 'eh_assinatura'
+            | 'plataforma_id'
+            | 'plataforma_nome'
+            | 'plataforma_cor'
         >> & {
             propagar_grupo?: boolean
         }
@@ -1259,6 +1277,9 @@ const FaturasViewPage = () => {
             const origemCompra = patch.origem_compra !== undefined
                 ? patch.origem_compra
                 : (tx.origem_compra ?? null)
+            const plataformaId = patch.plataforma_id !== undefined
+                ? patch.plataforma_id
+                : (tx.plataforma_id ?? null)
             const ehAssinatura = patch.eh_assinatura !== undefined
                 ? patch.eh_assinatura
                 : (tx.eh_assinatura ?? null)
@@ -1279,6 +1300,7 @@ const FaturasViewPage = () => {
                 eh_assinatura: ehAssinatura != null ? Boolean(ehAssinatura) : undefined,
                 categoria_id: categoriaId,
                 subcategoria_id: subcategoriaId,
+                plataforma_id: plataformaId,
                 responsavel_id: patch.responsavel_id !== undefined ? patch.responsavel_id : (tx.responsavel_id ?? null),
                 observacoes: patch.observacoes !== undefined ? patch.observacoes : (tx.observacoes ?? null),
                 propagar_grupo: propagarGrupo || undefined,
@@ -1315,6 +1337,11 @@ const FaturasViewPage = () => {
                             origensCompraOptions.find((o) => o.value === rowPatch.origem_compra)?.label
                             ?? origemCompraLabel[rowPatch.origem_compra ?? '']
                             ?? null
+                    }
+                    if (rowPatch.plataforma_id !== undefined) {
+                        const plataforma = plataformasLookup.find((o) => o.id === rowPatch.plataforma_id)
+                        next.plataforma_nome = rowPatch.plataforma_nome ?? plataforma?.nome
+                        next.plataforma_cor = rowPatch.plataforma_cor ?? plataforma?.cor
                     }
                     if (rowPatch.responsavel_id !== undefined) {
                         const responsavel =
@@ -1353,7 +1380,7 @@ const FaturasViewPage = () => {
 
     const handleUpdateSelect = async (
         tx: TransacoesList,
-        field: 'categoria_id' | 'subcategoria_id' | 'responsavel_id',
+        field: 'categoria_id' | 'subcategoria_id' | 'responsavel_id' | 'plataforma_id',
         value: string
     ) => {
         const parsed = value === '' ? null : Number(value)
@@ -1447,6 +1474,7 @@ const FaturasViewPage = () => {
                 origem_compra: tx.origem_compra ?? null,
                 categoria_id: tx.categoria_id ?? null,
                 subcategoria_id: tx.subcategoria_id ?? null,
+                plataforma_id: tx.plataforma_id ?? null,
                 responsavel_id: tx.responsavel_id ?? null,
                 observacoes: tx.observacoes ?? null,
                 cartao_numero_id: parsed,
@@ -1600,6 +1628,39 @@ const FaturasViewPage = () => {
             propagar_grupo: result.propagar_grupo,
         })
         setRowForSubcategoriaRapido(null)
+    }
+
+    const openPlataformaRapidoModal = (tx: TransacoesList) => {
+        setRowForPlataformaRapido(tx)
+        setPlataformaRapidoOpen(true)
+    }
+
+    const handleConfirmPlataformaRapido = async (result: PlataformaRapidoConfirm) => {
+        if (!rowForPlataformaRapido?.id) return
+        const plat = result.data
+        setPlataformasLookup((prev) => {
+            if (prev.some((p) => Number(p.id) === Number(plat.id))) {
+                return prev.map((p) => (Number(p.id) === Number(plat.id) ? { ...p, nome: plat.nome, cor: plat.cor } : p))
+            }
+            return [...prev, { id: plat.id, nome: plat.nome, cor: plat.cor }]
+        })
+        setPlataformasOptions((prev) => {
+            if (prev.some((o) => Number(o.value) === Number(plat.id))) {
+                return prev.map((o) =>
+                    Number(o.value) === Number(plat.id)
+                        ? { ...o, label: plat.nome, cor: corPlataforma({ cor: plat.cor, plataforma_id: plat.id }) }
+                        : o
+                )
+            }
+            return [...prev, { value: plat.id, label: plat.nome, cor: corPlataforma({ cor: plat.cor, plataforma_id: plat.id }) }]
+        })
+        await saveTransacao(rowForPlataformaRapido, {
+            plataforma_id: plat.id,
+            plataforma_nome: plat.nome,
+            plataforma_cor: plat.cor,
+            propagar_grupo: result.propagar_grupo,
+        })
+        setRowForPlataformaRapido(null)
     }
 
     useEffect(() => {
@@ -2306,6 +2367,7 @@ const FaturasViewPage = () => {
                                                 <th>Origem</th>
                                                 <th style={{ minWidth: 160 }}>Categoria</th>
                                                 <th style={{ minWidth: 160 }}>Subcategoria</th>
+                                                <th style={{ minWidth: 160 }}>Plataforma</th>
                                                 <th style={{ minWidth: 250 }}>Observação</th>
                                                 <th style={{ width: 90 }} title="Responsável">Resp.</th>
                                                 <th style={{ width: 90 }}>Ver</th>
@@ -2325,7 +2387,7 @@ const FaturasViewPage = () => {
                                                 return (
                                                 <React.Fragment key={grupo.key}>
                                                     <tr className="table-secondary">
-                                                        <td colSpan={11} className="py-2">
+                                                        <td colSpan={12} className="py-2">
                                                             <div className="d-flex flex-wrap align-items-center justify-content-between gap-2">
                                                                 <span className="fw-semibold">
                                                                     {grupo.label}
@@ -2343,7 +2405,7 @@ const FaturasViewPage = () => {
                                                 <React.Fragment key={`${grupo.key}_${secao.key}`}>
                                                     {showSecaoTitulo && secao.titulo && (
                                                     <tr className="table-light">
-                                                        <td colSpan={11} className="py-1">
+                                                        <td colSpan={12} className="py-1">
                                                             <span className="small fw-semibold text-uppercase text-muted">
                                                                 {secao.titulo}
                                                             </span>
@@ -2379,7 +2441,7 @@ const FaturasViewPage = () => {
                                                         <React.Fragment key={rowKey}>
                                                         {isPagamentosGrupo && (
                                                             <tr className="table-warning">
-                                                                <td colSpan={11} className="py-2">
+                                                                <td colSpan={12} className="py-2">
                                                                     <div className="d-flex flex-wrap align-items-center gap-2">
                                                                         <span className="text-muted small text-nowrap">
                                                                             <i className="ri-bank-card-line me-1"></i>
@@ -2576,6 +2638,42 @@ const FaturasViewPage = () => {
                                                                     </Button>
                                                                 </div>
                                                             </td>
+                                                            <td style={{ minWidth: 160 }}>
+                                                                <div className="d-flex gap-1 align-items-center">
+                                                                    <Input
+                                                                        type="select"
+                                                                        bsSize="sm"
+                                                                        value={tx.plataforma_id ?? ''}
+                                                                        disabled={!!savingIds[tx.id!]}
+                                                                        onChange={(e) => handleUpdateSelect(tx, 'plataforma_id', e.target.value)}
+                                                                        style={
+                                                                            tx.plataforma_id
+                                                                                ? getPlataformaFieldStyle({
+                                                                                    cor: tx.plataforma_cor
+                                                                                        ?? plataformasLookup.find((p) => p.id === tx.plataforma_id)?.cor,
+                                                                                    plataforma_id: tx.plataforma_id,
+                                                                                })
+                                                                                : undefined
+                                                                        }
+                                                                    >
+                                                                        <option value="">Selecione</option>
+                                                                        {plataformasOptions.map((opt) => (
+                                                                            <option key={String(opt.value)} value={opt.value ?? ''}>{opt.label}</option>
+                                                                        ))}
+                                                                    </Input>
+                                                                    <Button
+                                                                        type="button"
+                                                                        color="light"
+                                                                        size="sm"
+                                                                        className="border px-1"
+                                                                        title="Nova plataforma"
+                                                                        disabled={!!savingIds[tx.id!]}
+                                                                        onClick={() => openPlataformaRapidoModal(tx)}
+                                                                    >
+                                                                        <i className="ri-add-line"></i>
+                                                                    </Button>
+                                                                </div>
+                                                            </td>
                                                             <td>
                                                                 <Input
                                                                     type="text"
@@ -2703,6 +2801,16 @@ const FaturasViewPage = () => {
                         }
                         showPropagarGrupo={Boolean(rowForSubcategoriaRapido?.compra_grupo_id)}
                         onConfirm={handleConfirmSubcategoriaRapido}
+                    />
+
+                    <PlataformaRapidoModal
+                        isOpen={plataformaRapidoOpen}
+                        toggle={() => {
+                            setPlataformaRapidoOpen(false)
+                            setRowForPlataformaRapido(null)
+                        }}
+                        showPropagarGrupo={Boolean(rowForPlataformaRapido?.compra_grupo_id)}
+                        onConfirm={handleConfirmPlataformaRapido}
                     />
 
                     <Card className="mb-4">

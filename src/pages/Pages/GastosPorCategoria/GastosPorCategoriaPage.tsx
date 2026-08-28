@@ -32,7 +32,10 @@ import {
   resolveGastosPorCategoriaSelecao,
   resolveKpis,
   resolvePorOrigemSelecao,
+  resolvePorPlataformaSelecao,
+  fatiasPlataforma,
   tituloOrigem,
+  tituloPlataforma,
 } from 'helpers/gastos_por_categoria_helpers'
 import GastosPorCategoriaHeader from './GastosPorCategoriaHeader/GastosPorCategoriaHeader'
 import GastosPorCategoriaHero from './GastosPorCategoriaHero/GastosPorCategoriaHero'
@@ -124,6 +127,7 @@ const GastosPorCategoriaPage = () => {
       {
         ...filters,
         origem_compra: lastFiltersRef.current.origem_compra,
+        plataforma_id: lastFiltersRef.current.plataforma_id,
       },
       { force: true }
     )
@@ -133,6 +137,13 @@ const GastosPorCategoriaPage = () => {
     loadGastos({
       ...lastFiltersRef.current,
       origem_compra: origem,
+    })
+  }
+
+  const handlePlataforma = (plataformaId: number | null) => {
+    loadGastos({
+      ...lastFiltersRef.current,
+      plataforma_id: plataformaId,
     })
   }
 
@@ -164,12 +175,17 @@ const GastosPorCategoriaPage = () => {
     () => fatiasOrigem(resolvePorOrigemSelecao(data, selecao)),
     [data, selecao]
   )
+  const porPlataforma = useMemo(
+    () => fatiasPlataforma(resolvePorPlataformaSelecao(data, selecao)),
+    [data, selecao]
+  )
   const categoriaSelecionada = useMemo(() => encontrarCategoria(data, selecao), [data, selecao])
   const origemCentro = useMemo(() => centroValorOrigem(data, selecao), [data, selecao])
   const tituloSubcategorias = selecao.categoria_chave
     ? `Subcategorias de ${categoriaSelecionada?.nome || 'categoria'}`
     : 'Subcategorias'
   const tituloOrigemCard = tituloOrigem(selecao.categoria_chave ? categoriaSelecionada?.nome : null)
+  const tituloPlataformaCard = tituloPlataforma(selecao.categoria_chave ? categoriaSelecionada?.nome : null)
 
   return (
     <React.Fragment>
@@ -236,15 +252,20 @@ const GastosPorCategoriaPage = () => {
                 categorias={categoriasChart}
                 subcategorias={subcategoriasChart}
                 origens={porOrigem}
+                plataformas={porPlataforma}
                 categoriaSelecionadaChave={selecao.categoria_chave}
                 subcategoriaSelecionadaId={selecao.subcategoria_id}
                 origemAtiva={lastFiltersRef.current.origem_compra}
+                plataformaAtiva={lastFiltersRef.current.plataforma_id}
                 tituloSubcategorias={tituloSubcategorias}
                 tituloOrigem={tituloOrigemCard}
+                tituloPlataforma={tituloPlataformaCard}
                 centroValor={kpis.valor_total}
                 centroLabel={kpis.label}
                 centroValorOrigem={origemCentro.valor}
                 centroLabelOrigem={origemCentro.label}
+                centroValorPlataforma={origemCentro.valor}
+                centroLabelPlataforma={origemCentro.label}
                 categoriaFiltrada={Boolean(selecao.categoria_chave)}
                 loading={skeleton}
                 onCliqueCategoria={(item) => aplicarSelecao(aplicarCliqueCategoria(selecao, item))}
@@ -252,7 +273,9 @@ const GastosPorCategoriaPage = () => {
                 onDuploCliqueCategoria={(item) => abrirAtalho(item.atalho)}
                 onDuploCliqueSubcategoria={(item) => abrirAtalho(item.atalho)}
                 onDuploCliqueOrigem={(item) => abrirAtalho(item.atalho)}
+                onDuploCliquePlataforma={(item) => abrirAtalho(item.atalho)}
                 onFiltrarOrigem={handleOrigem}
+                onFiltrarPlataforma={handlePlataforma}
                 onLimpar={() => aplicarSelecao({ ...GastosPorCategoriaSelecaoVazia })}
               />
               <GastosPorCategoriaBarras

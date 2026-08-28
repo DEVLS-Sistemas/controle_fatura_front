@@ -9,6 +9,7 @@ import {
   GastosPorCategoriaMeses,
   GastosPorCategoriaOrigem,
   GastosPorCategoriaOrigemItem,
+  GastosPorCategoriaPlataformaItem,
   GastosPorCategoriaSearch,
   GastosPorCategoriaSelecao,
   GastosPorCategoriaSelecaoVazia,
@@ -19,6 +20,7 @@ import {
   COR_FATIA_OUTROS,
   COR_SEM_CATEGORIA,
   corCategoria,
+  corPlataforma,
   corSubcategoria,
 } from 'helpers/cores_tema_helpers'
 
@@ -213,6 +215,24 @@ export const fatiasOrigem = (
 ): GastosPorCategoriaOrigemItem[] =>
   (Array.isArray(itens) ? itens : []).filter((item) => Number(item.valor_total ?? 0) > 0)
 
+export const chavePlataforma = (item?: GastosPorCategoriaPlataformaItem | null): string => {
+  if (item?.chave) return String(item.chave)
+  const id = Number(item?.plataforma_id)
+  if (Number.isFinite(id) && id > 0) return `plataforma-${id}`
+  return 'sem-plataforma'
+}
+
+export const fatiasPlataforma = (
+  itens?: GastosPorCategoriaPlataformaItem[] | null
+): GastosPorCategoriaPlataformaItem[] =>
+  (Array.isArray(itens) ? itens : []).filter((item) => Number(item.valor_total ?? 0) > 0)
+
+export const plataformaCorItem = (item?: GastosPorCategoriaPlataformaItem | null): string =>
+  corPlataforma({
+    cor: item?.cor,
+    plataforma_id: item?.plataforma_id,
+  })
+
 export const isOrigemValida = (value?: string | null): value is GastosPorCategoriaOrigem =>
   GASTOS_POR_CATEGORIA_ORIGENS.includes(value as GastosPorCategoriaOrigem)
 
@@ -300,6 +320,7 @@ export const resolveGastosPorCategoriaSearch = (
       responsavel_id: parsePositiveId(urlParams?.get('responsavel_id')),
       categoria_id: null,
       origem_compra: isOrigemValida(origem) ? origem : null,
+      plataforma_id: parsePositiveId(urlParams?.get('plataforma_id')),
     }
   }
 
@@ -322,6 +343,7 @@ export const resolveGastosPorCategoriaSearch = (
       responsavel_id: parsePositiveId(urlParams?.get('responsavel_id')),
       categoria_id: null,
       origem_compra: isOrigemValida(origem) ? origem : null,
+      plataforma_id: parsePositiveId(urlParams?.get('plataforma_id')),
     }
   }
 
@@ -345,6 +367,7 @@ export const resolveGastosPorCategoriaSearch = (
       responsavel_id: parsePositiveId(urlParams?.get('responsavel_id')),
       categoria_id: null,
       origem_compra: isOrigemValida(origem) ? origem : null,
+      plataforma_id: parsePositiveId(urlParams?.get('plataforma_id')),
     }
   }
 
@@ -361,6 +384,7 @@ export const resolveGastosPorCategoriaSearch = (
     responsavel_id: parsePositiveId(urlParams?.get('responsavel_id')),
     categoria_id: null,
     origem_compra: isOrigemValida(origem) ? origem : null,
+    plataforma_id: parsePositiveId(urlParams?.get('plataforma_id')),
   }
 }
 
@@ -395,6 +419,8 @@ export const buildGastosPorCategoriaSearchParams = (
   if (filters.cartao_id) next.set('cartao_id', String(filters.cartao_id))
   if (filters.responsavel_id) next.set('responsavel_id', String(filters.responsavel_id))
   if (isOrigemValida(filters.origem_compra)) next.set('origem_compra', filters.origem_compra)
+  const plataformaId = Number(filters.plataforma_id)
+  if (Number.isFinite(plataformaId) && plataformaId > 0) next.set('plataforma_id', String(plataformaId))
 
   return next
 }
@@ -427,6 +453,9 @@ export const cleanGastosPorCategoriaParams = (
   if (Number.isFinite(responsavelId) && responsavelId > 0) clean.responsavel_id = responsavelId
 
   if (isOrigemValida(params.origem_compra)) clean.origem_compra = params.origem_compra
+
+  const plataformaId = Number(params.plataforma_id)
+  if (Number.isFinite(plataformaId) && plataformaId > 0) clean.plataforma_id = plataformaId
 
   return clean
 }
@@ -821,6 +850,24 @@ export const centroValorOrigem = (
   }
 }
 
+export const coresFatiasPlataforma = (
+  fatias: GastosPorCategoriaPlataformaItem[],
+  selecionadaChave?: string | null
+): string[] =>
+  fatias.map((item) => {
+    const cor = plataformaCorItem(item)
+    const ativa = Boolean(selecionadaChave) && selecionadaChave === chavePlataforma(item)
+    return corBarraDim(cor, Boolean(selecionadaChave) && !ativa)
+  })
+
+export const tituloPlataforma = (categoriaNome?: string | null): string =>
+  categoriaNome ? `Plataforma em ${categoriaNome}` : 'Plataforma'
+
+export const centroValorPlataforma = (
+  data?: GastosPorCategoriaView | null,
+  selecao?: GastosPorCategoriaSelecao | null
+): { valor: number | null; label: string } => centroValorOrigem(data, selecao)
+
 export const encontrarSubcategoria = (
   data?: GastosPorCategoriaView | null,
   selecao?: GastosPorCategoriaSelecao | null
@@ -885,6 +932,15 @@ export const resolvePorOrigemSelecao = (
   const cat = encontrarCategoria(data, selecao)
   if (cat && 'por_origem' in cat && Array.isArray(cat.por_origem)) return cat.por_origem
   return Array.isArray(data?.por_origem) ? data.por_origem : []
+}
+
+export const resolvePorPlataformaSelecao = (
+  data?: GastosPorCategoriaView | null,
+  selecao?: GastosPorCategoriaSelecao | null
+): GastosPorCategoriaPlataformaItem[] => {
+  const cat = encontrarCategoria(data, selecao)
+  if (cat && 'por_plataforma' in cat && Array.isArray(cat.por_plataforma)) return cat.por_plataforma
+  return Array.isArray(data?.por_plataforma) ? data.por_plataforma : []
 }
 
 export const buildSelectOptions = (
