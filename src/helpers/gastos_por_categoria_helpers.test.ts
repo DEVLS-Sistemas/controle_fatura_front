@@ -9,6 +9,7 @@ import {
   barrasCategoria,
   barrasSubcategoria,
   comFatiaOutros,
+  coresFatiasCategoria,
   fatiasCategoria,
   fatiasSubcategoria,
   percentualFatia,
@@ -284,6 +285,18 @@ describe('seleção Power BI', () => {
     expect(fatias[10].nome).toBe('Outros')
     expect(fatias[10].chave).toBe('outros')
     expect(fatias[10].valor_total).toBe(200)
+    expect(fatias[10].cor).toBe('#d1d5db')
+  })
+
+  it('pinta categoria com a cor salva, preto no legado, cinza sem categoria e Outros em #d1d5db', () => {
+    expect(
+      coresFatiasCategoria([
+        { categoria_id: 2, cor: '#3b82f6', nome: 'Alimentação' },
+        { categoria_id: 3, cor: null, nome: 'Transporte' },
+        { categoria_id: null, cor: null, nome: 'Sem categoria' },
+        { chave: 'outros', nome: 'Outros' },
+      ])
+    ).toEqual(['#3b82f6', '#000000', '#9ca3af', '#d1d5db'])
   })
 
   it('depois do filtro da categoria a pizza escrava usa o percentual da categoria', () => {

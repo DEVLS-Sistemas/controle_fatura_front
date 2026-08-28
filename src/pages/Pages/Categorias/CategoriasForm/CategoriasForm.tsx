@@ -7,14 +7,26 @@ import { Breadcrumb, BreadcrumbItem, Card, CardBody, Col, Container, Label, Row 
 import { SubmitHandler, useForm } from 'react-hook-form'
 import { required } from 'Components/ComponentController/ValidatorForm/ValidatorForm'
 import { InputTextControlled } from 'Components/ComponentController/Inputs/Text/InputTextControlled'
-import { CategoriasDefaultValues, CategoriasModel } from 'interfaces/Categorias/CategoriasInterface'
+import {
+    CategoriaTemaLookup,
+    CategoriasDefaultValues,
+    CategoriasModel,
+} from 'interfaces/Categorias/CategoriasInterface'
 import { CategoriasService } from 'services/Categorias/CategoriasService'
+import CorTemaSwatches from 'Components/CoresTema/CorTemaSwatches'
+import {
+    COR_TEMA_PADRAO,
+    corTemaPadrao,
+    normalizeHexTema,
+    resolverTemasCategoria,
+} from 'helpers/cores_tema_helpers'
 
 const buildRecordFromSource = (source: any): CategoriasModel => ({
     ...CategoriasDefaultValues,
     ...source,
     id: source.id ?? null,
     categoria_id: source.categoria_id ?? source.id ?? null,
+    cor: normalizeHexTema(source.cor) || COR_TEMA_PADRAO,
 })
 
 const CategoriasForm = () => {
@@ -25,18 +37,34 @@ const CategoriasForm = () => {
     const [record, setRecord] = useState<CategoriasModel>(
         state?.source ? buildRecordFromSource(state.source) : CategoriasDefaultValues
     )
+    const [temas, setTemas] = useState<CategoriaTemaLookup[]>(resolverTemasCategoria())
 
-    const { register, handleSubmit, control, reset, setValue, watch } = useForm<CategoriasModel>({
+    const { register, handleSubmit, control, reset, setValue, watch, getValues } = useForm<CategoriasModel>({
         defaultValues: record
     })
 
-    const corValue = watch('cor') || '#000000'
+    const corValue = watch('cor') || COR_TEMA_PADRAO
 
     const { voltarParaRotaAnterior } = useNavegacao()
     const navigate = useNavigate()
     const categoriasService = new CategoriasService()
 
     const isEditing = !!(record.categoria_id || record.id || paramId)
+
+    const loadLookups = async () => {
+        try {
+            const lookups = await categoriasService.getLookupsCategorias()
+            setTemas(resolverTemasCategoria(lookups))
+            if (!isEditing) {
+                const atual = normalizeHexTema(getValues('cor'))
+                if (!atual || atual === COR_TEMA_PADRAO) {
+                    setValue('cor', corTemaPadrao(lookups))
+                }
+            }
+        } catch (error) {
+            console.error('Erro ao carregar cores tema:', error)
+        }
+    }
 
     const loadRecord = async (id: string | number) => {
         try {
@@ -54,11 +82,15 @@ const CategoriasForm = () => {
 
     const onSubmit: SubmitHandler<CategoriasModel> = async (data) => {
         try {
+            const payload: CategoriasModel = {
+                ...data,
+                cor: normalizeHexTema(data.cor) || COR_TEMA_PADRAO,
+            }
             if (isEditing) {
-                await categoriasService.editCategorias(data)
+                await categoriasService.editCategorias(payload)
                 toast.success('Categoria atualizada com sucesso!')
             } else {
-                await categoriasService.createCategorias(data)
+                await categoriasService.createCategorias(payload)
                 toast.success('Categoria cadastrada com sucesso!')
             }
             navigate('/categorias')
@@ -70,6 +102,7 @@ const CategoriasForm = () => {
 
     useEffect(() => {
         setActiveMenu('/categorias')
+        loadLookups()
     }, [])
 
     useEffect(() => {
@@ -119,21 +152,13 @@ const CategoriasForm = () => {
                                             </Col>
                                             <Col md={6}>
                                                 <div className="mb-3">
-                                                    <Label htmlFor="cor" className="form-label">Cor</Label>
-                                                    <div className="d-flex align-items-center gap-2">
-                                                        <input
-                                                            type="color"
-                                                            className="form-control form-control-color"
-                                                            id="cor"
-                                                            value={corValue}
-                                                            onChange={(e) => setValue('cor', e.target.value)}
-                                                        />
-                                                        <InputTextControlled<CategoriasModel>
-                                                            field={"cor"}
-                                                            control={control}
-                                                            placeholder="#000000"
-                                                        />
-                                                    </div>
+                                                    <Label className="form-label">Cor tema</Label>
+                                                    <input type="hidden" {...register('cor')} />
+                                                    <CorTemaSwatches
+                                                        temas={temas}
+                                                        value={corValue}
+                                                        onChange={(hex) => setValue('cor', hex, { shouldDirty: true })}
+                                                    />
                                                 </div>
                                             </Col>
                                             <Col md={6}>

@@ -15,6 +15,13 @@ import {
   GastosPorCategoriaSubcategoriaBarra,
   GastosPorCategoriaView,
 } from 'interfaces/GastosPorCategoria/GastosPorCategoriaInterface'
+import {
+  COR_FATIA_OUTROS,
+  COR_SEM_CATEGORIA,
+  corCategoria,
+} from 'helpers/cores_tema_helpers'
+
+export { corCategoria } from 'helpers/cores_tema_helpers'
 
 export const MESES_OPCOES: { value: GastosPorCategoriaMeses; label: string }[] = [
   { value: 1, label: '1 mês' },
@@ -30,7 +37,7 @@ export const ORIGEM_CORES: Record<string, string> = {
   PAGAMENTO_FATURA: '#6b7280',
 }
 
-export const ORIGEM_COR_SEM = '#9ca3af'
+export const ORIGEM_COR_SEM = COR_SEM_CATEGORIA
 
 export const origemCor = (origem?: string | null): string => {
   if (!origem) return ORIGEM_COR_SEM
@@ -257,8 +264,6 @@ export const atalhoSemCategoria = (
   }
 }
 
-export const corCategoria = (cor?: string | null): string => cor || '#9ca3af'
-
 export const hexToRgba = (hex: string, alpha: number): string => {
   const raw = hex.replace('#', '').trim()
   const full = raw.length === 3 ? raw.split('').map((c) => c + c).join('') : raw
@@ -273,7 +278,7 @@ export const hexToRgba = (hex: string, alpha: number): string => {
 }
 
 export const corBarraDim = (cor?: string | null, dim?: boolean): string => {
-  const hex = corCategoria(cor)
+  const hex = cor || corCategoria(cor)
   return dim ? hexToRgba(hex, 0.4) : hex
 }
 
@@ -470,8 +475,8 @@ export const comFatiaOutros = <T extends GastosPorCategoriaDashboardBarra>(
   const outros = {
     chave: FATIA_OUTROS_CHAVE,
     nome: 'Outros',
-    cor: '#9ca3af',
-    categoria_cor: '#9ca3af',
+    cor: COR_FATIA_OUTROS,
+    categoria_cor: COR_FATIA_OUTROS,
     valor_total: valor,
     compras,
     percentual_gasto: percentual,
@@ -529,7 +534,7 @@ export const coresFatiasCategoria = (
   selecionadaChave?: string | null
 ): string[] =>
   fatias.map((item) => {
-    const cor = isFatiaOutros(item) ? '#9ca3af' : item.cor
+    const cor = isFatiaOutros(item) ? COR_FATIA_OUTROS : corCategoria(item)
     const ativa =
       !isFatiaOutros(item) && Boolean(selecionadaChave) && chaveCategoria(item) === selecionadaChave
     return corBarraDim(cor, Boolean(selecionadaChave) && !ativa)
@@ -542,7 +547,7 @@ export const coresFatiasSubcategoria = (
   const indicePorPai = new Map<string, number>()
   return fatias.map((item) => {
     if (isFatiaOutros(item)) {
-      return selecionadaId != null ? hexToRgba('#9ca3af', 0.4) : '#9ca3af'
+      return selecionadaId != null ? hexToRgba(COR_FATIA_OUTROS, 0.4) : COR_FATIA_OUTROS
     }
     const pai = chaveCategoria(item)
     const indice = indicePorPai.get(pai) ?? 0

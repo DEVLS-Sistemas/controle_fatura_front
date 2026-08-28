@@ -6,6 +6,7 @@ import { useNavegacao } from 'helpers/functions_helpers'
 import { Breadcrumb, BreadcrumbItem, Card, CardBody, Col, Container, Label, Row } from 'reactstrap'
 import { CategoriasView } from 'interfaces/Categorias/CategoriasInterface'
 import { CategoriasService } from 'services/Categorias/CategoriasService'
+import { corCategoria } from 'helpers/cores_tema_helpers'
 
 const CategoriasViewPage = () => {
     const { state } = useLocation()
@@ -44,6 +45,11 @@ const CategoriasViewPage = () => {
         )
     }
 
+    const cor = corCategoria({
+        cor: record.cor,
+        categoria_id: record.id,
+    })
+
     return (
         <React.Fragment>
             <div className="page-content">
@@ -75,19 +81,17 @@ const CategoriasViewPage = () => {
                                         <Col md={6} className="mb-3">
                                             <Label className="form-label fw-semibold">Cor</Label>
                                             <p className="mb-0">
-                                                {record.cor ? (
-                                                    <span className="d-flex align-items-center gap-2">
-                                                        <span
-                                                            className="d-inline-block rounded border"
-                                                            style={{
-                                                                width: '24px',
-                                                                height: '24px',
-                                                                backgroundColor: record.cor,
-                                                            }}
-                                                        />
-                                                        <span className="text-muted">{record.cor}</span>
-                                                    </span>
-                                                ) : '-'}
+                                                <span className="d-flex align-items-center gap-2">
+                                                    <span
+                                                        className="d-inline-block rounded border"
+                                                        style={{
+                                                            width: '24px',
+                                                            height: '24px',
+                                                            backgroundColor: cor,
+                                                        }}
+                                                    />
+                                                    <span className="text-muted">{cor}</span>
+                                                </span>
                                             </p>
                                         </Col>
                                         <Col md={6} className="mb-3">

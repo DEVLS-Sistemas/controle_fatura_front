@@ -17,6 +17,7 @@ import {
   persistDashboardFiltro,
   resolveDashboardFiltro,
 } from 'helpers/dashboard_resumo_helpers'
+import { corCategoria } from 'helpers/cores_tema_helpers'
 import { SelectListControlled } from 'Components/ComponentController/Selects/Select/SelectListControlled'
 import { SelectOptions } from 'interfaces/SystemInterfaces/SelectInterface'
 import { toast } from 'react-toastify'
@@ -109,7 +110,7 @@ const DashboardsHome = () => {
 
   const categoriasLabels = resumo?.por_categoria?.map((c) => c.nome) || []
   const categoriasSeries = resumo?.por_categoria?.map((c) => Number(c.total)) || []
-  const categoriasCores = resumo?.por_categoria?.map((c) => c.cor || '#6b7280') || []
+  const categoriasCores = resumo?.por_categoria?.map((c) => corCategoria(c)) || []
   const semLancamentos = !loading && (resumo?.totais?.total_transacoes ?? 0) === 0
 
   const summaryCards = [

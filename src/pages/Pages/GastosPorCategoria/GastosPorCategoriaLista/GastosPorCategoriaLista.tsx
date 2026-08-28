@@ -70,7 +70,7 @@ const SubBarra = ({
 const CategoriaCard = ({ item }: { item: GastosPorCategoriaItem }) => {
   const navigate = useNavigate()
   const path = atalhoToPath(item.atalho)
-  const cor = corCategoria(item.cor)
+  const cor = corCategoria(item)
   const percentual = formatPercentualApi(item.percentual_gasto)
   const variacao = formatVariacao(item.variacao_valor_percentual)
   const subs = Array.isArray(item.top_subcategorias) ? item.top_subcategorias.slice(0, 2) : []

@@ -219,7 +219,7 @@ const GastosPorCategoriaBarras = ({
                   Boolean(categoriaSelecionadaChave) && chaveCategoria(item) === categoriaSelecionadaChave
                 }
                 dimNaoSelecionadas={Boolean(categoriaSelecionadaChave)}
-                corDe={(item) => corCategoria(item.cor)}
+                corDe={(item) => corCategoria(item)}
                 onClique={onCliqueCategoria}
                 onDuploClique={onDuploCliqueCategoria}
                 altura={altura}
@@ -251,7 +251,12 @@ const GastosPorCategoriaBarras = ({
                   Number(item.subcategoria_id) === Number(subcategoriaSelecionadaId)
                 }
                 dimNaoSelecionadas={subcategoriaSelecionadaId != null}
-                corDe={(item) => corCategoria(item.categoria_cor || item.cor)}
+                corDe={(item) =>
+                  corCategoria({
+                    cor: item.categoria_cor || item.cor,
+                    categoria_id: item.categoria_id,
+                  })
+                }
                 percentualDe={(item) => percentualFatia(item, Boolean(categoriaFiltrada))}
                 tooltipExtra={(item) => {
                   const daCat = formatPercentualApi(item.percentual_da_categoria)

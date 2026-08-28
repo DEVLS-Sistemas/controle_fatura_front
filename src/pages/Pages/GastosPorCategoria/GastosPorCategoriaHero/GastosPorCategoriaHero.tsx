@@ -97,7 +97,7 @@ const GastosPorCategoriaHero = ({ data, loading }: GastosPorCategoriaHeroProps) 
   if (!destaque) return null
 
   const categoria = destaque.categoria
-  const cor = corCategoria(categoria?.cor)
+  const cor = corCategoria(categoria)
   const path = atalhoToPath(categoria?.atalho)
   const variacao = formatVariacao(categoria?.variacao_valor_percentual)
   const subs = Array.isArray(destaque.subcategorias) ? destaque.subcategorias.slice(0, 2) : []

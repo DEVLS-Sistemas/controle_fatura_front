@@ -23,8 +23,18 @@ export interface CategoriasModel {
     ativo?: boolean
 }
 
+export interface CategoriaTemaLookup {
+    chave?: string
+    label?: string
+    hex: string
+    padrao?: boolean
+    variacoes?: string[]
+}
+
 export interface LookupsCategorias {
     cores?: string[]
+    cor_padrao?: string
+    temas?: CategoriaTemaLookup[]
 }
 
 export interface CategoriaRapidoPayload {
@@ -61,6 +71,6 @@ export const CategoriasDefaultValues: CategoriasModel = {
     id: null,
     categoria_id: null,
     nome: null,
-    cor: null,
+    cor: '#000000',
     ativo: true,
 }

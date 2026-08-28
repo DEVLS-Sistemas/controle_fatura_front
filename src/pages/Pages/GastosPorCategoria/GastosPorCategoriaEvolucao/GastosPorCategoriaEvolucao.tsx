@@ -67,10 +67,10 @@ const GastosPorCategoriaEvolucao = ({
       ]
 
   const colors = selecionada
-    ? [corCategoria(selecionada.cor)]
+    ? [corCategoria(selecionada)]
     : visaoGeralComFiltro
       ? ['rgba(64, 81, 137, 0.4)']
-      : ['#405189', ...categorias.map((cat) => corCategoria(cat.cor))]
+      : ['#405189', ...categorias.map((cat) => corCategoria(cat))]
 
   const rotacionarLabels = serieMeses.length > 8
 

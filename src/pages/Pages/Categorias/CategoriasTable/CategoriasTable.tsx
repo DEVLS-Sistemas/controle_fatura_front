@@ -11,6 +11,7 @@ import TableActionsDropdown from "Components/Common/TableActionsDropdown"
 import { useNavegacao } from "helpers/functions_helpers"
 import { CategoriasList, CategoriasSearch } from "interfaces/Categorias/CategoriasInterface"
 import { CategoriasService } from "services/Categorias/CategoriasService"
+import { corCategoria } from "helpers/cores_tema_helpers"
 
 export interface CategoriasTableProps {
     data: PaginateInterface<CategoriasList> | undefined
@@ -120,21 +121,24 @@ export const CategoriasTable = ({ data, getData, setPerPage, setPage, perPage, f
                                                             </tr>
                                                         </thead>
                                                         <tbody>
-                                                            {data.data.map((row, index) => (
+                                                            {data.data.map((row, index) => {
+                                                                const cor = corCategoria({
+                                                                    cor: row.cor,
+                                                                    categoria_id: row.id,
+                                                                })
+                                                                return (
                                                                 <tr key={row.id ?? index}>
                                                                     <td className="text-start">{row.nome}</td>
                                                                     <td>
-                                                                        {row.cor ? (
-                                                                            <span
-                                                                                className="d-inline-block rounded border"
-                                                                                style={{
-                                                                                    width: '24px',
-                                                                                    height: '24px',
-                                                                                    backgroundColor: row.cor,
-                                                                                }}
-                                                                                title={row.cor}
-                                                                            />
-                                                                        ) : '-'}
+                                                                        <span
+                                                                            className="d-inline-block rounded border"
+                                                                            style={{
+                                                                                width: '24px',
+                                                                                height: '24px',
+                                                                                backgroundColor: cor,
+                                                                            }}
+                                                                            title={cor}
+                                                                        />
                                                                     </td>
                                                                     <td>
                                                                         <span className={`badge bg-${row.ativo ? 'success' : 'danger'}`}>
@@ -160,7 +164,8 @@ export const CategoriasTable = ({ data, getData, setPerPage, setPage, perPage, f
                                                                         </TableActionsDropdown>
                                                                     </td>
                                                                 </tr>
-                                                            ))}
+                                                                )
+                                                            })}
                                                         </tbody>
                                                     </table>
                                                 </div>

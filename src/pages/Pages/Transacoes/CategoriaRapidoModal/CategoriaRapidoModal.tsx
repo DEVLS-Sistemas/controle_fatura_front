@@ -1,9 +1,16 @@
 import React, { useEffect, useState } from 'react'
 import { Button, Col, FormGroup, Input, Label, Modal, ModalBody, ModalFooter, ModalHeader, Row } from 'reactstrap'
 import { toast } from 'react-toastify'
-import { CategoriaRapidoResult } from 'interfaces/Categorias/CategoriasInterface'
+import { CategoriaRapidoResult, CategoriaTemaLookup } from 'interfaces/Categorias/CategoriasInterface'
 import { CategoriasService } from 'services/Categorias/CategoriasService'
 import { ValidationError } from 'libs/api/exceptions/ValidationError'
+import CorTemaSwatches from 'Components/CoresTema/CorTemaSwatches'
+import {
+    COR_TEMA_PADRAO,
+    corTemaPadrao,
+    normalizeHexTema,
+    resolverTemasCategoria,
+} from 'helpers/cores_tema_helpers'
 
 export interface CategoriaRapidoConfirm extends CategoriaRapidoResult {
     propagar_grupo?: boolean
@@ -16,11 +23,6 @@ export interface CategoriaRapidoModalProps {
     /** Exibe checkbox para aplicar em todas as parcelas (compra parcelada já salva) */
     showPropagarGrupo?: boolean
 }
-
-const CORES_FALLBACK = [
-    '#ef4444', '#f97316', '#eab308', '#22c55e', '#14b8a6',
-    '#3b82f6', '#8b5cf6', '#ec4899', '#64748b', '#0f172a',
-]
 
 const extractErrorMessage = (error: unknown): string => {
     if (error instanceof ValidationError) {
@@ -41,8 +43,8 @@ const CategoriaRapidoModal = ({
     showPropagarGrupo = false,
 }: CategoriaRapidoModalProps) => {
     const [nome, setNome] = useState('')
-    const [cor, setCor] = useState('')
-    const [cores, setCores] = useState<string[]>(CORES_FALLBACK)
+    const [cor, setCor] = useState(COR_TEMA_PADRAO)
+    const [temas, setTemas] = useState<CategoriaTemaLookup[]>(resolverTemasCategoria())
     const [propagarGrupo, setPropagarGrupo] = useState(false)
     const [saving, setSaving] = useState(false)
     const categoriasService = new CategoriasService()
@@ -50,14 +52,15 @@ const CategoriaRapidoModal = ({
     useEffect(() => {
         if (!isOpen) return
         setNome('')
-        setCor('')
+        setCor(COR_TEMA_PADRAO)
         setPropagarGrupo(false)
         ;(async () => {
             try {
                 const lookups = await categoriasService.getLookupsCategorias()
-                if (lookups?.cores?.length) setCores(lookups.cores)
+                setTemas(resolverTemasCategoria(lookups))
+                setCor(corTemaPadrao(lookups))
             } catch {
-                // mantém fallback
+                setTemas(resolverTemasCategoria())
             }
         })()
     }, [isOpen])
@@ -74,7 +77,7 @@ const CategoriaRapidoModal = ({
         try {
             const result = await categoriasService.createCategoriasRapido({
                 nome: trimmed,
-                cor: cor || undefined,
+                cor: normalizeHexTema(cor) || COR_TEMA_PADRAO,
             })
             toast.success(result.message || (result.criado ? 'Categoria cadastrada' : 'Categoria reutilizada'))
             await onConfirm({
@@ -111,34 +114,15 @@ const CategoriaRapidoModal = ({
                         </Col>
                         <Col md={12}>
                             <div className="mb-3">
-                                <Label className="form-label">Cor <span className="text-muted">(opcional)</span></Label>
-                                <div className="d-flex flex-wrap gap-2 align-items-center">
-                                    <Input
-                                        type="select"
-                                        bsSize="sm"
-                                        value={cor}
-                                        onChange={(e) => setCor(e.target.value)}
-                                        disabled={saving}
-                                        style={{ maxWidth: 220 }}
-                                    >
-                                        <option value="">Sem cor</option>
-                                        {cores.map((hex) => (
-                                            <option key={hex} value={hex}>{hex}</option>
-                                        ))}
-                                    </Input>
-                                    {cor && (
-                                        <span
-                                            className="rounded border"
-                                            style={{
-                                                width: 28,
-                                                height: 28,
-                                                backgroundColor: cor,
-                                                display: 'inline-block',
-                                            }}
-                                            title={cor}
-                                        />
-                                    )}
-                                </div>
+                                <Label className="form-label">Cor tema</Label>
+                                <CorTemaSwatches
+                                    temas={temas}
+                                    value={cor}
+                                    onChange={setCor}
+                                    disabled={saving}
+                                    idPrefix="cor-tema-rapido"
+                                    size={22}
+                                />
                             </div>
                         </Col>
                         {showPropagarGrupo && (
