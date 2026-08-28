@@ -264,6 +264,7 @@ const FaturaResponsavelView = () => {
             const options = (list ?? []).map((s) => ({
                 value: s.id!,
                 label: s.nome ?? `#${s.id}`,
+                cor: s.cor ?? null,
             }))
             setSubcategoriasByCategoria((prev) => ({ ...prev, [categoriaId]: options }))
         } catch (error) {

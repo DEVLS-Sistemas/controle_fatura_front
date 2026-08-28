@@ -7,6 +7,7 @@ import {
   atalhoToPath,
   atalhoToPeriodoState,
   corCategoria,
+  corSubcategoria,
 } from 'helpers/gastos_por_categoria_helpers'
 import {
   GastosPorCategoriaAtalho,
@@ -144,7 +145,11 @@ const GastosPorCategoriaHero = ({ data, loading }: GastosPorCategoriaHeroProps) 
         {subs.length > 0 ? (
           <Row className="g-3">
             {subs.map((sub, idx) => (
-              <SubCard key={sub.subcategoria_id ?? idx} sub={sub} cor={cor} />
+              <SubCard
+                key={sub.subcategoria_id ?? idx}
+                sub={sub}
+                cor={corSubcategoria({ cor: sub.cor, categoria_cor: categoria?.cor })}
+              />
             ))}
           </Row>
         ) : null}

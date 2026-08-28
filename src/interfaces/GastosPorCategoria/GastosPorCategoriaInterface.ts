@@ -88,6 +88,7 @@ export interface GastosPorCategoriaTotais {
 export interface GastosPorCategoriaSubDestaque {
   subcategoria_id?: number | null
   nome?: string | null
+  cor?: string | null
   valor_total?: number | null
   compras?: number | null
   ticket_medio?: number | null

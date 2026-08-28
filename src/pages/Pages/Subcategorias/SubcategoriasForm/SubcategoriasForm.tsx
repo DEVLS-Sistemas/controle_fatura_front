@@ -10,11 +10,14 @@ import { InputTextControlled } from 'Components/ComponentController/Inputs/Text/
 import { SelectListControlled } from 'Components/ComponentController/Selects/Select/SelectListControlled'
 import { SelectOptions } from 'interfaces/SystemInterfaces/SelectInterface'
 import {
+    SubcategoriaCategoriaVinculo,
     SubcategoriasDefaultValues,
     SubcategoriasModel,
 } from 'interfaces/Subcategorias/SubcategoriasInterface'
 import { SubcategoriasService } from 'services/Subcategorias/SubcategoriasService'
 import { CategoriasService } from 'services/Categorias/CategoriasService'
+import { CorTemaPreview } from 'Components/CoresTema/CorTemaSwatches'
+import { corSubcategoria } from 'helpers/cores_tema_helpers'
 
 const buildRecordFromSource = (source: any): SubcategoriasModel => {
     const categoriaIds =
@@ -40,7 +43,7 @@ const SubcategoriasForm = () => {
         state?.source ? buildRecordFromSource(state.source) : SubcategoriasDefaultValues
     )
 
-    const { register, handleSubmit, control, reset } = useForm<SubcategoriasModel>({
+    const { register, handleSubmit, control, reset, watch } = useForm<SubcategoriasModel>({
         defaultValues: record
     })
 
@@ -49,8 +52,15 @@ const SubcategoriasForm = () => {
     const subcategoriasService = new SubcategoriasService()
     const categoriasService = new CategoriasService()
     const [categoriasOptions, setCategoriasOptions] = useState<SelectOptions[]>([])
+    const [vinculos, setVinculos] = useState<SubcategoriaCategoriaVinculo[]>(
+        state?.source?.categorias ?? []
+    )
 
     const isEditing = !!(record.subcategoria_id || record.id || paramId)
+    const categoriaIdsWatch = watch('categoria_ids') ?? []
+    const vinculosVisiveis = vinculos.filter((item) =>
+        categoriaIdsWatch.map((id) => Number(id)).includes(Number(item.id))
+    )
 
     const loadCategorias = async () => {
         try {
@@ -73,6 +83,7 @@ const SubcategoriasForm = () => {
                 const loaded = buildRecordFromSource(view)
                 setRecord(loaded)
                 reset(loaded)
+                setVinculos(view.categorias ?? [])
             }
         } catch (error) {
             console.error('Erro ao carregar subcategoria:', error)
@@ -89,7 +100,8 @@ const SubcategoriasForm = () => {
             }
 
             const payload: SubcategoriasModel = {
-                ...data,
+                nome: data.nome,
+                ativo: data.ativo,
                 id: record.id ?? record.subcategoria_id,
                 subcategoria_id: record.subcategoria_id ?? record.id,
                 categoria_ids: categoriaIds,
@@ -115,7 +127,7 @@ const SubcategoriasForm = () => {
     }, [])
 
     useEffect(() => {
-        if (paramId && !state?.source) {
+        if (paramId) {
             loadRecord(paramId)
         }
     }, [paramId])
@@ -183,6 +195,35 @@ const SubcategoriasForm = () => {
                                                         required={required}
                                                     />
                                                     <small className="text-muted">Selecione ao menos uma categoria.</small>
+                                                    {vinculosVisiveis.length > 0 ? (
+                                                        <div className="d-flex flex-column gap-2 mt-3">
+                                                            {vinculosVisiveis.map((item) => {
+                                                                const hex = item.cor
+                                                                    ? corSubcategoria({ cor: item.cor })
+                                                                    : null
+                                                                return (
+                                                                    <div
+                                                                        key={item.id ?? item.nome}
+                                                                        className="d-flex align-items-center gap-2"
+                                                                    >
+                                                                        {hex ? (
+                                                                            <CorTemaPreview
+                                                                                hexes={[hex]}
+                                                                                idPrefix={`vinculo-${item.id}`}
+                                                                                size={18}
+                                                                            />
+                                                                        ) : (
+                                                                            <span className="text-muted small">—</span>
+                                                                        )}
+                                                                        <span>{item.nome || `#${item.id}`}</span>
+                                                                        {hex ? (
+                                                                            <span className="text-muted small">{hex}</span>
+                                                                        ) : null}
+                                                                    </div>
+                                                                )
+                                                            })}
+                                                        </div>
+                                                    ) : null}
                                                 </div>
                                             </Col>
                                         </Row>

@@ -52,7 +52,9 @@ export const resolverTemasCategoria = (lookups?: LookupsCategorias | null): Cate
         label: tema.label || known?.label || hex,
         hex,
         padrao: Boolean(tema.padrao || known?.padrao),
-        variacoes: tema.variacoes ?? [],
+        variacoes: (tema.variacoes ?? [])
+          .map((item) => normalizeHexTema(item))
+          .filter((item): item is string => Boolean(item)),
       }
     })
   }
@@ -69,7 +71,9 @@ export const resolverTemasCategoria = (lookups?: LookupsCategorias | null): Cate
       label: known?.label || normalized,
       hex: normalized,
       padrao: Boolean(known?.padrao || normalized === COR_TEMA_PADRAO),
-      variacoes: known?.variacoes ?? [],
+      variacoes: (known?.variacoes ?? [])
+        .map((item) => normalizeHexTema(item))
+        .filter((item): item is string => Boolean(item)),
     }
   })
 }
@@ -97,4 +101,29 @@ export const corCategoria = (item?: string | null | CorCategoriaItem): string =>
 export const corSubcategoria = (item?: {
   cor?: string | null
   categoria_cor?: string | null
-}): string => corCategoria(item?.cor || item?.categoria_cor)
+}): string =>
+  normalizeHexTema(item?.cor) || normalizeHexTema(item?.categoria_cor) || COR_TEMA_PADRAO
+
+export const variacoesDoTema = (
+  temas: CategoriaTemaLookup[],
+  hex?: string | null
+): string[] => {
+  const tema = temas.find((item) => hexesTemaIguais(item.hex, hex))
+  return (tema?.variacoes ?? [])
+    .map((item) => normalizeHexTema(item))
+    .filter((item): item is string => Boolean(item))
+}
+
+export const previewVariacoesSubcategoria = (
+  formCor?: string | null,
+  temas: CategoriaTemaLookup[] = [],
+  subcategoriasSalvas?: { cor?: string | null }[] | null,
+  corCategoriaSalva?: string | null
+): string[] => {
+  const doTema = variacoesDoTema(temas, formCor)
+  if (!hexesTemaIguais(formCor, corCategoriaSalva)) return doTema
+  const salvas = (subcategoriasSalvas ?? [])
+    .map((item) => normalizeHexTema(item.cor))
+    .filter((item): item is string => Boolean(item))
+  return salvas.length > 0 ? salvas : doTema
+}

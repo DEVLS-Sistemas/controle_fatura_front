@@ -19,9 +19,10 @@ import {
   COR_FATIA_OUTROS,
   COR_SEM_CATEGORIA,
   corCategoria,
+  corSubcategoria,
 } from 'helpers/cores_tema_helpers'
 
-export { corCategoria } from 'helpers/cores_tema_helpers'
+export { corCategoria, corSubcategoria } from 'helpers/cores_tema_helpers'
 
 export const MESES_OPCOES: { value: GastosPorCategoriaMeses; label: string }[] = [
   { value: 1, label: '1 mês' },
@@ -415,7 +416,7 @@ const flattenTopSubcategorias = (
         categoria_id: cat.categoria_id,
         categoria_nome: cat.nome,
         categoria_cor: cat.cor,
-        cor: cat.cor,
+        cor: sub.cor,
         valor_total: sub.valor_total,
         compras: sub.compras,
         ticket_medio: sub.ticket_medio,
@@ -440,26 +441,6 @@ export const FATIA_OUTROS_CHAVE = 'outros'
 
 export const isFatiaOutros = (item?: { chave?: string | null } | null): boolean =>
   item?.chave === FATIA_OUTROS_CHAVE
-
-const parseRgb = (hex: string): [number, number, number] => {
-  const raw = hex.replace('#', '').trim()
-  const full = raw.length === 3 ? raw.split('').map((c) => c + c).join('') : raw
-  if (full.length !== 6) return [156, 163, 175]
-  const n = parseInt(full, 16)
-  if (Number.isNaN(n)) return [156, 163, 175]
-  return [(n >> 16) & 255, (n >> 8) & 255, n & 255]
-}
-
-export const variarCorFatia = (hex: string, indice: number): string => {
-  const base = corCategoria(hex)
-  if (indice <= 0) return base
-  const [r, g, b] = parseRgb(base)
-  const towardWhite = indice % 2 === 1
-  const t = Math.min(0.42, 0.16 * Math.ceil(indice / 2))
-  const mix = (c: number) =>
-    towardWhite ? Math.round(c + (255 - c) * t) : Math.round(c * (1 - t))
-  return `#${[mix(r), mix(g), mix(b)].map((x) => x.toString(16).padStart(2, '0')).join('')}`
-}
 
 export const comFatiaOutros = <T extends GastosPorCategoriaDashboardBarra>(
   itens: T[],
@@ -543,20 +524,14 @@ export const coresFatiasCategoria = (
 export const coresFatiasSubcategoria = (
   fatias: GastosPorCategoriaSubcategoriaBarra[],
   selecionadaId?: number | null
-): string[] => {
-  const indicePorPai = new Map<string, number>()
-  return fatias.map((item) => {
+): string[] =>
+  fatias.map((item) => {
     if (isFatiaOutros(item)) {
       return selecionadaId != null ? hexToRgba(COR_FATIA_OUTROS, 0.4) : COR_FATIA_OUTROS
     }
-    const pai = chaveCategoria(item)
-    const indice = indicePorPai.get(pai) ?? 0
-    indicePorPai.set(pai, indice + 1)
-    const base = variarCorFatia(item.categoria_cor || item.cor || '', indice)
     const ativa = selecionadaId != null && Number(item.subcategoria_id) === Number(selecionadaId)
-    return corBarraDim(base, selecionadaId != null && !ativa)
+    return corBarraDim(corSubcategoria(item), selecionadaId != null && !ativa)
   })
-}
 
 export const percentualFatia = (
   item?: {

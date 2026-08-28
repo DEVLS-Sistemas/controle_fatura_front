@@ -7,11 +7,17 @@ export interface SubcategoriasSearch {
     palavra_chave?: string | null | unknown
 }
 
+export interface SubcategoriaCategoriaVinculo {
+    id?: number
+    nome?: string
+    cor?: string | null
+}
+
 export interface SubcategoriasList {
     id?: number
     nome?: string
     ativo?: boolean
-    categorias?: { id?: number; nome?: string }[]
+    categorias?: SubcategoriaCategoriaVinculo[]
     categoria_ids?: number[]
     categorias_nomes?: string
 }
@@ -30,10 +36,11 @@ export interface SubcategoriaLookup {
     id?: number
     nome?: string
     categoria_id?: number | null
+    cor?: string | null
 }
 
 export interface LookupsSubcategorias {
-    categorias?: { id?: number; nome?: string }[]
+    categorias?: { id?: number; nome?: string; cor?: string | null }[]
 }
 
 export interface SubcategoriaRapidoPayload {
@@ -46,7 +53,7 @@ export interface SubcategoriaRapidoData {
     id: number
     nome: string
     ativo?: boolean
-    categorias?: { id?: number; nome?: string; cor?: string }[]
+    categorias?: SubcategoriaCategoriaVinculo[]
     categoria_ids?: number[]
 }
 

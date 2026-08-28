@@ -13,7 +13,9 @@ export interface CategoriasList {
     ativo?: boolean
 }
 
-export interface CategoriasView extends CategoriasList {}
+export interface CategoriasView extends CategoriasList {
+    subcategorias?: { id?: number; nome?: string; cor?: string | null }[]
+}
 
 export interface CategoriasModel {
     id?: number | null

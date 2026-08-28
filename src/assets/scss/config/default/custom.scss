@@ -441,6 +441,15 @@ input[type="number"].text-valor {
       outline-offset: 2px;
     }
   }
+
+  &__preview {
+    display: inline-block;
+    padding: 0;
+    border-radius: 4px;
+    border: 1px solid rgba(0, 0, 0, 0.18);
+    flex-shrink: 0;
+    cursor: default;
+  }
 }
 
 .compra-dados-obs {

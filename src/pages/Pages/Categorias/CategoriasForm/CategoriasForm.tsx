@@ -13,11 +13,12 @@ import {
     CategoriasModel,
 } from 'interfaces/Categorias/CategoriasInterface'
 import { CategoriasService } from 'services/Categorias/CategoriasService'
-import CorTemaSwatches from 'Components/CoresTema/CorTemaSwatches'
+import CorTemaSwatches, { CorTemaPreview } from 'Components/CoresTema/CorTemaSwatches'
 import {
     COR_TEMA_PADRAO,
     corTemaPadrao,
     normalizeHexTema,
+    previewVariacoesSubcategoria,
     resolverTemasCategoria,
 } from 'helpers/cores_tema_helpers'
 
@@ -38,6 +39,9 @@ const CategoriasForm = () => {
         state?.source ? buildRecordFromSource(state.source) : CategoriasDefaultValues
     )
     const [temas, setTemas] = useState<CategoriaTemaLookup[]>(resolverTemasCategoria())
+    const [subcategoriasSalvas, setSubcategoriasSalvas] = useState<{ id?: number; nome?: string; cor?: string | null }[]>(
+        state?.source?.subcategorias ?? []
+    )
 
     const { register, handleSubmit, control, reset, setValue, watch, getValues } = useForm<CategoriasModel>({
         defaultValues: record
@@ -50,6 +54,12 @@ const CategoriasForm = () => {
     const categoriasService = new CategoriasService()
 
     const isEditing = !!(record.categoria_id || record.id || paramId)
+    const previewHexes = previewVariacoesSubcategoria(
+        corValue,
+        temas,
+        subcategoriasSalvas,
+        record.cor
+    )
 
     const loadLookups = async () => {
         try {
@@ -73,6 +83,7 @@ const CategoriasForm = () => {
                 const loaded = buildRecordFromSource(view)
                 setRecord(loaded)
                 reset(loaded)
+                setSubcategoriasSalvas(view.subcategorias ?? [])
             }
         } catch (error) {
             console.error('Erro ao carregar categoria:', error)
@@ -106,7 +117,7 @@ const CategoriasForm = () => {
     }, [])
 
     useEffect(() => {
-        if (paramId && !state?.source) {
+        if (paramId) {
             loadRecord(paramId)
         }
     }, [paramId])
@@ -159,6 +170,13 @@ const CategoriasForm = () => {
                                                         value={corValue}
                                                         onChange={(hex) => setValue('cor', hex, { shouldDirty: true })}
                                                     />
+                                                    <div className="mt-3">
+                                                        <Label className="form-label">Subcategorias (tons mais claros)</Label>
+                                                        <CorTemaPreview hexes={previewHexes} />
+                                                        <small className="text-muted d-block mt-2">
+                                                            Ao salvar, as subcategorias desta categoria recebem tons desta cor, sempre mais claros que o tema.
+                                                        </small>
+                                                    </div>
                                                 </div>
                                             </Col>
                                             <Col md={6}>

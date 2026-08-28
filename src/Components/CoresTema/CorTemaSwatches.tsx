@@ -91,3 +91,36 @@ const CorTemaSwatches = ({
 }
 
 export default CorTemaSwatches
+
+export const CorTemaPreview = ({
+  hexes,
+  idPrefix = 'cor-tema-preview',
+  size = 22,
+}: {
+  hexes: string[]
+  idPrefix?: string
+  size?: number
+}) => {
+  if (!hexes.length) return null
+  return (
+    <div className="cor-tema-swatches" role="group" aria-label="Tons das subcategorias">
+      {hexes.map((raw, index) => {
+        const hex = normalizeHexTema(raw) || raw
+        const id = `${idPrefix}-${index}-${hex.replace('#', '')}`
+        return (
+          <React.Fragment key={id}>
+            <span
+              id={id}
+              className="cor-tema-swatches__preview"
+              aria-label={hex}
+              style={{ width: size, height: size, backgroundColor: hex }}
+            />
+            <UncontrolledTooltip placement="top" target={id}>
+              {hex}
+            </UncontrolledTooltip>
+          </React.Fragment>
+        )
+      })}
+    </div>
+  )
+}

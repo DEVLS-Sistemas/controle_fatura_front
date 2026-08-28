@@ -8,6 +8,7 @@ import {
   atalhoToPeriodoState,
   barraPercentual,
   corCategoria,
+  corSubcategoria,
 } from 'helpers/gastos_por_categoria_helpers'
 import {
   GastosPorCategoriaItem,
@@ -136,7 +137,7 @@ const CategoriaCard = ({ item }: { item: GastosPorCategoriaItem }) => {
             <SubBarra
               key={sub.subcategoria_id ?? idx}
               sub={sub}
-              cor={cor}
+              cor={corSubcategoria({ cor: sub.cor, categoria_cor: item.cor })}
               onOpen={() => abrir(sub.atalho)}
             />
           ))}

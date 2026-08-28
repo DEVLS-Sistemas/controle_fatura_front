@@ -7,6 +7,7 @@ import {
   chaveCategoria,
   coresFatiasCategoria,
   coresFatiasSubcategoria,
+  corCategoria,
   isFatiaOutros,
   percentualFatia,
 } from 'helpers/gastos_por_categoria_helpers'
@@ -331,7 +332,15 @@ const GastosPorCategoriaDashboards = ({
                   const daCat = formatPercentualApi(item.percentual_da_categoria)
                   const pai = item.categoria_nome
                   if (!pai && !daCat) return ''
-                  return `<div class="text-muted fs-12 mt-1">${escapeHtml(pai || '')}${
+                  const paiCor = item.categoria_cor
+                    ? `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${escapeHtml(
+                        corCategoria({
+                          cor: item.categoria_cor,
+                          categoria_id: item.categoria_id,
+                        })
+                      )};margin-right:4px;vertical-align:middle"></span>`
+                    : ''
+                  return `<div class="text-muted fs-12 mt-1">${paiCor}${escapeHtml(pai || '')}${
                     daCat ? ` · ${daCat} da categoria` : ''
                   }</div>`
                 }}

@@ -8,6 +8,7 @@ import {
   corTemaPadrao,
   hexesTemaIguais,
   normalizeHexTema,
+  previewVariacoesSubcategoria,
   resolverTemasCategoria,
   TEMAS_CATEGORIA_FALLBACK,
 } from './cores_tema_helpers'
@@ -61,10 +62,10 @@ describe('corSubcategoria', () => {
 describe('resolverTemasCategoria', () => {
   it('usa temas da API quando existem', () => {
     const temas = resolverTemasCategoria({
-      temas: [{ chave: 'azul', label: 'Azul', hex: '#3B82F6', padrao: false, variacoes: [] }],
+      temas: [{ chave: 'azul', label: 'Azul', hex: '#3B82F6', padrao: false, variacoes: ['#93C5FD', '#60A5FA'] }],
     })
     expect(temas).toEqual([
-      { chave: 'azul', label: 'Azul', hex: '#3b82f6', padrao: false, variacoes: [] },
+      { chave: 'azul', label: 'Azul', hex: '#3b82f6', padrao: false, variacoes: ['#93c5fd', '#60a5fa'] },
     ])
   })
 
@@ -95,6 +96,57 @@ describe('corTemaPadrao / legado', () => {
     expect(corHexLegadoForaDaPaleta('#1a2b3c', TEMAS_CATEGORIA_FALLBACK)).toBe('#1a2b3c')
     expect(corHexLegadoForaDaPaleta('#3b82f6', TEMAS_CATEGORIA_FALLBACK)).toBeNull()
     expect(hexesTemaIguais('#3B82F6', '#3b82f6')).toBe(true)
+  })
+})
+
+describe('previewVariacoesSubcategoria', () => {
+  const temas = resolverTemasCategoria({
+    temas: [
+      {
+        chave: 'azul',
+        label: 'Azul',
+        hex: '#3b82f6',
+        padrao: false,
+        variacoes: ['#93c5fd', '#60a5fa', '#3b82f6', '#2563eb', '#1d4ed8'],
+      },
+    ],
+  })
+
+  it('usa as variações do lookup ao criar ou trocar o tema', () => {
+    expect(previewVariacoesSubcategoria('#3b82f6', temas, [], '#000000')).toEqual([
+      '#93c5fd',
+      '#60a5fa',
+      '#3b82f6',
+      '#2563eb',
+      '#1d4ed8',
+    ])
+  })
+
+  it('no edit, prefere as cores salvas das subs enquanto o tema não muda', () => {
+    expect(
+      previewVariacoesSubcategoria(
+        '#3b82f6',
+        temas,
+        [{ cor: '#93c5fd' }, { cor: '#bfdbfe' }],
+        '#3b82f6'
+      )
+    ).toEqual(['#93c5fd', '#bfdbfe'])
+  })
+
+  it('ao trocar o tema, a prévia troca na hora para as variações do lookup', () => {
+    expect(
+      previewVariacoesSubcategoria(
+        '#22c55e',
+        resolverTemasCategoria({
+          temas: [
+            { chave: 'azul', hex: '#3b82f6', variacoes: ['#93c5fd'] },
+            { chave: 'verde', hex: '#22c55e', variacoes: ['#86efac', '#4ade80'] },
+          ],
+        }),
+        [{ cor: '#93c5fd' }],
+        '#3b82f6'
+      )
+    ).toEqual(['#86efac', '#4ade80'])
   })
 })
 

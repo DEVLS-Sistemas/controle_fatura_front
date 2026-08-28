@@ -348,6 +348,7 @@ const TransacoesForm = () => {
                 (list ?? []).map((s) => ({
                     value: s.id!,
                     label: s.nome ?? `#${s.id}`,
+                    cor: s.cor ?? null,
                 }))
             )
         } catch (error) {

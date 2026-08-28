@@ -10,6 +10,7 @@ import {
   barrasSubcategoria,
   comFatiaOutros,
   coresFatiasCategoria,
+  coresFatiasSubcategoria,
   fatiasCategoria,
   fatiasSubcategoria,
   percentualFatia,
@@ -297,6 +298,36 @@ describe('seleção Power BI', () => {
         { chave: 'outros', nome: 'Outros' },
       ])
     ).toEqual(['#3b82f6', '#000000', '#9ca3af', '#d1d5db'])
+  })
+
+  it('pinta subcategoria com a cor da sub, não clareia de novo a pai', () => {
+    expect(
+      coresFatiasSubcategoria([
+        {
+          subcategoria_id: 10,
+          nome: 'Delivery',
+          cor: '#93c5fd',
+          categoria_cor: '#3b82f6',
+          categoria_id: 2,
+        },
+        {
+          subcategoria_id: 11,
+          nome: 'Supermercado',
+          cor: '#60a5fa',
+          categoria_cor: '#3b82f6',
+          categoria_id: 2,
+        },
+        { chave: 'outros', nome: 'Outros' },
+      ])
+    ).toEqual(['#93c5fd', '#60a5fa', '#d1d5db'])
+  })
+
+  it('cai na cor da categoria se a sub ainda não tem cor', () => {
+    expect(
+      coresFatiasSubcategoria([
+        { subcategoria_id: 10, cor: null, categoria_cor: '#3b82f6', categoria_id: 2 },
+      ])
+    ).toEqual(['#3b82f6'])
   })
 
   it('depois do filtro da categoria a pizza escrava usa o percentual da categoria', () => {

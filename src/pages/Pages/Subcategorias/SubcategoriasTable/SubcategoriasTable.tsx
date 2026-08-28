@@ -10,6 +10,7 @@ import CustomModal from "Components/ComponentController/Modal/CustomModal"
 import TableActionsDropdown from "Components/Common/TableActionsDropdown"
 import { SubcategoriasList, SubcategoriasSearch } from "interfaces/Subcategorias/SubcategoriasInterface"
 import { SubcategoriasService } from "services/Subcategorias/SubcategoriasService"
+import { corSubcategoria } from "helpers/cores_tema_helpers"
 
 export interface SubcategoriasTableProps {
     data: PaginateInterface<SubcategoriasList> | undefined
@@ -22,10 +23,28 @@ export interface SubcategoriasTableProps {
 }
 
 const formatCategorias = (row: SubcategoriasList) => {
-    if (row.categorias_nomes) return row.categorias_nomes
     if (row.categorias?.length) {
-        return row.categorias.map((c) => c.nome).filter(Boolean).join(', ')
+        return (
+            <div className="d-flex flex-wrap gap-2 justify-content-start">
+                {row.categorias.map((item) => {
+                    const hex = item.cor ? corSubcategoria({ cor: item.cor }) : null
+                    return (
+                        <span key={item.id ?? item.nome} className="d-inline-flex align-items-center gap-1">
+                            {hex ? (
+                                <span
+                                    className="d-inline-block rounded border"
+                                    style={{ width: 12, height: 12, backgroundColor: hex }}
+                                    title={hex}
+                                />
+                            ) : null}
+                            {item.nome || `#${item.id}`}
+                        </span>
+                    )
+                })}
+            </div>
+        )
     }
+    if (row.categorias_nomes) return row.categorias_nomes
     return '-'
 }
 

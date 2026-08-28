@@ -7,6 +7,7 @@ import {
   chaveCategoria,
   corBarraDim,
   corCategoria,
+  corSubcategoria,
   percentualFatia,
 } from 'helpers/gastos_por_categoria_helpers'
 import {
@@ -251,18 +252,19 @@ const GastosPorCategoriaBarras = ({
                   Number(item.subcategoria_id) === Number(subcategoriaSelecionadaId)
                 }
                 dimNaoSelecionadas={subcategoriaSelecionadaId != null}
-                corDe={(item) =>
-                  corCategoria({
-                    cor: item.categoria_cor || item.cor,
-                    categoria_id: item.categoria_id,
-                  })
-                }
+                corDe={(item) => corSubcategoria(item)}
                 percentualDe={(item) => percentualFatia(item, Boolean(categoriaFiltrada))}
                 tooltipExtra={(item) => {
                   const daCat = formatPercentualApi(item.percentual_da_categoria)
                   const pai = item.categoria_nome
                   if (!pai && !daCat) return ''
-                  return `<div class="text-muted fs-12 mt-1">${pai || ''}${
+                  const paiCor = item.categoria_cor
+                    ? `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${corCategoria({
+                        cor: item.categoria_cor,
+                        categoria_id: item.categoria_id,
+                      })};margin-right:4px;vertical-align:middle"></span>`
+                    : ''
+                  return `<div class="text-muted fs-12 mt-1">${paiCor}${pai || ''}${
                     daCat ? ` · ${daCat} da categoria` : ''
                   }</div>`
                 }}
