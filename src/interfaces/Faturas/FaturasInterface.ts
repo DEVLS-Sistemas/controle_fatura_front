@@ -1,4 +1,5 @@
 import { ParserHomologado, SenhaPdfRegraLookup } from 'interfaces/Cartoes/CartoesInterface'
+import { PaginateInterface } from 'interfaces/SystemInterfaces/PaginateInterface'
 import { CandidatoConciliacao } from 'interfaces/Transacoes/TransacoesInterface'
 
 export interface FaturasSearch {
@@ -8,11 +9,37 @@ export interface FaturasSearch {
     cartao_bandeira_id?: string | number | null
     mes?: string | number | null
     ano?: string | number | null
+    /** Atalho da API (`1`/`true`). `0` é só da URL do front — não enviar no GET. */
+    mes_atual?: 0 | 1 | boolean | null
     status?: string | null
     pessoa_id?: string | number | null
     palavra_chave?: string | null | unknown
     page?: number
     perPage?: number
+}
+
+/** Competência de hoje vinda do lookup/listagem — não calcular no browser */
+export interface CompetenciaAtual {
+    mes: number
+    ano: number
+    label?: string
+}
+
+export interface FaturasLookupAno {
+    value: number
+    label: string
+}
+
+export interface FaturasLookupMes {
+    value: number | string
+    label: string
+}
+
+/** Eco dos filtros aplicados em `GET /faturas/listar` */
+export interface FaturasListFiltros {
+    mes?: number | null
+    ano?: number | null
+    mes_atual_ativo?: boolean
 }
 
 /** Metadados de senha do PDF quando a fatura precisa de desbloqueio */
@@ -105,6 +132,12 @@ export interface FaturasCartaoGroup {
 
 /** @deprecated Use FaturasCartaoGroup — mantido só para compatibilidade de imports */
 export type FaturasList = FaturasCartaoGroup
+
+/** Paginação de `GET /faturas/listar` com competência e eco dos filtros */
+export type FaturasPaginate = PaginateInterface<FaturasCartaoGroup> & {
+    competencia_atual?: CompetenciaAtual
+    filtros?: FaturasListFiltros
+}
 
 export type FaturaGrupoChave = 'cartao' | 'pagamentos_financiamentos'
 
@@ -212,6 +245,9 @@ export interface LookupsFaturas {
     cartoes?: CartaoLookup[]
     senhas_pdf_regras?: SenhaPdfRegraLookup[]
     parsers_homologados?: ParserHomologado[]
+    competencia_atual?: CompetenciaAtual
+    anos?: FaturasLookupAno[]
+    meses?: FaturasLookupMes[]
 }
 
 /** Resposta de `DELETE /faturas/excluir-todas` */
@@ -343,7 +379,7 @@ export interface ComprasParaReconcilia {
 
 export interface FaturasInterface {
     getViewFaturas(params: any): Promise<FaturasView | undefined>
-    listFaturasPaginate(params: FaturasSearch): Promise<any>
+    listFaturasPaginate(params: FaturasSearch): Promise<FaturasPaginate | undefined>
     AsyncListFaturas(params: FaturasSearch): Promise<FaturasModel[] | undefined>
     createFaturas(params: FaturasModel): Promise<any>
     editFaturas(params: FaturasModel): Promise<any>

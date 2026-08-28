@@ -2,12 +2,12 @@ import { AxiosHttpClient, HttpStatusCode } from "../../libs/api/ApiConfig"
 import { AccessDeniedError } from "../../libs/api/exceptions/AccessDeniedError"
 import { UnexpectedError } from "../../libs/api/exceptions/UnexpectedError"
 import { ValidationError } from "../../libs/api/exceptions/ValidationError"
-import { PaginateInterface } from "interfaces/SystemInterfaces/PaginateInterface"
 import {
     ExcluirTodasFaturasResponse,
     FaturasCartaoGroup,
     FaturasInterface,
     FaturasModel,
+    FaturasPaginate,
     FaturasSearch,
     FaturasView,
     ImpactoRemoverAnexo,
@@ -20,6 +20,7 @@ import {
     extractRemoverAnexoResult,
     extractComprasParaReconcilia,
 } from "interfaces/Faturas/FaturasInterface"
+import { extractLookupsFaturas } from "helpers/fatura_listagem_helpers"
 import { PdfSenhaError } from "../../libs/api/exceptions/PdfSenhaError"
 import { FaturaSelecaoError } from "../../libs/api/exceptions/FaturaSelecaoError"
 import { FaturaMetadadosError } from "../../libs/api/exceptions/FaturaMetadadosError"
@@ -51,9 +52,9 @@ export class FaturasService implements FaturasInterface {
         }
     }
 
-    async listFaturasPaginate(params: FaturasSearch): Promise<PaginateInterface<FaturasCartaoGroup> | undefined> {
+    async listFaturasPaginate(params: FaturasSearch): Promise<FaturasPaginate | undefined> {
         try {
-            const response = await this.httpClient.get<PaginateInterface<FaturasCartaoGroup>>({
+            const response = await this.httpClient.get<FaturasPaginate>({
                 url: this.url + '/listar',
                 body: params
             })
@@ -86,7 +87,7 @@ export class FaturasService implements FaturasInterface {
             url: this.url + '/lookups'
         })
         switch (response.statusCode) {
-            case HttpStatusCode.ok: return response.body
+            case HttpStatusCode.ok: return extractLookupsFaturas(response.body)
             case HttpStatusCode.unauthorized: throw new AccessDeniedError()
             default: throw new UnexpectedError()
         }

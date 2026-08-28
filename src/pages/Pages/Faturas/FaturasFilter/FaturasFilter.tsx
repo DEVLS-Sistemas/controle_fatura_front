@@ -1,6 +1,6 @@
 import UiContent from "Components/Common/UiContent"
 import React, { useEffect, useState } from "react"
-import { Link, useSearchParams } from "react-router-dom"
+import { Link } from "react-router-dom"
 import { useForm } from "react-hook-form"
 import {
     Breadcrumb, BreadcrumbItem, Button, Card, CardHeader, Col, Collapse,
@@ -11,14 +11,21 @@ import { InputTextControlled } from "Components/ComponentController/Inputs/Text/
 import { SelectListControlled } from "Components/ComponentController/Selects/Select/SelectListControlled"
 import { SelectOptions } from "interfaces/SystemInterfaces/SelectInterface"
 import { mesesOptions } from "helpers/fatura_helpers"
-import { AnosSelect } from "helpers/functions_helpers"
-import { FaturasSearch } from "interfaces/Faturas/FaturasInterface"
+import { isMesAtualAtivo } from "helpers/fatura_listagem_helpers"
+import { CompetenciaAtual, FaturasSearch } from "interfaces/Faturas/FaturasInterface"
 import { FaturasService } from "services/Faturas/FaturasService"
 import { PessoasService } from "services/Pessoas/PessoasService"
 import { toPessoaSelectOption } from "interfaces/Pessoas/PessoasInterface"
 
 export interface FaturasFilterProps {
-    getRemoteFaturasList: (data: any) => void
+    getRemoteFaturasList: (data: FaturasSearch) => void
+    filtersRef: FaturasSearch
+    competenciaAtual: CompetenciaAtual | null
+    mesAtualAtivo: boolean
+    appliedMes: number | null
+    appliedAno: number | null
+    anosOptions: SelectOptions[]
+    cartoesOptions: SelectOptions[]
 }
 
 const isDev = process.env.NODE_ENV === 'development'
@@ -31,18 +38,24 @@ const optStatus: SelectOptions[] = [
     { value: 'erro', label: 'Erro' },
 ]
 
-const FaturasFilter = ({ getRemoteFaturasList }: FaturasFilterProps) => {
-    const [searchParams] = useSearchParams()
-    const mesUrl = Number(searchParams.get('mes'))
-    const anoUrl = Number(searchParams.get('ano'))
-    const { handleSubmit, control, register } = useForm<FaturasSearch>({
+const FaturasFilter = ({
+    getRemoteFaturasList,
+    filtersRef,
+    competenciaAtual,
+    mesAtualAtivo,
+    appliedMes,
+    appliedAno,
+    anosOptions,
+    cartoesOptions,
+}: FaturasFilterProps) => {
+    const { handleSubmit, control, register, getValues, setValue } = useForm<FaturasSearch>({
         defaultValues: {
-            mes: Number.isFinite(mesUrl) && mesUrl >= 1 && mesUrl <= 12 ? mesUrl : null,
-            ano: Number.isFinite(anoUrl) && anoUrl > 2000 ? anoUrl : null,
+            ...filtersRef,
+            mes: appliedMes,
+            ano: appliedAno,
         },
     })
     const [showFilter, setShowFilter] = useState<boolean>(false)
-    const [cartoesOptions, setCartoesOptions] = useState<SelectOptions[]>([{ value: '', label: 'Todos' }])
     const [pessoasOptions, setPessoasOptions] = useState<SelectOptions[]>([{ value: '', label: 'Todas' }])
     const [limparModalOpen, setLimparModalOpen] = useState(false)
     const [confirmado, setConfirmado] = useState(false)
@@ -51,21 +64,8 @@ const FaturasFilter = ({ getRemoteFaturasList }: FaturasFilterProps) => {
     const pessoasService = new PessoasService()
 
     useEffect(() => {
-        const loadLookups = async () => {
+        const loadPessoas = async () => {
             try {
-                const lookups = await faturasService.getLookupsFaturas()
-                if (lookups?.cartoes) {
-                    const opts: SelectOptions[] = [{ value: '', label: 'Todos' }]
-                    lookups.cartoes.forEach((c) => {
-                        opts.push({
-                            value: c.id!,
-                            label: c.nome ?? `Cartão ${c.id}`,
-                            cor_fundo: c.cor_fundo ?? null,
-                            cor_texto: c.cor_texto ?? null,
-                        })
-                    })
-                    setCartoesOptions(opts)
-                }
                 const pessoas = await pessoasService.AsyncListPessoas()
                 if (pessoas) {
                     setPessoasOptions([
@@ -74,15 +74,57 @@ const FaturasFilter = ({ getRemoteFaturasList }: FaturasFilterProps) => {
                     ])
                 }
             } catch (error) {
-                console.error('Erro ao carregar lookups:', error)
+                console.error('Erro ao carregar titulares:', error)
             }
         }
-        loadLookups()
+        loadPessoas()
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
-    const optAnos = AnosSelect({ includeTodos: true })
+    useEffect(() => {
+        setValue('mes', appliedMes)
+        setValue('ano', appliedAno)
+    }, [appliedMes, appliedAno, setValue])
 
     const optMeses: SelectOptions[] = [{ value: '', label: 'Todos' }, ...mesesOptions]
+
+    const competenciaLabel = competenciaAtual?.label
+        ?? (competenciaAtual
+            ? `${String(competenciaAtual.mes).padStart(2, '0')}/${competenciaAtual.ano}`
+            : null)
+    const botaoAtivo = mesAtualAtivo || isMesAtualAtivo(appliedMes, appliedAno, competenciaAtual)
+
+    const submitFiltros = (patch: Partial<FaturasSearch>) => {
+        getRemoteFaturasList({
+            ...getValues(),
+            ...patch,
+            page: 1,
+        })
+    }
+
+    const handleIrParaMesAtual = () => {
+        if (botaoAtivo) {
+            setValue('mes', null)
+            setValue('ano', null)
+            submitFiltros({ mes: null, ano: null, mes_atual: undefined })
+            return
+        }
+        if (competenciaAtual) {
+            setValue('mes', competenciaAtual.mes)
+            setValue('ano', competenciaAtual.ano)
+            submitFiltros({
+                mes: competenciaAtual.mes,
+                ano: competenciaAtual.ano,
+                mes_atual: undefined,
+            })
+            return
+        }
+        submitFiltros({ mes_atual: 1 })
+    }
+
+    const handleCompetenciaChange = (field: 'mes' | 'ano', value: unknown) => {
+        submitFiltros({ [field]: value === '' ? null : value })
+    }
 
     const toggleLimparModal = () => {
         if (excluindoTodas) return
@@ -103,7 +145,7 @@ const FaturasFilter = ({ getRemoteFaturasList }: FaturasFilterProps) => {
             )
             setLimparModalOpen(false)
             setConfirmado(false)
-            await getRemoteFaturasList({})
+            submitFiltros({})
         } catch (error: any) {
             console.error('Erro ao excluir todas as faturas:', error)
             toast.error(error?.message || 'Erro ao excluir faturas e transações')
@@ -155,16 +197,25 @@ const FaturasFilter = ({ getRemoteFaturasList }: FaturasFilterProps) => {
                 <Col xl={12}>
                     <Card>
                         <CardHeader>
-                            <div className="gap-2 flex-wrap">
-                                <Row>
-                                    <Col md={4}>
-                                        <Button onClick={() => setShowFilter(!showFilter)} color="primary" className="mb-1">
-                                            Filtros
-                                        </Button>
-                                    </Col>
-                                    {!showFilter && (
-                                        <Col md={8}>
-                                            <form onSubmit={handleSubmit(getRemoteFaturasList)}>
+                            <form
+                                className="px-0 my-0"
+                                id="form-search-faturas"
+                                onSubmit={handleSubmit((data) => submitFiltros(data))}
+                            >
+                                <div className="gap-2 flex-wrap">
+                                    <Row>
+                                        <Col md={4}>
+                                            <Button
+                                                type="button"
+                                                onClick={() => setShowFilter(!showFilter)}
+                                                color="primary"
+                                                className="mb-1"
+                                            >
+                                                Filtros
+                                            </Button>
+                                        </Col>
+                                        {!showFilter && (
+                                            <Col md={8}>
                                                 <div className="input-group">
                                                     <input
                                                         {...register("palavra_chave")}
@@ -176,92 +227,108 @@ const FaturasFilter = ({ getRemoteFaturasList }: FaturasFilterProps) => {
                                                         <i className="ri-search-line align-middle me-1"></i> Buscar
                                                     </button>
                                                 </div>
-                                            </form>
-                                        </Col>
-                                    )}
-                                </Row>
-                            </div>
+                                            </Col>
+                                        )}
+                                    </Row>
+                                </div>
 
-                            <Row>
-                                <Col>
-                                    <Collapse isOpen={showFilter} className="multi-collapse mt-3">
-                                        <form
-                                            className="px-0 my-0 m-2"
-                                            id="form-search"
-                                            onSubmit={handleSubmit(getRemoteFaturasList)}
+                                <Row className="mt-3 align-items-end g-2">
+                                    <Col xs={6} sm={4} md={2}>
+                                        <div className="mb-0">
+                                            <Label htmlFor="mes" className="form-label">Mês</Label>
+                                            <SelectListControlled<FaturasSearch>
+                                                options={optMeses}
+                                                field="mes"
+                                                control={control}
+                                                onValueChange={(value) => handleCompetenciaChange('mes', value)}
+                                            />
+                                        </div>
+                                    </Col>
+                                    <Col xs={6} sm={4} md={2}>
+                                        <div className="mb-0">
+                                            <Label htmlFor="ano" className="form-label">Ano</Label>
+                                            <SelectListControlled<FaturasSearch>
+                                                options={anosOptions}
+                                                field="ano"
+                                                control={control}
+                                                onValueChange={(value) => handleCompetenciaChange('ano', value)}
+                                            />
+                                        </div>
+                                    </Col>
+                                    <Col xs={12} sm="auto" className="d-flex align-items-end">
+                                        <button
+                                            type="button"
+                                            className={`btn ${botaoAtivo ? 'btn-primary' : 'btn-soft-primary'}`}
+                                            aria-pressed={botaoAtivo}
+                                            title={competenciaLabel ? `Competência ${competenciaLabel}` : 'Ir para o mês atual'}
+                                            onClick={handleIrParaMesAtual}
                                         >
-                                            <Row>
-                                                <Col md={3}>
-                                                    <div className="mb-3">
-                                                        <Label htmlFor="pessoa_id" className="form-label">Titular</Label>
-                                                        <SelectListControlled<FaturasSearch>
-                                                            options={pessoasOptions}
-                                                            field="pessoa_id"
-                                                            control={control}
-                                                        />
-                                                    </div>
-                                                </Col>
-                                                <Col md={3}>
-                                                    <div className="mb-3">
-                                                        <Label htmlFor="cartao_id" className="form-label">Cartão</Label>
-                                                        <SelectListControlled<FaturasSearch>
-                                                            options={cartoesOptions}
-                                                            field="cartao_id"
-                                                            control={control}
-                                                        />
-                                                    </div>
-                                                </Col>
-                                                <Col md={2}>
-                                                    <div className="mb-3">
-                                                        <Label htmlFor="mes" className="form-label">Mês</Label>
-                                                        <SelectListControlled<FaturasSearch>
-                                                            options={optMeses}
-                                                            field="mes"
-                                                            control={control}
-                                                        />
-                                                    </div>
-                                                </Col>
-                                                <Col md={2}>
-                                                    <div className="mb-3">
-                                                        <Label htmlFor="ano" className="form-label">Ano</Label>
-                                                        <SelectListControlled<FaturasSearch>
-                                                            options={optAnos}
-                                                            field="ano"
-                                                            control={control}
-                                                        />
-                                                    </div>
-                                                </Col>
-                                                <Col md={3}>
-                                                    <div className="mb-3">
-                                                        <Label htmlFor="status" className="form-label">Status</Label>
-                                                        <SelectListControlled<FaturasSearch>
-                                                            options={optStatus}
-                                                            field="status"
-                                                            control={control}
-                                                        />
-                                                    </div>
-                                                </Col>
-                                            </Row>
-                                            <Row className="mt-3">
-                                                <div className="d-flex flex-row justify-content-end align-items-center">
-                                                    <Col md={6}>
-                                                        <InputTextControlled<FaturasSearch>
-                                                            field="palavra_chave"
-                                                            control={control}
-                                                            placeholder="Buscar..."
-                                                        />
+                                            <i className={`${botaoAtivo ? 'ri-checkbox-circle-fill' : 'ri-calendar-line'} align-middle me-1`}></i>
+                                            {botaoAtivo ? 'Mês Atual Selecionado' : 'Ir para Mês Atual'}
+                                            {botaoAtivo && competenciaLabel ? (
+                                                <span className="badge bg-white text-primary ms-1">{competenciaLabel}</span>
+                                            ) : null}
+                                        </button>
+                                    </Col>
+                                </Row>
+
+                                <Row>
+                                    <Col>
+                                        <Collapse isOpen={showFilter} className="multi-collapse mt-3">
+                                            <div className="px-0 my-0 m-2">
+                                                <Row>
+                                                    <Col md={3}>
+                                                        <div className="mb-3">
+                                                            <Label htmlFor="pessoa_id" className="form-label">Titular</Label>
+                                                            <SelectListControlled<FaturasSearch>
+                                                                options={pessoasOptions}
+                                                                field="pessoa_id"
+                                                                control={control}
+                                                            />
+                                                        </div>
                                                     </Col>
-                                                    <Col md={2} className="me-3">
-                                                        <button className="btn btn-success form-control ms-3" type="submit">
-                                                            Buscar
-                                                        </button>
+                                                    <Col md={3}>
+                                                        <div className="mb-3">
+                                                            <Label htmlFor="cartao_id" className="form-label">Cartão</Label>
+                                                            <SelectListControlled<FaturasSearch>
+                                                                options={cartoesOptions}
+                                                                field="cartao_id"
+                                                                control={control}
+                                                            />
+                                                        </div>
                                                     </Col>
-                                                </div>
-                                            </Row>
-                                        </form>
-                                    </Collapse>
-                                </Col>
-                            </Row>
+                                                    <Col md={3}>
+                                                        <div className="mb-3">
+                                                            <Label htmlFor="status" className="form-label">Status</Label>
+                                                            <SelectListControlled<FaturasSearch>
+                                                                options={optStatus}
+                                                                field="status"
+                                                                control={control}
+                                                            />
+                                                        </div>
+                                                    </Col>
+                                                </Row>
+                                                <Row className="mt-3">
+                                                    <div className="d-flex flex-row justify-content-end align-items-center">
+                                                        <Col md={6}>
+                                                            <InputTextControlled<FaturasSearch>
+                                                                field="palavra_chave"
+                                                                control={control}
+                                                                placeholder="Buscar..."
+                                                            />
+                                                        </Col>
+                                                        <Col md={2} className="me-3">
+                                                            <button className="btn btn-success form-control ms-3" type="submit">
+                                                                Buscar
+                                                            </button>
+                                                        </Col>
+                                                    </div>
+                                                </Row>
+                                            </div>
+                                        </Collapse>
+                                    </Col>
+                                </Row>
+                            </form>
                         </CardHeader>
                     </Card>
                 </Col>

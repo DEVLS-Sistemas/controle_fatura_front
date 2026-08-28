@@ -15,6 +15,7 @@ import {
     resolveFaturaAnexo, downloadFaturaAnexo, FaturaAnexoDownloadTipo, FaturaAnexoDownloadMeta,
 } from "helpers/fatura_helpers"
 import { TOOLTIP_ICONE_PDF_LISTAGEM } from "helpers/fatura_competencia_pdf_helpers"
+import { parseAnoFiltro, parseMesFiltro } from "helpers/fatura_listagem_helpers"
 import { CartaoChip, BandeiraChip, resolveCartaoCores } from "helpers/cartao_helpers"
 import { resolveCartaoHomologacao } from "helpers/parser_homologado_helpers"
 import CartaoPdfHomologacaoBadge from "Components/Cartoes/CartaoPdfHomologacaoBadge"
@@ -190,8 +191,8 @@ export const FaturasTable = ({ data, getData, setPerPage, perPage, filters }: Fa
                 palavra_chave: new_url.searchParams.get('palavra_chave') ?? filters.palavra_chave,
                 cartao_id: new_url.searchParams.get('cartao_id') ?? filters.cartao_id,
                 pessoa_id: new_url.searchParams.get('pessoa_id') ?? filters.pessoa_id,
-                mes: new_url.searchParams.get('mes') ?? filters.mes,
-                ano: new_url.searchParams.get('ano') ?? filters.ano,
+                mes: parseMesFiltro(new_url.searchParams.get('mes')) ?? filters.mes,
+                ano: parseAnoFiltro(new_url.searchParams.get('ano')) ?? filters.ano,
                 status: new_url.searchParams.get('status') ?? filters.status,
             })
         } catch (error) {
@@ -223,7 +224,7 @@ export const FaturasTable = ({ data, getData, setPerPage, perPage, filters }: Fa
                                 {data && data.total === 0 ? (
                                     <div className="bg-primary text-white border-0 alert alert-primary fade show text-center">
                                         {temFiltroPeriodo
-                                            ? 'Nenhuma fatura neste período para os filtros informados.'
+                                            ? 'Nenhuma fatura neste período'
                                             : 'Nenhuma fatura encontrada. Cadastre uma compra ou importe um PDF/CSV.'}
                                     </div>
                                 ) : !data ? (

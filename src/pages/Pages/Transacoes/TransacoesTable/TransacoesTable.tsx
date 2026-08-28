@@ -20,6 +20,7 @@ import {
     isTransacaoOperacional,
 } from "helpers/fatura_helpers"
 import { pathVisualizacaoDaLinha, tituloListagemCompra, precisaConciliarCompra, labelPrecisaConciliar, temSugestaoConciliacao, labelSugestaoConciliacao, conciliadaComManual, labelConciliadaComManual, identificadorCompraManualVinculada, pathVisualizacaoCompra } from "helpers/cadastro_manual_compra_helpers"
+import { CartaoChip } from "helpers/cartao_helpers"
 import { corCategoria, corSubcategoria, corPlataforma } from "helpers/cores_tema_helpers"
 import { isCompraAvista, isEhAssinatura } from "helpers/assinaturas_helpers"
 import { SelectOptions } from "interfaces/SystemInterfaces/SelectInterface"
