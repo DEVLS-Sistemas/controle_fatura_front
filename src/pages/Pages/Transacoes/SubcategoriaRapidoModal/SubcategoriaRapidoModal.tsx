@@ -42,14 +42,14 @@ const SubcategoriaRapidoModal = ({
     showPropagarGrupo = false,
 }: SubcategoriaRapidoModalProps) => {
     const [nome, setNome] = useState('')
-    const [propagarGrupo, setPropagarGrupo] = useState(false)
+    const [propagarGrupo, setPropagarGrupo] = useState(true)
     const [saving, setSaving] = useState(false)
     const subcategoriasService = new SubcategoriasService()
 
     useEffect(() => {
         if (!isOpen) return
         setNome('')
-        setPropagarGrupo(false)
+        setPropagarGrupo(true)
     }, [isOpen])
 
     const handleSubmit = async (e: React.FormEvent) => {

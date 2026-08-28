@@ -42,7 +42,6 @@ import {
     findSenhaPdfRegraByBanco,
     matchPresetCorBandeira,
     matchPresetCorCartao,
-    parCorCasaComFundo,
     toInputColorHex,
     corTextoPorContraste,
     hexesCartaoIguais,
@@ -191,7 +190,6 @@ const CartoesForm = () => {
     const [selectedChave, setSelectedChave] = useState<string | null>(
         paramId || state?.source ? null : 'padrao'
     )
-    const [corPersonalizadaAberta, setCorPersonalizadaAberta] = useState(false)
     const personalizadaInitRef = useRef(false)
     const [senhaPdfRegraOptions, setSenhaPdfRegraOptions] = useState<SelectOptions[]>([])
     const [pessoasOptions, setPessoasOptions] = useState<SelectOptions[]>([
@@ -213,21 +211,16 @@ const CartoesForm = () => {
         setValue('cor_fundo', par.cor_fundo, { shouldDirty: manual })
         setValue('cor_texto', par.cor_texto, { shouldDirty: manual })
         setSelectedChave(par.chave ?? null)
-        setCorPersonalizadaAberta(false)
         if (manual) setCoresManuais(true)
     }
 
-    const applyCorPersonalizada = (hex: string) => {
-        const fundo = toInputColorHex(hex, corPadrao.cor_fundo || '#e5e7eb')
-        setValue('cor_fundo', fundo, { shouldDirty: true })
-        setValue('cor_texto', corTextoPorContraste(fundo), { shouldDirty: true })
+    const applyCorPersonalizadaCampo = (campo: 'cor_fundo' | 'cor_texto', hex: string) => {
+        const fallback = campo === 'cor_fundo'
+            ? (corPadrao.cor_fundo || '#e5e7eb')
+            : (getValues('cor_texto') || corPadrao.cor_texto || '#111827')
+        setValue(campo, toInputColorHex(hex, fallback), { shouldDirty: true })
         setCoresManuais(true)
         setSelectedChave(null)
-        setCorPersonalizadaAberta(true)
-    }
-
-    const abrirCorPersonalizada = () => {
-        applyCorPersonalizada(getValues('cor_fundo') || corPadrao.cor_fundo || '#e5e7eb')
     }
 
     const getLookups = async (): Promise<void> => {
@@ -688,17 +681,20 @@ const CartoesForm = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [nomePreview, bancoWatch, coresManuais, presetsCores, corPadrao])
 
-    // Edit: HEX fora do catálogo abre já em modo personalizada
+    // Edit: se o par salvo não é um preset, nenhum chip de banco fica marcado
     useEffect(() => {
         if (!isEditing || personalizadaInitRef.current || !paresCores.length) return
         const fundo = getValues('cor_fundo')
+        const texto = getValues('cor_texto')
         if (!fundo) return
         personalizadaInitRef.current = true
-        if (!parCorCasaComFundo(fundo, paresCores)) {
-            setCorPersonalizadaAberta(true)
-            setSelectedChave(null)
-        }
-    }, [isEditing, paresCores, corFundo, getValues])
+        const par = paresCores.find(
+            (item) =>
+                hexesCartaoIguais(item.cor_fundo, fundo)
+                && hexesCartaoIguais(item.cor_texto, texto)
+        )
+        setSelectedChave(par?.chave ?? null)
+    }, [isEditing, paresCores, corFundo, corTexto, getValues])
 
     // Limita a senha digitada ao máximo de dígitos da regra selecionada
     useEffect(() => {
@@ -726,7 +722,8 @@ const CartoesForm = () => {
         [nomePreview, bancoWatch, parsersHomologados, presetsCores]
     )
     const textoHomologacao = textoFormCartaoHomologacao(homologacaoNome, parsersHomologados)
-    const pickerHex = toInputColorHex(corFundo, corPadrao.cor_fundo || '#e5e7eb')
+    const pickerHexFundo = toInputColorHex(corFundo, corPadrao.cor_fundo || '#e5e7eb')
+    const pickerHexTexto = toInputColorHex(corTexto, corPadrao.cor_texto || '#111827')
 
     return (
         <React.Fragment>
@@ -972,7 +969,6 @@ const CartoesForm = () => {
                                                                 type="button"
                                                                 className="btn btn-sm btn-soft-primary"
                                                                 onClick={() => {
-                                                                    setCorPersonalizadaAberta(false)
                                                                     setCoresManuais(false)
                                                                 }}
                                                             >
@@ -993,7 +989,7 @@ const CartoesForm = () => {
                                                             const corMatch =
                                                                 hexesCartaoIguais(corFundo, par.cor_fundo) &&
                                                                 hexesCartaoIguais(corTexto, par.cor_texto)
-                                                            const selected = !corPersonalizadaAberta && (selectedChave ? chaveMatch : corMatch)
+                                                            const selected = selectedChave ? chaveMatch : corMatch
                                                             const swatchId = `cartao-cor-swatch-${par.chave || index}`
                                                             const homologado = isParCorPdfHomologado(par, parsersHomologados)
                                                             return (
@@ -1034,38 +1030,46 @@ const CartoesForm = () => {
                                                     </div>
 
                                                     <div className="cartao-cor-personalizada mb-3">
-                                                        <button
-                                                            type="button"
-                                                            id="cartao-cor-personalizada"
-                                                            className={`cartao-cor-personalizada__chip ${corPersonalizadaAberta ? 'is-selected' : ''}`}
-                                                            onClick={abrirCorPersonalizada}
-                                                        >
-                                                            <span className="cartao-cor-personalizada__plus" aria-hidden>+</span>
-                                                            Cor personalizada
-                                                        </button>
-                                                        <UncontrolledTooltip placement="top" target="cartao-cor-personalizada">
-                                                            {corPersonalizadaAberta ? pickerHex : 'Escolher qualquer HEX'}
-                                                        </UncontrolledTooltip>
-
-                                                        {corPersonalizadaAberta ? (
-                                                            <div className="cartao-cor-personalizada__picker d-flex align-items-center gap-2 mt-2">
-                                                                <input
-                                                                    id="cartao-cor-picker"
-                                                                    type="color"
-                                                                    className="cartao-cor-personalizada__input"
-                                                                    value={pickerHex}
-                                                                    title={pickerHex}
-                                                                    aria-label="Cor de fundo personalizada"
-                                                                    onChange={(e) => applyCorPersonalizada(e.target.value)}
-                                                                />
-                                                                <small
-                                                                    className="text-muted font-monospace mb-0"
-                                                                    title={pickerHex}
-                                                                >
-                                                                    {pickerHex}
-                                                                </small>
-                                                            </div>
-                                                        ) : null}
+                                                        <Row className="g-3">
+                                                            <Col md={6}>
+                                                                <Label className="form-label mb-1" htmlFor="cartao-cor-picker-fundo">
+                                                                    Fundo personalizado
+                                                                </Label>
+                                                                <div className="cartao-cor-personalizada__picker d-flex align-items-center gap-2">
+                                                                    <input
+                                                                        id="cartao-cor-picker-fundo"
+                                                                        type="color"
+                                                                        className="cartao-cor-personalizada__input"
+                                                                        value={pickerHexFundo}
+                                                                        title={pickerHexFundo}
+                                                                        aria-label="Cor de fundo personalizada"
+                                                                        onChange={(e) => applyCorPersonalizadaCampo('cor_fundo', e.target.value)}
+                                                                    />
+                                                                    <small className="text-muted font-monospace mb-0" title={pickerHexFundo}>
+                                                                        {pickerHexFundo}
+                                                                    </small>
+                                                                </div>
+                                                            </Col>
+                                                            <Col md={6}>
+                                                                <Label className="form-label mb-1" htmlFor="cartao-cor-picker-texto">
+                                                                    Texto personalizado
+                                                                </Label>
+                                                                <div className="cartao-cor-personalizada__picker d-flex align-items-center gap-2">
+                                                                    <input
+                                                                        id="cartao-cor-picker-texto"
+                                                                        type="color"
+                                                                        className="cartao-cor-personalizada__input"
+                                                                        value={pickerHexTexto}
+                                                                        title={pickerHexTexto}
+                                                                        aria-label="Cor do texto personalizada"
+                                                                        onChange={(e) => applyCorPersonalizadaCampo('cor_texto', e.target.value)}
+                                                                    />
+                                                                    <small className="text-muted font-monospace mb-0" title={pickerHexTexto}>
+                                                                        {pickerHexTexto}
+                                                                    </small>
+                                                                </div>
+                                                            </Col>
+                                                        </Row>
                                                     </div>
 
                                                     <div className="d-flex align-items-center gap-2 mt-2">

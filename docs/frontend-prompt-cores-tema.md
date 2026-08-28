@@ -17,142 +17,6 @@ HEX sempre minúsculo (`#3b82f6`). Moeda e demais regras das telas **não mudam*
 
 ---
 
-## Mapa de implementação neste repositório
-
-Cada etapa é um PR. O front só começa a etapa N quando o back da etapa N estiver no ar. Cartão (etapa 4) **não entra** nos PRs de categoria.
-
-### Estado atual (o que está errado hoje)
-
-| Onde | Hoje | Problema |
-|------|------|----------|
-| Cadastro de categoria | `<input type="color">` + campo HEX livre | Picker livre some daqui; vira grade de temas |
-| Cadastro rápido de categoria | `<select>` de HEX com “Sem cor” | Mesma grade tema, default preto |
-| `corCategoria()` | `cor \|\| '#9ca3af'` | Categoria cadastrada sem cor vira **cinza**. Deve ser **preto** |
-| Pizza/barras de categoria | usam `item.cor` via helper cinza | Cadastrada sem cor ≠ “Sem categoria” |
-| Fatia **Outros** | `#9ca3af` | Spec: `#d1d5db` |
-| Pizza/barras de sub | `variarCorFatia(categoria_cor)` no front | Etapa 2: pintar com `sub.cor` da API |
-| Dashboard resumo | `c.cor \|\| '#6b7280'` | Mesmo helper: cadastrada → preto; sem categoria → `#9ca3af` |
-| Cadastro de cartão | chips de banco + ajuste fino de paleta | **Não mexer** até a etapa 4 |
-| Cadastro de subcategoria | sem seletor de cor | Correto — permanece assim |
-
-### Helper único (criar na etapa 1, reusar nas outras)
-
-Novo arquivo: `src/helpers/cores_tema_helpers.ts` (+ testes).
-
-Não copiar fallback em cada tela. `gastos_por_categoria_helpers.ts` passa a importar daqui e **não** redefine `corCategoria`.
-
-```ts
-export const COR_TEMA_PADRAO = '#000000'
-export const COR_SEM_CATEGORIA = '#9ca3af'
-export const COR_FATIA_OUTROS = '#d1d5db'
-
-export function corCategoria(item: { cor?: string | null; categoria_id?: number | null }) {
-  if (item.categoria_id == null) return item.cor ?? COR_SEM_CATEGORIA
-  return item.cor || COR_TEMA_PADRAO
-}
-
-export function corSubcategoria(item: { cor?: string | null; categoria_cor?: string | null }) {
-  return item.cor || item.categoria_cor || COR_TEMA_PADRAO
-}
-```
-
-Na etapa 1, `corSubcategoria` ainda pode cair em `categoria_cor`. Na etapa 3, o fallback de clarear no front some — a API já manda `cor` na sub.
-
-### Componente de quadrados tema (etapa 1)
-
-Novo: `src/Components/CoresTema/CorTemaSwatches.tsx`
-
-- Quadrados 20–28px, `border-radius` 4px, tooltip HEX no hover, `aria-label`.
-- Usado no form de categoria e (se couber) no modal rápido.
-- **Não** reutilizar o `ColorSwatch` circular do cadastro de cartão.
-
----
-
-### Etapa 1 — PR: temas na categoria + gráficos de categoria
-
-**Depende do back:** `GET /categorias/lookups` com `cores[]` (e `temas[]` se já existir; `variacoes` pode vir vazio).
-
-| Arquivo | O que fazer |
-|---------|-------------|
-| `src/interfaces/Categorias/CategoriasInterface.ts` | `LookupsCategorias`: `cor_padrao`, `cores`, `temas[]` |
-| `src/Components/CoresTema/CorTemaSwatches.tsx` | grade de quadrados (novo) |
-| `src/helpers/cores_tema_helpers.ts` | `corCategoria` / constantes / normalize HEX (novo) |
-| `src/pages/Pages/Categorias/CategoriasForm/CategoriasForm.tsx` | trocar picker livre pela grade; create inicia em preto |
-| `src/pages/Pages/Categorias/CategoriasTable/CategoriasTable.tsx` | bolinha sempre visível; `null` → preto, tooltip HEX |
-| `src/pages/Pages/Categorias/CategoriasView/CategoriasView.tsx` | mesma bolinha + HEX |
-| `src/helpers/gastos_por_categoria_helpers.ts` | `corCategoria` delega ao helper; fatia Outros = `#d1d5db`; **não** mudar `variarCorFatia` ainda |
-| `src/pages/Pages/GastosPorCategoria/GastosPorCategoriaDashboards/` | pizza mestre já consome `coresFatiasCategoria` — só o helper muda |
-| `src/pages/Pages/GastosPorCategoria/GastosPorCategoriaBarras/` | barras de categoria via `corCategoria` |
-| `src/pages/Pages/GastosPorCategoria/GastosPorCategoriaHero/` | bolinha da categoria via helper |
-| `src/pages/Pages/GastosPorCategoria/GastosPorCategoriaEvolucao/` | série por categoria via helper (hoje cinza no null) |
-| `src/pages/Pages/Dashboards/DashboardHome/DashboardsHome.tsx` | `por_categoria[].cor` via `corCategoria` (hoje `#6b7280`) |
-| `src/pages/Pages/Transacoes/CategoriaRapidoModal/` | grade tema **ou** omitir cor (back grava preto). Se mostrar, não usar select “Sem cor” |
-| testes do helper | cadastrada `null` → `#000000`; sem categoria → `#9ca3af`; Outros → `#d1d5db` |
-
-**Não fazer nesta etapa:** preview de variações, pizza escrava com `sub.cor`, seletor no cartão, `input type="color"` em qualquer tela.
-
----
-
-### Etapa 2 — PR: variações claras nas subcategorias
-
-**Depende do back:** `temas[].variacoes` (~5 HEX mais claros) + `cor` no item de sub (list/view/gastos).
-
-| Arquivo | O que fazer |
-|---------|-------------|
-| `src/interfaces/Categorias/CategoriasInterface.ts` | `temas[].variacoes`; view da categoria pode trazer `subcategorias[].cor` |
-| `src/interfaces/Subcategorias/SubcategoriasInterface.ts` | `cor` no vínculo categoria↔sub (`categorias[].cor`) |
-| `src/pages/Pages/Categorias/CategoriasForm/` | abaixo da grade: prévia **não clicável** “Subcategorias (tons mais claros)” |
-| `src/pages/Pages/Subcategorias/SubcategoriasForm/` | **sem** seletor; ao lado de cada categoria vinculada, quadrado read-only + tooltip HEX |
-| `src/pages/Pages/Subcategorias/SubcategoriasTable/` | bolinha da cor do vínculo (se a listagem mandar) |
-| `src/helpers/gastos_por_categoria_helpers.ts` | `coresFatiasSubcategoria` usa `item.cor`; **apagar** `variarCorFatia` da pintura da pizza |
-| `src/pages/Pages/GastosPorCategoria/GastosPorCategoriaDashboards/` | pizza escrava pinta com `sub.cor` |
-| `src/pages/Pages/GastosPorCategoria/GastosPorCategoriaBarras/` | barras de sub: `corSubcategoria(item)` — não copiar a pai |
-| `src/pages/Pages/GastosPorCategoria/GastosPorCategoriaHero/` | barra da sub usa `sub.cor`, não a cor da categoria |
-| clique na fatia mestre | só recorta dataset; **não** recolorir |
-
-**Não fazer nesta etapa:** varrer compras/assinaturas (etapa 3); cartão (etapa 4).
-
----
-
-### Etapa 3 — PR: o restante das telas no mesmo helper
-
-Sem lógica nova. Importar `corCategoria` / `corSubcategoria` e pintar o HEX da API.
-
-| Arquivo | O que pintar |
-|---------|--------------|
-| `src/pages/Pages/GastosCriticos/GastosCriticosRankings/` | bolinha: sub usa `cor` se existir, senão `categoria_cor` só até o backfill |
-| `src/pages/Pages/Transacoes/TransacoesTable/` | chip categoria (hoje some se `categoria_cor` for null — legado deve aparecer preto) |
-| `src/pages/Pages/Faturas/FaturasView/` | chip na linha da compra |
-| `src/pages/Pages/ProjecaoFaturas/FaturaResponsavelView/` | agregados / linha com `categoria_cor` |
-| `src/pages/Pages/CompraVisualizacao/` | chip categoria / sub |
-| `src/pages/Pages/Assinaturas/AssinaturasList/` e `AssinaturasDetalhe/` | borda/chip da categoria |
-| `src/pages/Pages/Estabelecimentos/` | categoria padrão (bolinha se a API mandar `cor`) |
-| `src/pages/Pages/Responsaveis/ResponsaveisVisualizar/` | agregados `por_categoria` |
-| `src/pages/Pages/Dashboards/DashboardHome/` | só se a etapa 1 não cobriu 100% |
-| `src/pages/Pages/Transacoes/CategoriaRapidoModal/` | grade tema se a etapa 1 omitiu no modal estreito |
-
-Critério: nenhuma tela de gasto mostra categoria cadastrada cinza ou rainbow. “Sem categoria” continua `#9ca3af`. Chip da sub na compra = mesma HEX da pizza escrava.
-
----
-
-### Etapa 4 — PR separado: cor personalizada no cartão
-
-**Outra tarefa.** Presets de banco **permanecem**. Spec dos presets: [`frontend-prompt-cores-cartoes.md`](frontend-prompt-cores-cartoes.md).
-
-O seletor livre (`<input type="color">` + tooltip HEX) que hoje está na **categoria** entra no **cartão**, atrás de um chip **Cor personalizada**.
-
-| Arquivo | O que fazer |
-|---------|-------------|
-| `src/pages/Pages/Cartoes/CartoesForm/CartoesForm.tsx` | chip “+ Cor personalizada”; revela o picker; hover mostra HEX |
-| preview `CartaoChip` | `cor_fundo` escolhido + `cor_texto` por contraste (luminância ≥ 0.179 → texto escuro) |
-| `coresManuais` | `true` ao personalizar; clicar num banco **fecha** o picker e volta o par oficial |
-| edit | se `cor_fundo` não casa com `pares_cores[]`, abrir já em modo personalizada |
-| `src/pages/Pages/Transacoes/CartaoRapidoModal/` | só se o modal rápido também permitir cor; senão deixa só no form completo |
-
-**Não fazer:** recolorir cartões em massa; tirar Nubank/Inter/C6/…; color picker livre na categoria.
-
----
-
 ## Regras visuais (todas as etapas)
 
 | Quem | Cor | Fallback |
@@ -264,8 +128,8 @@ Bolinha ao lado do nome com `background: cor`.
 
 O modal de nova categoria hoje tem select opcional de cor. Nesta etapa:
 
-- Os **mesmos quadrados tema** (compactos) + default preto.
-- Pode omitir a grade e mandar sem `cor` (back grava preto) — aceitável no modal estreito. Se mostrar cor, é a grade, não um select.
+- Os **mesmos quadrados tema** (compactos) + default preto **já com anel**.
+- O modal da **fatura** precisa do mesmo estado selecionado — item 2 em [`frontend-prompt-ajustes-ux-cores-periodo.md`](frontend-prompt-ajustes-ux-cores-periodo.md).
 
 Detalhe do fluxo: [`frontend-prompt-cadastro-rapido-categoria-subcategoria.md`](frontend-prompt-cadastro-rapido-categoria-subcategoria.md).
 
@@ -378,13 +242,15 @@ Depois do backfill, `item.cor` sempre vem.
 
 # Etapa 3 — Alinhar o restante das telas
 
+**Back: pronto.** APIs coalescem `null` → preto (cadastrada) / cinza (sem categoria). Item de sub em gastos críticos traz `cor`. Compra devolve `subcategoria.cor`. Estabelecimento sem categoria padrão continua `categoria_padrao_cor: null`.
+
 Com as APIs já coalescendo `null` → preto e devolvendo `cor` na sub.
 
 Percorrer e pintar com o HEX da API (sem lógica nova):
 
 | Tela | O que pintar |
 |------|----------------|
-| Gastos críticos | bolinha `categoria_cor`; item de sub usa `cor` se existir, senão `categoria_cor` só até o back mandar `cor` |
+| Gastos críticos | bolinha `categoria_cor`; item de sub usa `cor` (variação) |
 | Compras / fatura view | chip categoria / sub na linha |
 | Visualização da compra | chip |
 | Assinaturas | chip categoria |
@@ -404,6 +270,8 @@ Helper único no front (`corCategoria` / `corSubcategoria`) — **reutilizar**, 
 ---
 
 # Etapa 4 — Cartão: cor personalizada *(outra tarefa)*
+
+**Back: pronto.** `lookups.cor_personalizada` + HEX livre em `cor_fundo`/`cor_texto`. Se o front mandar só o fundo, o back preenche o texto pelo contraste. `pares_cores` intacto (Padrão + bancos).
 
 **Não remover** o esquema atual de cores oficiais dos bancos.
 
@@ -427,12 +295,11 @@ Cor do cartão
 ```
 
 1. Clique num preset → comportamento atual (`cor_fundo` + `cor_texto`, `coresManuais = true`).
-2. Clique em **Cor personalizada**:
-   - destaca esse chip
-   - revela o seletor (`<input type="color">` ou o componente de HEX já usado na categoria)
-   - hover no preview do seletor mostra o hexadecimal
-   - `cor_fundo` = HEX escolhido
-   - `cor_texto` = `#ffffff` ou `#111827` pelo contraste (luminância relativa do fundo; se ≥ 0.179 usar texto escuro)
+2. Clique em **Cor personalizada** — **não** é um seletor só. São **dois** blocos (Fundo e Texto). Detalhe: [`frontend-prompt-ajustes-ux-cores-periodo.md`](frontend-prompt-ajustes-ux-cores-periodo.md) item 1.
+   - destaca a seção personalizada
+   - **Fundo:** `<input type="color">` → `cor_fundo`; hover = HEX
+   - **Texto:** outro seletor → `cor_texto`; hover = HEX
+   - ao mudar só o fundo, *sugerir* texto por contraste (luminância ≥ 0.179 → `#111827`, senão `#ffffff`); o usuário pode override no bloco Texto
    - `coresManuais = true` (auto-apply por nome/banco **para**)
 3. Se o usuário depois clicar num banco, o seletor personalizado **fecha** e o par oficial volta (override do personalizado).
 4. Edit: se `cor_fundo` **não** casa com nenhum `pares_cores[].cor_fundo`, abrir já em modo personalizada com o HEX salvo.
@@ -447,7 +314,7 @@ Continua `cor_fundo` + `cor_texto`. O back **já aceita** HEX livre. O front **d
 
 - [ ] Todos os chips de banco atuais continuam visíveis e funcionando
 - [ ] Auto-apply ao digitar Nubank etc. **não** quebra
-- [ ] “Cor personalizada” revela o seletor; hover mostra HEX
+- [ ] “Cor personalizada” = **dois** seletores (Fundo e Texto); hover mostra HEX de cada um
 - [ ] Preview do cartão usa fundo escolhido + texto com contraste
 - [ ] Edit de um cartão com HEX fora do catálogo abre em personalizada
 - [ ] C6 e XP continuam dois chips (preto oficial ≠ personalizada)

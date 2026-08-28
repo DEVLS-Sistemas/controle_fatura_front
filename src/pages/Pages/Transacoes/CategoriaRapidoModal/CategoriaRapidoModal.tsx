@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { Button, Col, FormGroup, Input, Label, Modal, ModalBody, ModalFooter, ModalHeader, Row } from 'reactstrap'
 import { toast } from 'react-toastify'
 import { CategoriaRapidoResult, CategoriaTemaLookup } from 'interfaces/Categorias/CategoriasInterface'
@@ -45,20 +45,24 @@ const CategoriaRapidoModal = ({
     const [nome, setNome] = useState('')
     const [cor, setCor] = useState(COR_TEMA_PADRAO)
     const [temas, setTemas] = useState<CategoriaTemaLookup[]>(resolverTemasCategoria())
-    const [propagarGrupo, setPropagarGrupo] = useState(false)
+    const [propagarGrupo, setPropagarGrupo] = useState(true)
     const [saving, setSaving] = useState(false)
+    const corEscolhidaRef = useRef(false)
     const categoriasService = new CategoriasService()
 
     useEffect(() => {
         if (!isOpen) return
         setNome('')
         setCor(COR_TEMA_PADRAO)
-        setPropagarGrupo(false)
+        setPropagarGrupo(true)
+        corEscolhidaRef.current = false
         ;(async () => {
             try {
                 const lookups = await categoriasService.getLookupsCategorias()
                 setTemas(resolverTemasCategoria(lookups))
-                setCor(corTemaPadrao(lookups))
+                if (!corEscolhidaRef.current) {
+                    setCor(corTemaPadrao(lookups))
+                }
             } catch {
                 setTemas(resolverTemasCategoria())
             }
@@ -118,7 +122,10 @@ const CategoriaRapidoModal = ({
                                 <CorTemaSwatches
                                     temas={temas}
                                     value={cor}
-                                    onChange={setCor}
+                                    onChange={(hex) => {
+                                        corEscolhidaRef.current = true
+                                        setCor(hex)
+                                    }}
                                     disabled={saving}
                                     idPrefix="cor-tema-rapido"
                                     size={22}

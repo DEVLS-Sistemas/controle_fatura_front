@@ -21,6 +21,9 @@ export interface GastosPorCategoriaSearch {
   data_fim?: string | null
   mes?: number | string | null
   ano?: number | string | null
+  /** Intervalo calendário (como o dashboard). `all` = jan–dez do ano. */
+  mes_inicio?: number | string | null
+  mes_fim?: number | string | null
   cartao_id?: number | string | null
   responsavel_id?: number | string | null
   categoria_id?: number | string | null
@@ -234,6 +237,8 @@ export const GastosPorCategoriaDefaultValues: GastosPorCategoriaSearch = {
   data_fim: null,
   mes: null,
   ano: null,
+  mes_inicio: null,
+  mes_fim: null,
   cartao_id: null,
   responsavel_id: null,
   categoria_id: null,

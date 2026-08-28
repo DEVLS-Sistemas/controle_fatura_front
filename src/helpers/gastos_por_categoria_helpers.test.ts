@@ -26,6 +26,9 @@ import {
   resolveKpis,
   resolvePorOrigemSelecao,
   resolverMesAnoCalendario,
+  rotuloAnoCalendario,
+  rotuloJanelaMeses,
+  rotuloPeriodoFiltro,
 } from './gastos_por_categoria_helpers'
 
 describe('resolveGastosPorCategoriaSearch', () => {
@@ -41,12 +44,23 @@ describe('resolveGastosPorCategoriaSearch', () => {
   })
 
   it('usa mes/ano da query e não envia meses', () => {
-    persistGastosPorCategoriaSearch({ meses: 12 })
+    persistGastosPorCategoriaSearch({ meses: 6 })
     const search = resolveGastosPorCategoriaSearch(new URLSearchParams('mes=8&ano=2026'))
     expect(search).toMatchObject({
       meses: null,
       mes: 8,
       ano: 2026,
+      mes_inicio: 8,
+      mes_fim: 8,
+    })
+  })
+
+  it('lê ano calendário jan–dez', () => {
+    const search = resolveGastosPorCategoriaSearch(new URLSearchParams('ano=2026&mes_inicio=all'))
+    expect(search).toMatchObject({
+      meses: null,
+      ano: 2026,
+      mes_inicio: 'all',
     })
   })
 
@@ -54,6 +68,14 @@ describe('resolveGastosPorCategoriaSearch', () => {
     persistGastosPorCategoriaSearch({ meses: 1 })
     const search = resolveGastosPorCategoriaSearch(new URLSearchParams())
     expect(search.meses).toBe(1)
+  })
+
+  it('converte meses=12 antigo para o ano calendário', () => {
+    persistGastosPorCategoriaSearch({ meses: 12 })
+    const search = resolveGastosPorCategoriaSearch(new URLSearchParams())
+    expect(search.meses).toBeNull()
+    expect(search.mes_inicio).toBe('all')
+    expect(search.ano).toBe(new Date().getFullYear())
   })
 
   it('cai em 3 meses sem query e sem storage', () => {
@@ -95,6 +117,36 @@ describe('resolverMesAnoCalendario', () => {
   })
 })
 
+describe('rótulos de período', () => {
+  const now = new Date(2026, 7, 27)
+
+  it('mostra a janela dos últimos meses a partir do mês atual', () => {
+    expect(rotuloJanelaMeses(1, now)).toBe('Ago 2026')
+    expect(rotuloJanelaMeses(3, now)).toBe('Jun–Ago 2026')
+    expect(rotuloJanelaMeses(6, now)).toBe('Mar–Ago 2026')
+  })
+
+  it('cruza o ano quando a janela começa no ano anterior', () => {
+    expect(rotuloJanelaMeses(3, new Date(2026, 0, 15))).toBe('Nov 2025–Jan 2026')
+  })
+
+  it('explica o ano calendário e o intervalo De–Até', () => {
+    expect(rotuloAnoCalendario(2026)).toBe('Jan–Dez 2026')
+    expect(rotuloPeriodoFiltro({ ano: 2026, mes_inicio: 'all' })).toEqual({
+      titulo: 'Ano 2026',
+      detalhe: 'Janeiro a dezembro de 2026 (ano calendário, não os últimos 12 meses)',
+    })
+    expect(rotuloPeriodoFiltro({ ano: 2026, mes_inicio: 8, mes_fim: 8 })).toEqual({
+      titulo: 'Agosto de 2026',
+      detalhe: 'Somente Agosto de 2026',
+    })
+    expect(rotuloPeriodoFiltro({ meses: 3 }, now)).toEqual({
+      titulo: 'Jun–Ago 2026',
+      detalhe: 'Últimos 3 meses a partir do mês atual para trás',
+    })
+  })
+})
+
 describe('buildGastosPorCategoriaSearchParams / cleanGastosPorCategoriaParams', () => {
   it('não mistura meses com mes+ano', () => {
     const params = buildGastosPorCategoriaSearchParams({
@@ -102,8 +154,9 @@ describe('buildGastosPorCategoriaSearchParams / cleanGastosPorCategoriaParams', 
       mes: 8,
       ano: 2026,
     })
-    expect(params.get('mes')).toBe('8')
     expect(params.get('ano')).toBe('2026')
+    expect(params.get('mes_inicio')).toBe('8')
+    expect(params.get('mes_fim')).toBe('8')
     expect(params.get('meses')).toBeNull()
 
     expect(
@@ -113,6 +166,38 @@ describe('buildGastosPorCategoriaSearchParams / cleanGastosPorCategoriaParams', 
         ano: 2026,
       })
     ).toEqual({ mes: 8, ano: 2026 })
+  })
+
+  it('envia o ano calendário jan–dez como intervalo de datas', () => {
+    expect(
+      cleanGastosPorCategoriaParams({
+        ano: 2026,
+        mes_inicio: 'all',
+      })
+    ).toEqual({
+      data_inicio: '2026-01-01',
+      data_fim: '2026-12-31',
+    })
+    const params = buildGastosPorCategoriaSearchParams({
+      ano: 2026,
+      mes_inicio: 'all',
+    })
+    expect(params.get('ano')).toBe('2026')
+    expect(params.get('mes_inicio')).toBe('all')
+    expect(params.get('meses')).toBeNull()
+  })
+
+  it('envia intervalo De–Até no mesmo ano', () => {
+    expect(
+      cleanGastosPorCategoriaParams({
+        ano: 2026,
+        mes_inicio: 3,
+        mes_fim: 8,
+      })
+    ).toEqual({
+      data_inicio: '2026-03-01',
+      data_fim: '2026-08-31',
+    })
   })
 
   it('envia meses quando não há calendário', () => {

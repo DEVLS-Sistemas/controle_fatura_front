@@ -485,8 +485,23 @@ input[type="number"].text-valor {
 
     &:focus-visible,
     &.is-selected {
-      outline: 2px solid var(--vz-body-color, #212529);
-      outline-offset: 2px;
+      outline: 3px solid #405189;
+      outline-offset: 3px;
+      box-shadow: 0 0 0 1px #fff;
+      position: relative;
+    }
+
+    &.is-selected::after {
+      content: '';
+      position: absolute;
+      right: -5px;
+      bottom: -5px;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #405189;
+      border: 2px solid #fff;
+      box-shadow: 0 0 0 1px #405189;
     }
   }
 
@@ -505,4 +520,25 @@ input[type="number"].text-valor {
   border-radius: 0.85rem;
   background: var(--vz-light, #f3f6f9);
   border-left: 4px solid #405189;
+}
+
+.gastos-periodo-atalhos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+
+  .btn {
+    min-width: 9.5rem;
+    line-height: 1.25;
+    white-space: normal;
+  }
+}
+
+.gastos-periodo-resumo {
+  padding: 0.7rem 0.9rem;
+  border-radius: 0.5rem;
+  background: var(--vz-light, #f3f6f9);
+  border-left: 4px solid #405189;
+  font-size: 0.8125rem;
 }

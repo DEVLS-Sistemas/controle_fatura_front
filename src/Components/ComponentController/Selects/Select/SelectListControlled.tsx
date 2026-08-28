@@ -23,9 +23,10 @@ export type SelectListProps<T extends FieldValues> = {
     validate?: any
     requiredPlaceholder?: boolean
     defaultValue?: any
+    onValueChange?: (value: any) => void
 }
 
-export const SelectListControlled = <T extends FieldValues>({ field, control, ...props }: SelectListProps<T>) => {
+export const SelectListControlled = <T extends FieldValues>({ field, control, onValueChange, ...props }: SelectListProps<T>) => {
     return (
         <div>
             <Controller
@@ -39,7 +40,10 @@ export const SelectListControlled = <T extends FieldValues>({ field, control, ..
                 render={({ field: { onChange, value, name, ref } }) => (
                     // render={({ field: { onChange, value } }) => (
                     <SelectList  {...props}
-                        onChange={onChange}
+                        onChange={(val: any) => {
+                            onChange(val)
+                            onValueChange?.(val)
+                        }}
                         value={value}
                         name={name}
                         errors={props.errors}

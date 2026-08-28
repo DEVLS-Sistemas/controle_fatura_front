@@ -201,7 +201,7 @@ const GastosPorCategoriaBarras = ({
             <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
               <div>
                 <h5 className="card-title mb-0">Categorias</h5>
-                <p className="text-muted mb-0 fs-13">Top 10 em barras</p>
+                <p className="text-muted mb-0 fs-13">Top 10</p>
               </div>
               {temSelecao ? (
                 <button type="button" className="btn btn-soft-secondary btn-sm" onClick={onLimpar}>
@@ -234,7 +234,7 @@ const GastosPorCategoriaBarras = ({
           <CardBody>
             <div className="mb-2">
               <h5 className="card-title mb-0">{tituloSubcategorias}</h5>
-              <p className="text-muted mb-0 fs-13">Top 10 em barras</p>
+              <p className="text-muted mb-0 fs-13">Top 10</p>
             </div>
             {loading ? (
               <ChartSkeleton />

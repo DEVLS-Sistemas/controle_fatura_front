@@ -24,12 +24,167 @@ import {
 
 export { corCategoria, corSubcategoria } from 'helpers/cores_tema_helpers'
 
+export const GASTOS_ANO_TODO = 'all'
+
+export const MESES_JANELA_OPCOES: { value: 1 | 3 | 6; label: string }[] = [
+  { value: 1, label: 'Este mês' },
+  { value: 3, label: 'Últimos 3 meses' },
+  { value: 6, label: 'Últimos 6 meses' },
+]
+
 export const MESES_OPCOES: { value: GastosPorCategoriaMeses; label: string }[] = [
-  { value: 1, label: '1 mês' },
-  { value: 3, label: '3 meses' },
-  { value: 6, label: '6 meses' },
+  ...MESES_JANELA_OPCOES,
   { value: 12, label: '1 ano' },
 ]
+
+export const MESES_ABREV_GASTOS = [
+  'Jan',
+  'Fev',
+  'Mar',
+  'Abr',
+  'Mai',
+  'Jun',
+  'Jul',
+  'Ago',
+  'Set',
+  'Out',
+  'Nov',
+  'Dez',
+]
+
+const pad2 = (n: number): string => String(n).padStart(2, '0')
+
+export const ultimoDiaDoMes = (ano: number, mes: number): number => new Date(ano, mes, 0).getDate()
+
+export const datasDoIntervaloCalendario = (
+  ano: number,
+  mesInicio: number,
+  mesFim: number
+): { data_inicio: string; data_fim: string } => {
+  const inicio = Math.min(mesInicio, mesFim)
+  const fim = Math.max(mesInicio, mesFim)
+  return {
+    data_inicio: `${ano}-${pad2(inicio)}-01`,
+    data_fim: `${ano}-${pad2(fim)}-${pad2(ultimoDiaDoMes(ano, fim))}`,
+  }
+}
+
+export const rotuloMesAbrev = (mes: number, ano?: number): string => {
+  const nome = MESES_ABREV_GASTOS[mes - 1] || String(mes)
+  return ano != null ? `${nome} ${ano}` : nome
+}
+
+export const rotuloJanelaMeses = (meses: 1 | 3 | 6, now: Date = new Date()): string => {
+  const fimMes = now.getMonth() + 1
+  const fimAno = now.getFullYear()
+  const inicioDate = new Date(fimAno, now.getMonth() - (meses - 1), 1)
+  const iniMes = inicioDate.getMonth() + 1
+  const iniAno = inicioDate.getFullYear()
+  if (meses === 1) return rotuloMesAbrev(fimMes, fimAno)
+  if (iniAno === fimAno) {
+    return `${MESES_ABREV_GASTOS[iniMes - 1]}–${MESES_ABREV_GASTOS[fimMes - 1]} ${fimAno}`
+  }
+  return `${rotuloMesAbrev(iniMes, iniAno)}–${rotuloMesAbrev(fimMes, fimAno)}`
+}
+
+export const rotuloAnoCalendario = (ano: number): string => `Jan–Dez ${ano}`
+
+export const MESES_NOME_GASTOS = [
+  'Janeiro',
+  'Fevereiro',
+  'Março',
+  'Abril',
+  'Maio',
+  'Junho',
+  'Julho',
+  'Agosto',
+  'Setembro',
+  'Outubro',
+  'Novembro',
+  'Dezembro',
+]
+
+const nomeMes = (mes: number): string => MESES_NOME_GASTOS[mes - 1] || String(mes)
+
+export const rotuloPeriodoFiltro = (
+  search: Pick<GastosPorCategoriaSearch, 'meses' | 'ano' | 'mes' | 'mes_inicio' | 'mes_fim'>,
+  now: Date = new Date()
+): { titulo: string; detalhe: string } => {
+  const intervalo = resolverIntervaloCalendario(search)
+  if (intervalo) {
+    if (intervalo.mes_inicio === GASTOS_ANO_TODO) {
+      return {
+        titulo: `Ano ${intervalo.ano}`,
+        detalhe: `Janeiro a dezembro de ${intervalo.ano} (ano calendário, não os últimos 12 meses)`,
+      }
+    }
+    const ini = Number(intervalo.mes_inicio)
+    const fim = Number(intervalo.mes_fim ?? ini)
+    if (ini === fim) {
+      return {
+        titulo: `${nomeMes(ini)} de ${intervalo.ano}`,
+        detalhe: `Somente ${nomeMes(ini)} de ${intervalo.ano}`,
+      }
+    }
+    return {
+      titulo: `${nomeMes(ini)} a ${nomeMes(fim)} de ${intervalo.ano}`,
+      detalhe: `De ${nomeMes(ini)} até ${nomeMes(fim)} no ano ${intervalo.ano}`,
+    }
+  }
+
+  const meses = (parseMeses(search.meses) ?? 3) as 1 | 3 | 6 | 12
+  if (meses === 12) {
+    const ano = now.getFullYear()
+    return {
+      titulo: `Ano ${ano}`,
+      detalhe: `Janeiro a dezembro de ${ano} (ano calendário, não os últimos 12 meses)`,
+    }
+  }
+  const janela = rotuloJanelaMeses(meses, now)
+  if (meses === 1) {
+    return {
+      titulo: janela,
+      detalhe: 'Somente o mês atual',
+    }
+  }
+  return {
+    titulo: janela,
+    detalhe: `Últimos ${meses} meses a partir do mês atual para trás`,
+  }
+}
+
+export const isGastosAnoTodo = (mesInicio?: string | number | null): boolean =>
+  mesInicio === GASTOS_ANO_TODO
+
+export const resolverIntervaloCalendario = (
+  params: Pick<GastosPorCategoriaSearch, 'ano' | 'mes' | 'mes_inicio' | 'mes_fim'>
+): {
+  ano: number
+  mes_inicio: number | typeof GASTOS_ANO_TODO
+  mes_fim: number | null
+  data_inicio: string
+  data_fim: string
+  mesUnico: number | null
+} | null => {
+  const ano = Number(params.ano)
+  if (!isAnoValido(ano)) return null
+  if (isGastosAnoTodo(params.mes_inicio)) {
+    const datas = datasDoIntervaloCalendario(ano, 1, 12)
+    return { ano, mes_inicio: GASTOS_ANO_TODO, mes_fim: null, ...datas, mesUnico: null }
+  }
+  const inicio = Number(params.mes_inicio ?? params.mes)
+  if (!isMesValido(inicio)) return null
+  let fim = Number(params.mes_fim ?? inicio)
+  if (!isMesValido(fim) || fim < inicio) fim = inicio
+  const datas = datasDoIntervaloCalendario(ano, inicio, fim)
+  return {
+    ano,
+    mes_inicio: inicio,
+    mes_fim: fim,
+    ...datas,
+    mesUnico: inicio === fim ? inicio : null,
+  }
+}
 
 export const ORIGEM_CORES: Record<string, string> = {
   COMPRAS_ONLINE: '#0dcaf0',
@@ -110,18 +265,83 @@ export const resolveGastosPorCategoriaSearch = (
   const mesesUrl = parseMeses(urlParams?.get('meses'))
   const mesUrl = Number(urlParams?.get('mes'))
   const anoUrl = Number(urlParams?.get('ano'))
+  const mesInicioRaw = urlParams?.get('mes_inicio')
+  const mesFimRaw = urlParams?.get('mes_fim')
   const mesValido = isMesValido(mesUrl)
   const anoValido = isAnoValido(anoUrl)
   const dataInicio = urlParams?.get('data_inicio') || null
   const dataFim = urlParams?.get('data_fim') || null
   const origem = urlParams?.get('origem_compra')
+
+  if (anoValido && mesInicioRaw === GASTOS_ANO_TODO) {
+    return {
+      ...GastosPorCategoriaDefaultValues,
+      meses: null,
+      mes: null,
+      ano: anoUrl,
+      mes_inicio: GASTOS_ANO_TODO,
+      mes_fim: null,
+      data_inicio: null,
+      data_fim: null,
+      cartao_id: parsePositiveId(urlParams?.get('cartao_id')),
+      responsavel_id: parsePositiveId(urlParams?.get('responsavel_id')),
+      categoria_id: null,
+      origem_compra: isOrigemValida(origem) ? origem : null,
+    }
+  }
+
+  const mesInicioNum = Number(mesInicioRaw)
+  const mesFimNum = Number(mesFimRaw)
+  if (anoValido && isMesValido(mesInicioNum)) {
+    const fim = isMesValido(mesFimNum) ? mesFimNum : mesInicioNum
+    const inicio = mesInicioNum
+    const fimOk = fim < inicio ? inicio : fim
+    return {
+      ...GastosPorCategoriaDefaultValues,
+      meses: null,
+      mes: inicio === fimOk ? inicio : null,
+      ano: anoUrl,
+      mes_inicio: inicio,
+      mes_fim: fimOk,
+      data_inicio: null,
+      data_fim: null,
+      cartao_id: parsePositiveId(urlParams?.get('cartao_id')),
+      responsavel_id: parsePositiveId(urlParams?.get('responsavel_id')),
+      categoria_id: null,
+      origem_compra: isOrigemValida(origem) ? origem : null,
+    }
+  }
+
   const usaCalendario = mesValido && anoValido
+  const mesesResolved = usaCalendario || dataInicio || dataFim
+    ? null
+    : mesesUrl ?? readMesesGastosPorCategoria()
+
+  if (mesesResolved === 12) {
+    const ano = anoValido ? anoUrl : new Date().getFullYear()
+    return {
+      ...GastosPorCategoriaDefaultValues,
+      meses: null,
+      mes: null,
+      ano,
+      mes_inicio: GASTOS_ANO_TODO,
+      mes_fim: null,
+      data_inicio: null,
+      data_fim: null,
+      cartao_id: parsePositiveId(urlParams?.get('cartao_id')),
+      responsavel_id: parsePositiveId(urlParams?.get('responsavel_id')),
+      categoria_id: null,
+      origem_compra: isOrigemValida(origem) ? origem : null,
+    }
+  }
 
   return {
     ...GastosPorCategoriaDefaultValues,
-    meses: usaCalendario ? null : mesesUrl ?? readMesesGastosPorCategoria(),
+    meses: mesesResolved,
     mes: usaCalendario ? mesUrl : null,
     ano: usaCalendario ? anoUrl : null,
+    mes_inicio: usaCalendario ? mesUrl : null,
+    mes_fim: usaCalendario ? mesUrl : null,
     data_inicio: usaCalendario ? null : dataInicio,
     data_fim: usaCalendario ? null : dataFim,
     cartao_id: parsePositiveId(urlParams?.get('cartao_id')),
@@ -139,15 +359,18 @@ export const buildGastosPorCategoriaSearchParams = (
   filters: GastosPorCategoriaSearch
 ): URLSearchParams => {
   const next = new URLSearchParams()
-  const mes = Number(filters.mes)
-  const ano = Number(filters.ano)
-  const usaCalendario = isMesValido(mes) && isAnoValido(ano)
+  const intervalo = resolverIntervaloCalendario(filters)
   const dataInicio = typeof filters.data_inicio === 'string' ? filters.data_inicio.trim() : ''
   const dataFim = typeof filters.data_fim === 'string' ? filters.data_fim.trim() : ''
 
-  if (usaCalendario) {
-    next.set('mes', String(mes))
-    next.set('ano', String(ano))
+  if (intervalo) {
+    next.set('ano', String(intervalo.ano))
+    if (intervalo.mes_inicio === GASTOS_ANO_TODO) {
+      next.set('mes_inicio', GASTOS_ANO_TODO)
+    } else {
+      next.set('mes_inicio', String(intervalo.mes_inicio))
+      next.set('mes_fim', String(intervalo.mes_fim ?? intervalo.mes_inicio))
+    }
   } else if (dataInicio || dataFim) {
     if (dataInicio) next.set('data_inicio', dataInicio)
     if (dataFim) next.set('data_fim', dataFim)
@@ -167,16 +390,16 @@ export const cleanGastosPorCategoriaParams = (
   params: GastosPorCategoriaSearch
 ): Record<string, unknown> => {
   const clean: Record<string, unknown> = {}
-  const mes = Number(params.mes)
-  const ano = Number(params.ano)
-  const mesValido = isMesValido(mes)
-  const anoValido = isAnoValido(ano)
+  const intervalo = resolverIntervaloCalendario(params)
   const dataInicio = typeof params.data_inicio === 'string' ? params.data_inicio.trim() : ''
   const dataFim = typeof params.data_fim === 'string' ? params.data_fim.trim() : ''
 
-  if (mesValido && anoValido) {
-    clean.mes = mes
-    clean.ano = ano
+  if (intervalo?.mesUnico != null) {
+    clean.mes = intervalo.mesUnico
+    clean.ano = intervalo.ano
+  } else if (intervalo) {
+    clean.data_inicio = intervalo.data_inicio
+    clean.data_fim = intervalo.data_fim
   } else if (dataInicio || dataFim) {
     if (dataInicio) clean.data_inicio = dataInicio
     if (dataFim) clean.data_fim = dataFim
