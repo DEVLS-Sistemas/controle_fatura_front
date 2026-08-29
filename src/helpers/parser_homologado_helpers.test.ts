@@ -2,6 +2,7 @@ import {
     formatParsersHomologadosLista,
     isParCorPdfHomologado,
     isParserChaveHomologada,
+    precisaAvisarParserNaoHomologado,
     resolveCartaoHomologacao,
     textoFormCartaoHomologacao,
     tooltipParCorCartao,
@@ -52,6 +53,35 @@ describe('resolveCartaoHomologacao', () => {
     it('não trata cor oficial como parser pronto', () => {
         expect(resolveCartaoHomologacao({ nome: 'Magalu' }).homologada).toBe(false)
         expect(resolveCartaoHomologacao({ nome: 'Bradesco' }).homologada).toBe(false)
+    })
+})
+
+describe('precisaAvisarParserNaoHomologado', () => {
+    const base = {
+        temArquivo: true,
+        cartaoId: 31,
+        cartaoIdentificado: true,
+        homologada: false,
+        jaConfirmou: false,
+    }
+
+    it('não avisa sem arquivo ou sem cartão escolhido', () => {
+        expect(precisaAvisarParserNaoHomologado({ ...base, temArquivo: false })).toBe(false)
+        expect(precisaAvisarParserNaoHomologado({ ...base, cartaoId: null })).toBe(false)
+        expect(precisaAvisarParserNaoHomologado({ ...base, cartaoId: '' })).toBe(false)
+    })
+
+    it('não avisa quando o cartão ainda não foi resolvido na lista', () => {
+        expect(precisaAvisarParserNaoHomologado({ ...base, cartaoIdentificado: false })).toBe(false)
+    })
+
+    it('não avisa em cartão homologado (Nubank) nem depois de confirmar', () => {
+        expect(precisaAvisarParserNaoHomologado({ ...base, homologada: true })).toBe(false)
+        expect(precisaAvisarParserNaoHomologado({ ...base, jaConfirmou: true })).toBe(false)
+    })
+
+    it('avisa só com cartão identificado e parser ainda não testado', () => {
+        expect(precisaAvisarParserNaoHomologado(base)).toBe(true)
     })
 })
 

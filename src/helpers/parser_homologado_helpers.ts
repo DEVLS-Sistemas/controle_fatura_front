@@ -110,6 +110,30 @@ export const resolveCartaoHomologacao = (
     return { homologada: Boolean(parser), parser }
 }
 
+/**
+ * Aviso de “cartão não homologado” só quando o cartão está identificado e
+ * sabemos que a leitura de PDF não foi testada. Sem cartão (anexo primeiro)
+ * ou com lookups ainda vazios, o back decide pelo parser do arquivo.
+ */
+export const precisaAvisarParserNaoHomologado = ({
+    temArquivo,
+    cartaoId,
+    cartaoIdentificado,
+    homologada,
+    jaConfirmou,
+}: {
+    temArquivo: boolean
+    cartaoId?: number | string | null
+    cartaoIdentificado: boolean
+    homologada: boolean
+    jaConfirmou: boolean
+}): boolean => {
+    if (!temArquivo || cartaoId == null || cartaoId === '') return false
+    if (!cartaoIdentificado) return false
+    if (homologada) return false
+    return !jaConfirmou
+}
+
 export const isParCorPdfHomologado = (
     par: ParCorLookup,
     parsers?: ParserHomologado[] | null

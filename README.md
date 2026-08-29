@@ -34,7 +34,7 @@ A aplicação sobe em `http://localhost:3000`.
 
 | Variável | Descrição | Default |
 |----------|-----------|---------|
-| `REACT_APP_API_URL` | Base da API (com `/api/v1/`) | `http://127.0.0.1:5000/api/v1/` |
+| `REACT_APP_API_URL` | Base da API (com `/api/v1/`) | Dev: `http://127.0.0.1:5000/api/v1/` · Prod: `https://api-faturas.devls.com.br/api/v1/` |
 
 ## Login demo
 

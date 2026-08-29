@@ -55,7 +55,7 @@ import {
 } from 'helpers/cadastro_manual_compra_helpers'
 import { CartaoChip, BandeiraChip, resolveCartaoCores } from 'helpers/cartao_helpers'
 import { corCategoria, corPlataforma } from 'helpers/cores_tema_helpers'
-import { formatParsersHomologadosLista, parsersHomologadosOrFallback, resolveCartaoHomologacao } from 'helpers/parser_homologado_helpers'
+import { formatParsersHomologadosLista, parsersHomologadosOrFallback, precisaAvisarParserNaoHomologado, resolveCartaoHomologacao } from 'helpers/parser_homologado_helpers'
 import CartaoPdfHomologacaoBadge from 'Components/Cartoes/CartaoPdfHomologacaoBadge'
 import { SelectOptions } from 'interfaces/SystemInterfaces/SelectInterface'
 import {
@@ -950,7 +950,13 @@ const FaturasViewPage = () => {
                 parser_homologado: fatura?.parser_homologado ?? cartaoLookup?.parser_homologado,
             }, parsersHomologados)
             const attemptKey = `${fatura?.cartao_id ?? ''}|${file.name}:${file.size}:${file.lastModified}`
-            if (!homologacao.homologada && homologConfirmRef.current !== attemptKey) {
+            if (precisaAvisarParserNaoHomologado({
+                temArquivo: true,
+                cartaoId: fatura?.cartao_id,
+                cartaoIdentificado: Boolean(fatura?.cartao_nome || cartaoLookup),
+                homologada: homologacao.homologada,
+                jaConfirmou: homologConfirmRef.current === attemptKey,
+            })) {
                 setHomologModalOpen(true)
                 return
             }

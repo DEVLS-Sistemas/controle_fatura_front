@@ -1,6 +1,8 @@
 import axios, { AxiosResponse } from 'axios';
 import { getAuthToken, handleUnauthorizedSession, isPublicAuthUrl } from 'helpers/auth_session';
 
+const PRODUCTION_API_URL = 'https://api-faturas.devls.com.br/api/v1/';
+
 /** Resolve API base URL so LAN access uses the host IP, not 127.0.0.1. */
 export function getApiBaseUrl(): string {
   const fromEnv = process.env.REACT_APP_API_URL;
@@ -8,6 +10,10 @@ export function getApiBaseUrl(): string {
     !fromEnv ||
     fromEnv.includes('127.0.0.1') ||
     fromEnv.includes('localhost');
+
+  if (process.env.NODE_ENV === 'production') {
+    return fromEnv && !isLoopback ? fromEnv : PRODUCTION_API_URL;
+  }
 
   if (fromEnv && !isLoopback) {
     return fromEnv;

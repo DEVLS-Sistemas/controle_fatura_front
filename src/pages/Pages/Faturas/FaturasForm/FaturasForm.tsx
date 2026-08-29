@@ -44,6 +44,7 @@ import FaturaParserNaoHomologadoModal from 'Components/Faturas/FaturaParserNaoHo
 import {
     formatParsersHomologadosLista,
     parsersHomologadosOrFallback,
+    precisaAvisarParserNaoHomologado,
     resolveCartaoHomologacao,
 } from 'helpers/parser_homologado_helpers'
 import {
@@ -214,9 +215,15 @@ const FaturasForm = () => {
     }
 
     const precisaConfirmarParser = (id?: FaturasModel['cartao_id'], file?: File | null) => {
-        if (!file || id == null || id === '') return false
-        if (homologacaoDoCartao(id).homologada) return false
-        return homologConfirmRef.current !== homologAttemptKey(id, file)
+        const lookup = cartaoLookupById(id)
+        const option = cartoesOptions.find((c) => Number(c.value) === Number(id))
+        return precisaAvisarParserNaoHomologado({
+            temArquivo: Boolean(file),
+            cartaoId: id,
+            cartaoIdentificado: Boolean(lookup || option),
+            homologada: homologacaoDoCartao(id).homologada,
+            jaConfirmou: homologConfirmRef.current === homologAttemptKey(id, file),
+        })
     }
 
     const confirmarParserDestaTentativa = (id?: FaturasModel['cartao_id'], file?: File | null) => {
