@@ -12,8 +12,9 @@ export class VersaoService {
     async obter(): Promise<VersaoApi> {
         const response = await this.httpClient.get<VersaoApi>({ url: '' })
 
-        if (response.statusCode === HttpStatusCode.ok && response.body?.api_version) {
-            return response.body
+        const body = response.body
+        if (response.statusCode === HttpStatusCode.ok && body && body.api_version) {
+            return body
         }
 
         throw new UnexpectedError()

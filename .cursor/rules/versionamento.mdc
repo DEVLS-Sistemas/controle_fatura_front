@@ -15,3 +15,4 @@ alwaysApply: true
 - Status: A fazer, Fazendo, Parado, Review, Testando, Testado, Aguardando Publicação, Feito.
 - PR sempre para `main`.
 - Footer: versão da API; nome fantasia **Devls Sistemas**.
+- Skills: `get-project-version`, `create-jira-card`, `start-jira-card`, `detect-jira-card`, `create-commit`.
