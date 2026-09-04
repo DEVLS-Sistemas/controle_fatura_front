@@ -17,6 +17,7 @@ import {
     origemCompraLabel,
     isTransacaoOperacional,
     FATURA_FILE_ACCEPT, isValidFaturaFile, resolveFaturaAnexo, downloadFaturaAnexo,
+    faturaAnexoDownloadMetaFrom, resolveFaturaAnexoNomeOriginal, rotulosFaturaAnexoNomes,
     getCategoriaFieldStyle, getSubcategoriaFieldStyle, getPlataformaFieldStyle, VALOR_TEXT_CLASS, isMeuResponsavelDisplay, nomeResponsavelPadraoNaoEu,
 } from 'helpers/fatura_helpers'
 import {
@@ -1326,12 +1327,14 @@ const FaturasViewPage = () => {
     const handleDownloadAnexo = async (tipo: 'pdf' | 'csv') => {
         if (!id || !fatura) return
         try {
-            await downloadFaturaAnexo(id, tipo, {
-                cartaoNome: fatura.cartao_nome,
-                competencia: fatura.competencia ?? formatPeriodo(fatura.mes, fatura.ano),
-                mes: fatura.mes,
-                ano: fatura.ano,
-            })
+            await downloadFaturaAnexo(
+                id,
+                tipo,
+                faturaAnexoDownloadMetaFrom(
+                    fatura,
+                    fatura.competencia ?? formatPeriodo(fatura.mes, fatura.ano),
+                ),
+            )
         } catch (error) {
             console.error('Erro ao baixar anexo:', error)
             toast.error(tipo === 'pdf' ? 'PDF não disponível' : 'CSV não disponível')
@@ -1901,6 +1904,9 @@ const FaturasViewPage = () => {
     const isProcessing = fatura.status === 'pendente' || fatura.status === 'processando'
     const precisaSenhaPdf = faturaPrecisaSenhaPdf(fatura)
     const anexo = resolveFaturaAnexo(fatura)
+    const nomesAnexo = rotulosFaturaAnexoNomes(fatura)
+    const nomePdf = resolveFaturaAnexoNomeOriginal(fatura, 'pdf')
+    const nomeCsv = resolveFaturaAnexoNomeOriginal(fatura, 'csv')
     const podeRemover = podeRemoverAnexo(fatura)
     const competenciaAtual = fatura.competencia ?? formatPeriodo(fatura.mes, fatura.ano)
     const bandeiraLabel = fatura.bandeira || fatura.cartao_bandeira
@@ -2962,7 +2968,14 @@ const FaturasViewPage = () => {
                     <Card className="mb-4">
                         <CardBody>
                             <div className="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
-                                <h5 className="card-title mb-0">Anexos da fatura</h5>
+                                <div>
+                                    <h5 className="card-title mb-0">Anexos da fatura</h5>
+                                    {nomesAnexo.length > 0 && (
+                                        <div className="small text-muted mt-1">
+                                            {nomesAnexo.join(' · ')}
+                                        </div>
+                                    )}
+                                </div>
                                 <div className="d-flex flex-wrap gap-2">
                                     {anexo.temPdf && (
                                         <Button
@@ -3054,20 +3067,20 @@ const FaturasViewPage = () => {
                             </div>
                             {anexo.temCsv && !anexo.temPdf ? (
                                 <div className="text-center text-muted py-5">
-                                    Arquivo <strong>CSV</strong> anexado. Use o botão acima para baixar.
+                                    Arquivo <strong>CSV</strong> anexado{nomeCsv ? ` (${nomeCsv})` : ''}. Use o botão acima para baixar.
                                     A pré-visualização está disponível apenas para PDF.
                                 </div>
                             ) : anexo.temPdf ? (
                                 showPdfPreview && pdfBlobUrl ? (
                                     <iframe
                                         src={pdfBlobUrl}
-                                        title="PDF da Fatura"
+                                        title={nomePdf || 'PDF da Fatura'}
                                         style={{ width: '100%', height: '600px', border: '1px solid #dee2e6' }}
                                     />
                                 ) : (
                                     <div className="text-center py-5">
                                         <p className="text-muted mb-3">
-                                            Há um PDF anexado. Clique no botão para carregar a pré-visualização.
+                                            Há um PDF anexado{nomePdf ? ` (${nomePdf})` : ''}. Clique no botão para carregar a pré-visualização.
                                         </p>
                                         <Button
                                             color="primary"

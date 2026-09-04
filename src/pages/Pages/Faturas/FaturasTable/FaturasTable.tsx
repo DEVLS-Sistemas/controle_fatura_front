@@ -14,6 +14,7 @@ import {
     formatCurrency, formatDateBr, faturaStatusColor,
     faturaQuitacaoLabel, faturaQuitacaoColor, VALOR_TEXT_CLASS,
     resolveFaturaAnexo, downloadFaturaAnexo, FaturaAnexoDownloadTipo, FaturaAnexoDownloadMeta,
+    faturaAnexoDownloadMetaFrom, rotulosFaturaAnexoNomes,
 } from "helpers/fatura_helpers"
 import { TOOLTIP_ICONE_PDF_LISTAGEM } from "helpers/fatura_competencia_pdf_helpers"
 import { parseAnoFiltro, parseMesFiltro } from "helpers/fatura_listagem_helpers"
@@ -162,12 +163,8 @@ export const FaturasTable = ({ data, getData, setPerPage, perPage, filters }: Fa
         }
     }
 
-    const anexoDownloadMeta = (row: FaturaRow): FaturaAnexoDownloadMeta => ({
-        cartaoNome: row.cartao_nome,
-        competencia: formatCompetencia(row),
-        mes: row.mes,
-        ano: row.ano,
-    })
+    const anexoDownloadMeta = (row: FaturaRow): FaturaAnexoDownloadMeta =>
+        faturaAnexoDownloadMetaFrom(row, formatCompetencia(row))
 
     /** Grupos com mais de uma bandeira — chip discreto na linha */
     const bandeirasPorCartao = useMemo(() => {
@@ -329,27 +326,39 @@ export const FaturasTable = ({ data, getData, setPerPage, perPage, filters }: Fa
                                                                         </td>
                                                                         <td>
                                                                             {(anexo.temPdf || anexo.temCsv) ? (
-                                                                                <div className="d-inline-flex align-items-center gap-1">
-                                                                                    {anexo.temPdf && (
-                                                                                        <button
-                                                                                            type="button"
-                                                                                            className="btn btn-link p-0 border-0"
-                                                                                            title={TOOLTIP_ICONE_PDF_LISTAGEM}
-                                                                                            onClick={() => row.id && handleDownloadAnexo(row.id, 'pdf', anexoDownloadMeta(row))}
+                                                                                <div className="d-inline-flex flex-column align-items-center gap-1">
+                                                                                    <div className="d-inline-flex align-items-center gap-1">
+                                                                                        {anexo.temPdf && (
+                                                                                            <button
+                                                                                                type="button"
+                                                                                                className="btn btn-link p-0 border-0"
+                                                                                                title={TOOLTIP_ICONE_PDF_LISTAGEM}
+                                                                                                onClick={() => row.id && handleDownloadAnexo(row.id, 'pdf', anexoDownloadMeta(row))}
+                                                                                            >
+                                                                                                <i className="mdi mdi-file-pdf-box text-danger fs-4" />
+                                                                                            </button>
+                                                                                        )}
+                                                                                        {anexo.temCsv && (
+                                                                                            <button
+                                                                                                type="button"
+                                                                                                className="btn btn-link p-0 border-0"
+                                                                                                title="Baixar CSV"
+                                                                                                onClick={() => row.id && handleDownloadAnexo(row.id, 'csv', anexoDownloadMeta(row))}
+                                                                                            >
+                                                                                                <i className="las la-file-csv text-success fs-4" />
+                                                                                            </button>
+                                                                                        )}
+                                                                                    </div>
+                                                                                    {rotulosFaturaAnexoNomes(row).map((nome) => (
+                                                                                        <div
+                                                                                            key={nome}
+                                                                                            className="small text-muted text-truncate"
+                                                                                            style={{ maxWidth: 200 }}
+                                                                                            title={nome}
                                                                                         >
-                                                                                            <i className="mdi mdi-file-pdf-box text-danger fs-4" />
-                                                                                        </button>
-                                                                                    )}
-                                                                                    {anexo.temCsv && (
-                                                                                        <button
-                                                                                            type="button"
-                                                                                            className="btn btn-link p-0 border-0"
-                                                                                            title="Baixar CSV"
-                                                                                            onClick={() => row.id && handleDownloadAnexo(row.id, 'csv', anexoDownloadMeta(row))}
-                                                                                        >
-                                                                                            <i className="las la-file-csv text-success fs-4" />
-                                                                                        </button>
-                                                                                    )}
+                                                                                            {nome}
+                                                                                        </div>
+                                                                                    ))}
                                                                                 </div>
                                                                             ) : null}
                                                                         </td>
