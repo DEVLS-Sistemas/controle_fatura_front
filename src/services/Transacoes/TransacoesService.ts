@@ -1,3 +1,4 @@
+import { parseContentDispositionFilename } from "../../helpers/anexo_filename_helpers"
 import { AxiosHttpClient, HttpStatusCode } from "../../libs/api/ApiConfig"
 import { AccessDeniedError } from "../../libs/api/exceptions/AccessDeniedError"
 import { UnexpectedError } from "../../libs/api/exceptions/UnexpectedError"
@@ -289,9 +290,9 @@ export class TransacoesService implements TransacoesInterface {
         const response = await ApiConfig.get(`${this.url}/anexos/${id}`, {
             responseType: 'blob',
         })
-        const disposition = String(response.headers?.['content-disposition'] ?? '')
-        const match = disposition.match(/filename\*?=(?:UTF-8''|"?)([^";]+)/i)
-        const filename = match ? decodeURIComponent(match[1].replace(/"/g, '')) : `anexo-${id}`
+        const filename = parseContentDispositionFilename(
+            String(response.headers?.['content-disposition'] ?? ''),
+        ) ?? `anexo-${id}`
         return { blob: response.data, filename }
     }
 

@@ -93,6 +93,12 @@ export interface FaturaResumo {
     pdf_url?: string | null
     /** URL autenticada para abrir/baixar o CSV */
     csv_url?: string | null
+    /** Nome enviado no upload (quando a API manda um único anexo) */
+    nome_original?: string | null
+    /** Nome original do PDF, quando PDF e CSV coexistirem */
+    nome_original_pdf?: string | null
+    /** Nome original do CSV, quando PDF e CSV coexistirem */
+    nome_original_csv?: string | null
     /** true se tem PDF ou CSV e status !== processando */
     pode_remover_anexo?: boolean
     status?: string

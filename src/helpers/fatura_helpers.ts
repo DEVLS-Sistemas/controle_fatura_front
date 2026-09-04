@@ -1,6 +1,11 @@
 import { getApiBaseUrl } from 'libs/api/ApiConfig'
 import { getAuthToken, handleUnauthorizedSession } from 'helpers/auth_session'
 import { corCategoria, corSubcategoria, corPlataforma, CorCategoriaItem, CorPlataformaItem } from 'helpers/cores_tema_helpers'
+import {
+    FaturaAnexoDownloadTipo,
+    FaturaAnexoDownloadMeta,
+    resolveFaturaAnexoDownloadFilename,
+} from 'helpers/fatura_anexo_nome_helpers'
 
 /** Classe CSS para alinhar valores monetários à direita */
 export const VALOR_TEXT_CLASS = 'text-valor'
@@ -225,44 +230,20 @@ export const FATURA_FILE_EXTENSIONS = ['pdf', 'csv'] as const
 
 export type { FaturaAnexoTipo } from './fatura_anexo_flags'
 export { resolveFaturaAnexo } from './fatura_anexo_flags'
+export type { FaturaAnexoNomeSource, FaturaAnexoDownloadTipo, FaturaAnexoDownloadMeta } from './fatura_anexo_nome_helpers'
+export {
+  resolveFaturaAnexoNomeOriginal,
+  rotulosFaturaAnexoNomes,
+  faturaAnexoDownloadMetaFrom,
+  resolveFaturaAnexoDownloadFilename,
+  buildFaturaAnexoFilename,
+} from './fatura_anexo_nome_helpers'
 
-export type FaturaAnexoDownloadTipo = 'pdf' | 'csv'
-
-export type FaturaAnexoDownloadMeta = {
-  cartaoNome?: string | null
-  competencia?: string | null
-  mes?: number | string | null
-  ano?: number | string | null
-}
-
-const sanitizeFilenamePart = (value: string): string =>
-  value
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[\\/:*?"<>|]+/g, '-')
-    .replace(/\s+/g, ' ')
-    .trim()
-
-/** Monta o nome do arquivo: fatura - {cartão} - {competência}.{ext} */
-export const buildFaturaAnexoFilename = (
-  tipo: FaturaAnexoDownloadTipo,
-  meta?: FaturaAnexoDownloadMeta,
-): string => {
-  const cartao = sanitizeFilenamePart(meta?.cartaoNome?.trim() || 'cartao')
-  const competenciaRaw = meta?.competencia
-    || (meta?.mes != null && meta?.ano != null
-      ? `${String(meta.mes).padStart(2, '0')}/${meta.ano}`
-      : '')
-  const competencia = sanitizeFilenamePart(competenciaRaw || 'sem-competencia')
-  return `fatura - ${cartao} - ${competencia}.${tipo}`
-}
-
-/** Baixa o anexo autenticado (`GET /faturas/pdf|{csv}/{id}`). */
-export const downloadFaturaAnexo = async (
+const fetchFaturaAnexoBlob = async (
   id: number | string,
   tipo: FaturaAnexoDownloadTipo,
   meta?: FaturaAnexoDownloadMeta,
-): Promise<void> => {
+): Promise<{ blob: Blob; filename: string }> => {
   const token = getAuthToken()
   const base = getApiBaseUrl()
   const res = await fetch(`${base}faturas/${tipo}/${id}`, {
@@ -275,11 +256,25 @@ export const downloadFaturaAnexo = async (
   if (!res.ok) {
     throw new Error(tipo === 'pdf' ? 'PDF não disponível' : 'CSV não disponível')
   }
-  const blob = await res.blob()
+  const filename = resolveFaturaAnexoDownloadFilename(
+    tipo,
+    meta,
+    res.headers.get('content-disposition'),
+  )
+  return { blob: await res.blob(), filename }
+}
+
+/** Baixa o anexo autenticado (`GET /faturas/pdf|{csv}/{id}`). */
+export const downloadFaturaAnexo = async (
+  id: number | string,
+  tipo: FaturaAnexoDownloadTipo,
+  meta?: FaturaAnexoDownloadMeta,
+): Promise<void> => {
+  const { blob, filename } = await fetchFaturaAnexoBlob(id, tipo, meta)
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = buildFaturaAnexoFilename(tipo, meta)
+  a.download = filename
   document.body.appendChild(a)
   a.click()
   a.remove()
@@ -292,25 +287,13 @@ export const openFaturaAnexoInNewTab = async (
   tipo: FaturaAnexoDownloadTipo = 'pdf',
   meta?: FaturaAnexoDownloadMeta,
 ): Promise<void> => {
-  const token = getAuthToken()
-  const base = getApiBaseUrl()
-  const res = await fetch(`${base}faturas/${tipo}/${id}`, {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-  })
-  if (res.status === 401) {
-    handleUnauthorizedSession()
-    throw new Error('Sessão expirada')
-  }
-  if (!res.ok) {
-    throw new Error(tipo === 'pdf' ? 'PDF não disponível' : 'CSV não disponível')
-  }
-  const blob = await res.blob()
+  const { blob, filename } = await fetchFaturaAnexoBlob(id, tipo, meta)
   const url = URL.createObjectURL(blob)
   const opened = window.open(url, '_blank', 'noopener,noreferrer')
   if (!opened) {
     const a = document.createElement('a')
     a.href = url
-    a.download = buildFaturaAnexoFilename(tipo, meta)
+    a.download = filename
     document.body.appendChild(a)
     a.click()
     a.remove()
