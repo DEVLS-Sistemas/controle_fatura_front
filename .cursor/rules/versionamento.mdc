@@ -1,0 +1,17 @@
+---
+description: Versionamento, branches e Jira CTLFAT
+alwaysApply: true
+---
+
+# Versionamento CTLFAT
+
+- `main` é a única branch de deploy. Nunca desenvolver direto nela.
+- Fonte da versão no front: `version.json` (branch/agente) e `GET /api/v1` (footer).
+- Versão atual: `1.0.0` / `1.0`.
+- Branch: `v{major}.{minor}/{ambiente}-{tela}-{PROJETO}-{numero}`
+- Exemplo: `v1.0/dev-raiox-CTLFAT-9999`
+- `tela` em minúsculo, sem hífen (`raiox`). Ambiente: `dev`.
+- Projeto Jira: `CTLFAT` em https://devlssistemas.atlassian.net
+- Status: A fazer, Fazendo, Parado, Review, Testando, Testado, Aguardando Publicação, Feito.
+- PR sempre para `main`.
+- Footer: versão da API; nome fantasia **Devls Sistemas**.
