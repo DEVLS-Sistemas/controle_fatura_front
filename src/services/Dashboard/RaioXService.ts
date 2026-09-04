@@ -2,7 +2,7 @@ import { AxiosHttpClient, HttpStatusCode } from '../../libs/api/ApiConfig'
 import { AccessDeniedError } from '../../libs/api/exceptions/AccessDeniedError'
 import { UnexpectedError } from '../../libs/api/exceptions/UnexpectedError'
 import { getAuthUser } from '../../helpers/auth_session'
-import { buildRaioXMock } from '../../helpers/raio_x_helpers'
+import { applyRaioXViewGuards, buildRaioXMock } from '../../helpers/raio_x_helpers'
 import { RaioXInterface, RaioXSearch, RaioXView } from 'interfaces/RaioX/RaioXInterface'
 
 const cleanParams = (params: RaioXSearch): Record<string, unknown> => {
@@ -46,7 +46,7 @@ export class RaioXService implements RaioXInterface {
       switch (response.statusCode) {
         case HttpStatusCode.ok: {
           const data = response.body?.data ?? response.body
-          if (isValidView(data)) return data
+          if (isValidView(data)) return applyRaioXViewGuards(data)
           return this.mock(params)
         }
         case HttpStatusCode.unauthorized:
@@ -68,11 +68,13 @@ export class RaioXService implements RaioXInterface {
     const user = getAuthUser()
     const renda = user?.renda_mensal
     const rendaInformada = renda != null && Number(renda) > 0
-    return buildRaioXMock({
-      mes: params.mes,
-      ano: params.ano,
-      rendaInformada,
-      rendaValor: rendaInformada ? Number(renda) : null,
-    })
+    return applyRaioXViewGuards(
+      buildRaioXMock({
+        mes: params.mes,
+        ano: params.ano,
+        rendaInformada,
+        rendaValor: rendaInformada ? Number(renda) : null,
+      })
+    )
   }
 }

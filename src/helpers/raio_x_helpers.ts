@@ -2,9 +2,11 @@ import {
   RAIO_X_ANO_STORAGE_KEY,
   RAIO_X_MES_STORAGE_KEY,
   RaioXAtalho,
+  RaioXDiagnostico,
   RaioXDiagnosticoTipo,
   RaioXNivel,
   RaioXSearch,
+  RaioXSinal,
   RaioXView,
 } from 'interfaces/RaioX/RaioXInterface'
 
@@ -212,6 +214,47 @@ export const rendaToInputValue = (value: number | null | undefined): string => {
 }
 
 export type RaioXEmptyKind = 'mes_futuro' | 'vazio' | null
+
+const metricaNum = (value: number | null | undefined): number => {
+  const n = Number(value ?? 0)
+  return Number.isFinite(n) ? n : 0
+}
+
+/** Mês anterior com PDF e mês atual sem anexo: ainda não é atraso. */
+export const isSinalPagamentosAguardando = (sinal?: RaioXSinal | null): boolean => {
+  if (!sinal || sinal.id !== 'pagamentos') return false
+  const aguardando = metricaNum(sinal.metricas?.aguardando_confirmacao)
+  const atrasadas = metricaNum(sinal.metricas?.atrasadas)
+  return aguardando > 0 && atrasadas === 0
+}
+
+export const resolveRaioXDiagnostico = (
+  diagnostico: RaioXDiagnostico | null | undefined,
+  sinais?: RaioXSinal[] | null
+): RaioXDiagnostico | null => {
+  if (!diagnostico) return null
+  if (diagnostico.tipo !== 'atraso') return diagnostico
+  const pagamentos = (sinais ?? []).find((sinal) => sinal.id === 'pagamentos')
+  if (pagamentos?.nivel !== 'alerta' || isSinalPagamentosAguardando(pagamentos)) {
+    return null
+  }
+  return diagnostico
+}
+
+/** Guarda de UI: âmbar + sem bloco “faturas em atraso” enquanto só aguarda confirmação. */
+export const applyRaioXViewGuards = (data: RaioXView): RaioXView => {
+  const sinais = (data.sinais ?? []).map((sinal) => {
+    if (!isSinalPagamentosAguardando(sinal)) return sinal
+    if (sinal.nivel === 'atencao') return sinal
+    return { ...sinal, nivel: 'atencao' as const }
+  })
+
+  return {
+    ...data,
+    sinais,
+    diagnostico: resolveRaioXDiagnostico(data.diagnostico, sinais),
+  }
+}
 
 export const resolveRaioXEmpty = (
   data: RaioXView | undefined,

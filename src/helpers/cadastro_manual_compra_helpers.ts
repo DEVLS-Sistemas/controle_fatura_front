@@ -189,7 +189,8 @@ export type TotaisConciliacaoFatura = {
 
 /**
  * Totais do detalhe da fatura: extrato (PDF) + compras manuais ainda abertas.
- * Prefere os campos do GET /faturas/listar/{id}. Não soma o extrato no front.
+ * Prefere os campos do GET /faturas/listar/{id}, inclusive quando o PDF é R$ 0,00.
+ * Não reconstrói o total somando pagamento antecipado — o valor da fatura já é o do cabeçalho.
  */
 export const totaisConciliacaoFatura = (
   fatura?: {
@@ -199,7 +200,6 @@ export const totaisConciliacaoFatura = (
     valor_total_com_pendencias?: number | string | null
     tem_compras_nao_conciliadas?: boolean | null
     compras_nao_conciliadas_label?: string | null
-    pagamentos_antecipado?: number | string | null
   } | null,
   transacoes: Array<{
     valor?: number | string | null
@@ -210,15 +210,8 @@ export const totaisConciliacaoFatura = (
   }> = []
 ): TotaisConciliacaoFatura => {
   const valorQuitacao = moneyOrNull(fatura?.valor_total) ?? 0
-  const antecipado = Math.max(moneyOrNull(fatura?.pagamentos_antecipado) ?? 0, 0)
   const extratoApi = moneyOrNull(fatura?.valor_extrato)
-  const extratoPareceQuitacao = extratoApi != null
-    && antecipado > 0.009
-    && Math.abs(extratoApi - valorQuitacao) < 0.02
-
-  const valorExtrato = extratoPareceQuitacao
-    ? roundMoney(valorQuitacao + antecipado)
-    : (extratoApi ?? roundMoney(valorQuitacao + antecipado))
+  const totalComPendenciasApi = moneyOrNull(fatura?.valor_total_com_pendencias)
 
   const valorNaoConciliadoApi = moneyOrNull(fatura?.valor_nao_conciliado)
   const valorNaoConciliado = valorNaoConciliadoApi != null
@@ -227,7 +220,11 @@ export const totaisConciliacaoFatura = (
       precisaConciliarCompra(tx) ? acc + Number(tx.valor ?? 0) : acc
     ), 0))
 
-  const valorTotalComPendencias = roundMoney(valorExtrato + valorNaoConciliado)
+  const valorExtrato = extratoApi != null ? roundMoney(extratoApi) : roundMoney(valorQuitacao)
+
+  const valorTotalComPendencias = totalComPendenciasApi != null
+    ? roundMoney(totalComPendenciasApi)
+    : roundMoney(valorExtrato + valorNaoConciliado)
 
   const temComprasNaoConciliadas = valorNaoConciliado > 0.009
     && fatura?.tem_compras_nao_conciliadas !== false

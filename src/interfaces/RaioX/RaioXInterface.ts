@@ -62,6 +62,13 @@ export interface RaioXSinalMetricas {
   percentual?: number | null
   valor_comprometido?: number | null
   renda?: number | null
+  atrasadas?: number | null
+  a_vencer?: number | null
+  aguardando_confirmacao?: number | null
+  em_aberto?: number | null
+  valor_restante?: number | null
+  valor_atrasado?: number | null
+  valor_aguardando?: number | null
   [key: string]: number | null | undefined
 }
 

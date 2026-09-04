@@ -5,6 +5,7 @@ import { toast } from 'react-toastify'
 import { setActiveMenu } from 'helpers/system_helpers'
 import { persistAuthUser } from 'helpers/auth_session'
 import {
+  applyRaioXViewGuards,
   parsePositiveId,
   parseRendaMensal,
   persistRaioXCompetencia,
@@ -83,7 +84,7 @@ const RaioXPage = () => {
       setLoadError(null)
       try {
         const result = await raioXService.getRaioX(next)
-        setData(result)
+        setData(applyRaioXViewGuards(result))
       } catch (error: unknown) {
         const message = error instanceof Error && error.message ? error.message : 'Erro ao carregar o Raio-X'
         toast.error(message)

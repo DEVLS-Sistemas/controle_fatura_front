@@ -313,17 +313,32 @@ describe('totaisConciliacaoFatura', () => {
       valor_extrato: 3445.97,
       valor_nao_conciliado: 177.48,
       valor_total_com_pendencias: 3623.45,
-      pagamentos_antecipado: 119.90,
       tem_compras_nao_conciliadas: true,
     })).toEqual({
-      valorExtrato: 3565.87,
+      valorExtrato: 3445.97,
       valorNaoConciliado: 177.48,
-      valorTotalComPendencias: 3743.35,
+      valorTotalComPendencias: 3623.45,
       temComprasNaoConciliadas: true,
       labelNaoConciliadas: 'Compras ainda não conciliadas',
     })
   })
-})
+
+    it('fatura zerada no PDF não infla com pagamento antecipado', () => {
+      expect(totaisConciliacaoFatura({
+        valor_total: '0.00',
+        valor_extrato: 0,
+        valor_nao_conciliado: 0,
+        valor_total_com_pendencias: 0,
+        tem_compras_nao_conciliadas: false,
+      })).toEqual({
+        valorExtrato: 0,
+        valorNaoConciliado: 0,
+        valorTotalComPendencias: 0,
+        temComprasNaoConciliadas: false,
+        labelNaoConciliadas: 'Compras ainda não conciliadas',
+      })
+    })
+  })
 
 describe('validarFormularioCompra', () => {
   const valido = {

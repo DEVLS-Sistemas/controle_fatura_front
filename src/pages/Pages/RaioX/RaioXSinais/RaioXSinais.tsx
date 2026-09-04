@@ -60,7 +60,14 @@ const RaioXSinais = ({ sinais, labelCurto, label }: Props) => {
                       {sinal.frase}
                     </div>
                     {sinal.contexto ? (
-                      <div className="text-muted fs-13 mt-1 text-truncate" title={sinal.contexto}>
+                      <div
+                        className="text-muted fs-13 mt-1"
+                        style={{
+                          lineHeight: 1.45,
+                          maxWidth: '38rem',
+                          whiteSpace: 'normal',
+                        }}
+                      >
                         {sinal.contexto}
                       </div>
                     ) : null}

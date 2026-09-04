@@ -3,17 +3,21 @@ import {
   RAIO_X_MES_STORAGE_KEY,
 } from 'interfaces/RaioX/RaioXInterface'
 import {
+  applyRaioXViewGuards,
   atalhoToPath,
   buildRaioXMock,
   formatRendaPayload,
   isMesFuturo,
+  isSinalPagamentosAguardando,
   labelCompetenciaExtenso,
   nivelUi,
   parseRendaMensal,
   persistRaioXCompetencia,
+  resolveRaioXDiagnostico,
   resolveRaioXEmpty,
   resolveRaioXSearch,
 } from './raio_x_helpers'
+import { RaioXView } from 'interfaces/RaioX/RaioXInterface'
 
 describe('resolveRaioXSearch', () => {
   const now = new Date(2026, 7, 24)
@@ -126,6 +130,92 @@ describe('buildRaioXMock', () => {
     expect(isMesFuturo(10, 2026, now)).toBe(true)
     expect(data.diagnostico).toBeNull()
     expect(resolveRaioXEmpty(data, 10, 2026, now)).toBe('mes_futuro')
+  })
+})
+
+describe('applyRaioXViewGuards', () => {
+  const aguardandoSinal = {
+    id: 'pagamentos' as const,
+    nivel: 'alerta' as const,
+    titulo: 'Aguardando confirmação de pagamentos',
+    frase: 'Aguardando confirmação de pagamentos',
+    contexto:
+      'As faturas de agosto ainda não têm definição de atraso. O pagamento se confirma com o anexo da fatura seguinte ou por operação manual.',
+    metricas: {
+      atrasadas: 0,
+      a_vencer: 0,
+      aguardando_confirmacao: 2,
+      em_aberto: 2,
+      valor_restante: 11078.07,
+      valor_atrasado: 0,
+      valor_aguardando: 11078.07,
+    },
+  }
+
+  it('reconhece aguardando confirmação e não trata como atraso', () => {
+    expect(isSinalPagamentosAguardando(aguardandoSinal)).toBe(true)
+    expect(
+      resolveRaioXDiagnostico(
+        {
+          tipo: 'atraso',
+          titulo: 'Principal problema: faturas em atraso.',
+          frase: 'Há fatura vencida ainda não quitada.',
+        },
+        [aguardandoSinal]
+      )
+    ).toBeNull()
+  })
+
+  it('força âmbar e esconde diagnóstico de atraso enquanto só aguarda confirmação', () => {
+    const data = applyRaioXViewGuards({
+      referencia: { mes: 8, ano: 2026, label: 'Agosto 2026', label_curto: 'Seu mês' },
+      renda: { informada: true, valor: 11400, moeda: 'BRL' },
+      sinais: [aguardandoSinal],
+      diagnostico: {
+        tipo: 'atraso',
+        titulo: 'Principal problema: faturas em atraso.',
+        frase: 'Há fatura vencida ainda não quitada.',
+      },
+      acoes: [],
+    } as RaioXView)
+
+    expect(data.sinais[0].nivel).toBe('atencao')
+    expect(data.sinais[0].frase).toBe('Aguardando confirmação de pagamentos')
+    expect(data.diagnostico).toBeNull()
+  })
+
+  it('mantém alerta quando o atraso está confirmado', () => {
+    const confirmado = {
+      ...aguardandoSinal,
+      nivel: 'alerta' as const,
+      titulo: 'Há fatura em atraso',
+      frase: 'Há fatura em atraso',
+      contexto: 'R$ 7.512 em aberto além do vencimento.',
+      metricas: {
+        atrasadas: 1,
+        a_vencer: 0,
+        aguardando_confirmacao: 0,
+        em_aberto: 1,
+        valor_restante: 7512,
+        valor_atrasado: 7512,
+        valor_aguardando: 0,
+      },
+    }
+    const data = applyRaioXViewGuards({
+      referencia: { mes: 10, ano: 2026, label: 'Outubro 2026', label_curto: 'Seu mês' },
+      renda: { informada: true, valor: 11400, moeda: 'BRL' },
+      sinais: [confirmado],
+      diagnostico: {
+        tipo: 'atraso',
+        titulo: 'Principal problema: faturas em atraso.',
+        frase: 'Há fatura vencida ainda não quitada.',
+      },
+      acoes: [],
+    } as RaioXView)
+
+    expect(isSinalPagamentosAguardando(confirmado)).toBe(false)
+    expect(data.sinais[0].nivel).toBe('alerta')
+    expect(data.diagnostico?.tipo).toBe('atraso')
   })
 })
 
