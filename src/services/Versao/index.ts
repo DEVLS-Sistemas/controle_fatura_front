@@ -1,0 +1,1 @@
+export { VersaoService } from './VersaoService'

@@ -9,6 +9,7 @@ import {
   formatTamanhoAnexo,
   identificadorDaCompra,
 } from 'helpers/cadastro_manual_compra_helpers'
+import { isFilenameFallbackPorId, primeiroNomeArquivoUtil } from 'helpers/anexo_filename_helpers'
 import { CompraAnexoView, CompraVisualizacaoView } from 'interfaces/CompraVisualizacao/CompraVisualizacaoInterface'
 import { TransacoesService } from 'services/Transacoes/TransacoesService'
 
@@ -59,7 +60,12 @@ const CompraVisualizacaoAnexos = ({ compra, onChanged }: CompraVisualizacaoAnexo
       a.href = url
       a.target = '_blank'
       a.rel = 'noopener noreferrer'
-      a.download = anexo.nome_original || anexo.nome || filename
+      a.download = primeiroNomeArquivoUtil(
+        isFilenameFallbackPorId(filename) ? null : filename,
+        anexo.nome_original,
+        anexo.nome,
+        filename,
+      ) || 'anexo'
       document.body.appendChild(a)
       a.click()
       a.remove()
@@ -103,7 +109,7 @@ const CompraVisualizacaoAnexos = ({ compra, onChanged }: CompraVisualizacaoAnexo
               <tbody>
                 {anexos.map((anexo) => (
                   <tr key={anexo.id}>
-                    <td>{anexo.nome_original || anexo.nome || `Anexo #${anexo.id}`}</td>
+                    <td>{primeiroNomeArquivoUtil(anexo.nome_original, anexo.nome) || 'Anexo'}</td>
                     <td>{ANEXO_TIPO_LABEL[anexo.tipo || ''] || anexo.tipo || '—'}</td>
                     <td>{formatTamanhoAnexo(anexo.tamanho) || '—'}</td>
                     <td>{anexo.created_at ? formatDateBr(anexo.created_at) : '—'}</td>

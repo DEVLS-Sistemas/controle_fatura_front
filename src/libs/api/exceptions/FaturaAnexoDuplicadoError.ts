@@ -22,6 +22,9 @@ export type FaturaExistenteAnexoDuplicado = {
     tem_csv?: boolean
     pdf_url?: string | null
     csv_url?: string | null
+    nome_original?: string | null
+    nome_original_pdf?: string | null
+    nome_original_csv?: string | null
     processado_em?: string | null
     created_at?: string | null
 }

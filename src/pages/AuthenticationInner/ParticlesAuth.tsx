@@ -1,7 +1,32 @@
- import React from 'react';
+import React, { useEffect, useState } from 'react';
 import withRouter from '../../Components/Common/withRouter';
+import { textoRodape } from '../../Layouts/footerTexto';
+import { VersaoService } from '../../services/Versao/VersaoService';
 
 const ParticlesAuth = ({ children }: any) => {
+    const [versao, setVersao] = useState<string | null>(null);
+    const ano = new Date().getFullYear();
+
+    useEffect(() => {
+        let ativo = true;
+
+        new VersaoService().obter()
+            .then((dados) => {
+                if (ativo) {
+                    setVersao(dados.api_version);
+                }
+            })
+            .catch(() => {
+                if (ativo) {
+                    setVersao(null);
+                }
+            });
+
+        return () => {
+            ativo = false;
+        };
+    }, []);
+
     return (
         <React.Fragment>
             <div className="auth-page-wrapper pt-5">
@@ -15,7 +40,6 @@ const ParticlesAuth = ({ children }: any) => {
                         </svg>
                     </div>
 
-                    {/* pass the children */}
                     {children}
 
                 </div>
@@ -25,7 +49,7 @@ const ParticlesAuth = ({ children }: any) => {
                         <div className="row">
                             <div className="col-lg-12">
                                 <div className="text-center">
-                                    <p className="mb-0 text-muted">&copy; {new Date().getFullYear()} Velzon. Crafted with <i className="mdi mdi-heart text-danger"></i> by Themesbrand</p>
+                                    <p className="mb-0 text-muted">{textoRodape(ano, versao)}</p>
                                 </div>
                             </div>
                         </div>

@@ -11,7 +11,13 @@ import {
     Spinner,
 } from 'reactstrap'
 import { toast } from 'react-toastify'
-import { faturaStatusColor, formatDateBr, openFaturaAnexoInNewTab } from 'helpers/fatura_helpers'
+import {
+    faturaAnexoDownloadMetaFrom,
+    faturaStatusColor,
+    formatDateBr,
+    openFaturaAnexoInNewTab,
+    rotulosFaturaAnexoNomes,
+} from 'helpers/fatura_helpers'
 import {
     COPY_AGUARDE_PROCESSANDO,
     COPY_MANTER_ANEXO,
@@ -51,17 +57,17 @@ const FaturaAnexoDuplicadoModal = ({
     const competencia = rotuloCompetenciaFatura(fatura)
     const ciclo = rotuloCicloFatura(fatura)
     const texto = error?.orientacao || error?.message
+    const nomesAnexo = rotulosFaturaAnexoNomes(fatura)
 
     const handleVerAnexo = async () => {
         if (fatura?.id == null) return
         const tipo = fatura.tem_csv && !fatura.tem_pdf ? 'csv' : 'pdf'
         try {
-            await openFaturaAnexoInNewTab(fatura.id, tipo, {
-                cartaoNome: fatura.cartao_nome,
-                competencia: competencia ?? undefined,
-                mes: fatura.mes,
-                ano: fatura.ano,
-            })
+            await openFaturaAnexoInNewTab(
+                fatura.id,
+                tipo,
+                faturaAnexoDownloadMetaFrom(fatura, competencia),
+            )
         } catch (err) {
             toast.error((err as Error)?.message || 'Anexo não disponível')
         }
@@ -112,7 +118,7 @@ const FaturaAnexoDuplicadoModal = ({
                                     type="button"
                                     onClick={() => { void handleVerAnexo() }}
                                 >
-                                    Ver anexo atual
+                                    Ver anexo atual{nomesAnexo.length ? ` (${nomesAnexo.join(', ')})` : ''}
                                 </Button>
                             )}
                             <Link
