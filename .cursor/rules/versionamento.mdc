@@ -15,12 +15,13 @@ alwaysApply: true
 - Projeto Jira: `CTLFAT` em https://devlssistemas.atlassian.net
 - Todo card descreve **Back** e **Front** separados. Mesmo número nos dois repos; começa no back e o front continua só o que for dele.
 - Status: A fazer, Fazendo, Parado, Review, Aguardando Merge, Merge Feito, Testando, Testado, Aguardando Publicação, Feito.
-- PR de feature sempre para `v1.0/dev`, nunca para `main`. Publicação: PR `v1.0/dev` → `main`.
+- PR de feature sempre para `v1.0/dev`, nunca para `main`. Publicação: PR `v1.0/dev` → `main` (`create-release-pr`).
 - Ao abrir o PR de feature: comentar no card, incluir o que foi implementado e mover para **Aguardando Merge**.
 - **Merge Feito** o usuário move depois do merge. Não transicionar para Merge Feito.
-- Depois do merge: `subir-depois` lê `version.json` (mesmo arquivo no back) e publica a tag `vX.Y.Z` na `main`.
+- Ao abrir o PR de promoção: comentar `Release front:` + versão e mover **todos** os cards em **Aguardando Publicação** para **Feito**.
+- Depois do merge: `subir-deploy` lê `version.json` (mesmo arquivo no back) e publica a tag `vX.Y.Z` na `main`.
 - Comentário do PR no card (`detect-jira-card`):
   - primeira linha: neste repo `PR front: <url>`; no back `PR back: <url>`
   - em seguida `**Implementado:**` com bullets do que entrou neste repo (só Front aqui)
 - Footer: versão da API; nome fantasia **Devls Sistemas**.
-- Skills: `get-project-version`, `create-jira-card`, `start-jira-card`, `detect-jira-card`, `create-commit`, `create-pr`, `subir-depois`.
+- Skills: `get-project-version`, `create-jira-card`, `start-jira-card`, `detect-jira-card`, `create-commit`, `create-pr`, `create-release-pr`, `subir-deploy`.

@@ -5,13 +5,13 @@ description: Cria PR para v1.0/dev e comenta o link no card CTLFAT. Neste repo o
 
 # Criar PR (CTLFAT)
 
-Feature → `v1.0/dev`. Depois do merge da promoção para `main`: `subir-depois`.
+Feature → `v1.0/dev`. Se o usuário pedir PR de promoção / promover para `main`, usar `create-release-pr`. *faça o deploy* / *subir deploy*: `subir-deploy`.
 
 ## Base
 
 - Head: branch atual (`git branch --show-current`)
 - Base: `v1.0/dev`
-- Depois do merge / tag: `subir-depois`
+- Promoção / `main`: `create-release-pr`
 
 ## Card
 
