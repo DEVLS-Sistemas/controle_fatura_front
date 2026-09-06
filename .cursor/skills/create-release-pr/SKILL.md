@@ -61,7 +61,11 @@ X.Y.Z (`version_short` X.Y)
 gh pr create --base main --head v1.0/dev --title "..." --body "..."
 ```
 
-Guardar a URL. Devolver a URL na resposta.
+Guardar a URL.
+
+## Resposta
+
+Devolver a URL. Dizer que o próximo passo é o usuário **mergear** e, depois do merge, pedir *faça o deploy* (`subir-deploy`). Não mergear.
 
 ## Jira — concluir publicação
 
