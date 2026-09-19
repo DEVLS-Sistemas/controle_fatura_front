@@ -41,6 +41,7 @@ import {
     anexoDuplicadoRetryFields,
     extractFaturaMessage,
 } from 'helpers/fatura_anexo_duplicado_helpers'
+import { substituirFaturaRetryFields } from 'helpers/fatura_substituir_existente_helpers'
 import { isCompraAvista, isEhAssinatura } from 'helpers/assinaturas_helpers'
 import {
     contaNoTotalLinha,
@@ -86,6 +87,7 @@ import FaturaSenhaPdfModal from 'Components/Faturas/FaturaSenhaPdfModal'
 import FaturaSelecaoModal, { FaturaSelecaoStep } from 'Components/Faturas/FaturaSelecaoModal'
 import FaturaTitularModal from 'Components/Faturas/FaturaTitularModal'
 import FaturaAnexoDuplicadoModal from 'Components/Faturas/FaturaAnexoDuplicadoModal'
+import FaturaJaAnexadaModal from 'Components/Faturas/FaturaJaAnexadaModal'
 import FaturaParserNaoHomologadoModal from 'Components/Faturas/FaturaParserNaoHomologadoModal'
 import FaturaRemoverAnexoModal from 'Components/Faturas/FaturaRemoverAnexoModal'
 import FaturaComprasRestauradasModal from 'Components/Faturas/FaturaComprasRestauradasModal'
@@ -107,6 +109,7 @@ import {
     FaturaTitularSugestao,
 } from 'libs/api/exceptions/FaturaTitularError'
 import { FaturaAnexoDuplicadoError } from 'libs/api/exceptions/FaturaAnexoDuplicadoError'
+import { FaturaJaAnexadaError } from 'libs/api/exceptions/FaturaJaAnexadaError'
 import { getApiBaseUrl } from 'libs/api/ApiConfig'
 import { getAuthToken, handleUnauthorizedSession } from 'helpers/auth_session'
 
@@ -382,6 +385,9 @@ const FaturasViewPage = () => {
     const [anexoDuplicadoModalOpen, setAnexoDuplicadoModalOpen] = useState(false)
     const [anexoDuplicadoLoading, setAnexoDuplicadoLoading] = useState(false)
     const [anexoDuplicadoError, setAnexoDuplicadoError] = useState<FaturaAnexoDuplicadoError | null>(null)
+    const [jaAnexadaModalOpen, setJaAnexadaModalOpen] = useState(false)
+    const [jaAnexadaLoading, setJaAnexadaLoading] = useState(false)
+    const [jaAnexadaError, setJaAnexadaError] = useState<FaturaJaAnexadaError | null>(null)
     const [categoriasOptions, setCategoriasOptions] = useState<SelectOptions[]>([])
     const [categoriasLookup, setCategoriasLookup] = useState<CategoriaLookup[]>([])
     const [subcategoriasByCategoria, setSubcategoriasByCategoria] = useState<Record<number, SelectOptions[]>>({})
@@ -985,6 +991,11 @@ const FaturasViewPage = () => {
                 setAnexoDuplicadoModalOpen(true)
                 return
             }
+            if (error instanceof FaturaJaAnexadaError) {
+                setJaAnexadaError(error)
+                setJaAnexadaModalOpen(true)
+                return
+            }
             if (error instanceof FaturaSelecaoError) {
                 openSelecaoModal(error)
                 return
@@ -1064,6 +1075,12 @@ const FaturasViewPage = () => {
                 setAnexoDuplicadoModalOpen(true)
                 return
             }
+            if (error instanceof FaturaJaAnexadaError) {
+                setSelecaoModalOpen(false)
+                setJaAnexadaError(error)
+                setJaAnexadaModalOpen(true)
+                return
+            }
             if (error instanceof PdfSenhaError) {
                 setSelecaoModalOpen(false)
                 await loadFatura({ silent: true, openSenhaIfNeeded: false })
@@ -1115,6 +1132,12 @@ const FaturasViewPage = () => {
                 setAnexoDuplicadoModalOpen(true)
                 return
             }
+            if (error instanceof FaturaJaAnexadaError) {
+                setTitularModalOpen(false)
+                setJaAnexadaError(error)
+                setJaAnexadaModalOpen(true)
+                return
+            }
             if (error instanceof PdfSenhaError) {
                 setTitularModalOpen(false)
                 await loadFatura({ silent: true, openSenhaIfNeeded: false })
@@ -1152,6 +1175,12 @@ const FaturasViewPage = () => {
                 setAnexoDuplicadoError(error)
                 return
             }
+            if (error instanceof FaturaJaAnexadaError) {
+                setAnexoDuplicadoModalOpen(false)
+                setJaAnexadaError(error)
+                setJaAnexadaModalOpen(true)
+                return
+            }
             if (error instanceof FaturaTitularError) {
                 setAnexoDuplicadoModalOpen(false)
                 setTitularTitulares(error.titulares)
@@ -1176,6 +1205,64 @@ const FaturasViewPage = () => {
             toast.error((error as Error)?.message || 'Erro ao substituir o anexo')
         } finally {
             setAnexoDuplicadoLoading(false)
+        }
+    }
+
+    const handleJaAnexadaSubstituir = async () => {
+        const file = pendingUploadFileRef.current ?? fileInputRef.current?.files?.[0]
+        const existingId = jaAnexadaError?.fatura_existente_id ?? jaAnexadaError?.fatura_existente?.id
+        if (!file || existingId == null) {
+            toast.warning('Selecione um arquivo PDF ou CSV')
+            return
+        }
+        const retry = substituirFaturaRetryFields(existingId)
+        setJaAnexadaLoading(true)
+        try {
+            const result = await faturasService.uploadPdf({
+                id: existingId,
+                arquivo_pdf: file,
+                processar_automatico: processarAuto,
+                ...pendingSelecaoRef.current,
+                ...pendingTitularRef.current,
+                ...retry,
+            })
+            setJaAnexadaModalOpen(false)
+            await handleUploadSuccess(result)
+        } catch (error) {
+            if (error instanceof FaturaJaAnexadaError) {
+                setJaAnexadaError(error)
+                return
+            }
+            if (error instanceof FaturaAnexoDuplicadoError) {
+                setJaAnexadaModalOpen(false)
+                setAnexoDuplicadoError(error)
+                setAnexoDuplicadoModalOpen(true)
+                return
+            }
+            if (error instanceof FaturaTitularError) {
+                setJaAnexadaModalOpen(false)
+                setTitularTitulares(error.titulares)
+                setTitularNomeNoCartao(error.nome_no_cartao ?? null)
+                setTitularPessoas(error.pessoas)
+                setTitularSugestao(error.sugestao)
+                setTitularOrientacao(error.orientacao ?? error.message ?? null)
+                setTitularModalOpen(true)
+                return
+            }
+            if (error instanceof FaturaSelecaoError) {
+                setJaAnexadaModalOpen(false)
+                openSelecaoModal(error)
+                return
+            }
+            if (error instanceof PdfSenhaError) {
+                setJaAnexadaModalOpen(false)
+                await loadFatura({ silent: true, openSenhaIfNeeded: false })
+                openSenhaModal(error.senha_pdf ?? null)
+                return
+            }
+            toast.error((error as Error)?.message || 'Erro ao substituir a fatura')
+        } finally {
+            setJaAnexadaLoading(false)
         }
     }
 
@@ -2027,6 +2114,13 @@ const FaturasViewPage = () => {
                 onClose={() => setAnexoDuplicadoModalOpen(false)}
                 onSubstituir={handleAnexoDuplicadoSubstituir}
                 onManter={handleAnexoDuplicadoManter}
+            />
+            <FaturaJaAnexadaModal
+                isOpen={jaAnexadaModalOpen}
+                error={jaAnexadaError}
+                loading={jaAnexadaLoading}
+                onClose={() => setJaAnexadaModalOpen(false)}
+                onSubstituir={handleJaAnexadaSubstituir}
             />
             <div className="page-content">
                 <Container fluid>

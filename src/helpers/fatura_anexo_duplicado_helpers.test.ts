@@ -1,5 +1,6 @@
 import { FaturaAnexoDuplicadoError } from 'libs/api/exceptions/FaturaAnexoDuplicadoError'
 import { FaturaCartaoTitularError } from 'libs/api/exceptions/FaturaCartaoTitularError'
+import { FaturaJaAnexadaError } from 'libs/api/exceptions/FaturaJaAnexadaError'
 import { FaturaTitularError } from 'libs/api/exceptions/FaturaTitularError'
 import { FaturaMetadadosError } from 'libs/api/exceptions/FaturaMetadadosError'
 import { FaturaSelecaoError } from 'libs/api/exceptions/FaturaSelecaoError'
@@ -64,6 +65,8 @@ describe('FaturaAnexoDuplicadoError', () => {
         expect(FaturaMetadadosError.isMetadadosBody(bodyDuplicado)).toBe(false)
         expect(FaturaSelecaoError.isSelecaoBody(bodyDuplicado)).toBe(false)
         expect(FaturaCartaoTitularError.isCartaoTitularBody(bodyDuplicado)).toBe(false)
+        expect(FaturaJaAnexadaError.isFaturaJaAnexadaBody(bodyDuplicado)).toBe(false)
+        expect(FaturaJaAnexadaError.isFaturaJaAnexadaBody({ codigo: 'fatura_ja_anexada' })).toBe(true)
     })
 
     it('lê fatura_existente e orientação', () => {

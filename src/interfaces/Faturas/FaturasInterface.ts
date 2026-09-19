@@ -224,6 +224,9 @@ export interface FaturasModel {
     /** Retry 422 `anexo_duplicado`: `substituir` reprocessa na fatura existente; `manter` não cria outra */
     confirmar_anexo_duplicado?: 'substituir' | 'manter' | null
     fatura_duplicada_id?: number | string | null
+    /** Retry 422 `fatura_ja_anexada` / CTA substituir nos metadados */
+    confirmar_substituir_fatura?: boolean
+    fatura_existente_id?: number | string | null
 }
 
 export interface ProcessarPdfParams {
@@ -414,6 +417,8 @@ export interface FaturasInterface {
         confirmar_titular?: boolean
         confirmar_anexo_duplicado?: 'substituir' | 'manter'
         fatura_duplicada_id?: number | string
+        confirmar_substituir_fatura?: boolean
+        fatura_existente_id?: number | string
     }): Promise<any>
     processarPdf(id: number, params?: ProcessarPdfParams): Promise<any>
     getImpactoRemoverAnexo(id: number | string): Promise<ImpactoRemoverAnexo>

@@ -27,6 +27,7 @@ import { FaturaMetadadosError } from "../../libs/api/exceptions/FaturaMetadadosE
 import { FaturaTitularError } from "../../libs/api/exceptions/FaturaTitularError"
 import { FaturaCartaoTitularError } from "../../libs/api/exceptions/FaturaCartaoTitularError"
 import { FaturaAnexoDuplicadoError } from "../../libs/api/exceptions/FaturaAnexoDuplicadoError"
+import { FaturaJaAnexadaError } from "../../libs/api/exceptions/FaturaJaAnexadaError"
 
 export class FaturasService implements FaturasInterface {
     private readonly url: string
@@ -124,6 +125,9 @@ export class FaturasService implements FaturasInterface {
                 }
                 if (FaturaAnexoDuplicadoError.isAnexoDuplicadoBody(body)) {
                     throw new FaturaAnexoDuplicadoError(body)
+                }
+                if (FaturaJaAnexadaError.isFaturaJaAnexadaBody(body)) {
+                    throw new FaturaJaAnexadaError(body)
                 }
                 if (FaturaSelecaoError.isSelecaoBody(body)) {
                     throw new FaturaSelecaoError(body)
@@ -232,6 +236,8 @@ export class FaturasService implements FaturasInterface {
         confirmar_titular?: boolean
         confirmar_anexo_duplicado?: 'substituir' | 'manter'
         fatura_duplicada_id?: number | string
+        confirmar_substituir_fatura?: boolean
+        fatura_existente_id?: number | string
     }) {
         const form = new FormData()
         form.append('id', String(params.id))
@@ -283,6 +289,12 @@ export class FaturasService implements FaturasInterface {
         if (params.fatura_duplicada_id != null && params.fatura_duplicada_id !== '') {
             form.append('fatura_duplicada_id', String(params.fatura_duplicada_id))
         }
+        if (params.confirmar_substituir_fatura) {
+            form.append('confirmar_substituir_fatura', 'true')
+        }
+        if (params.fatura_existente_id != null && params.fatura_existente_id !== '') {
+            form.append('fatura_existente_id', String(params.fatura_existente_id))
+        }
         const response = await this.httpClient.post({
             url: this.url + '/upload-pdf',
             body: form,
@@ -302,6 +314,9 @@ export class FaturasService implements FaturasInterface {
                 }
                 if (FaturaAnexoDuplicadoError.isAnexoDuplicadoBody(body)) {
                     throw new FaturaAnexoDuplicadoError(body)
+                }
+                if (FaturaJaAnexadaError.isFaturaJaAnexadaBody(body)) {
+                    throw new FaturaJaAnexadaError(body)
                 }
                 if (FaturaSelecaoError.isSelecaoBody(body)) {
                     throw new FaturaSelecaoError(body)
