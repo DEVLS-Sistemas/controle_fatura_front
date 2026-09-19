@@ -35,8 +35,20 @@ import {
     FaturaMetadadosRetryPayload,
     FaturaMetadadosSugestao,
 } from 'libs/api/exceptions/FaturaMetadadosError'
+import { FaturaExistenteAnexoDuplicado } from 'libs/api/exceptions/FaturaAnexoDuplicadoError'
 import { FaturaSelecaoBandeiraOption } from 'libs/api/exceptions/FaturaSelecaoError'
 import { CartoesService } from 'services/Cartoes/CartoesService'
+import {
+    COPY_AGUARDE_PROCESSANDO_SUBSTITUIR,
+    labelCtaFaturaExistente,
+    podeSubstituirFaturaExistente,
+    resolveAcaoSugeridaFatura,
+} from 'helpers/fatura_substituir_existente_helpers'
+import {
+    rotuloCartaoBandeira,
+    rotuloCompetenciaFatura,
+    rotuloValorTransacoes,
+} from 'helpers/fatura_anexo_duplicado_helpers'
 
 export type FaturaMetadadosModalProps = {
     isOpen: boolean
@@ -44,6 +56,9 @@ export type FaturaMetadadosModalProps = {
     cartoes?: FaturaMetadadosCartaoOption[]
     bandeiras?: FaturaSelecaoBandeiraOption[]
     precisaSelecionarBandeira?: boolean
+    acaoSugerida?: string | null
+    faturaExistente?: FaturaExistenteAnexoDuplicado | null
+    faturaExistenteId?: number | null
     loading?: boolean
     onClose: () => void
     onConfirm: (payload: FaturaMetadadosRetryPayload) => void | Promise<void>
@@ -99,6 +114,9 @@ const FaturaMetadadosModal = ({
     cartoes = [],
     bandeiras: bandeirasIniciais = [],
     precisaSelecionarBandeira = false,
+    acaoSugerida = null,
+    faturaExistente = null,
+    faturaExistenteId = null,
     loading = false,
     onClose,
     onConfirm,
@@ -384,11 +402,32 @@ const FaturaMetadadosModal = ({
         return payload
     }
 
+    const acaoCta = resolveAcaoSugeridaFatura({
+        acao_sugerida: acaoSugerida ?? sugestao?.acao_sugerida,
+        fatura_existente: faturaExistente ?? sugestao?.fatura_existente,
+    })
+    const existenteId = faturaExistenteId
+        ?? faturaExistente?.id
+        ?? sugestao?.fatura_existente_id
+        ?? sugestao?.fatura_existente?.id
+        ?? null
+    const isNovo = mode === 'novo'
+    const ctaLabel = labelCtaFaturaExistente(acaoCta, { cadastrarCartao: isNovo && acaoCta === 'cadastrar' })
+    const podeSubstituir = acaoCta !== 'substituir' || podeSubstituirFaturaExistente(faturaExistente ?? sugestao?.fatura_existente)
+    const rotuloExistente = rotuloCartaoBandeira(faturaExistente ?? sugestao?.fatura_existente)
+    const competenciaExistente = rotuloCompetenciaFatura(faturaExistente ?? sugestao?.fatura_existente)
+
     const handleSubmit = async () => {
         setError(null)
         setBandeiraError(null)
         const payload = buildPayload()
         if (!payload) return
+        if (existenteId != null) {
+            payload.fatura_existente_id = existenteId
+        }
+        if (acaoCta === 'substituir') {
+            payload.confirmar_substituir_fatura = true
+        }
         await onConfirm(payload)
     }
 
@@ -400,7 +439,6 @@ const FaturaMetadadosModal = ({
     const finais = sugestao?.ultimos_digitos?.filter(Boolean) ?? []
     const valor = sugestao?.valor_fatura
     const competenciaLida = formatCompetenciaMesAno({ mes, ano, competencia: null })
-    const isNovo = mode === 'novo'
     const cartaoSelecionado = cartoes.find((c) => Number(c.value) === Number(cartaoId))
     const homologacaoCartao = resolveCartaoHomologacao(
         isNovo
@@ -469,6 +507,35 @@ const FaturaMetadadosModal = ({
                 <Alert color="warning" className="mb-3">
                     {COPY_CONFERIR_COMPETENCIA_PDF}
                 </Alert>
+                {(faturaExistente || sugestao?.fatura_existente) && (
+                    <Alert color={acaoCta === 'substituir' ? 'warning' : 'info'} className="mb-3">
+                        {acaoCta === 'substituir' ? (
+                            <>
+                                Já existe fatura com anexo
+                                {[rotuloExistente, competenciaExistente].filter(Boolean).length
+                                    ? ` (${[rotuloExistente, competenciaExistente].filter(Boolean).join(' · ')})`
+                                    : ''}
+                                . O botão único é <strong>Substituir fatura</strong> — não cria outra linha.
+                            </>
+                        ) : (
+                            <>
+                                Há uma fatura sem anexo nesta competência
+                                {competenciaExistente ? ` (${competenciaExistente})` : ''}.
+                                {' '}O arquivo será anexado nela.
+                            </>
+                        )}
+                        {(faturaExistente ?? sugestao?.fatura_existente) && (
+                            <div className="small mt-1">
+                                {rotuloValorTransacoes(faturaExistente ?? sugestao?.fatura_existente)}
+                            </div>
+                        )}
+                    </Alert>
+                )}
+                {!podeSubstituir && (
+                    <Alert color="info" className="mb-3">
+                        {COPY_AGUARDE_PROCESSANDO_SUBSTITUIR}
+                    </Alert>
+                )}
                 {competenciaLida ? (
                     <div className="text-center mb-3">
                         <div className="text-muted small">Competência lida do arquivo</div>
@@ -683,10 +750,11 @@ const FaturaMetadadosModal = ({
                     type="button"
                     color="primary"
                     onClick={handleSubmit}
-                    disabled={loading || bandeirasLoading || (precisaAceiteValores && !aceiteValores)}
+                    disabled={loading || bandeirasLoading || !podeSubstituir || (precisaAceiteValores && !aceiteValores)}
+                    title={!podeSubstituir ? COPY_AGUARDE_PROCESSANDO_SUBSTITUIR : undefined}
                 >
                     {loading && <Spinner size="sm" className="me-2" />}
-                    {isNovo ? 'Cadastrar cartão e fatura' : 'Confirmar e cadastrar'}
+                    {ctaLabel}
                 </Button>
             </ModalFooter>
         </Modal>

@@ -18,6 +18,7 @@ export type FaturaExistenteAnexoDuplicado = {
     valor_total?: number | string | null
     status?: string | null
     total_transacoes?: number | null
+    tem_anexo?: boolean
     tem_pdf?: boolean
     tem_csv?: boolean
     pdf_url?: string | null
@@ -73,6 +74,8 @@ export class FaturaAnexoDuplicadoError extends Error {
         if (
             body.precisa_cartao_do_titular === true
             || codigo === 'precisa_cartao_do_titular'
+            || body.fatura_ja_anexada === true
+            || codigo === 'fatura_ja_anexada'
         ) {
             return false
         }

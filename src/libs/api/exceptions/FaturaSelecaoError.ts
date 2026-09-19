@@ -78,6 +78,8 @@ export class FaturaSelecaoError extends Error {
             || codigo === 'precisa_cartao_do_titular'
             || body.anexo_duplicado === true
             || codigo === 'anexo_duplicado'
+            || body.fatura_ja_anexada === true
+            || codigo === 'fatura_ja_anexada'
         ) {
             return false
         }

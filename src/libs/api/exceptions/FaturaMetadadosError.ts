@@ -1,4 +1,6 @@
 import { ParserHomologado } from 'interfaces/Cartoes/CartoesInterface'
+import { FaturaExistenteAnexoDuplicado } from 'libs/api/exceptions/FaturaAnexoDuplicadoError'
+import { AcaoSugeridaFatura } from 'libs/api/exceptions/FaturaJaAnexadaError'
 import { FaturaSelecaoBandeiraOption } from 'libs/api/exceptions/FaturaSelecaoError'
 
 /** Cartão sugerido / disponível no modal `precisa_confirmar_metadados` */
@@ -41,6 +43,9 @@ export type FaturaMetadadosSugestao = {
     parser_homologado?: ParserHomologado | null
     aviso_parser?: string | null
     conferencia?: FaturaMetadadosConferencia | null
+    acao_sugerida?: AcaoSugeridaFatura | string | null
+    fatura_existente_id?: number | null
+    fatura_existente?: FaturaExistenteAnexoDuplicado | null
 }
 
 /** Campos reenviados no retry após confirmar metadados */
@@ -57,6 +62,8 @@ export type FaturaMetadadosRetryPayload = {
     ano: number | string
     cartao_bandeira_id?: number | string | null
     bandeira?: string | null
+    confirmar_substituir_fatura?: boolean
+    fatura_existente_id?: number | string | null
 }
 
 export const FATURA_METADADOS_CODIGO = 'precisa_confirmar_metadados' as const
@@ -66,6 +73,9 @@ export class FaturaMetadadosError extends Error {
     codigo?: string
     precisa_confirmar_metadados: boolean
     precisa_selecionar_bandeira: boolean
+    acao_sugerida: AcaoSugeridaFatura | null
+    fatura_existente: FaturaExistenteAnexoDuplicado | null
+    fatura_existente_id: number | null
     sugestao: FaturaMetadadosSugestao
     cartoes: FaturaMetadadosCartaoOption[]
     bandeiras: FaturaSelecaoBandeiraOption[]
@@ -87,6 +97,22 @@ export class FaturaMetadadosError extends Error {
         this.sugestao = (body?.sugestao && typeof body.sugestao === 'object')
             ? body.sugestao
             : {}
+        const acaoRaw = body?.acao_sugerida ?? this.sugestao.acao_sugerida
+        this.acao_sugerida =
+            acaoRaw === 'cadastrar' || acaoRaw === 'substituir' ? acaoRaw : null
+        const existenteRaw = body?.fatura_existente ?? this.sugestao.fatura_existente
+        const existenteId = Number(
+            body?.fatura_existente_id
+            ?? this.sugestao.fatura_existente_id
+            ?? (existenteRaw && typeof existenteRaw === 'object' ? (existenteRaw as FaturaExistenteAnexoDuplicado).id : null)
+        )
+        this.fatura_existente =
+            existenteRaw && typeof existenteRaw === 'object' && Number((existenteRaw as FaturaExistenteAnexoDuplicado).id) > 0
+                ? existenteRaw as FaturaExistenteAnexoDuplicado
+                : null
+        this.fatura_existente_id = Number.isFinite(existenteId) && existenteId > 0
+            ? existenteId
+            : (this.fatura_existente?.id ?? null)
         this.cartoes = Array.isArray(body?.cartoes) ? body.cartoes : []
         this.bandeiras = Array.isArray(body?.bandeiras) ? body.bandeiras : []
         this.candidatos_cartao = Array.isArray(body?.candidatos_cartao)
@@ -105,6 +131,8 @@ export class FaturaMetadadosError extends Error {
             || codigo === 'precisa_cartao_do_titular'
             || body.anexo_duplicado === true
             || codigo === 'anexo_duplicado'
+            || body.fatura_ja_anexada === true
+            || codigo === 'fatura_ja_anexada'
         ) {
             return false
         }
