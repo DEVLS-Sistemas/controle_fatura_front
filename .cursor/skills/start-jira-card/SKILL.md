@@ -21,6 +21,7 @@ git checkout -b v1.0/dev-raiox-CTLFAT-9999
 ```
 
 Padrão: `v{major}.{minor}/{ambiente}-{tela}-CTLFAT-{numero}`  
+Só existem três camadas: `main` ← `v1.0/dev` ← branch do card. Não criar `v1.0/dev-build` nem outra branch de ambiente.  
 PR de feature sempre para `v1.0/dev`. Publicação (`v1.0/dev` → `main`): `create-release-pr`. Deploy/tag: `subir-deploy`.
 
 6. Transicionar para **Fazendo**: `getTransitionsForJiraIssue` e usar o **id** da transição. Nunca chutar id.

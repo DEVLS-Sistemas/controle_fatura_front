@@ -11,17 +11,29 @@ Não usar `create-pr` aqui. Aquele skill é feature → `v1.0/dev`. Este é só 
 
 ## Base
 
-- Head: `v1.0/dev` (nunca uma branch de card)
+- Head: `v1.0/dev` (nunca uma branch de card, nunca `v1.0/dev-build` nem outra camada extra)
 - Base: `main`
 - Nunca desenvolver na `main`
+- Só abrir depois da **aprovação dos testes** (cards em **Testado** / **Aguardando Publicação**)
 
 ## Preparar
 
-1. Resolver versão com `get-project-version` (`version.json`).
-2. Conferir que `v1.0/dev` está limpa e alinhada com `origin/v1.0/dev`.
-3. Changelog: `git log --format='%h %s' origin/main..origin/v1.0/dev`. Ignorar commits `Merge pull request`.
-4. Agrupar o que entrou por `CTLFAT-XXXX` (commits + `detect-jira-card`). Texto do que foi commitado, não o card inteiro. Só Front.
-5. Jira: `project = CTLFAT AND status = "Aguardando Publicação" ORDER BY key ASC`. Listar keys antes de transicionar.
+1. Conferir que `v1.0/dev` está limpa e alinhada com `origin/v1.0/dev`.
+2. Changelog: `git log --format='%h %s' origin/main..origin/v1.0/dev`. Ignorar commits `Merge pull request`.
+3. Agrupar o que entrou por `CTLFAT-XXXX` (commits + `detect-jira-card`). Texto do que foi commitado, não o card inteiro. Só Front.
+4. Jira: `project = CTLFAT AND status = "Aguardando Publicação" ORDER BY key ASC`. Listar keys antes de transicionar.
+
+## Versão do sistema
+
+Este PR **altera a versão**. Resolver com `get-project-version` e comparar com `origin/main:version.json`.
+
+- Se o usuário indicar a versão, usar essa.
+- Senão, bump de patch em `version` (`1.0.0` → `1.0.1`); `version_short` só muda se major/minor mudarem.
+- Commitar **na `v1.0/dev`**: `chore(version): sobe para X.Y.Z` (arquivo `version.json`).
+- Push de `v1.0/dev` para o remoto entrar no PR.
+- Título e body usam a **versão nova**.
+
+Se `version.json` da `v1.0/dev` já for maior que o da `main`, não bump de novo — usar a versão que já está na branch.
 
 Se já existir PR aberto `v1.0/dev` → `main`, atualizar o body em vez de abrir outro.
 

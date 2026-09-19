@@ -9,6 +9,8 @@ Só commitar se o usuário pediu. Não dar push.
 
 Se o usuário pediu commit **e** PR juntos, depois do commit seguir `create-pr` (link no card + **Implementado** + **Aguardando Merge**).
 
+Commitar na **branch do card**. Não commitar na `main`. Não commitar em camada extra (`v1.0/dev-build` etc.) — voltar para o card ou para `v1.0/dev`. Na `v1.0/dev`, só o bump de `version.json` do `create-release-pr`.
+
 1. Conferir `git status` e `git diff` / `git log -5`.
 2. Detectar card com `detect-jira-card`.
 3. Mensagem:

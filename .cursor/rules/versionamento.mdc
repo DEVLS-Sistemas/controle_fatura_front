@@ -5,21 +5,39 @@ alwaysApply: true
 
 # Versionamento CTLFAT
 
-- `v1.0/dev` é a integração da versão em desenvolvimento. Features saem dela e o PR volta para ela.
-- `main` é só deploy. Nunca desenvolver direto nela; só promover `v1.0/dev` → `main` quando for publicar.
-- Fonte da versão no front: `version.json` (branch/agente) e `GET /api/v1` (footer).
+Três camadas, só estas:
+
+```
+main  ←  v{major}.{minor}/dev  ←  v{major}.{minor}/dev-{tela}-CTLFAT-{n}
+```
+
+1. `main` — produção/deploy. Nunca desenvolver nela.
+2. `v1.0/dev` — integração da versão em desenvolvimento. Features saem dela e o PR volta para ela.
+3. Branch do card — `v1.0/dev-{tela}-CTLFAT-{n}` (ex. `v1.0/dev-raiox-CTLFAT-9999`).
+
+Proibido: camada extra (`v1.0/dev-build`, branch de ambiente, “build de produção”, etc.), PR de card para `main`, desenvolver na `main`.
+
+## PRs
+
+- Todo card da versão abre PR **da branch do card → `v1.0/dev`**. Nunca para `main`.
+- Só com aprovação dos testes se abre o PR de publicação **`v1.0/dev` → `main`** (`create-release-pr`). Esse PR **altera a versão do sistema** (`version.json`).
+- Depois do merge: `subir-deploy` lê `version.json` e publica a tag `vX.Y.Z` na `main`.
+
+## Versão e branch
+
+- Fonte no front: `version.json` (branch/agente) e `GET /api/v1` (footer).
 - Versão atual: `1.0.0` / `1.0`.
-- Branch: `v{major}.{minor}/{ambiente}-{tela}-{PROJETO}-{numero}`
-- Exemplo: `v1.0/dev-raiox-CTLFAT-9999`
+- Padrão da branch do card: `v{major}.{minor}/{ambiente}-{tela}-{PROJETO}-{numero}`
 - `tela` em minúsculo, sem hífen (`raiox`). Ambiente: `dev`.
-- Projeto Jira: `CTLFAT` em https://devlssistemas.atlassian.net
+
+## Jira
+
+- Projeto: `CTLFAT` em https://devlssistemas.atlassian.net
 - Todo card descreve **Back** e **Front** separados. Mesmo número nos dois repos; começa no back e o front continua só o que for dele.
 - Status: A fazer, Fazendo, Parado, Review, Aguardando Merge, Merge Feito, Testando, Testado, Aguardando Publicação, Feito.
-- PR de feature sempre para `v1.0/dev`, nunca para `main`. Publicação: PR `v1.0/dev` → `main` (`create-release-pr`).
 - Ao abrir o PR de feature: comentar no card, incluir o que foi implementado e mover para **Aguardando Merge**.
 - **Merge Feito** o usuário move depois do merge. Não transicionar para Merge Feito.
 - Ao abrir o PR de promoção: comentar `Release front:` + versão e mover **todos** os cards em **Aguardando Publicação** para **Feito**.
-- Depois do merge: `subir-deploy` lê `version.json` (mesmo arquivo no back) e publica a tag `vX.Y.Z` na `main`.
 - Comentário do PR no card (`detect-jira-card`):
   - primeira linha: neste repo `PR front: <url>`; no back `PR back: <url>`
   - em seguida `**Implementado:**` com bullets do que entrou neste repo (só Front aqui)
