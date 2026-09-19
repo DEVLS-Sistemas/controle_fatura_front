@@ -49,6 +49,9 @@ import {
     rotuloCompetenciaFatura,
     rotuloValorTransacoes,
 } from 'helpers/fatura_anexo_duplicado_helpers'
+import {
+    valoresConferenciaFatura,
+} from 'helpers/fatura_conferencia_helpers'
 
 export type FaturaMetadadosModalProps = {
     isOpen: boolean
@@ -459,8 +462,7 @@ const FaturaMetadadosModal = ({
         ? homologacaoCartao.homologada === false
         : false
     const precisaAceiteValores = parserNaoHomologado || cartaoNaoHomologado
-    const conferencia = sugestao?.conferencia
-    const conferenciaDiverge = conferencia != null && conferencia.bate === false
+    const valoresConferencia = valoresConferenciaFatura(sugestao?.conferencia)
     const parserHomologadoNota =
         !precisaAceiteValores
             ? (sugestao?.parser_homologado?.nota ?? homologacaoCartao.parser?.nota)
@@ -478,11 +480,14 @@ const FaturaMetadadosModal = ({
                 {parserHomologadoNota && (
                     <p className="small text-muted mb-3">{parserHomologadoNota}</p>
                 )}
-                {conferenciaDiverge && (
-                    <Alert color="warning" className="mb-3">
-                        O total do cabeçalho da fatura ({formatCurrency(conferencia?.valor_cabecalho)})
-                        {' '}diverge da soma das transações ({formatCurrency(conferencia?.soma_transacoes)}).
-                        {' '}Vamos usar a soma das transações.
+                {valoresConferencia && (
+                    <Alert color="info" className="mb-3">
+                        Total no PDF: {formatCurrency(valoresConferencia.valorCabecalho)}.
+                        {' '}Soma das linhas: {formatCurrency(valoresConferencia.somaTransacoes)}.
+                        {valoresConferencia.diferenca != null && (
+                            <> Diferença: {formatCurrency(valoresConferencia.diferenca)}.</>
+                        )}
+                        {' '}O total da fatura continua o do PDF.
                     </Alert>
                 )}
                 {isNovo ? (

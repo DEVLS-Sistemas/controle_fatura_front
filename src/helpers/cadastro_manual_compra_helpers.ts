@@ -190,7 +190,7 @@ export type TotaisConciliacaoFatura = {
 /**
  * Totais do detalhe da fatura: extrato (PDF) + compras manuais ainda abertas.
  * Prefere os campos do GET /faturas/listar/{id}, inclusive quando o PDF é R$ 0,00.
- * Não reconstrói o total somando pagamento antecipado — o valor da fatura já é o do cabeçalho.
+ * Não reconstrói o H1 somando `transacoes[]` — o número grande é `valor_total_com_pendencias`.
  */
 export const totaisConciliacaoFatura = (
   fatura?: {

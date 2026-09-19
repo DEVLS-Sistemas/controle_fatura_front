@@ -95,6 +95,7 @@ import FaturaReconciliaComprasModal from 'Components/Faturas/FaturaReconciliaCom
 import ConciliacaoCandidatosModal from 'pages/Pages/Transacoes/ConciliacaoCandidatosModal/ConciliacaoCandidatosModal'
 import FaturaConciliacaoLinha from './FaturaConciliacaoLinha'
 import FaturaTotalizadorPendencias from './FaturaTotalizadorPendencias'
+import FaturaConferenciaAviso from './FaturaConferenciaAviso'
 import { PdfSenhaError } from 'libs/api/exceptions/PdfSenhaError'
 import {
     FaturaSelecaoBandeiraOption,
@@ -756,14 +757,18 @@ const FaturasViewPage = () => {
                 if (view) {
                     setFatura(view)
                     lastStatus = view.status
-                    if (faturaProcessamentoTerminou(view.status)) break
+                    if (faturaProcessamentoTerminou(view.status)) {
+                        if (seq !== pollTrocaSeqRef.current) return undefined
+                        await loadTransacoes(String(faturaId))
+                        break
+                    }
                 }
             } catch (error) {
                 console.error('Erro ao acompanhar o processamento da fatura:', error)
             }
         }
         return lastStatus
-    }, [faturasService])
+    }, [faturasService, loadTransacoes])
 
     const handleReprocessar = async () => {
         if (!id) return
@@ -2392,6 +2397,7 @@ const FaturasViewPage = () => {
                                         </ul>
                                     </div>
                                 )}
+                                <FaturaConferenciaAviso conferencia={fatura.conferencia} />
                                 <FaturaTotalizadorPendencias totais={totaisConciliacao} />
                             </div>
 
