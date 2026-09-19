@@ -80,6 +80,8 @@ export class FaturaSelecaoError extends Error {
             || codigo === 'anexo_duplicado'
             || body.fatura_ja_anexada === true
             || codigo === 'fatura_ja_anexada'
+            || body.fatura_processando === true
+            || codigo === 'fatura_processando'
         ) {
             return false
         }

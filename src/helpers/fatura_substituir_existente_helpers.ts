@@ -63,3 +63,34 @@ export const substituirFaturaRetryFields = (
     confirmar_substituir_fatura: true,
     fatura_existente_id: faturaId,
 })
+
+const parseFaturaId = (raw: unknown): number | string | null => {
+    if (raw == null || raw === '') return null
+    const id = Number(raw)
+    if (Number.isFinite(id) && id > 0) return id
+    return typeof raw === 'string' && raw.trim() !== '' ? raw : null
+}
+
+/** Retry de substituir: usa o id da existente, nunca abre outra fatura. */
+export const idFaturaAposSubstituir = (
+    faturaExistenteId?: number | string | null,
+    idDaResposta?: number | string | null,
+): number | string | null => (
+    parseFaturaId(faturaExistenteId) ?? parseFaturaId(idDaResposta)
+)
+
+/**
+ * Depois do job, a lista refetchada é a fonte. Não cai no total_transacoes
+ * do card antigo quando o extrato novo veio vazio.
+ */
+export const totalLancamentosAposReprocesso = (params: {
+    status?: string | null
+    total_transacoes?: number | null
+    transacoesCount: number
+}): number => {
+    const status = String(params.status ?? '').toLowerCase()
+    if (status === 'processada' || status === 'erro') {
+        return params.transacoesCount
+    }
+    return params.transacoesCount || Number(params.total_transacoes ?? 0)
+}

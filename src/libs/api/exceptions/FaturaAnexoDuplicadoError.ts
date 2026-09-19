@@ -1,3 +1,5 @@
+import { FaturaProcessandoError } from 'libs/api/exceptions/FaturaProcessandoError'
+
 export const FATURA_ANEXO_DUPLICADO_CODIGO = 'anexo_duplicado' as const
 
 export type ConfirmarAnexoDuplicado = 'substituir' | 'manter'
@@ -76,6 +78,7 @@ export class FaturaAnexoDuplicadoError extends Error {
             || codigo === 'precisa_cartao_do_titular'
             || body.fatura_ja_anexada === true
             || codigo === 'fatura_ja_anexada'
+            || FaturaProcessandoError.isFaturaProcessandoBody(body)
         ) {
             return false
         }

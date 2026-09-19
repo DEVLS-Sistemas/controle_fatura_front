@@ -2,6 +2,7 @@ import { FaturaAnexoDuplicadoError } from 'libs/api/exceptions/FaturaAnexoDuplic
 import { FaturaCartaoTitularError } from 'libs/api/exceptions/FaturaCartaoTitularError'
 import { FaturaJaAnexadaError } from 'libs/api/exceptions/FaturaJaAnexadaError'
 import { FaturaMetadadosError } from 'libs/api/exceptions/FaturaMetadadosError'
+import { FaturaProcessandoError } from 'libs/api/exceptions/FaturaProcessandoError'
 import { FaturaSelecaoError } from 'libs/api/exceptions/FaturaSelecaoError'
 import { FaturaTitularError } from 'libs/api/exceptions/FaturaTitularError'
 import {
@@ -9,10 +10,12 @@ import {
     LABEL_CADASTRAR_FATURA,
     LABEL_SUBSTITUIR_FATURA,
     faturaExistenteTemAnexo,
+    idFaturaAposSubstituir,
     labelCtaFaturaExistente,
     podeSubstituirFaturaExistente,
     resolveAcaoSugeridaFatura,
     substituirFaturaRetryFields,
+    totalLancamentosAposReprocesso,
 } from './fatura_substituir_existente_helpers'
 
 const bodyJaAnexada = {
@@ -143,5 +146,68 @@ describe('substituirFaturaRetryFields', () => {
             confirmar_substituir_fatura: true,
             fatura_existente_id: 591,
         })
+    })
+})
+
+const bodyProcessando = {
+    error: true,
+    message: 'A fatura está sendo processada. Aguarde para substituir o anexo.',
+    codigo: 'fatura_processando',
+    fatura_processando: true,
+    fatura_existente_id: 591,
+}
+
+describe('FaturaProcessandoError', () => {
+    it('reconhece codigo ou flag', () => {
+        expect(FaturaProcessandoError.isFaturaProcessandoBody({ codigo: 'fatura_processando' })).toBe(true)
+        expect(FaturaProcessandoError.isFaturaProcessandoBody({ fatura_processando: true })).toBe(true)
+        expect(FaturaProcessandoError.isFaturaProcessandoBody({ message: 'aguarde' })).toBe(false)
+    })
+
+    it('não abre o modal de fatura já anexada', () => {
+        expect(FaturaJaAnexadaError.isFaturaJaAnexadaBody(bodyProcessando)).toBe(false)
+        expect(FaturaAnexoDuplicadoError.isAnexoDuplicadoBody(bodyProcessando)).toBe(false)
+        expect(FaturaTitularError.isTitularBody(bodyProcessando)).toBe(false)
+        expect(FaturaMetadadosError.isMetadadosBody(bodyProcessando)).toBe(false)
+        expect(FaturaSelecaoError.isSelecaoBody(bodyProcessando)).toBe(false)
+        expect(FaturaCartaoTitularError.isCartaoTitularBody(bodyProcessando)).toBe(false)
+    })
+
+    it('lê a message do 422 para o aviso', () => {
+        const error = new FaturaProcessandoError(bodyProcessando)
+        expect(error.fatura_processando).toBe(true)
+        expect(error.fatura_existente_id).toBe(591)
+        expect(error.message).toBe(bodyProcessando.message)
+    })
+})
+
+describe('idFaturaAposSubstituir', () => {
+    it('usa o id da existente e não o de uma fatura nova', () => {
+        expect(idFaturaAposSubstituir(591, 999)).toBe(591)
+        expect(idFaturaAposSubstituir(null, 591)).toBe(591)
+        expect(idFaturaAposSubstituir(undefined, undefined)).toBeNull()
+    })
+})
+
+describe('totalLancamentosAposReprocesso', () => {
+    it('depois de processada usa a lista refetchada, mesmo vazia', () => {
+        expect(totalLancamentosAposReprocesso({
+            status: 'processada',
+            total_transacoes: 34,
+            transacoesCount: 0,
+        })).toBe(0)
+        expect(totalLancamentosAposReprocesso({
+            status: 'processada',
+            total_transacoes: 34,
+            transacoesCount: 41,
+        })).toBe(41)
+    })
+
+    it('enquanto processa ainda pode mostrar o total conhecido', () => {
+        expect(totalLancamentosAposReprocesso({
+            status: 'processando',
+            total_transacoes: 34,
+            transacoesCount: 0,
+        })).toBe(34)
     })
 })

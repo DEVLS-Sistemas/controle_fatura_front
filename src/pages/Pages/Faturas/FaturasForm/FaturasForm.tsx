@@ -20,7 +20,7 @@ import {
     anexoDuplicadoRetryFields,
     extractFaturaMessage,
 } from 'helpers/fatura_anexo_duplicado_helpers'
-import { substituirFaturaRetryFields } from 'helpers/fatura_substituir_existente_helpers'
+import { idFaturaAposSubstituir, substituirFaturaRetryFields } from 'helpers/fatura_substituir_existente_helpers'
 import { toBandeiraSelectOption } from 'helpers/cartao_helpers'
 import {
     extractFaturaId,
@@ -76,6 +76,7 @@ import {
 } from 'libs/api/exceptions/FaturaCartaoTitularError'
 import { FaturaAnexoDuplicadoError } from 'libs/api/exceptions/FaturaAnexoDuplicadoError'
 import { FaturaJaAnexadaError } from 'libs/api/exceptions/FaturaJaAnexadaError'
+import { FaturaProcessandoError } from 'libs/api/exceptions/FaturaProcessandoError'
 import { PessoasService } from 'services/Pessoas/PessoasService'
 import { toPessoaSelectOption } from 'interfaces/Pessoas/PessoasInterface'
 
@@ -377,14 +378,24 @@ const FaturasForm = () => {
         const faturaData = extractFaturaPayload(result)
         const envelope = result as Record<string, any> | null
         const destino = destinoFaturaDoAnexo(result)
-        const newId = extractFaturaId(result) ?? destino?.id
+        const substituindo = Boolean(
+            pendingJaAnexadaRef.current.confirmar_substituir_fatura
+            || pendingMetadadosRef.current.confirmar_substituir_fatura
+        )
+        const faturaExistenteId =
+            pendingJaAnexadaRef.current.fatura_existente_id
+            ?? pendingMetadadosRef.current.fatura_existente_id
+            ?? null
+        const newId = idFaturaAposSubstituir(
+            faturaExistenteId,
+            extractFaturaId(result) ?? destino?.id,
+        )
         const form = getValues()
         const realocado = anexoFoiParaOutraFatura(
             { mes: form.mes, ano: form.ano },
             destino,
         )
         const fromDuplicado = Boolean(pendingAnexoDuplicadoRef.current.confirmar_anexo_duplicado)
-        const fromJaAnexada = Boolean(pendingJaAnexadaRef.current.confirmar_substituir_fatura)
         pendingAnexoDuplicadoRef.current = {}
         pendingJaAnexadaRef.current = {}
 
@@ -396,7 +407,7 @@ const FaturasForm = () => {
 
         const apiMessage = extractFaturaMessage(result)
         toast.success(
-            (fromDuplicado || fromJaAnexada) && apiMessage
+            (fromDuplicado || substituindo) && apiMessage
                 ? apiMessage
                 : (Boolean(arquivoFile) || realocado) && formatCompetenciaMesAno(destino)
                     ? mensagemPdfVinculadoCompetencia(destino, 'Fatura cadastrada com sucesso')
@@ -414,6 +425,14 @@ const FaturasForm = () => {
     }
 
     const handleCreateError = (error: unknown): boolean => {
+        if (error instanceof FaturaProcessandoError) {
+            toast.warning(error.message)
+            setJaAnexadaModalOpen(false)
+            setJaAnexadaError(null)
+            setMetadadosModalOpen(false)
+            setAnexoDuplicadoModalOpen(false)
+            return true
+        }
         if (error instanceof FaturaMetadadosError) {
             openMetadadosModal(error)
             return true
