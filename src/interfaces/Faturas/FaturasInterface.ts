@@ -188,6 +188,13 @@ export interface FaturasView extends FaturaResumo {
     responsavel_id?: number | null
     responsavel_nome?: string | null
     grupos_por_cartao?: FaturaGrupoPorCartao[]
+    /** Cabeçalho do PDF vs soma das linhas importadas — só no detalhe */
+    conferencia?: {
+        valor_cabecalho?: number | string | null
+        soma_transacoes?: number | string | null
+        bate?: boolean | null
+        diferenca?: number | string | null
+    } | null
 }
 
 export interface FaturasModel {

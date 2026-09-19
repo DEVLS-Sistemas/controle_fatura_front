@@ -338,6 +338,28 @@ describe('totaisConciliacaoFatura', () => {
         labelNaoConciliadas: 'Compras ainda não conciliadas',
       })
     })
+
+    it('não troca o total do PDF pela soma das linhas (caso 738)', () => {
+      expect(totaisConciliacaoFatura(
+        {
+          valor_total: 2288.25,
+          valor_extrato: 2288.25,
+          valor_nao_conciliado: 0,
+          valor_total_com_pendencias: 2288.25,
+          tem_compras_nao_conciliadas: false,
+        },
+        [
+          { compra_manual: false, precisa_conciliar: false, valor: 2075.82 },
+          { compra_manual: false, precisa_conciliar: false, valor: 74.86 },
+        ]
+      )).toEqual({
+        valorExtrato: 2288.25,
+        valorNaoConciliado: 0,
+        valorTotalComPendencias: 2288.25,
+        temComprasNaoConciliadas: false,
+        labelNaoConciliadas: 'Compras ainda não conciliadas',
+      })
+    })
   })
 
 describe('validarFormularioCompra', () => {
