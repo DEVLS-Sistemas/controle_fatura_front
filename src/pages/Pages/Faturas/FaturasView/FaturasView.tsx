@@ -41,7 +41,7 @@ import {
     anexoDuplicadoRetryFields,
     extractFaturaMessage,
 } from 'helpers/fatura_anexo_duplicado_helpers'
-import { substituirFaturaRetryFields } from 'helpers/fatura_substituir_existente_helpers'
+import { idFaturaAposSubstituir, substituirFaturaRetryFields, totalLancamentosAposReprocesso } from 'helpers/fatura_substituir_existente_helpers'
 import { isCompraAvista, isEhAssinatura } from 'helpers/assinaturas_helpers'
 import {
     contaNoTotalLinha,
@@ -110,6 +110,7 @@ import {
 } from 'libs/api/exceptions/FaturaTitularError'
 import { FaturaAnexoDuplicadoError } from 'libs/api/exceptions/FaturaAnexoDuplicadoError'
 import { FaturaJaAnexadaError } from 'libs/api/exceptions/FaturaJaAnexadaError'
+import { FaturaProcessandoError } from 'libs/api/exceptions/FaturaProcessandoError'
 import { getApiBaseUrl } from 'libs/api/ApiConfig'
 import { getAuthToken, handleUnauthorizedSession } from 'helpers/auth_session'
 
@@ -437,6 +438,7 @@ const FaturasViewPage = () => {
     const [processandoTroca, setProcessandoTroca] = useState<RemoverAnexoResult | null>(null)
     const [reconciliaCompras, setReconciliaCompras] = useState<CompraParaReconcilia[]>([])
     const pollTrocaSeqRef = useRef(0)
+    const pendingJaAnexadaIdRef = useRef<number | null>(null)
     const homologConfirmRef = useRef<string | null>(null)
 
     const nomeDoResponsavel = (responsavelId?: number | null, responsavelNome?: string | null) => (
@@ -708,12 +710,14 @@ const FaturasViewPage = () => {
         setSenhaModalOpen(true)
     }, [])
 
-    const loadFatura = useCallback(async (opts?: { silent?: boolean; openSenhaIfNeeded?: boolean }) => {
-        if (!id) return
+    const loadFatura = useCallback(async (opts?: { silent?: boolean; openSenhaIfNeeded?: boolean }): Promise<FaturasView | undefined> => {
+        if (!id) return undefined
         if (!opts?.silent) setLoading(true)
+        let loaded: FaturasView | undefined
         try {
             const view = await faturasService.getViewFaturas({ id })
             if (view) {
+                loaded = view
                 setFatura(view)
                 setShowPdfPreview(false)
                 clearPdfBlobUrl()
@@ -735,7 +739,31 @@ const FaturasViewPage = () => {
         } finally {
             if (!opts?.silent) setLoading(false)
         }
+        return loaded
     }, [id, faturasService, clearPdfBlobUrl, loadTransacoes, loadNumeros, resolveNavVizinhos, openSenhaModal])
+
+    const pollAteProcessamentoTerminar = useCallback(async (
+        faturaId: string | number,
+        seq: number,
+    ): Promise<string | null | undefined> => {
+        const started = Date.now()
+        let lastStatus: string | null | undefined
+        while (Date.now() - started < POLL_FATURA_MAX_MS) {
+            await new Promise((resolve) => setTimeout(resolve, POLL_FATURA_INTERVAL_MS))
+            if (seq !== pollTrocaSeqRef.current) return undefined
+            try {
+                const view = await faturasService.getViewFaturas({ id: faturaId })
+                if (view) {
+                    setFatura(view)
+                    lastStatus = view.status
+                    if (faturaProcessamentoTerminou(view.status)) break
+                }
+            } catch (error) {
+                console.error('Erro ao acompanhar o processamento da fatura:', error)
+            }
+        }
+        return lastStatus
+    }, [faturasService])
 
     const handleReprocessar = async () => {
         if (!id) return
@@ -882,11 +910,23 @@ const FaturasViewPage = () => {
         setSelecaoModalOpen(true)
     }
 
+    const avisarFaturaProcessando = (error: unknown): boolean => {
+        if (!(error instanceof FaturaProcessandoError)) return false
+        toast.warning(error.message)
+        setJaAnexadaModalOpen(false)
+        setJaAnexadaError(null)
+        setAnexoDuplicadoModalOpen(false)
+        return true
+    }
+
     const handleUploadSuccess = async (result: unknown) => {
         const faturaData = extractFaturaPayload(result)
         const envelope = result as Record<string, any> | null
         const destino = destinoFaturaDoAnexo(result)
-        const realocado = anexoFoiParaOutraFatura(
+        const faturaExistenteId = pendingJaAnexadaIdRef.current
+        pendingJaAnexadaIdRef.current = null
+        const substituindo = faturaExistenteId != null
+        const realocado = !substituindo && anexoFoiParaOutraFatura(
             { id, mes: fatura?.mes, ano: fatura?.ano, competencia: fatura?.competencia },
             destino,
         )
@@ -912,25 +952,27 @@ const FaturasViewPage = () => {
         if (nomeResp) {
             toast.info(`Responsável "${nomeResp}" criado e aplicado nesta fatura.`)
         }
-        const destinoId = destino?.id ?? id
-        if (precisaPollProcessamentoFatura(faturaData) && destinoId != null) {
-            const seq = ++pollTrocaSeqRef.current
-            const started = Date.now()
-            while (Date.now() - started < POLL_FATURA_MAX_MS) {
-                await new Promise((resolve) => setTimeout(resolve, POLL_FATURA_INTERVAL_MS))
-                if (seq !== pollTrocaSeqRef.current) return
-                try {
-                    const view = await faturasService.getViewFaturas({ id: destinoId })
-                    if (view && faturaProcessamentoTerminou(view.status)) break
-                } catch (error) {
-                    console.error('Erro ao acompanhar o processamento da fatura:', error)
-                }
-            }
-            if (seq !== pollTrocaSeqRef.current) return
-        }
+        const destinoId = idFaturaAposSubstituir(
+            faturaExistenteId,
+            faturaData?.id ?? destino?.id ?? id,
+        )
         if (realocado && destino?.id != null) {
             navigate(`/faturas/view/${destino.id}`)
             return
+        }
+        if (destinoId != null && Number(destinoId) !== Number(id)) {
+            navigate(`/faturas/view/${destinoId}`)
+            return
+        }
+        if (precisaPollProcessamentoFatura(faturaData) && destinoId != null) {
+            setFatura((prev) => (
+                prev && Number(prev.id) === Number(destinoId)
+                    ? { ...prev, status: String(faturaData?.status ?? 'processando') }
+                    : prev
+            ))
+            const seq = ++pollTrocaSeqRef.current
+            await pollAteProcessamentoTerminar(destinoId, seq)
+            if (seq !== pollTrocaSeqRef.current) return
         }
         await loadFatura({ silent: true, openSenhaIfNeeded: false })
         await loadLookups()
@@ -977,6 +1019,7 @@ const FaturasViewPage = () => {
             })
             await handleUploadSuccess(result)
         } catch (error) {
+            if (avisarFaturaProcessando(error)) return
             if (error instanceof FaturaTitularError) {
                 setTitularTitulares(error.titulares)
                 setTitularNomeNoCartao(error.nome_no_cartao ?? null)
@@ -1042,6 +1085,7 @@ const FaturasViewPage = () => {
             setSelecaoModalOpen(false)
             await handleUploadSuccess(result)
         } catch (error) {
+            if (avisarFaturaProcessando(error)) return
             if (error instanceof FaturaSelecaoError) {
                 if (error.precisa_selecionar_final || error.codigo === 'precisa_selecionar_final') {
                     setSelecaoStep('final')
@@ -1113,6 +1157,7 @@ const FaturasViewPage = () => {
             setTitularModalOpen(false)
             await handleUploadSuccess(result)
         } catch (error) {
+            if (avisarFaturaProcessando(error)) return
             if (error instanceof FaturaSelecaoError) {
                 setTitularModalOpen(false)
                 openSelecaoModal(error)
@@ -1171,6 +1216,7 @@ const FaturasViewPage = () => {
             setAnexoDuplicadoModalOpen(false)
             await handleUploadSuccess(result)
         } catch (error) {
+            if (avisarFaturaProcessando(error)) return
             if (error instanceof FaturaAnexoDuplicadoError) {
                 setAnexoDuplicadoError(error)
                 return
@@ -1216,6 +1262,7 @@ const FaturasViewPage = () => {
             return
         }
         const retry = substituirFaturaRetryFields(existingId)
+        pendingJaAnexadaIdRef.current = existingId
         setJaAnexadaLoading(true)
         try {
             const result = await faturasService.uploadPdf({
@@ -1229,6 +1276,8 @@ const FaturasViewPage = () => {
             setJaAnexadaModalOpen(false)
             await handleUploadSuccess(result)
         } catch (error) {
+            pendingJaAnexadaIdRef.current = null
+            if (avisarFaturaProcessando(error)) return
             if (error instanceof FaturaJaAnexadaError) {
                 setJaAnexadaError(error)
                 return
@@ -1376,22 +1425,7 @@ const FaturasViewPage = () => {
         await loadFatura({ silent: true, openSenhaIfNeeded: false })
         if (seq !== pollTrocaSeqRef.current) return
 
-        const started = Date.now()
-        let lastStatus: string | null | undefined
-        while (Date.now() - started < POLL_FATURA_MAX_MS) {
-            await new Promise((resolve) => setTimeout(resolve, POLL_FATURA_INTERVAL_MS))
-            if (seq !== pollTrocaSeqRef.current) return
-            try {
-                const view = await faturasService.getViewFaturas({ id })
-                if (view) {
-                    setFatura(view)
-                    lastStatus = view.status
-                    if (faturaProcessamentoTerminou(view.status)) break
-                }
-            } catch (error) {
-                console.error('Erro ao acompanhar o processamento da fatura:', error)
-            }
-        }
+        const lastStatus = await pollAteProcessamentoTerminar(id, seq)
 
         if (seq !== pollTrocaSeqRef.current) return
         await loadFatura({ silent: true, openSenhaIfNeeded: false })
@@ -1875,10 +1909,19 @@ const FaturasViewPage = () => {
     useEffect(() => {
         senhaModalAutoOpenedRef.current = null
         pollTrocaSeqRef.current += 1
+        const seq = pollTrocaSeqRef.current
         setProcessandoTroca(null)
         setComprasRestauradas(null)
         setReconciliaCompras([])
-        loadFatura()
+        void (async () => {
+            const view = await loadFatura()
+            if (seq !== pollTrocaSeqRef.current) return
+            if (!view || !id) return
+            if (String(view.status ?? '').toLowerCase() !== 'processando') return
+            await pollAteProcessamentoTerminar(id, seq)
+            if (seq !== pollTrocaSeqRef.current) return
+            await loadFatura({ silent: true, openSenhaIfNeeded: false })
+        })()
         return () => {
             pollTrocaSeqRef.current += 1
         }
@@ -1909,7 +1952,11 @@ const FaturasViewPage = () => {
         return () => window.removeEventListener('keydown', onKeyDown)
     }, [navVizinhos.anteriorId, navVizinhos.proximaId, navigate])
 
-    const totalTransacoes = transacoes.length || fatura?.total_transacoes || 0
+    const totalTransacoes = totalLancamentosAposReprocesso({
+        status: fatura?.status,
+        total_transacoes: fatura?.total_transacoes,
+        transacoesCount: transacoes.length,
+    })
     const transacoesComCategoria = useMemo(
         () => transacoes.filter((tx) => tx.categoria_id != null).length,
         [transacoes]
@@ -2285,7 +2332,7 @@ const FaturasViewPage = () => {
                                             {statusLabel[fatura.status ?? ''] ?? fatura.status}
                                         </Badge>
                                     </span>
-                                    <span><strong>Lançamentos:</strong> {fatura.total_transacoes ?? transacoes.length}</span>
+                                    <span><strong>Lançamentos:</strong> {totalTransacoes}</span>
                                     {fatura.processado_em && (
                                         <span><strong>Processado em:</strong> {formatDateBr(fatura.processado_em)}</span>
                                     )}

@@ -28,6 +28,7 @@ import { FaturaTitularError } from "../../libs/api/exceptions/FaturaTitularError
 import { FaturaCartaoTitularError } from "../../libs/api/exceptions/FaturaCartaoTitularError"
 import { FaturaAnexoDuplicadoError } from "../../libs/api/exceptions/FaturaAnexoDuplicadoError"
 import { FaturaJaAnexadaError } from "../../libs/api/exceptions/FaturaJaAnexadaError"
+import { FaturaProcessandoError } from "../../libs/api/exceptions/FaturaProcessandoError"
 
 export class FaturasService implements FaturasInterface {
     private readonly url: string
@@ -125,6 +126,9 @@ export class FaturasService implements FaturasInterface {
                 }
                 if (FaturaAnexoDuplicadoError.isAnexoDuplicadoBody(body)) {
                     throw new FaturaAnexoDuplicadoError(body)
+                }
+                if (FaturaProcessandoError.isFaturaProcessandoBody(body)) {
+                    throw new FaturaProcessandoError(body)
                 }
                 if (FaturaJaAnexadaError.isFaturaJaAnexadaBody(body)) {
                     throw new FaturaJaAnexadaError(body)
@@ -314,6 +318,9 @@ export class FaturasService implements FaturasInterface {
                 }
                 if (FaturaAnexoDuplicadoError.isAnexoDuplicadoBody(body)) {
                     throw new FaturaAnexoDuplicadoError(body)
+                }
+                if (FaturaProcessandoError.isFaturaProcessandoBody(body)) {
+                    throw new FaturaProcessandoError(body)
                 }
                 if (FaturaJaAnexadaError.isFaturaJaAnexadaBody(body)) {
                     throw new FaturaJaAnexadaError(body)
