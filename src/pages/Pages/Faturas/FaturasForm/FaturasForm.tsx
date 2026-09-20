@@ -21,6 +21,10 @@ import {
     extractFaturaMessage,
 } from 'helpers/fatura_anexo_duplicado_helpers'
 import { idFaturaAposSubstituir, substituirFaturaRetryFields } from 'helpers/fatura_substituir_existente_helpers'
+import {
+    cartaoEBandeiraDoCadastro,
+    resolveModoMetadados,
+} from 'helpers/fatura_metadados_helpers'
 import { toBandeiraSelectOption } from 'helpers/cartao_helpers'
 import {
     extractFaturaId,
@@ -58,6 +62,7 @@ import {
 import {
     FaturaMetadadosCartaoOption,
     FaturaMetadadosError,
+    FaturaMetadadosModo,
     FaturaMetadadosRetryPayload,
     FaturaMetadadosSugestao,
     isFalhaDeteccaoMetadados,
@@ -126,6 +131,9 @@ const FaturasForm = () => {
     const [metadadosCartoes, setMetadadosCartoes] = useState<FaturaMetadadosCartaoOption[]>([])
     const [metadadosBandeiras, setMetadadosBandeiras] = useState<FaturaSelecaoBandeiraOption[]>([])
     const [metadadosPrecisaBandeira, setMetadadosPrecisaBandeira] = useState(false)
+    const [metadadosModo, setMetadadosModo] = useState<FaturaMetadadosModo | null>(null)
+    const [metadadosPodeCadastrar, setMetadadosPodeCadastrar] = useState(false)
+    const [metadadosOrientacao, setMetadadosOrientacao] = useState<string | null>(null)
     const [metadadosAcaoSugerida, setMetadadosAcaoSugerida] = useState<string | null>(null)
     const [metadadosFaturaExistente, setMetadadosFaturaExistente] = useState<FaturaMetadadosError['fatura_existente']>(null)
     const [metadadosFaturaExistenteId, setMetadadosFaturaExistenteId] = useState<number | null>(null)
@@ -368,6 +376,9 @@ const FaturasForm = () => {
         setMetadadosCartoes(error.cartoes)
         setMetadadosBandeiras(error.bandeiras)
         setMetadadosPrecisaBandeira(error.precisa_selecionar_bandeira)
+        setMetadadosModo(resolveModoMetadados(error))
+        setMetadadosPodeCadastrar(error.pode_cadastrar_cartao)
+        setMetadadosOrientacao(error.orientacao ?? error.message ?? null)
         setMetadadosAcaoSugerida(error.acao_sugerida)
         setMetadadosFaturaExistente(error.fatura_existente)
         setMetadadosFaturaExistenteId(error.fatura_existente_id)
@@ -551,10 +562,6 @@ const FaturasForm = () => {
 
     const submitCreate = async (extra?: FaturaCreateExtra) => {
         const data = getValues()
-        const cartaoId =
-            extra?.cartao_id
-            ?? pendingMetadadosRef.current.cartao_id
-            ?? data.cartao_id
         const cartaoNome =
             extra?.cartao_nome
             ?? pendingMetadadosRef.current.cartao_nome
@@ -565,6 +572,19 @@ const FaturasForm = () => {
             ?? pendingCartaoTitularRef.current.cadastrar_cartao
             ?? cartaoNome
         )
+        const { cartao_id: cartaoId, cartao_bandeira_id: cartaoBandeiraId } = cartaoEBandeiraDoCadastro({
+            cadastrarCartao,
+            cartaoNome,
+            cartaoIdRetry: extra?.cartao_id ?? pendingMetadadosRef.current.cartao_id,
+            bandeiraIdRetry:
+                extra?.cartao_bandeira_id
+                ?? pendingMetadadosRef.current.cartao_bandeira_id
+                ?? pendingSelecaoRef.current.cartao_bandeira_id,
+            cartaoIdFormulario: data.cartao_id,
+            bandeiraIdFormulario: data.cartao_bandeira_id,
+            temArquivo: Boolean(arquivoFile) && !extra?.omitir_arquivo,
+            bandeiraDoFormularioExplicita: showBandeiraSelect && data.cartao_bandeira_id != null && data.cartao_bandeira_id !== '',
+        })
         const substituirFatura = Boolean(
             extra?.substituir_fatura
             ?? pendingCartaoTitularRef.current.substituir_fatura
@@ -584,7 +604,7 @@ const FaturasForm = () => {
 
         if (!confirmarAnexoDuplicado && !confirmarSubstituirFatura) {
             await assertPeriodoLivre({
-                cartao_id: cartaoNome || cadastrarCartao ? null : cartaoId,
+                cartao_id: cartaoId,
                 cartao_nome: cartaoNome,
                 cadastrar_cartao: cadastrarCartao,
                 substituir_fatura: substituirFatura,
@@ -597,18 +617,13 @@ const FaturasForm = () => {
 
         const payload: FaturasModel = {
             ...data,
-            // Novo cartão: envia nome sem cartao_id para o back criar no mesmo POST
-            cartao_id: cartaoNome || cadastrarCartao ? null : (cartaoId ?? null),
+            cartao_id: cartaoId,
             cartao_nome: cartaoNome || undefined,
             cadastrar_cartao: cadastrarCartao || undefined,
             substituir_fatura: substituirFatura || undefined,
             mes: extra?.mes ?? pendingMetadadosRef.current.mes ?? data.mes,
             ano: extra?.ano ?? pendingMetadadosRef.current.ano ?? data.ano,
-            cartao_bandeira_id:
-                extra?.cartao_bandeira_id
-                ?? pendingMetadadosRef.current.cartao_bandeira_id
-                ?? pendingSelecaoRef.current.cartao_bandeira_id
-                ?? data.cartao_bandeira_id,
+            cartao_bandeira_id: cartaoBandeiraId,
             bandeira:
                 extra?.bandeira
                 ?? pendingMetadadosRef.current.bandeira
@@ -750,15 +765,17 @@ const FaturasForm = () => {
     const handleMetadadosConfirm = async (selection: FaturaMetadadosRetryPayload) => {
         pendingMetadadosRef.current = {
             ...selection,
+            cartao_id: selection.cartao_nome || selection.cadastrar_cartao ? null : selection.cartao_id,
             cadastrar_cartao: Boolean(selection.cartao_nome) || selection.cadastrar_cartao,
             confirmar_substituir_fatura: Boolean(selection.confirmar_substituir_fatura),
             fatura_existente_id: selection.fatura_existente_id ?? null,
         }
         setValue('mes', selection.mes)
         setValue('ano', selection.ano)
-        if (selection.cartao_nome) {
+        if (selection.cartao_nome || selection.cadastrar_cartao) {
             setValue('cartao_id', null)
             setValue('cartao_nome', selection.cartao_nome)
+            setValue('cartao_bandeira_id', selection.cartao_bandeira_id ?? null)
         } else if (selection.cartao_id != null) {
             setValue('cartao_id', selection.cartao_id)
             setValue('cartao_nome', null)
@@ -1114,6 +1131,9 @@ const FaturasForm = () => {
                 sugestao={metadadosSugestao}
                 cartoes={metadadosCartoes}
                 bandeiras={metadadosBandeiras}
+                modo={metadadosModo}
+                podeCadastrarCartao={metadadosPodeCadastrar}
+                orientacao={metadadosOrientacao}
                 precisaSelecionarBandeira={metadadosPrecisaBandeira}
                 acaoSugerida={metadadosAcaoSugerida}
                 faturaExistente={metadadosFaturaExistente}

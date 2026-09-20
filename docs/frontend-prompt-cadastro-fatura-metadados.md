@@ -4,7 +4,8 @@ Use este prompt no repositório do frontend para alinhar o **cadastro de fatura*
 
 Complementa [`frontend-prompt-faturas.md`](frontend-prompt-faturas.md) e o modal de senha em [`frontend-prompt-senha-pdf-fatura.md`](frontend-prompt-senha-pdf-fatura.md).
 
-PDF no **ano certo** (não anexar 07/2024 em 07/2026): [`frontend-prompt-pdf-competencia-ano.md`](frontend-prompt-pdf-competencia-ano.md).
+PDF no **ano certo** (não anexar 07/2024 em 07/2026): [`frontend-prompt-pdf-competencia-ano.md`](frontend-prompt-pdf-competencia-ano.md).  
+PDF manda no cartão (não a tela de origem): [`frontend-prompt-modal-cartao-bandeira.md`](frontend-prompt-modal-cartao-bandeira.md).
 
 ---
 

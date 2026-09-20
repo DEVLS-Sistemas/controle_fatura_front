@@ -2198,7 +2198,6 @@ const FaturasViewPage = () => {
                                     state={{
                                         source: {
                                             cartao_id: fatura.cartao_id ?? null,
-                                            cartao_bandeira_id: fatura.cartao_bandeira_id ?? null,
                                         },
                                     }}
                                 >
