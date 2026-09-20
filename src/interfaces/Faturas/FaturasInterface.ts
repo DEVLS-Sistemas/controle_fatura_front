@@ -195,6 +195,15 @@ export interface FaturasView extends FaturaResumo {
         bate?: boolean | null
         diferenca?: number | string | null
     } | null
+    /** Cartão da fatura — `GET /faturas/listar/{id}` (senha do PDF sem devolver o valor) */
+    cartao?: {
+        id?: number
+        nome?: string
+        banco?: string | null
+        tem_senha_pdf?: boolean
+        senha_pdf_regra?: string | null
+        senha_pdf_orientacao?: string | null
+    } | null
 }
 
 export interface FaturasModel {

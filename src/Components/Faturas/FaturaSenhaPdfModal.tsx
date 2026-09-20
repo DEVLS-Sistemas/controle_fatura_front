@@ -163,7 +163,6 @@ const FaturaSenhaPdfModal = ({
                     salvar_senha_pdf: salvarSenha,
                     senha_pdf_regra: regraSelecionada || undefined,
                 })
-                onClose()
                 await onSuccess?.()
                 return
             }
