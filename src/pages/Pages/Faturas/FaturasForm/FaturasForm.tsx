@@ -36,6 +36,13 @@ import {
     resolveSenhaPdfMeta,
     SenhaPdfMeta,
 } from 'interfaces/Faturas/FaturasInterface'
+import {
+    cadastroPdfNaoPersistiu,
+    cartaoTemSenhaPdfSalva,
+    deveAbrirModalSenhaPdf,
+    deveAbrirModalSenhaPdfDeErro,
+    MSG_CADASTRO_PDF_NAO_ANEXADO,
+} from 'helpers/fatura_senha_pdf_helpers'
 import { ParserHomologado, PARSERS_HOMOLOGADOS_PADRAO } from 'interfaces/Cartoes/CartoesInterface'
 import { FaturasService } from 'services/Faturas/FaturasService'
 import { CartoesService } from 'services/Cartoes/CartoesService'
@@ -385,7 +392,15 @@ const FaturasForm = () => {
         setMetadadosModalOpen(true)
     }
 
-    const handleCreateSuccess = (result: unknown) => {
+    const temSenhaPdfDoCartao = (meta?: SenhaPdfMeta | null) => {
+        const cartaoId = pendingMetadadosRef.current.cartao_id ?? getValues('cartao_id')
+        return cartaoTemSenhaPdfSalva({
+            senhaMeta: meta,
+            lookup: cartaoLookupById(cartaoId),
+        })
+    }
+
+    const handleCreateSuccess = (result: unknown): boolean => {
         const faturaData = extractFaturaPayload(result)
         const envelope = result as Record<string, any> | null
         const destino = destinoFaturaDoAnexo(result)
@@ -410,10 +425,38 @@ const FaturasForm = () => {
         pendingAnexoDuplicadoRef.current = {}
         pendingJaAnexadaRef.current = {}
 
-        if (faturaPrecisaSenhaPdf(faturaData, envelope) && newId) {
+        const senhaMeta = resolveSenhaPdfMeta(faturaData, envelope)
+        const enviouArquivo = Boolean(arquivoFile)
+        const pdfNaoPersistiu = cadastroPdfNaoPersistiu({
+            enviouArquivo,
+            temPdf: faturaData?.tem_pdf,
+            temCsv: faturaData?.tem_csv,
+        })
+        const precisaSenha = faturaPrecisaSenhaPdf(faturaData, envelope)
+        const abrirModalSenha = deveAbrirModalSenhaPdf({
+            codigo: faturaData?.erro_codigo ?? envelope?.codigo ?? envelope?.erro_codigo,
+            motivo: senhaMeta?.motivo,
+            precisa_senha_pdf: precisaSenha,
+            temSenhaPdfCartao: temSenhaPdfDoCartao(senhaMeta),
+        })
+
+        if (enviouArquivo && pdfNaoPersistiu) {
+            if (abrirModalSenha && !pendingSenhaRef.current.senha_pdf) {
+                toast.info('Informe a senha do PDF para anexar o arquivo.')
+                openSenhaModalCadastro(senhaMeta)
+                return true
+            }
+            throw new Error(MSG_CADASTRO_PDF_NAO_ANEXADO)
+        }
+
+        if (precisaSenha && newId && abrirModalSenha) {
             toast.info('Fatura cadastrada. Informe a senha do PDF para continuar.')
-            openSenhaModalPosCadastro(newId, resolveSenhaPdfMeta(faturaData, envelope))
-            return
+            if (pdfNaoPersistiu && arquivoFile) {
+                openSenhaModalCadastro(senhaMeta)
+            } else {
+                openSenhaModalPosCadastro(newId, senhaMeta)
+            }
+            return true
         }
 
         const apiMessage = extractFaturaMessage(result)
@@ -433,6 +476,7 @@ const FaturasForm = () => {
         } else {
             navigate('/faturas')
         }
+        return false
     }
 
     const handleCreateError = (error: unknown): boolean => {
@@ -471,7 +515,11 @@ const FaturasForm = () => {
             return true
         }
         if (error instanceof PdfSenhaError) {
-            openSenhaModalCadastro(error.senha_pdf ?? null)
+            if (deveAbrirModalSenhaPdfDeErro(error, temSenhaPdfDoCartao(error.senha_pdf))) {
+                openSenhaModalCadastro(error.senha_pdf ?? null)
+                return true
+            }
+            toast.error(error.message || MSG_CADASTRO_PDF_NAO_ANEXADO)
             return true
         }
         if (error instanceof ValidationError && isFalhaDeteccaoMetadados(error.errors as any)) {
@@ -601,6 +649,11 @@ const FaturasForm = () => {
             extra?.fatura_existente_id
             ?? pendingJaAnexadaRef.current.fatura_existente_id
             ?? pendingMetadadosRef.current.fatura_existente_id
+
+        if (pendingSenhaRef.current.senha_pdf && !extra?.omitir_arquivo && !arquivoFile) {
+            toast.error(MSG_CADASTRO_PDF_NAO_ANEXADO)
+            throw new Error(MSG_CADASTRO_PDF_NAO_ANEXADO)
+        }
 
         if (!confirmarAnexoDuplicado && !confirmarSubstituirFatura) {
             await assertPeriodoLivre({
@@ -963,6 +1016,10 @@ const FaturasForm = () => {
     }
 
     const handleSenhaCadastroUnlock = async (payload: FaturaSenhaUnlockPayload) => {
+        if (!arquivoFile) {
+            toast.error(MSG_CADASTRO_PDF_NAO_ANEXADO)
+            throw new Error(MSG_CADASTRO_PDF_NAO_ANEXADO)
+        }
         pendingSenhaRef.current = {
             senha_pdf: payload.senha_pdf,
             salvar_senha_pdf: payload.salvar_senha_pdf,
@@ -970,12 +1027,18 @@ const FaturasForm = () => {
         }
         try {
             const result = await submitCreate()
-            handleCreateSuccess(result)
+            const manteveSenhaModal = handleCreateSuccess(result)
+            if (!manteveSenhaModal) {
+                setSenhaModalOpen(false)
+                setSenhaCadastroMode(false)
+            }
         } catch (error) {
             if (error instanceof PdfSenhaError) {
                 throw error
             }
             if (handleCreateError(error)) {
+                setSenhaModalOpen(false)
+                setSenhaCadastroMode(false)
                 return
             }
             throw error

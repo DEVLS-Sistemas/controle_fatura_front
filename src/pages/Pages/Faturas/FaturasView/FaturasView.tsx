@@ -83,7 +83,7 @@ import ResponsavelModal from 'pages/Pages/Transacoes/ResponsavelModal/Responsave
 import CategoriaRapidoModal, { CategoriaRapidoConfirm } from 'pages/Pages/Transacoes/CategoriaRapidoModal/CategoriaRapidoModal'
 import SubcategoriaRapidoModal, { SubcategoriaRapidoConfirm } from 'pages/Pages/Transacoes/SubcategoriaRapidoModal/SubcategoriaRapidoModal'
 import PlataformaRapidoModal, { PlataformaRapidoConfirm } from 'pages/Pages/Transacoes/PlataformaRapidoModal/PlataformaRapidoModal'
-import FaturaSenhaPdfModal from 'Components/Faturas/FaturaSenhaPdfModal'
+import FaturaSenhaPdfModal, { FaturaSenhaUnlockPayload } from 'Components/Faturas/FaturaSenhaPdfModal'
 import FaturaSelecaoModal, { FaturaSelecaoStep } from 'Components/Faturas/FaturaSelecaoModal'
 import FaturaTitularModal from 'Components/Faturas/FaturaTitularModal'
 import FaturaAnexoDuplicadoModal from 'Components/Faturas/FaturaAnexoDuplicadoModal'
@@ -114,6 +114,14 @@ import { FaturaJaAnexadaError } from 'libs/api/exceptions/FaturaJaAnexadaError'
 import { FaturaProcessandoError } from 'libs/api/exceptions/FaturaProcessandoError'
 import { getApiBaseUrl } from 'libs/api/ApiConfig'
 import { getAuthToken, handleUnauthorizedSession } from 'helpers/auth_session'
+import {
+    cadastroPdfNaoPersistiu,
+    cartaoTemSenhaPdfSalva,
+    deveAbrirModalSenhaPdf,
+    deveAbrirModalSenhaPdfDeErro,
+    deveAbrirModalSenhaPdfDeFatura,
+    MSG_UPLOAD_PDF_NAO_ANEXADO,
+} from 'helpers/fatura_senha_pdf_helpers'
 
 const formatNumeroOptionLabel = (n: NumeroListItem): string => {
     if (n.label) return n.label
@@ -366,6 +374,7 @@ const FaturasViewPage = () => {
     const [processarAuto, setProcessarAuto] = useState(true)
     const [senhaModalOpen, setSenhaModalOpen] = useState(false)
     const [senhaModalMeta, setSenhaModalMeta] = useState<SenhaPdfMeta | null>(null)
+    const [senhaViaUpload, setSenhaViaUpload] = useState(false)
     const senhaModalAutoOpenedRef = useRef<string | null>(null)
     const [selecaoModalOpen, setSelecaoModalOpen] = useState(false)
     const [selecaoStep, setSelecaoStep] = useState<FaturaSelecaoStep>('bandeira')
@@ -706,10 +715,28 @@ const FaturasViewPage = () => {
         }
     }, [faturasService])
 
-    const openSenhaModal = useCallback((meta?: SenhaPdfMeta | null) => {
+    const openSenhaModal = useCallback((meta?: SenhaPdfMeta | null, opts?: { viaUpload?: boolean }) => {
+        setSenhaViaUpload(Boolean(opts?.viaUpload))
         setSenhaModalMeta(meta ?? null)
         setSenhaModalOpen(true)
     }, [])
+
+    const lookupDoCartao = (cartaoId?: number | null) =>
+        cartoesLookup.find((c) => Number(c.id) === Number(cartaoId))
+
+    const handlePdfSenhaError = (error: PdfSenhaError, opts?: { viaUpload?: boolean }): boolean => {
+        const temSenha = cartaoTemSenhaPdfSalva({
+            senhaMeta: error.senha_pdf ?? fatura?.senha_pdf,
+            cartao: fatura?.cartao,
+            lookup: lookupDoCartao(fatura?.cartao_id),
+        })
+        if (deveAbrirModalSenhaPdfDeErro(error, temSenha)) {
+            openSenhaModal(error.senha_pdf ?? null, { viaUpload: opts?.viaUpload })
+            return true
+        }
+        toast.error(error.message)
+        return true
+    }
 
     const loadFatura = useCallback(async (opts?: { silent?: boolean; openSenhaIfNeeded?: boolean }): Promise<FaturasView | undefined> => {
         if (!id) return undefined
@@ -727,7 +754,13 @@ const FaturasViewPage = () => {
                     loadNumeros(id),
                     resolveNavVizinhos(view),
                 ])
-                if (opts?.openSenhaIfNeeded !== false && faturaPrecisaSenhaPdf(view)) {
+                if (
+                    opts?.openSenhaIfNeeded !== false
+                    && deveAbrirModalSenhaPdfDeFatura(
+                        view,
+                        cartoesLookup.find((c) => Number(c.id) === Number(view.cartao_id)),
+                    )
+                ) {
                     if (senhaModalAutoOpenedRef.current !== String(id)) {
                         senhaModalAutoOpenedRef.current = String(id)
                         openSenhaModal(resolveSenhaPdfMeta(view))
@@ -741,7 +774,7 @@ const FaturasViewPage = () => {
             if (!opts?.silent) setLoading(false)
         }
         return loaded
-    }, [id, faturasService, clearPdfBlobUrl, loadTransacoes, loadNumeros, resolveNavVizinhos, openSenhaModal])
+    }, [id, faturasService, clearPdfBlobUrl, loadTransacoes, loadNumeros, resolveNavVizinhos, openSenhaModal, cartoesLookup])
 
     const pollAteProcessamentoTerminar = useCallback(async (
         faturaId: string | number,
@@ -772,7 +805,8 @@ const FaturasViewPage = () => {
 
     const handleReprocessar = async () => {
         if (!id) return
-        if (fatura && faturaPrecisaSenhaPdf(fatura)) {
+        const lookup = cartoesLookup.find((c) => Number(c.id) === Number(fatura?.cartao_id))
+        if (fatura && deveAbrirModalSenhaPdfDeFatura(fatura, lookup)) {
             openSenhaModal(resolveSenhaPdfMeta(fatura))
             return
         }
@@ -784,7 +818,7 @@ const FaturasViewPage = () => {
             await loadLookups()
         } catch (error) {
             if (error instanceof PdfSenhaError) {
-                openSenhaModal(error.senha_pdf ?? null)
+                handlePdfSenhaError(error)
                 return
             }
             toast.error('Erro ao reprocessar fatura')
@@ -935,17 +969,51 @@ const FaturasViewPage = () => {
             { id, mes: fatura?.mes, ano: fatura?.ano, competencia: fatura?.competencia },
             destino,
         )
+        const enviouArquivo = Boolean(pendingUploadFileRef.current ?? fileInputRef.current?.files?.[0])
+        const senhaMeta = resolveSenhaPdfMeta(faturaData, envelope)
+        const pdfNaoPersistiu = cadastroPdfNaoPersistiu({
+            enviouArquivo,
+            temPdf: faturaData?.tem_pdf,
+            temCsv: faturaData?.tem_csv,
+        })
+        const precisaSenha = faturaPrecisaSenhaPdf(faturaData, envelope)
+        const temSenha = cartaoTemSenhaPdfSalva({
+            senhaMeta,
+            cartao: faturaData?.cartao ?? fatura?.cartao,
+            lookup: lookupDoCartao(faturaData?.cartao_id ?? fatura?.cartao_id),
+        })
+        const abrirModalSenha = deveAbrirModalSenhaPdf({
+            codigo: faturaData?.erro_codigo ?? envelope?.codigo ?? envelope?.erro_codigo,
+            motivo: senhaMeta?.motivo,
+            precisa_senha_pdf: precisaSenha,
+            temSenhaPdfCartao: temSenha,
+        })
+
+        if (enviouArquivo && pdfNaoPersistiu) {
+            if (abrirModalSenha) {
+                toast.info('Informe a senha do PDF para anexar o arquivo.')
+                if (realocado && destino?.id != null) {
+                    navigate(`/faturas/view/${destino.id}`)
+                    return
+                }
+                openSenhaModal(senhaMeta, { viaUpload: true })
+                return
+            }
+            toast.error(MSG_UPLOAD_PDF_NAO_ANEXADO)
+            return
+        }
+
         if (fileInputRef.current) fileInputRef.current.value = ''
         pendingUploadFileRef.current = null
 
-        if (faturaPrecisaSenhaPdf(faturaData, envelope)) {
+        if (precisaSenha && abrirModalSenha) {
             toast.info('Arquivo enviado. Informe a senha do PDF para continuar.')
             if (realocado && destino?.id != null) {
                 navigate(`/faturas/view/${destino.id}`)
                 return
             }
             await loadFatura({ silent: true, openSenhaIfNeeded: false })
-            openSenhaModal(resolveSenhaPdfMeta(faturaData, envelope))
+            openSenhaModal(senhaMeta)
             return
         }
 
@@ -1049,12 +1117,39 @@ const FaturasViewPage = () => {
                 return
             }
             if (error instanceof PdfSenhaError) {
-                await loadFatura({ silent: true, openSenhaIfNeeded: false })
-                openSenhaModal(error.senha_pdf ?? null)
+                handlePdfSenhaError(error, { viaUpload: true })
                 return
             }
             toast.error((error as Error)?.message || 'Erro ao enviar arquivo')
         }
+    }
+
+    const handleSenhaUnlockUpload = async (payload: FaturaSenhaUnlockPayload) => {
+        const file = pendingUploadFileRef.current ?? fileInputRef.current?.files?.[0]
+        if (!file || !id) {
+            toast.error(MSG_UPLOAD_PDF_NAO_ANEXADO)
+            throw new Error(MSG_UPLOAD_PDF_NAO_ANEXADO)
+        }
+        const result = await faturasService.uploadPdf({
+            id: Number(id),
+            arquivo_pdf: file,
+            processar_automatico: processarAuto,
+            senha_pdf: payload.senha_pdf,
+            salvar_senha_pdf: payload.salvar_senha_pdf,
+            senha_pdf_regra: payload.senha_pdf_regra,
+            ...pendingSelecaoRef.current,
+            ...pendingTitularRef.current,
+        })
+        await handleUploadSuccess(result)
+        if (cadastroPdfNaoPersistiu({
+            enviouArquivo: true,
+            temPdf: extractFaturaPayload(result)?.tem_pdf,
+            temCsv: extractFaturaPayload(result)?.tem_csv,
+        })) {
+            throw new Error(MSG_UPLOAD_PDF_NAO_ANEXADO)
+        }
+        setSenhaModalOpen(false)
+        setSenhaViaUpload(false)
     }
 
     const handleSelecaoConfirm = async (selection: FaturaSelecaoRetryPayload) => {
@@ -1132,8 +1227,7 @@ const FaturasViewPage = () => {
             }
             if (error instanceof PdfSenhaError) {
                 setSelecaoModalOpen(false)
-                await loadFatura({ silent: true, openSenhaIfNeeded: false })
-                openSenhaModal(error.senha_pdf ?? null)
+                handlePdfSenhaError(error, { viaUpload: true })
                 return
             }
             toast.error((error as Error)?.message || 'Erro ao enviar arquivo')
@@ -1190,8 +1284,7 @@ const FaturasViewPage = () => {
             }
             if (error instanceof PdfSenhaError) {
                 setTitularModalOpen(false)
-                await loadFatura({ silent: true, openSenhaIfNeeded: false })
-                openSenhaModal(error.senha_pdf ?? null)
+                handlePdfSenhaError(error, { viaUpload: true })
                 return
             }
             toast.error((error as Error)?.message || 'Erro ao enviar arquivo')
@@ -1249,8 +1342,7 @@ const FaturasViewPage = () => {
             }
             if (error instanceof PdfSenhaError) {
                 setAnexoDuplicadoModalOpen(false)
-                await loadFatura({ silent: true, openSenhaIfNeeded: false })
-                openSenhaModal(error.senha_pdf ?? null)
+                handlePdfSenhaError(error, { viaUpload: true })
                 return
             }
             toast.error((error as Error)?.message || 'Erro ao substituir o anexo')
@@ -1310,8 +1402,7 @@ const FaturasViewPage = () => {
             }
             if (error instanceof PdfSenhaError) {
                 setJaAnexadaModalOpen(false)
-                await loadFatura({ silent: true, openSenhaIfNeeded: false })
-                openSenhaModal(error.senha_pdf ?? null)
+                handlePdfSenhaError(error, { viaUpload: true })
                 return
             }
             toast.error((error as Error)?.message || 'Erro ao substituir a fatura')
@@ -2041,7 +2132,7 @@ const FaturasViewPage = () => {
     }
 
     const isProcessing = fatura.status === 'pendente' || fatura.status === 'processando'
-    const precisaSenhaPdf = faturaPrecisaSenhaPdf(fatura)
+    const precisaSenhaPdf = deveAbrirModalSenhaPdfDeFatura(fatura, cartoesLookup.find((c) => Number(c.id) === Number(fatura.cartao_id)))
     const anexo = resolveFaturaAnexo(fatura)
     const nomesAnexo = rotulosFaturaAnexoNomes(fatura)
     const nomePdf = resolveFaturaAnexoNomeOriginal(fatura, 'pdf')
@@ -2068,6 +2159,11 @@ const FaturasViewPage = () => {
                 isOpen={removerAnexoOpen}
                 faturaId={id ?? null}
                 tipo={removerAnexoTipo}
+                temSenhaPdfCartao={cartaoTemSenhaPdfSalva({
+                    senhaMeta: fatura.senha_pdf,
+                    cartao: fatura.cartao,
+                    lookup: cartaoLookup,
+                })}
                 onClose={() => setRemoverAnexoOpen(false)}
                 onRemoved={handleAnexoRemovido}
                 onTrocado={handleAnexoTrocado}
@@ -2124,7 +2220,11 @@ const FaturasViewPage = () => {
                 isOpen={senhaModalOpen}
                 faturaId={id ?? null}
                 senhaMeta={senhaModalMeta}
-                onClose={() => setSenhaModalOpen(false)}
+                onUnlock={senhaViaUpload ? handleSenhaUnlockUpload : undefined}
+                onClose={() => {
+                    setSenhaModalOpen(false)
+                    setSenhaViaUpload(false)
+                }}
                 onSuccess={async () => {
                     senhaModalAutoOpenedRef.current = String(id)
                     await loadFatura({ silent: true, openSenhaIfNeeded: false })
@@ -2451,7 +2551,15 @@ const FaturasViewPage = () => {
                             <Row className="mt-3 align-items-end">
                                 <Col md={4}>
                                     <Label htmlFor="upload_pdf" className="form-label">Anexo da fatura (PDF ou CSV)</Label>
-                                    <Input innerRef={fileInputRef} type="file" accept={FATURA_FILE_ACCEPT} />
+                                    <Input
+                                        id="upload_pdf"
+                                        innerRef={fileInputRef}
+                                        type="file"
+                                        accept={FATURA_FILE_ACCEPT}
+                                        onChange={(e) => {
+                                            pendingUploadFileRef.current = e.target.files?.[0] ?? null
+                                        }}
+                                    />
                                     <small className="text-muted">PDF ou CSV</small>
                                     <small className="text-muted d-block mt-1">
                                         Leitura automática homologada: {formatParsersHomologadosLista(parsersHomologados)}.
@@ -3252,8 +3360,23 @@ const FaturasViewPage = () => {
                                     </div>
                                 )
                             ) : (
-                                <div className="text-center text-muted py-5">
-                                    Nenhum anexo disponível para visualização.
+                                <div
+                                    className="text-center text-muted py-5 border rounded"
+                                    style={{ borderStyle: 'dashed', cursor: 'pointer' }}
+                                    role="button"
+                                    tabIndex={0}
+                                    onClick={() => fileInputRef.current?.click()}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' || e.key === ' ') {
+                                            e.preventDefault()
+                                            fileInputRef.current?.click()
+                                        }
+                                    }}
+                                >
+                                    <p className="fw-semibold mb-2">Sem anexo</p>
+                                    <p className="mb-0 small">
+                                        Clique aqui ou use o campo acima para enviar o PDF ou CSV.
+                                    </p>
                                 </div>
                             )}
                         </CardBody>

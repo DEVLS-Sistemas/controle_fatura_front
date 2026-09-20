@@ -22,13 +22,13 @@ import { CartaoChip, BandeiraChip, resolveCartaoCores } from "helpers/cartao_hel
 import { resolveCartaoHomologacao } from "helpers/parser_homologado_helpers"
 import CartaoPdfHomologacaoBadge from "Components/Cartoes/CartaoPdfHomologacaoBadge"
 import {
-    faturaPrecisaSenhaPdf,
     FaturaResumo,
     FaturasCartaoGroup,
     FaturasSearch,
     resolveSenhaPdfMeta,
     SenhaPdfMeta,
 } from "interfaces/Faturas/FaturasInterface"
+import { deveAbrirModalSenhaPdfDeErro, deveAbrirModalSenhaPdfDeFatura } from "helpers/fatura_senha_pdf_helpers"
 import { FaturasService } from "services/Faturas/FaturasService"
 import FaturaSenhaPdfModal from "Components/Faturas/FaturaSenhaPdfModal"
 import { PdfSenhaError } from "libs/api/exceptions/PdfSenhaError"
@@ -132,7 +132,7 @@ export const FaturasTable = ({ data, getData, setPerPage, perPage, filters }: Fa
 
     const handleReprocessar = async (row: FaturaRow) => {
         if (!row.id) return
-        if (faturaPrecisaSenhaPdf(row)) {
+        if (deveAbrirModalSenhaPdfDeFatura(row)) {
             openSenhaModal(row.id, resolveSenhaPdfMeta(row))
             return
         }
@@ -142,7 +142,11 @@ export const FaturasTable = ({ data, getData, setPerPage, perPage, filters }: Fa
             if (data) await handleThisRoute(data.first_page_url)
         } catch (error) {
             if (error instanceof PdfSenhaError) {
-                openSenhaModal(row.id, error.senha_pdf ?? null)
+                if (deveAbrirModalSenhaPdfDeErro(error)) {
+                    openSenhaModal(row.id, error.senha_pdf ?? null)
+                    return
+                }
+                toast.error(error.message)
                 return
             }
             console.error('Erro ao reprocessar:', error)
@@ -438,7 +442,7 @@ export const FaturasTable = ({ data, getData, setPerPage, perPage, filters }: Fa
                                                                                             Baixar CSV
                                                                                         </DropdownItem>
                                                                                     )}
-                                                                                    {faturaPrecisaSenhaPdf(row) ? (
+                                                                                    {deveAbrirModalSenhaPdfDeFatura(row) ? (
                                                                                         <DropdownItem onClick={() => row.id && openSenhaModal(row.id, resolveSenhaPdfMeta(row))}>
                                                                                             Informar senha / Desbloquear PDF
                                                                                         </DropdownItem>
