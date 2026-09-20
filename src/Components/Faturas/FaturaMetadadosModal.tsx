@@ -32,9 +32,15 @@ import { SelectOptions } from 'interfaces/SystemInterfaces/SelectInterface'
 import { buildBandeiraSelectOptions, toBandeiraSelectOption } from 'helpers/cartao_helpers'
 import {
     FaturaMetadadosCartaoOption,
+    FaturaMetadadosModo,
     FaturaMetadadosRetryPayload,
     FaturaMetadadosSugestao,
 } from 'libs/api/exceptions/FaturaMetadadosError'
+import {
+    bandeirasDoModal,
+    nomeCartaoDoPayload,
+    resolveModoMetadados,
+} from 'helpers/fatura_metadados_helpers'
 import { FaturaExistenteAnexoDuplicado } from 'libs/api/exceptions/FaturaAnexoDuplicadoError'
 import { FaturaSelecaoBandeiraOption } from 'libs/api/exceptions/FaturaSelecaoError'
 import { CartoesService } from 'services/Cartoes/CartoesService'
@@ -58,6 +64,9 @@ export type FaturaMetadadosModalProps = {
     sugestao?: FaturaMetadadosSugestao | null
     cartoes?: FaturaMetadadosCartaoOption[]
     bandeiras?: FaturaSelecaoBandeiraOption[]
+    modo?: FaturaMetadadosModo | null
+    podeCadastrarCartao?: boolean
+    orientacao?: string | null
     precisaSelecionarBandeira?: boolean
     acaoSugerida?: string | null
     faturaExistente?: FaturaExistenteAnexoDuplicado | null
@@ -94,28 +103,14 @@ const confiancaLabel = (confianca?: string | null): string | null => {
     }
 }
 
-const parserToNomeSugestao = (parser?: string | null, cartaoNome?: string | null): string => {
-    if (cartaoNome?.trim()) return cartaoNome.trim()
-    if (!parser) return ''
-    const map: Record<string, string> = {
-        c6: 'C6',
-        sofisa: 'Sofisa',
-        nubank: 'Nubank',
-        inter: 'Inter',
-        itau: 'Itaú',
-        bradesco: 'Bradesco',
-        santander: 'Santander',
-        xp: 'XP',
-    }
-    const key = String(parser).toLowerCase()
-    return map[key] || parser.charAt(0).toUpperCase() + parser.slice(1)
-}
-
 const FaturaMetadadosModal = ({
     isOpen,
     sugestao = null,
     cartoes = [],
     bandeiras: bandeirasIniciais = [],
+    modo: modoProp = null,
+    podeCadastrarCartao = false,
+    orientacao = null,
     precisaSelecionarBandeira = false,
     acaoSugerida = null,
     faturaExistente = null,
@@ -168,6 +163,19 @@ const FaturaMetadadosModal = ({
     )
 
     const anosOptions = useMemo(() => AnosSelect(), [])
+    const modoResolvido = useMemo(
+        () =>
+            resolveModoMetadados({
+                modo: modoProp,
+                pode_cadastrar_cartao: podeCadastrarCartao,
+                sugestao,
+            }),
+        [modoProp, podeCadastrarCartao, sugestao]
+    )
+    const nomeIdentificado = useMemo(
+        () => nomeCartaoDoPayload(sugestao, modoResolvido),
+        [sugestao, modoResolvido]
+    )
 
     const applyBandeiras = (
         list: FaturaSelecaoBandeiraOption[],
@@ -221,15 +229,16 @@ const FaturaMetadadosModal = ({
         setMode('novo')
         setCartaoId(null)
         setBandeiraError(null)
-        setCartaoNome(nomeSugestao ?? parserToNomeSugestao(sugestao?.parser, sugestao?.cartao_nome))
-        const list =
-            bandeirasIniciais.length > 0
-                ? bandeirasIniciais
-                : bandeirasLookup.length > 0
-                    ? bandeirasLookup
-                    : []
-        // Sempre deixa o select vazio — usuário confirma a bandeira
-        applyBandeiras(list, true, { autoSelect: false })
+        setCartaoNome(nomeSugestao || nomeIdentificado)
+        const list = bandeirasDoModal({
+            modo: 'cadastrar_cartao',
+            payload: bandeirasIniciais,
+            lookup: bandeirasLookup,
+        })
+        applyBandeiras(list, true, {
+            preferLabel: sugestao?.bandeira_sugerida ?? null,
+            autoSelect: Boolean(sugestao?.bandeira_sugerida),
+        })
     }
 
     const enterExistenteMode = (id?: number | string | null) => {
@@ -293,25 +302,31 @@ const FaturaMetadadosModal = ({
         setMes(sugestao?.mes ?? null)
         setAno(sugestao?.ano ?? null)
 
-        const semCartao =
-            nextCartao == null
-            || sugestao?.confianca === 'baixa'
-
-        if (semCartao) {
-            enterNovoMode(parserToNomeSugestao(sugestao?.parser, sugestao?.cartao_nome))
+        if (modoResolvido === 'cadastrar_cartao') {
+            enterNovoMode(nomeIdentificado)
         } else {
             enterExistenteMode(nextCartao)
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isOpen, sugestao, bandeirasIniciais, precisaSelecionarBandeira])
+    }, [isOpen, sugestao, bandeirasIniciais, precisaSelecionarBandeira, modoResolvido, nomeIdentificado])
 
-    // Completa opções de bandeira do lookup sem pré-selecionar (usuário escolhe)
     useEffect(() => {
         if (!isOpen || mode !== 'novo' || bandeirasLookup.length === 0) return
-        if (bandeiras.length > 0) return
-        applyBandeiras(bandeirasLookup, true, { autoSelect: false })
+        const next = bandeirasDoModal({
+            modo: 'cadastrar_cartao',
+            payload: bandeirasIniciais,
+            lookup: bandeirasLookup,
+        })
+        const sameLabels =
+            next.length === bandeiras.length
+            && next.every((b, i) => b.label === bandeiras[i]?.label)
+        if (sameLabels) return
+        applyBandeiras(next, true, {
+            preferLabel: sugestao?.bandeira_sugerida ?? null,
+            autoSelect: Boolean(sugestao?.bandeira_sugerida),
+        })
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isOpen, mode, bandeirasLookup])
+    }, [isOpen, mode, bandeirasLookup, bandeirasIniciais])
 
     const loadBandeirasForCartao = async (id: number | string) => {
         setBandeirasLoading(true)
@@ -383,7 +398,9 @@ const FaturaMetadadosModal = ({
                 return null
             }
             const payload: FaturaMetadadosRetryPayload = {
+                cartao_id: null,
                 cartao_nome: nome,
+                cadastrar_cartao: true,
                 mes,
                 ano,
             }
@@ -493,10 +510,15 @@ const FaturaMetadadosModal = ({
                 {isNovo ? (
                     <>
                         <p className="mb-2">
-                            Identificamos o <strong>mês</strong> e o <strong>ano</strong> no arquivo.
-                            O cartão ainda não está vinculado — você pode <strong>cadastrá-lo agora</strong>,
+                            {nomeIdentificado
+                                ? <>Identificamos <strong>{nomeIdentificado}</strong>, o mês e o ano no arquivo.</>
+                                : <>Identificamos o <strong>mês</strong> e o <strong>ano</strong> no arquivo.</>}
+                            {' '}O cartão ainda não está vinculado — você pode <strong>cadastrá-lo agora</strong>,
                             nesta mesma tela, informando o nome e a bandeira.
                         </p>
+                        {orientacao && (
+                            <p className="small text-muted mb-2">{orientacao}</p>
+                        )}
                         <Alert color="success" className="mb-3">
                             <i className="ri-checkbox-circle-line me-1 align-middle"></i>
                             Não precisa sair para cadastrar o cartão nem anexar o arquivo de novo.

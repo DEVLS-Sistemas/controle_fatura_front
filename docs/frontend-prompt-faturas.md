@@ -22,7 +22,8 @@ Remover / trocar PDF (desfazer extrato errado, etapas 1–4): [`frontend-prompt-
 PDF no ano certo (07/2024 ≠ 07/2026): [`frontend-prompt-pdf-competencia-ano.md`](frontend-prompt-pdf-competencia-ano.md).  
 Listagem: botão **Ir para Mês Atual** (default ligado, selects de mês/ano sincronizados): [`frontend-prompt-fatura-mes-atual.md`](frontend-prompt-fatura-mes-atual.md).  
 Mesmo PDF importado de novo (hash, substituir ou manter): [`frontend-prompt-fatura-anexo-duplicado.md`](frontend-prompt-fatura-anexo-duplicado.md).  
-Total oficial do cabeçalho do PDF: [`frontend-prompt-total-fatura-pdf.md`](frontend-prompt-total-fatura-pdf.md).
+Total oficial do cabeçalho do PDF: [`frontend-prompt-total-fatura-pdf.md`](frontend-prompt-total-fatura-pdf.md).  
+PDF manda no cartão (não a tela de origem): [`frontend-prompt-modal-cartao-bandeira.md`](frontend-prompt-modal-cartao-bandeira.md).
 
 Hierarquia de cartões: ver [`frontend-prompt-cartoes.md`](frontend-prompt-cartoes.md).
 
@@ -371,6 +372,7 @@ Quando `tem_compras_nao_conciliadas` virar `false`, o aviso **desaparece** e o t
 
 > Fluxo completo (detecção de cartão/mês/ano pelo PDF, modal de confirmação):  
 > [`frontend-prompt-cadastro-fatura-metadados.md`](frontend-prompt-cadastro-fatura-metadados.md).  
+> Cartão da tela é hint: o modal usa o PDF — [`frontend-prompt-modal-cartao-bandeira.md`](frontend-prompt-modal-cartao-bandeira.md).  
 > Cartão sem parser testado: aviso de que o valor pode estar errado — [`frontend-prompt-fatura-parser-homologado.md`](frontend-prompt-fatura-parser-homologado.md).
 
 1. Formulário inicial: **nada obrigatório** (cartão, mês, ano e anexo são opcionais).

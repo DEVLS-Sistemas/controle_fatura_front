@@ -28,9 +28,12 @@ export type FaturaMetadadosConfianca =
     | 'baixa'
     | string
 
+export type FaturaMetadadosModo = 'cadastrar_cartao' | 'confirmar_cartao'
+
 export type FaturaMetadadosSugestao = {
     cartao_id?: number | null
     cartao_nome?: string | null
+    cartao_nome_sugerido?: string | null
     mes?: number | null
     ano?: number | null
     parser?: string | null
@@ -73,6 +76,9 @@ export class FaturaMetadadosError extends Error {
     codigo?: string
     precisa_confirmar_metadados: boolean
     precisa_selecionar_bandeira: boolean
+    modo: FaturaMetadadosModo | null
+    pode_cadastrar_cartao: boolean
+    orientacao?: string | null
     acao_sugerida: AcaoSugeridaFatura | null
     fatura_existente: FaturaExistenteAnexoDuplicado | null
     fatura_existente_id: number | null
@@ -94,6 +100,12 @@ export class FaturaMetadadosError extends Error {
             || this.codigo === FATURA_METADADOS_CODIGO
         )
         this.precisa_selecionar_bandeira = Boolean(body?.precisa_selecionar_bandeira)
+        this.modo =
+            body?.modo === 'cadastrar_cartao' || body?.modo === 'confirmar_cartao'
+                ? body.modo
+                : null
+        this.pode_cadastrar_cartao = Boolean(body?.pode_cadastrar_cartao)
+        this.orientacao = typeof body?.orientacao === 'string' ? body.orientacao : null
         this.sugestao = (body?.sugestao && typeof body.sugestao === 'object')
             ? body.sugestao
             : {}

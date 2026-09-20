@@ -109,7 +109,7 @@ Remover / trocar PDF (desfaz parcelas geradas + restaura compras conciliadas): [
 Resposta de confirmação (resumo):
 
 - `modo = confirmar_cartao` — cartão já existe; confirmar `cartao_id` + mês/ano (+ bandeira).
-- `modo = cadastrar_cartao` — cartão **não** está na conta; UI cadastra **nome + bandeira na mesma tela** (não redirecionar para /cartoes).
+- `modo = cadastrar_cartao` — cartão **não** está na conta; UI cadastra **nome + bandeira na mesma tela** (não redirecionar para /cartoes). O `cartao_id` da tela é só hint: depois do 422 o modal usa o payload do PDF (Sofisa ≠ PicPay da rota).
 
 ```json
 {
