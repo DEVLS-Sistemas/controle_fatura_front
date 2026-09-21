@@ -37,7 +37,7 @@ Sempre separar **Back** e **Front**. O mesmo card é iniciado nos dois projetos;
 
 - **Resumo**
 - **Back** — o que entra / o que fica fora / critérios / como testar
-- **Front** — o que entra / o que fica fora / critérios / como testar
+- **Front** — o que entra / o que fica fora / critérios / como testar. O prompt vive no back (`docs/frontend-prompt-*.md`); o back comenta `Prompt front:` no card.
 - Se um lado não tiver trabalho: escrever explicitamente `Nenhuma alteração neste card.`
 
 Não misturar tarefas de API e de tela no mesmo parágrafo.

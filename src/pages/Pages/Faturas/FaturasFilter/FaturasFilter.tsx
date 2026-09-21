@@ -11,7 +11,7 @@ import { InputTextControlled } from "Components/ComponentController/Inputs/Text/
 import { SelectListControlled } from "Components/ComponentController/Selects/Select/SelectListControlled"
 import { SelectOptions } from "interfaces/SystemInterfaces/SelectInterface"
 import { mesesOptions } from "helpers/fatura_helpers"
-import { isMesAtualAtivo } from "helpers/fatura_listagem_helpers"
+import { buildProjecaoAtalhoPath, isMesAtualAtivo } from "helpers/fatura_listagem_helpers"
 import { CompetenciaAtual, FaturasSearch } from "interfaces/Faturas/FaturasInterface"
 import { FaturasService } from "services/Faturas/FaturasService"
 import { PessoasService } from "services/Pessoas/PessoasService"
@@ -48,7 +48,7 @@ const FaturasFilter = ({
     anosOptions,
     cartoesOptions,
 }: FaturasFilterProps) => {
-    const { handleSubmit, control, register, getValues, setValue } = useForm<FaturasSearch>({
+    const { handleSubmit, control, register, getValues, setValue, watch } = useForm<FaturasSearch>({
         defaultValues: {
             ...filtersRef,
             mes: appliedMes,
@@ -93,6 +93,7 @@ const FaturasFilter = ({
             ? `${String(competenciaAtual.mes).padStart(2, '0')}/${competenciaAtual.ano}`
             : null)
     const botaoAtivo = mesAtualAtivo || isMesAtualAtivo(appliedMes, appliedAno, competenciaAtual)
+    const projecaoPath = buildProjecaoAtalhoPath(watch('mes') ?? appliedMes, watch('ano') ?? appliedAno)
 
     const submitFiltros = (patch: Partial<FaturasSearch>) => {
         getRemoteFaturasList({
@@ -255,7 +256,7 @@ const FaturasFilter = ({
                                             />
                                         </div>
                                     </Col>
-                                    <Col xs={12} sm="auto" className="d-flex align-items-end">
+                                    <Col xs={12} sm="auto" className="d-flex align-items-end flex-wrap gap-2">
                                         <button
                                             type="button"
                                             className={`btn ${botaoAtivo ? 'btn-primary' : 'btn-soft-primary'}`}
@@ -269,6 +270,18 @@ const FaturasFilter = ({
                                                 <span className="badge bg-white text-primary ms-1">{competenciaLabel}</span>
                                             ) : null}
                                         </button>
+                                        <Link
+                                            to={projecaoPath}
+                                            className="btn btn-soft-info"
+                                            title={
+                                                projecaoPath.includes('?')
+                                                    ? 'Abrir a projeção nesta competência'
+                                                    : 'Abrir a projeção'
+                                            }
+                                        >
+                                            <i className="ri-line-chart-line align-middle me-1"></i>
+                                            Projeção
+                                        </Link>
                                     </Col>
                                 </Row>
 
