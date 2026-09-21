@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { Container, Spinner } from 'reactstrap'
 import { SubmitHandler } from 'react-hook-form'
 import { toast } from 'react-toastify'
+import { parseProjecaoRotaRecorte } from 'helpers/fatura_listagem_helpers'
 import { setActiveMenu } from 'helpers/system_helpers'
 import {
   ProjecaoFaturasDefaultValues,
@@ -31,14 +32,11 @@ const ProjecaoFaturasPage = () => {
   const projecaoFaturasService = new ProjecaoFaturasService()
 
   const now = new Date()
-  const mesUrl = Number(searchParams.get('mes'))
-  const anoUrl = Number(searchParams.get('ano'))
-  const mesValido = Number.isFinite(mesUrl) && mesUrl >= 1 && mesUrl <= 12
-  const anoValido = Number.isFinite(anoUrl) && anoUrl > 2000
+  const recorteUrl = parseProjecaoRotaRecorte(searchParams.get('mes'), searchParams.get('ano'))
 
   const ProjecaoFaturasFilterContextValue: ProjecaoFaturasFilterContextType = {
-    mes: mesValido ? mesUrl : ProjecaoFaturasDefaultValues.mes ?? now.getMonth() + 1,
-    ano: anoValido ? anoUrl : ProjecaoFaturasDefaultValues.ano ?? now.getFullYear(),
+    mes: recorteUrl ? recorteUrl.mes : ProjecaoFaturasDefaultValues.mes ?? now.getMonth() + 1,
+    ano: recorteUrl ? recorteUrl.ano : ProjecaoFaturasDefaultValues.ano ?? now.getFullYear(),
     palavra_chave: null,
     firstEntry: false,
   }
@@ -77,6 +75,7 @@ const ProjecaoFaturasPage = () => {
         <div className="page-content">
           <Container fluid>
             <ProjecaoFaturasFilter
+              key={`${ProjecaoFaturasFilterContextValue.mes}-${ProjecaoFaturasFilterContextValue.ano}`}
               getRemoteProjecaoFaturas={getRemoteProjecaoFaturas}
               defaultValues={{
                 mes: ProjecaoFaturasFilterContextValue.mes,

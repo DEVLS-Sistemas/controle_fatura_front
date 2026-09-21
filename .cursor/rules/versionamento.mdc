@@ -34,6 +34,7 @@ Proibido: camada extra (`v1.0/dev-build`, branch de ambiente, “build de produ�
 
 - Projeto: `CTLFAT` em https://devlssistemas.atlassian.net
 - Todo card descreve **Back** e **Front** separados. Mesmo número nos dois repos; começa no back e o front continua só o que for dele.
+- Ao iniciar o card: skill `ler-prompt-front` — ler comentários do Jira (`Prompt front:`) e implementar pelo arquivo no `controle_fatura_back`. Sem prompt, avisar — não inventar a tela.
 - Status: A fazer, Fazendo, Parado, Review, Aguardando Merge, Merge Feito, Testando, Testado, Aguardando Publicação, Feito.
 - Ao abrir o PR de feature: comentar no card, incluir o que foi implementado e mover para **Aguardando Merge**.
 - **Merge Feito** o usuário move depois do merge. Não transicionar para Merge Feito.
@@ -42,4 +43,4 @@ Proibido: camada extra (`v1.0/dev-build`, branch de ambiente, “build de produ�
   - primeira linha: neste repo `PR front: <url>`; no back `PR back: <url>`
   - em seguida `**Implementado:**` com bullets do que entrou neste repo (só Front aqui)
 - Footer: versão da API; nome fantasia **Devls Sistemas**.
-- Skills: `get-project-version`, `create-jira-card`, `start-jira-card`, `detect-jira-card`, `create-commit`, `create-pr`, `create-release-pr`, `subir-deploy`.
+- Skills: `get-project-version`, `create-jira-card`, `start-jira-card`, `detect-jira-card`, `ler-prompt-front`, `create-commit`, `create-pr`, `create-release-pr`, `subir-deploy`.

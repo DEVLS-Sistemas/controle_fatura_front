@@ -233,3 +233,21 @@ export const anosLookupToOptions = (anos?: FaturasLookupAno[] | null): SelectOpt
     })
     return opts
 }
+
+/** Projeção só aceita o par mês+ano. Só um dos dois = sem recorte (default do back). */
+export const parseProjecaoRotaRecorte = (
+    mes: unknown,
+    ano: unknown,
+): { mes: number; ano: number } | null => {
+    const mesValido = parseMesFiltro(mes)
+    const anoValido = parseAnoFiltro(ano)
+    if (mesValido == null || anoValido == null) return null
+    return { mes: mesValido, ano: anoValido }
+}
+
+/** Atalho da listagem → tela de projeção. Só leva competência; sem o par, sem query. */
+export const buildProjecaoAtalhoPath = (mes: unknown, ano: unknown): string => {
+    const recorte = parseProjecaoRotaRecorte(mes, ano)
+    if (!recorte) return '/projecao-faturas'
+    return `/projecao-faturas?mes=${recorte.mes}&ano=${recorte.ano}`
+}
