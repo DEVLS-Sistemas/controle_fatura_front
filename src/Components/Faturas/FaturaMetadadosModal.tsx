@@ -35,17 +35,24 @@ import {
     FaturaMetadadosModo,
     FaturaMetadadosRetryPayload,
     FaturaMetadadosSugestao,
+    FaturaNoPeriodo,
 } from 'libs/api/exceptions/FaturaMetadadosError'
 import {
+    bandeirasDaCompetencia,
     bandeirasDoModal,
+    bandeiraConfereComFaturaExistente,
+    competenciaExigeSelectBandeira,
+    faturaDoPeriodoPelaBandeira,
     nomeCartaoDoPayload,
     resolveModoMetadados,
+    retryMetadadosPelaBandeira,
 } from 'helpers/fatura_metadados_helpers'
 import { FaturaExistenteAnexoDuplicado } from 'libs/api/exceptions/FaturaAnexoDuplicadoError'
 import { FaturaSelecaoBandeiraOption } from 'libs/api/exceptions/FaturaSelecaoError'
 import { CartoesService } from 'services/Cartoes/CartoesService'
 import {
     COPY_AGUARDE_PROCESSANDO_SUBSTITUIR,
+    faturaExistenteTemAnexo,
     labelCtaFaturaExistente,
     podeSubstituirFaturaExistente,
     resolveAcaoSugeridaFatura,
@@ -71,6 +78,9 @@ export type FaturaMetadadosModalProps = {
     acaoSugerida?: string | null
     faturaExistente?: FaturaExistenteAnexoDuplicado | null
     faturaExistenteId?: number | null
+    faturasPeriodo?: FaturaNoPeriodo[]
+    /** Bandeira já escolhida no formulário, antes do 422. */
+    bandeiraIdEscolhida?: number | string | null
     loading?: boolean
     onClose: () => void
     onConfirm: (payload: FaturaMetadadosRetryPayload) => void | Promise<void>
@@ -115,6 +125,8 @@ const FaturaMetadadosModal = ({
     acaoSugerida = null,
     faturaExistente = null,
     faturaExistenteId = null,
+    faturasPeriodo = [],
+    bandeiraIdEscolhida = null,
     loading = false,
     onClose,
     onConfirm,
@@ -175,6 +187,28 @@ const FaturaMetadadosModal = ({
     const nomeIdentificado = useMemo(
         () => nomeCartaoDoPayload(sugestao, modoResolvido),
         [sugestao, modoResolvido]
+    )
+    const periodo = faturasPeriodo.length > 0
+        ? faturasPeriodo
+        : (sugestao?.faturas_periodo ?? [])
+    const exigeBandeira = competenciaExigeSelectBandeira({
+        precisaSelecionarBandeira,
+        faturasPeriodo: periodo,
+    })
+    const cartaoDoPeriodo = sugestao?.cartao_id ?? null
+    const idEscolhidoNoFormulario = (() => {
+        const id = Number(bandeiraIdEscolhida)
+        return Number.isFinite(id) && id > 0 ? id : null
+    })()
+    const preferirBandeiraId = idEscolhidoNoFormulario ?? sugestao?.cartao_bandeira_id ?? null
+    const preferirBandeiraLabel = idEscolhidoNoFormulario != null
+        ? null
+        : (sugestao?.bandeira_sugerida ?? null)
+    const noCartaoDoPeriodo = (id?: number | string | null) => (
+        cartaoDoPeriodo != null
+        && id != null
+        && id !== ''
+        && Number(id) === Number(cartaoDoPeriodo)
     )
 
     const applyBandeiras = (
@@ -253,18 +287,22 @@ const FaturaMetadadosModal = ({
             setBandeiraValue(null)
             return
         }
-        if (
-            initialCartaoRef.current != null
+        const forcarSelect = exigeBandeira && noCartaoDoPeriodo(next)
+        const mesmoCartaoInicial = initialCartaoRef.current != null
             && Number(next) === Number(initialCartaoRef.current)
-            && bandeirasIniciais.length > 0
-        ) {
-            applyBandeiras(bandeirasIniciais, precisaSelecionarBandeira, {
-                preferId: sugestao?.cartao_bandeira_id ?? null,
-                preferLabel: sugestao?.bandeira_sugerida ?? null,
-            })
-            return
+        if (mesmoCartaoInicial && (bandeirasIniciais.length > 0 || forcarSelect)) {
+            const lista = forcarSelect
+                ? bandeirasDaCompetencia({ payload: bandeirasIniciais, lookup: bandeirasLookup })
+                : bandeirasIniciais
+            if (lista.length > 0) {
+                applyBandeiras(lista, precisaSelecionarBandeira || forcarSelect, {
+                    preferId: preferirBandeiraId,
+                    preferLabel: preferirBandeiraLabel,
+                })
+                return
+            }
         }
-        void loadBandeirasForCartao(next)
+        void loadBandeirasForCartao(next, forcarSelect)
     }
 
     useEffect(() => {
@@ -308,7 +346,7 @@ const FaturaMetadadosModal = ({
             enterExistenteMode(nextCartao)
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isOpen, sugestao, bandeirasIniciais, precisaSelecionarBandeira, modoResolvido, nomeIdentificado])
+    }, [isOpen, sugestao, bandeirasIniciais, precisaSelecionarBandeira, modoResolvido, nomeIdentificado, faturasPeriodo, bandeiraIdEscolhida])
 
     useEffect(() => {
         if (!isOpen || mode !== 'novo' || bandeirasLookup.length === 0) return
@@ -328,19 +366,59 @@ const FaturaMetadadosModal = ({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isOpen, mode, bandeirasLookup, bandeirasIniciais])
 
-    const loadBandeirasForCartao = async (id: number | string) => {
+    useEffect(() => {
+        if (!isOpen || mode !== 'existente' || !exigeBandeira) return
+        if (!noCartaoDoPeriodo(cartaoId)) return
+        if (bandeirasLookup.length === 0 && bandeirasIniciais.length === 0) return
+        const next = bandeirasDaCompetencia({
+            payload: bandeirasIniciais.length > 0 ? bandeirasIniciais : bandeiras,
+            lookup: bandeirasLookup,
+        })
+        if (next.length === 0) return
+        const same = next.length === bandeiras.length
+            && next.every((b, i) => (
+                b.label === bandeiras[i]?.label && Boolean(b.criar) === Boolean(bandeiras[i]?.criar)
+            ))
+        if (same && showBandeira) return
+        const atual = bandeiraValue
+        const criarAtual = atual != null && String(atual).startsWith(CRIAR_PREFIX)
+        const idAtual = !criarAtual && atual != null && atual !== '' && Number(atual) > 0
+            ? Number(atual)
+            : null
+        const idSugestao = sugestao?.cartao_bandeira_id != null ? Number(sugestao.cartao_bandeira_id) : null
+        const aindaEhSugestao = idAtual == null || (idSugestao != null && idAtual === idSugestao)
+        const preferId = idEscolhidoNoFormulario != null && aindaEhSugestao
+            ? idEscolhidoNoFormulario
+            : (idAtual ?? preferirBandeiraId)
+        applyBandeiras(next, true, {
+            preferId: criarAtual ? null : preferId,
+            preferLabel: criarAtual
+                ? String(atual).slice(CRIAR_PREFIX.length)
+                : (idEscolhidoNoFormulario != null && aindaEhSugestao ? null : preferirBandeiraLabel),
+        })
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isOpen, mode, exigeBandeira, bandeirasLookup, bandeirasIniciais, cartaoId])
+
+    const loadBandeirasForCartao = async (id: number | string, forceShow = false) => {
         setBandeirasLoading(true)
         try {
             const list = (await cartoesService.AsyncListBandeiras({ cartao_id: id })) ?? []
+            const mapped = list.map((b) => ({
+                value: b.value,
+                label: b.label,
+                cor_principal: b.cor_principal,
+                cor_secundaria: b.cor_secundaria,
+            }))
+            const lista = forceShow
+                ? bandeirasDaCompetencia({ payload: mapped, lookup: bandeirasLookup })
+                : mapped
             applyBandeiras(
-                list.map((b) => ({
-                    value: b.value,
-                    label: b.label,
-                    cor_principal: b.cor_principal,
-                    cor_secundaria: b.cor_secundaria,
-                })),
-                false,
-                { preferLabel: sugestao?.bandeira_sugerida ?? null }
+                lista.length > 0 ? lista : mapped,
+                forceShow,
+                {
+                    preferId: forceShow ? preferirBandeiraId : null,
+                    preferLabel: forceShow ? preferirBandeiraLabel : (sugestao?.bandeira_sugerida ?? null),
+                }
             )
         } catch {
             applyBandeiras([], true, { autoSelect: false })
@@ -418,35 +496,88 @@ const FaturaMetadadosModal = ({
             mes,
             ano,
         }
-        if (!resolveBandeiraPayload(payload, showBandeira)) return null
+        const bandeiraObrigatoria = showBandeira || (exigeBandeira && noCartaoDoPeriodo(cartaoId))
+        if (!resolveBandeiraPayload(payload, bandeiraObrigatoria)) return null
         return payload
     }
 
+    const faturaCard = faturaExistente ?? sugestao?.fatura_existente ?? null
     const acaoCta = resolveAcaoSugeridaFatura({
         acao_sugerida: acaoSugerida ?? sugestao?.acao_sugerida,
-        fatura_existente: faturaExistente ?? sugestao?.fatura_existente,
+        fatura_existente: faturaCard,
     })
-    const existenteId = faturaExistenteId
-        ?? faturaExistente?.id
-        ?? sugestao?.fatura_existente_id
-        ?? sugestao?.fatura_existente?.id
-        ?? null
+    const idDaEscolha = (() => {
+        const doCard = Number(faturaCard?.id)
+        if (Number.isFinite(doCard) && doCard > 0) return doCard
+        const informado = Number(faturaExistenteId ?? sugestao?.fatura_existente_id)
+        return Number.isFinite(informado) && informado > 0 ? informado : null
+    })()
+    const escolhaBandeiraAtual = () => {
+        if (bandeiraValue == null || bandeiraValue === '') return {}
+        if (String(bandeiraValue).startsWith(CRIAR_PREFIX)) {
+            return {
+                criar: true,
+                bandeira: String(bandeiraValue).slice(CRIAR_PREFIX.length),
+            }
+        }
+        const opt = bandeiras.find((b) => toBandeiraSelectValue(b) === String(bandeiraValue))
+        const id = Number(opt?.value ?? bandeiraValue)
+        return {
+            criar: Boolean(opt?.criar),
+            bandeira: opt?.label ?? null,
+            cartao_bandeira_id: Number.isFinite(id) && id > 0 ? id : null,
+        }
+    }
+    const escolhaAtual = escolhaBandeiraAtual()
+    const faturaDaBandeira = faturaDoPeriodoPelaBandeira(periodo, escolhaAtual)
+    const confereBandeira = bandeiraConfereComFaturaExistente(escolhaAtual, faturaCard, periodo)
+    const decidirPelaBandeira = mode === 'existente'
+        && (exigeBandeira || showBandeira)
+        && (faturaDaBandeira != null || faturaCard != null)
+    const retryBandeira = retryMetadadosPelaBandeira({
+        exigeBandeira: decidirPelaBandeira,
+        escolha: escolhaAtual,
+        periodo,
+        confereComExistente: confereBandeira,
+        faturaTemAnexo: faturaDaBandeira ? Boolean(faturaDaBandeira.tem_anexo) : faturaExistenteTemAnexo(faturaCard),
+        faturaId: faturaDaBandeira?.id ?? idDaEscolha,
+    })
+    const acaoVisivel = decidirPelaBandeira ? retryBandeira.acao : acaoCta
     const isNovo = mode === 'novo'
-    const ctaLabel = labelCtaFaturaExistente(acaoCta, { cadastrarCartao: isNovo && acaoCta === 'cadastrar' })
-    const podeSubstituir = acaoCta !== 'substituir' || podeSubstituirFaturaExistente(faturaExistente ?? sugestao?.fatura_existente)
-    const rotuloExistente = rotuloCartaoBandeira(faturaExistente ?? sugestao?.fatura_existente)
-    const competenciaExistente = rotuloCompetenciaFatura(faturaExistente ?? sugestao?.fatura_existente)
+    const mostrarBandeira = isNovo || showBandeira || (exigeBandeira && noCartaoDoPeriodo(cartaoId))
+    const ctaLabel = labelCtaFaturaExistente(acaoVisivel, { cadastrarCartao: isNovo && acaoVisivel === 'cadastrar' })
+    const podeSubstituir = acaoVisivel !== 'substituir' || podeSubstituirFaturaExistente(faturaExistente ?? sugestao?.fatura_existente)
+    const rotuloExistente = faturaDaBandeira?.bandeira
+        ? [
+            (faturaExistente ?? sugestao?.fatura_existente)?.cartao_nome,
+            faturaDaBandeira.bandeira,
+        ].filter(Boolean).join(' · ')
+        : rotuloCartaoBandeira(faturaExistente ?? sugestao?.fatura_existente)
+    const competenciaExistente = faturaDaBandeira?.competencia
+        ?? rotuloCompetenciaFatura(faturaExistente ?? sugestao?.fatura_existente)
+    const trocouBandeira = decidirPelaBandeira && !confereBandeira
 
     const handleSubmit = async () => {
         setError(null)
         setBandeiraError(null)
+        if (precisaAceiteValores && !aceiteValores) {
+            setError('Marque que você leu o aviso dos valores para continuar')
+            return
+        }
         const payload = buildPayload()
         if (!payload) return
-        if (existenteId != null) {
-            payload.fatura_existente_id = existenteId
-        }
-        if (acaoCta === 'substituir') {
+        if (decidirPelaBandeira) {
+            if (retryBandeira.confirmar_substituir_fatura && retryBandeira.fatura_existente_id != null) {
+                payload.fatura_existente_id = retryBandeira.fatura_existente_id
+                payload.confirmar_substituir_fatura = true
+            } else if (retryBandeira.fatura_existente_id != null && !faturaExistenteTemAnexo(faturaCard)) {
+                payload.fatura_existente_id = retryBandeira.fatura_existente_id
+            }
+        } else if (acaoCta === 'substituir' && idDaEscolha != null) {
+            payload.fatura_existente_id = idDaEscolha
             payload.confirmar_substituir_fatura = true
+        } else if (acaoCta === 'cadastrar' && idDaEscolha != null && !faturaExistenteTemAnexo(faturaCard)) {
+            payload.fatura_existente_id = idDaEscolha
         }
         await onConfirm(payload)
     }
@@ -526,23 +657,33 @@ const FaturaMetadadosModal = ({
                         </Alert>
                     </>
                 ) : (
-                    <p className="mb-3">
-                        Identificamos cartão, mês e ano no arquivo. Confirme os dados antes de cadastrar.
-                    </p>
+                    <>
+                        {orientacao && (
+                            <Alert color="warning" className="mb-3">{orientacao}</Alert>
+                        )}
+                        <p className="mb-3">
+                            Identificamos cartão, mês e ano no arquivo. Confirme os dados antes de cadastrar.
+                        </p>
+                    </>
                 )}
 
                 <Alert color="warning" className="mb-3">
                     {COPY_CONFERIR_COMPETENCIA_PDF}
                 </Alert>
                 {(faturaExistente || sugestao?.fatura_existente) && (
-                    <Alert color={acaoCta === 'substituir' ? 'warning' : 'info'} className="mb-3">
-                        {acaoCta === 'substituir' ? (
+                    <Alert color={acaoVisivel === 'substituir' ? 'warning' : 'info'} className="mb-3">
+                        {acaoVisivel === 'substituir' ? (
                             <>
                                 Já existe fatura com anexo
                                 {[rotuloExistente, competenciaExistente].filter(Boolean).length
                                     ? ` (${[rotuloExistente, competenciaExistente].filter(Boolean).join(' · ')})`
                                     : ''}
                                 . O botão único é <strong>Substituir fatura</strong> — não cria outra linha.
+                            </>
+                        ) : trocouBandeira ? (
+                            <>
+                                Outra bandeira nesta competência é outra fatura.
+                                {' '}O botão é <strong>Cadastrar fatura</strong> — não substitui a que já existe.
                             </>
                         ) : (
                             <>
@@ -710,7 +851,7 @@ const FaturaMetadadosModal = ({
                                     />
                                 </div>
                             </Col>
-                            {showBandeira && (
+                            {mostrarBandeira && (
                                 <Col md={6}>
                                     <div className="mb-3">
                                         <Label className="form-label">Bandeira</Label>
@@ -730,11 +871,19 @@ const FaturaMetadadosModal = ({
                                             isLoading={bandeirasLoading}
                                         />
                                         <small className="text-muted d-block mt-1">
-                                            Selecione a bandeira desta fatura
-                                            {sugestao?.bandeira_sugerida
-                                                ? ` (sugerida: ${sugestao.bandeira_sugerida})`
-                                                : ''}
-                                            .
+                                            {exigeBandeira && noCartaoDoPeriodo(cartaoId)
+                                                ? (idEscolhidoNoFormulario != null
+                                                    ? 'A bandeira escolhida no formulário vem selecionada. Outra bandeira neste mês é outra fatura.'
+                                                    : 'Outra bandeira neste mês é outra fatura. A sugerida já vem selecionada; você pode trocar.')
+                                                : (
+                                                    <>
+                                                        Selecione a bandeira desta fatura
+                                                        {sugestao?.bandeira_sugerida
+                                                            ? ` (sugerida: ${sugestao.bandeira_sugerida})`
+                                                            : ''}
+                                                        .
+                                                    </>
+                                                )}
                                         </small>
                                     </div>
                                 </Col>
@@ -777,8 +926,14 @@ const FaturaMetadadosModal = ({
                     type="button"
                     color="primary"
                     onClick={handleSubmit}
-                    disabled={loading || bandeirasLoading || !podeSubstituir || (precisaAceiteValores && !aceiteValores)}
-                    title={!podeSubstituir ? COPY_AGUARDE_PROCESSANDO_SUBSTITUIR : undefined}
+                    disabled={loading || bandeirasLoading || !podeSubstituir}
+                    title={
+                        !podeSubstituir
+                            ? COPY_AGUARDE_PROCESSANDO_SUBSTITUIR
+                            : (precisaAceiteValores && !aceiteValores
+                                ? 'Marque a confirmação dos valores para continuar'
+                                : undefined)
+                    }
                 >
                     {loading && <Spinner size="sm" className="me-2" />}
                     {ctaLabel}

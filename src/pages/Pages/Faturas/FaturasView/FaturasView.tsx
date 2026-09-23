@@ -41,7 +41,7 @@ import {
     anexoDuplicadoRetryFields,
     extractFaturaMessage,
 } from 'helpers/fatura_anexo_duplicado_helpers'
-import { idFaturaAposSubstituir, substituirFaturaRetryFields, totalLancamentosAposReprocesso } from 'helpers/fatura_substituir_existente_helpers'
+import { idFaturaAposSubstituir, idFaturaEscolhida, substituirFaturaRetryFields, totalLancamentosAposReprocesso } from 'helpers/fatura_substituir_existente_helpers'
 import { isCompraAvista, isEhAssinatura } from 'helpers/assinaturas_helpers'
 import {
     contaNoTotalLinha,
@@ -111,6 +111,7 @@ import {
 } from 'libs/api/exceptions/FaturaTitularError'
 import { FaturaAnexoDuplicadoError } from 'libs/api/exceptions/FaturaAnexoDuplicadoError'
 import { FaturaJaAnexadaError } from 'libs/api/exceptions/FaturaJaAnexadaError'
+import { FaturaArquivoDivergeAlvoError } from 'libs/api/exceptions/FaturaArquivoDivergeAlvoError'
 import { FaturaProcessandoError } from 'libs/api/exceptions/FaturaProcessandoError'
 import { getApiBaseUrl } from 'libs/api/ApiConfig'
 import { getAuthToken, handleUnauthorizedSession } from 'helpers/auth_session'
@@ -1051,6 +1052,36 @@ const FaturasViewPage = () => {
         await loadLookups()
     }
 
+    const abrirCadastroSeArquivoDiverge = (error: unknown): boolean => {
+        if (!(error instanceof FaturaArquivoDivergeAlvoError)) return false
+        setJaAnexadaModalOpen(false)
+        setJaAnexadaError(null)
+        setAnexoDuplicadoModalOpen(false)
+        setSelecaoModalOpen(false)
+        setTitularModalOpen(false)
+        pendingJaAnexadaIdRef.current = null
+        const file = pendingUploadFileRef.current ?? fileInputRef.current?.files?.[0] ?? null
+        navigate('/faturas/add', {
+            state: {
+                source: {
+                    mes: error.sugestao?.mes ?? null,
+                    ano: error.sugestao?.ano ?? null,
+                },
+                arquivoDiverge: error.body ?? {
+                    error: true,
+                    codigo: 'arquivo_diverge_alvo',
+                    arquivo_diverge_alvo: true,
+                    acao_sugerida: 'cadastrar',
+                    message: error.message,
+                    orientacao: error.orientacao,
+                    sugestao: error.sugestao,
+                },
+                arquivoPendente: file,
+            },
+        })
+        return true
+    }
+
     const handleUploadPdf = async (opts?: { skipHomologConfirm?: boolean }) => {
         const file = fileInputRef.current?.files?.[0] ?? pendingUploadFileRef.current
         if (!file || !id) {
@@ -1092,6 +1123,7 @@ const FaturasViewPage = () => {
             })
             await handleUploadSuccess(result)
         } catch (error) {
+            if (abrirCadastroSeArquivoDiverge(error)) return
             if (avisarFaturaProcessando(error)) return
             if (error instanceof FaturaTitularError) {
                 setTitularTitulares(error.titulares)
@@ -1185,6 +1217,7 @@ const FaturasViewPage = () => {
             setSelecaoModalOpen(false)
             await handleUploadSuccess(result)
         } catch (error) {
+            if (abrirCadastroSeArquivoDiverge(error)) return
             if (avisarFaturaProcessando(error)) return
             if (error instanceof FaturaSelecaoError) {
                 if (error.precisa_selecionar_final || error.codigo === 'precisa_selecionar_final') {
@@ -1256,6 +1289,7 @@ const FaturasViewPage = () => {
             setTitularModalOpen(false)
             await handleUploadSuccess(result)
         } catch (error) {
+            if (abrirCadastroSeArquivoDiverge(error)) return
             if (avisarFaturaProcessando(error)) return
             if (error instanceof FaturaSelecaoError) {
                 setTitularModalOpen(false)
@@ -1314,6 +1348,7 @@ const FaturasViewPage = () => {
             setAnexoDuplicadoModalOpen(false)
             await handleUploadSuccess(result)
         } catch (error) {
+            if (abrirCadastroSeArquivoDiverge(error)) return
             if (avisarFaturaProcessando(error)) return
             if (error instanceof FaturaAnexoDuplicadoError) {
                 setAnexoDuplicadoError(error)
@@ -1353,7 +1388,7 @@ const FaturasViewPage = () => {
 
     const handleJaAnexadaSubstituir = async () => {
         const file = pendingUploadFileRef.current ?? fileInputRef.current?.files?.[0]
-        const existingId = jaAnexadaError?.fatura_existente_id ?? jaAnexadaError?.fatura_existente?.id
+        const existingId = idFaturaEscolhida(jaAnexadaError?.fatura_existente) ?? jaAnexadaError?.fatura_existente_id
         if (!file || existingId == null) {
             toast.warning('Selecione um arquivo PDF ou CSV')
             return
@@ -1374,6 +1409,7 @@ const FaturasViewPage = () => {
             await handleUploadSuccess(result)
         } catch (error) {
             pendingJaAnexadaIdRef.current = null
+            if (abrirCadastroSeArquivoDiverge(error)) return
             if (avisarFaturaProcessando(error)) return
             if (error instanceof FaturaJaAnexadaError) {
                 setJaAnexadaError(error)
@@ -1430,6 +1466,7 @@ const FaturasViewPage = () => {
             setAnexoDuplicadoModalOpen(false)
             await handleUploadSuccess(result)
         } catch (error) {
+            if (abrirCadastroSeArquivoDiverge(error)) return
             if (error instanceof FaturaAnexoDuplicadoError) {
                 setAnexoDuplicadoError(error)
                 return
@@ -2298,6 +2335,8 @@ const FaturasViewPage = () => {
                                     state={{
                                         source: {
                                             cartao_id: fatura.cartao_id ?? null,
+                                            mes: fatura.mes ?? null,
+                                            ano: fatura.ano ?? null,
                                         },
                                     }}
                                 >

@@ -8,6 +8,7 @@ export type FaturaExistenteAnexoDuplicado = {
     id: number
     cartao_id?: number | null
     cartao_nome?: string | null
+    cartao_bandeira_id?: number | null
     bandeira?: string | null
     pessoa_id?: number | null
     pessoa_nome?: string | null
