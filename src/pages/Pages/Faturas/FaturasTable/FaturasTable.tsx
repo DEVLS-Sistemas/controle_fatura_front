@@ -11,7 +11,7 @@ import TableActionsDropdown from "Components/Common/TableActionsDropdown"
 import TablePagination from "Components/Common/TablePagination"
 import { useNavegacao } from "helpers/functions_helpers"
 import {
-    formatCurrency, formatDateBr, faturaStatusColor,
+    formatCurrency, formatDateBr, formatProcessadoEm, faturaStatusColor,
     faturaQuitacaoLabel, faturaQuitacaoColor, VALOR_TEXT_CLASS,
     resolveFaturaAnexo, downloadFaturaAnexo, FaturaAnexoDownloadTipo, FaturaAnexoDownloadMeta,
     faturaAnexoDownloadMetaFrom, rotulosFaturaAnexoNomes,
@@ -272,6 +272,7 @@ export const FaturasTable = ({ data, getData, setPerPage, perPage, filters }: Fa
                                                                 <th scope="col" className={VALOR_TEXT_CLASS}>Restante</th>
                                                                 <th scope="col">Quitação</th>
                                                                 <th scope="col">Status PDF</th>
+                                                                <th scope="col">Processado em</th>
                                                                 <th scope="col">Lançamentos</th>
                                                                 <th scope="col" style={{ width: "220px" }}>Ações</th>
                                                             </tr>
@@ -279,7 +280,7 @@ export const FaturasTable = ({ data, getData, setPerPage, perPage, filters }: Fa
                                                         <tbody>
                                                             {rows.length === 0 ? (
                                                                 <tr>
-                                                                    <td colSpan={12} className="text-muted py-4">
+                                                                    <td colSpan={13} className="text-muted py-4">
                                                                         Nenhuma fatura neste período
                                                                     </td>
                                                                 </tr>
@@ -397,6 +398,7 @@ export const FaturasTable = ({ data, getData, setPerPage, perPage, filters }: Fa
                                                                                 {statusLabel[row.status ?? ''] ?? row.status}
                                                                             </span>
                                                                         </td>
+                                                                        <td>{formatProcessadoEm(row.processado_em)}</td>
                                                                         <td>
                                                                             <span className="text-muted">
                                                                                 {row.total_transacoes ?? 0}

@@ -10,7 +10,7 @@ import {
 } from 'reactstrap'
 import { toast } from 'react-toastify'
 import {
-    formatCurrency, formatDateBr, faturaStatusColor,
+    formatCurrency, formatDateBr, formatProcessadoEm, faturaStatusColor,
     faturaQuitacaoLabel, faturaQuitacaoColor,
     tipoTransacaoColor,
     resolveTipoTransacaoLabel,
@@ -2518,8 +2518,8 @@ const FaturasViewPage = () => {
                                         </Badge>
                                     </span>
                                     <span><strong>Lançamentos:</strong> {totalTransacoes}</span>
-                                    {fatura.processado_em && (
-                                        <span><strong>Processado em:</strong> {formatDateBr(fatura.processado_em)}</span>
+                                    {formatProcessadoEm(fatura.processado_em) && (
+                                        <span><strong>Processado em:</strong> {formatProcessadoEm(fatura.processado_em)}</span>
                                     )}
                                 </div>
                             </div>

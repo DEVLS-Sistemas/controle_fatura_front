@@ -22,6 +22,15 @@ export const formatDateBr = (value?: string | null): string => {
   return `${d}/${m}/${y}`
 }
 
+/** ISO UTC de processado_em → dd/MM/yyyy HH:mm, sem converter o fuso. */
+export const formatProcessadoEm = (value?: string | null): string => {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${pad(date.getUTCDate())}/${pad(date.getUTCMonth() + 1)}/${date.getUTCFullYear()} ${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}`
+}
+
 export const tipoTransacaoLabel: Record<string, string> = {
   purchase: 'Compra',
   payment: 'Pagamento',
