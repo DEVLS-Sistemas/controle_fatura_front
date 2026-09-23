@@ -5,15 +5,19 @@ import { FaturaMetadadosError } from 'libs/api/exceptions/FaturaMetadadosError'
 import { FaturaProcessandoError } from 'libs/api/exceptions/FaturaProcessandoError'
 import { FaturaSelecaoError } from 'libs/api/exceptions/FaturaSelecaoError'
 import { FaturaTitularError } from 'libs/api/exceptions/FaturaTitularError'
+import { FaturaArquivoDivergeAlvoError } from 'libs/api/exceptions/FaturaArquivoDivergeAlvoError'
 import {
     LABEL_CADASTRAR_CARTAO_E_FATURA,
     LABEL_CADASTRAR_FATURA,
     LABEL_SUBSTITUIR_FATURA,
     faturaExistenteTemAnexo,
     idFaturaAposSubstituir,
+    idFaturaEscolhida,
     labelCtaFaturaExistente,
+    payloadAdicionarFatura,
     podeSubstituirFaturaExistente,
     resolveAcaoSugeridaFatura,
+    retrySubstituirFaturaEscolhida,
     substituirFaturaRetryFields,
     totalLancamentosAposReprocesso,
 } from './fatura_substituir_existente_helpers'
@@ -146,6 +150,84 @@ describe('substituirFaturaRetryFields', () => {
             confirmar_substituir_fatura: true,
             fatura_existente_id: 591,
         })
+    })
+})
+
+const bodyArquivoDiverge = {
+    error: true,
+    codigo: 'arquivo_diverge_alvo',
+    arquivo_diverge_alvo: true,
+    acao_sugerida: 'cadastrar',
+    message: 'Este arquivo não é do mesmo cartão, bandeira e competência. Confirme para cadastrar em vez de substituir.',
+    fatura_existente_id: 777,
+    fatura_existente: { id: 777, tem_anexo: true, cartao_nome: 'Sofisa' },
+    sugestao: {
+        mes: 8,
+        ano: 2026,
+        parser: 'picpay',
+        bandeira_sugerida: null,
+        cartao_nome_sugerido: 'PicPay',
+    },
+}
+
+describe('Adicionar fatura — alvo da escolha', () => {
+    it('o primeiro POST não leva o id da fatura aberta na tela', () => {
+        expect(payloadAdicionarFatura({
+            id: 738,
+            fatura_id: 738,
+            fatura_existente_id: 738,
+            confirmar_substituir_fatura: true,
+            cartao_id: 12,
+            cartao_bandeira_id: 4,
+            mes: 9,
+            ano: 2026,
+            arquivo_pdf: 'sofisa.pdf',
+        })).toEqual({
+            cartao_id: 12,
+            cartao_bandeira_id: 4,
+            mes: 9,
+            ano: 2026,
+            arquivo_pdf: 'sofisa.pdf',
+        })
+    })
+
+    it('o retry usa o id da fatura escolhida, não o da tela de origem', () => {
+        expect(idFaturaEscolhida({ id: 777 })).toBe(777)
+        expect(idFaturaEscolhida({ id: 0 })).toBeNull()
+        expect(retrySubstituirFaturaEscolhida(
+            { id: 777, cartao_id: 12, mes: 9, ano: 2026 },
+            { cartao_id: 3, cartao_bandeira_id: 4, mes: 7, ano: 2024 },
+        )).toEqual({
+            confirmar_substituir_fatura: true,
+            fatura_existente_id: 777,
+            cartao_id: 12,
+            cartao_bandeira_id: 4,
+            mes: 9,
+            ano: 2026,
+        })
+    })
+
+    it('sem cartão na fatura escolhida, o retry fica com o do formulário', () => {
+        expect(retrySubstituirFaturaEscolhida(
+            { id: 777, cartao_id: 0, mes: 9, ano: 2026 },
+            { cartao_id: 12, cartao_bandeira_id: 4, mes: 9, ano: 2026 },
+        ).cartao_id).toBe(12)
+    })
+})
+
+describe('FaturaArquivoDivergeAlvoError', () => {
+    it('pede cadastrar e não reabre o modal de substituir', () => {
+        expect(FaturaArquivoDivergeAlvoError.isArquivoDivergeAlvoBody(bodyArquivoDiverge)).toBe(true)
+        expect(FaturaJaAnexadaError.isFaturaJaAnexadaBody(bodyArquivoDiverge)).toBe(false)
+        expect(FaturaMetadadosError.isMetadadosBody(bodyArquivoDiverge)).toBe(false)
+        expect(FaturaSelecaoError.isSelecaoBody(bodyArquivoDiverge)).toBe(false)
+        expect(FaturaAnexoDuplicadoError.isAnexoDuplicadoBody(bodyArquivoDiverge)).toBe(false)
+        expect(FaturaProcessandoError.isFaturaProcessandoBody(bodyArquivoDiverge)).toBe(false)
+        const error = new FaturaArquivoDivergeAlvoError(bodyArquivoDiverge)
+        expect(error.acao_sugerida).toBe('cadastrar')
+        expect(error.fatura_existente_id).toBe(777)
+        expect(error.sugestao.cartao_nome_sugerido).toBe('PicPay')
+        expect(error.sugestao.mes).toBe(8)
     })
 })
 

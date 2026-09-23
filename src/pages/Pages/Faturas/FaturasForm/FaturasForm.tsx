@@ -1,11 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { setActiveMenu } from 'helpers/system_helpers'
 import { AnosSelect, useNavegacao } from 'helpers/functions_helpers'
 import { Breadcrumb, BreadcrumbItem, Card, CardBody, Col, Container, Input, Label, Row } from 'reactstrap'
 import { SubmitHandler, useForm } from 'react-hook-form'
 import { toast } from 'react-toastify'
-import { required } from 'Components/ComponentController/ValidatorForm/ValidatorForm'
 import { InputCheckbox } from 'Components/ComponentController/Inputs/Checkbox/InputCheckbox'
 import { SelectListControlled } from 'Components/ComponentController/Selects/Select/SelectListControlled'
 import { SelectOptions } from 'interfaces/SystemInterfaces/SelectInterface'
@@ -20,7 +19,12 @@ import {
     anexoDuplicadoRetryFields,
     extractFaturaMessage,
 } from 'helpers/fatura_anexo_duplicado_helpers'
-import { idFaturaAposSubstituir, substituirFaturaRetryFields } from 'helpers/fatura_substituir_existente_helpers'
+import {
+    idFaturaAposSubstituir,
+    idFaturaEscolhida,
+    payloadAdicionarFatura,
+    retrySubstituirFaturaEscolhida,
+} from 'helpers/fatura_substituir_existente_helpers'
 import {
     cartaoEBandeiraDoCadastro,
     resolveModoMetadados,
@@ -72,6 +76,7 @@ import {
     FaturaMetadadosModo,
     FaturaMetadadosRetryPayload,
     FaturaMetadadosSugestao,
+    FaturaNoPeriodo,
     isFalhaDeteccaoMetadados,
 } from 'libs/api/exceptions/FaturaMetadadosError'
 import { PdfSenhaError } from 'libs/api/exceptions/PdfSenhaError'
@@ -88,6 +93,7 @@ import {
 } from 'libs/api/exceptions/FaturaCartaoTitularError'
 import { FaturaAnexoDuplicadoError } from 'libs/api/exceptions/FaturaAnexoDuplicadoError'
 import { FaturaJaAnexadaError } from 'libs/api/exceptions/FaturaJaAnexadaError'
+import { FaturaArquivoDivergeAlvoError } from 'libs/api/exceptions/FaturaArquivoDivergeAlvoError'
 import { FaturaProcessandoError } from 'libs/api/exceptions/FaturaProcessandoError'
 import { PessoasService } from 'services/Pessoas/PessoasService'
 import { toPessoaSelectOption } from 'interfaces/Pessoas/PessoasInterface'
@@ -100,18 +106,29 @@ type PendingSenhaPayload = {
 
 const FaturasForm = () => {
     const { state } = useLocation()
-    const [record] = useState<FaturasModel>(
-        state?.source
-            ? {
+    const { id: editRouteId } = useParams()
+    const [record] = useState<FaturasModel>(() => {
+        const source = state?.source
+        if (!source) return FaturasDefaultValues
+        if (!editRouteId) {
+            return {
                 ...FaturasDefaultValues,
-                ...state.source,
-                fatura_id: state.source.fatura_id ?? state.source.id,
-                cartao_id: state.source.cartao_id ?? null,
-                cartao_bandeira_id: state.source.cartao_bandeira_id ?? null,
+                cartao_id: source.cartao_id ?? null,
+                cartao_bandeira_id: source.cartao_bandeira_id ?? null,
+                mes: source.mes ?? FaturasDefaultValues.mes,
+                ano: source.ano ?? FaturasDefaultValues.ano,
+                pessoa_id: source.pessoa_id ?? null,
             }
-            : FaturasDefaultValues
-    )
-    const { register, handleSubmit, control, setValue, watch, getValues } = useForm<FaturasModel>({
+        }
+        return {
+            ...FaturasDefaultValues,
+            ...source,
+            fatura_id: source.fatura_id ?? source.id ?? editRouteId,
+            cartao_id: source.cartao_id ?? null,
+            cartao_bandeira_id: source.cartao_bandeira_id ?? null,
+        }
+    })
+    const { register, handleSubmit, control, setValue, watch, getValues, formState: { errors } } = useForm<FaturasModel>({
         defaultValues: record
     })
     const [cartoesOptions, setCartoesOptions] = useState<SelectOptions[]>([])
@@ -144,6 +161,8 @@ const FaturasForm = () => {
     const [metadadosAcaoSugerida, setMetadadosAcaoSugerida] = useState<string | null>(null)
     const [metadadosFaturaExistente, setMetadadosFaturaExistente] = useState<FaturaMetadadosError['fatura_existente']>(null)
     const [metadadosFaturaExistenteId, setMetadadosFaturaExistenteId] = useState<number | null>(null)
+    const [metadadosFaturasPeriodo, setMetadadosFaturasPeriodo] = useState<FaturaNoPeriodo[]>([])
+    const [metadadosUsarBandeiraDoFormulario, setMetadadosUsarBandeiraDoFormulario] = useState(false)
     const [titularModalOpen, setTitularModalOpen] = useState(false)
     const [titularLoading, setTitularLoading] = useState(false)
     const [titularTitulares, setTitularTitulares] = useState<string[]>([])
@@ -163,6 +182,7 @@ const FaturasForm = () => {
     const [jaAnexadaError, setJaAnexadaError] = useState<FaturaJaAnexadaError | null>(null)
     const [pessoasOptions, setPessoasOptions] = useState<SelectOptions[]>([])
     const [cartoesLookup, setCartoesLookup] = useState<CartaoLookup[]>([])
+    const [lookupsProntos, setLookupsProntos] = useState(false)
     const [parsersHomologados, setParsersHomologados] = useState<ParserHomologado[]>(PARSERS_HOMOLOGADOS_PADRAO)
     const [homologModalOpen, setHomologModalOpen] = useState(false)
     const [homologIntent, setHomologIntent] = useState<'attach' | 'submit' | 'cartao'>('attach')
@@ -211,6 +231,8 @@ const FaturasForm = () => {
             }
         } catch (error) {
             console.error('Erro ao carregar lookups:', error)
+        } finally {
+            setLookupsProntos(true)
         }
     }
 
@@ -284,7 +306,9 @@ const FaturasForm = () => {
                 setValue('cartao_bandeira_id', list[0].value ?? null)
             } else {
                 setShowBandeiraSelect(true)
-                setValue('cartao_bandeira_id', null)
+                const atual = getValues('cartao_bandeira_id')
+                const aindaValida = list.some((b) => String(b.value) === String(atual))
+                if (!aindaValida) setValue('cartao_bandeira_id', null)
             }
         } catch (error) {
             console.error('Erro ao carregar bandeiras:', error)
@@ -389,6 +413,52 @@ const FaturasForm = () => {
         setMetadadosAcaoSugerida(error.acao_sugerida)
         setMetadadosFaturaExistente(error.fatura_existente)
         setMetadadosFaturaExistenteId(error.fatura_existente_id)
+        setMetadadosFaturasPeriodo(error.faturas_periodo)
+        setMetadadosUsarBandeiraDoFormulario(true)
+        setMetadadosModalOpen(true)
+    }
+
+    const openCadastroAposDiverge = (error: FaturaArquivoDivergeAlvoError) => {
+        pendingJaAnexadaRef.current = {}
+        pendingMetadadosRef.current = {}
+        setJaAnexadaModalOpen(false)
+        setJaAnexadaError(null)
+        const nome = String(error.sugestao?.cartao_nome_sugerido ?? '').trim().toLowerCase()
+        const match = nome
+            ? cartoesLookup.find((c) => String(c.nome ?? '').trim().toLowerCase() === nome)
+            : undefined
+        const cartaoId = match?.id ?? error.sugestao?.cartao_id ?? null
+        setMetadadosSugestao({
+            cartao_id: cartaoId,
+            cartao_bandeira_id: null,
+            cartao_nome_sugerido: error.sugestao?.cartao_nome_sugerido ?? null,
+            bandeira_sugerida: error.sugestao?.bandeira_sugerida ?? null,
+            mes: error.sugestao?.mes ?? null,
+            ano: error.sugestao?.ano ?? null,
+            parser: error.sugestao?.parser ?? null,
+        })
+        setMetadadosCartoes(
+            cartoesLookup
+                .filter((c) => c.id != null)
+                .map((c) => ({
+                    value: c.id as number,
+                    label: c.nome ?? `Cartão ${c.id}`,
+                    banco: c.banco,
+                    sugerido: cartaoId != null && Number(c.id) === Number(cartaoId),
+                    importacao_pdf_homologada: c.importacao_pdf_homologada,
+                    parser_homologado: c.parser_homologado,
+                }))
+        )
+        setMetadadosBandeiras([])
+        setMetadadosPrecisaBandeira(false)
+        setMetadadosModo(cartaoId ? 'confirmar_cartao' : 'cadastrar_cartao')
+        setMetadadosPodeCadastrar(cartaoId == null)
+        setMetadadosOrientacao(error.orientacao ?? error.message ?? null)
+        setMetadadosAcaoSugerida('cadastrar')
+        setMetadadosFaturaExistente(null)
+        setMetadadosFaturaExistenteId(null)
+        setMetadadosFaturasPeriodo([])
+        setMetadadosUsarBandeiraDoFormulario(false)
         setMetadadosModalOpen(true)
     }
 
@@ -503,6 +573,10 @@ const FaturasForm = () => {
         if (error instanceof FaturaAnexoDuplicadoError) {
             setAnexoDuplicadoError(error)
             setAnexoDuplicadoModalOpen(true)
+            return true
+        }
+        if (error instanceof FaturaArquivoDivergeAlvoError) {
+            openCadastroAposDiverge(error)
             return true
         }
         if (error instanceof FaturaJaAnexadaError) {
@@ -620,18 +694,23 @@ const FaturasForm = () => {
             ?? pendingCartaoTitularRef.current.cadastrar_cartao
             ?? cartaoNome
         )
+        const bandeiraNomeDestaTentativa = extra?.bandeira ?? null
         const { cartao_id: cartaoId, cartao_bandeira_id: cartaoBandeiraId } = cartaoEBandeiraDoCadastro({
             cadastrarCartao,
             cartaoNome,
             cartaoIdRetry: extra?.cartao_id ?? pendingMetadadosRef.current.cartao_id,
-            bandeiraIdRetry:
-                extra?.cartao_bandeira_id
-                ?? pendingMetadadosRef.current.cartao_bandeira_id
-                ?? pendingSelecaoRef.current.cartao_bandeira_id,
+            bandeiraIdRetry: bandeiraNomeDestaTentativa
+                ? (extra?.cartao_bandeira_id ?? null)
+                : (
+                    extra?.cartao_bandeira_id
+                    ?? pendingMetadadosRef.current.cartao_bandeira_id
+                    ?? pendingSelecaoRef.current.cartao_bandeira_id
+                ),
+            bandeiraNomeRetry: bandeiraNomeDestaTentativa,
             cartaoIdFormulario: data.cartao_id,
             bandeiraIdFormulario: data.cartao_bandeira_id,
             temArquivo: Boolean(arquivoFile) && !extra?.omitir_arquivo,
-            bandeiraDoFormularioExplicita: showBandeiraSelect && data.cartao_bandeira_id != null && data.cartao_bandeira_id !== '',
+            bandeiraDoFormularioExplicita: data.cartao_bandeira_id != null && data.cartao_bandeira_id !== '',
         })
         const substituirFatura = Boolean(
             extra?.substituir_fatura
@@ -645,10 +724,16 @@ const FaturasForm = () => {
             ?? pendingJaAnexadaRef.current.confirmar_substituir_fatura
             ?? pendingMetadadosRef.current.confirmar_substituir_fatura
         )
-        const faturaExistenteId =
-            extra?.fatura_existente_id
-            ?? pendingJaAnexadaRef.current.fatura_existente_id
-            ?? pendingMetadadosRef.current.fatura_existente_id
+        const faturaExistenteInformado = extra != null && Object.prototype.hasOwnProperty.call(extra, 'fatura_existente_id')
+        const faturaExistenteId = faturaExistenteInformado
+            ? (() => {
+                const id = Number(extra?.fatura_existente_id)
+                return Number.isFinite(id) && id > 0 ? id : undefined
+            })()
+            : (
+                pendingJaAnexadaRef.current.fatura_existente_id
+                ?? pendingMetadadosRef.current.fatura_existente_id
+            )
 
         if (pendingSenhaRef.current.senha_pdf && !extra?.omitir_arquivo && !arquivoFile) {
             toast.error(MSG_CADASTRO_PDF_NAO_ANEXADO)
@@ -702,10 +787,15 @@ const FaturasForm = () => {
                 extra?.fatura_duplicada_id
                 ?? pendingAnexoDuplicadoRef.current.fatura_duplicada_id,
             confirmar_substituir_fatura: confirmarSubstituirFatura || undefined,
-            fatura_existente_id: faturaExistenteId ?? undefined,
+            fatura_existente_id: Number(faturaExistenteId) > 0 ? faturaExistenteId : undefined,
             arquivo_pdf: extra?.omitir_arquivo ? null : arquivoFile,
         }
-        return faturasService.createFaturas(payload)
+        delete payload.id
+        delete payload.fatura_id
+        const envio = (!confirmarSubstituirFatura && !(Number(faturaExistenteId) > 0))
+            ? payloadAdicionarFatura(payload as unknown as Record<string, unknown>)
+            : payload
+        return faturasService.createFaturas(envio as FaturasModel)
     }
 
     const validateCreateSubmit = (data: FaturasModel): boolean => {
@@ -816,6 +906,9 @@ const FaturasForm = () => {
     }
 
     const handleMetadadosConfirm = async (selection: FaturaMetadadosRetryPayload) => {
+        if (!selection.confirmar_substituir_fatura) {
+            pendingJaAnexadaRef.current = {}
+        }
         pendingMetadadosRef.current = {
             ...selection,
             cartao_id: selection.cartao_nome || selection.cadastrar_cartao ? null : selection.cartao_id,
@@ -992,12 +1085,28 @@ const FaturasForm = () => {
     }
 
     const handleJaAnexadaSubstituir = async () => {
-        const existingId = jaAnexadaError?.fatura_existente_id ?? jaAnexadaError?.fatura_existente?.id
+        const fatura = jaAnexadaError?.fatura_existente
+        const existingId = idFaturaEscolhida(fatura) ?? jaAnexadaError?.fatura_existente_id
         if (existingId == null) {
             toast.error('Não foi possível identificar a fatura que já tem anexo.')
             return
         }
-        const retry = substituirFaturaRetryFields(existingId)
+        const form = getValues()
+        const retry = retrySubstituirFaturaEscolhida(
+            {
+                id: existingId,
+                cartao_id: fatura?.cartao_id,
+                cartao_bandeira_id: fatura?.cartao_bandeira_id,
+                mes: fatura?.mes,
+                ano: fatura?.ano,
+            },
+            {
+                cartao_id: form.cartao_id,
+                cartao_bandeira_id: form.cartao_bandeira_id,
+                mes: form.mes,
+                ano: form.ano,
+            },
+        )
         pendingJaAnexadaRef.current = retry
         setJaAnexadaLoading(true)
         try {
@@ -1126,6 +1235,19 @@ const FaturasForm = () => {
         getLookups()
     }, [])
 
+    const divergeAbertoRef = useRef(false)
+    useEffect(() => {
+        if (!lookupsProntos || divergeAbertoRef.current) return
+        const body = state?.arquivoDiverge as Record<string, unknown> | undefined
+        if (!body) return
+        divergeAbertoRef.current = true
+        const file = state?.arquivoPendente
+        if (file instanceof File) applyArquivo(file)
+        openCadastroAposDiverge(new FaturaArquivoDivergeAlvoError(body))
+        // Abre uma vez, depois dos lookups, quando o detalhe manda cadastrar o arquivo.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [lookupsProntos])
+
     useEffect(() => {
         setActiveMenu('/faturas')
     }, [])
@@ -1148,7 +1270,9 @@ const FaturasForm = () => {
     }, [cartaoId, isEdit])
 
     const optAnos = AnosSelect()
-    const requiredManual = camposManualObrigatorios ? required : undefined
+    const regraObrigatoria = (message: string) => (
+        camposManualObrigatorios ? { value: true, message } : undefined
+    )
 
     return (
         <React.Fragment>
@@ -1201,6 +1325,8 @@ const FaturasForm = () => {
                 acaoSugerida={metadadosAcaoSugerida}
                 faturaExistente={metadadosFaturaExistente}
                 faturaExistenteId={metadadosFaturaExistenteId}
+                faturasPeriodo={metadadosFaturasPeriodo}
+                bandeiraIdEscolhida={metadadosUsarBandeiraDoFormulario ? getValues('cartao_bandeira_id') : null}
                 loading={metadadosLoading}
                 onClose={() => setMetadadosModalOpen(false)}
                 onConfirm={handleMetadadosConfirm}
@@ -1251,7 +1377,7 @@ const FaturasForm = () => {
                                         {isEdit ? 'Editar' : 'Adicionar'} Fatura
                                     </h4>
                                 </div>
-                                <Breadcrumb pageTitle="" listClassName="mb-sm-0 pt-1 py-2">
+                                <Breadcrumb listClassName="mb-sm-0 pt-1 py-2">
                                     <BreadcrumbItem><Link to="/dashboard"><i className="ri-home-5-fill"></i></Link></BreadcrumbItem>
                                     <BreadcrumbItem><Link to="/faturas">Faturas</Link></BreadcrumbItem>
                                     <BreadcrumbItem active>
@@ -1329,7 +1455,8 @@ const FaturasForm = () => {
                                                         options={cartoesOptions}
                                                         field="cartao_id"
                                                         control={control}
-                                                        required={requiredManual}
+                                                        required={regraObrigatoria('Informe o cartão')}
+                                                        errors={errors.cartao_id}
                                                         disabled={isEdit}
                                                     />
                                                 </div>
@@ -1344,7 +1471,8 @@ const FaturasForm = () => {
                                                             options={bandeirasOptions}
                                                             field="cartao_bandeira_id"
                                                             control={control}
-                                                            required={required}
+                                                            required={{ value: true, message: 'Selecione a bandeira da fatura' }}
+                                                            errors={errors.cartao_bandeira_id}
                                                             isLoading={bandeirasLoading}
                                                         />
                                                     </div>
@@ -1362,7 +1490,8 @@ const FaturasForm = () => {
                                                         options={mesesOptions}
                                                         field="mes"
                                                         control={control}
-                                                        required={requiredManual}
+                                                        required={regraObrigatoria('Informe o mês da fatura')}
+                                                        errors={errors.mes}
                                                     />
                                                 </div>
                                             </Col>
@@ -1378,7 +1507,8 @@ const FaturasForm = () => {
                                                         options={optAnos}
                                                         field="ano"
                                                         control={control}
-                                                        required={requiredManual}
+                                                        required={regraObrigatoria('Informe o ano da fatura')}
+                                                        errors={errors.ano}
                                                     />
                                                 </div>
                                             </Col>
