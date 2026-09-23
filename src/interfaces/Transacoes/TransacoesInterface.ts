@@ -243,6 +243,7 @@ export interface TransacoesInterface {
     AsyncListTransacoes(params: TransacoesSearch): Promise<TransacoesModel[] | undefined>
     listEstabelecimentosDoFiltro(params: TransacoesSearch): Promise<EstabelecimentoDoFiltro[]>
     createTransacoes(params: TransacoesModel): Promise<any>
+    cadastrarLote(compras: Record<string, unknown>[]): Promise<any>
     editTransacoes(params: TransacoesModel): Promise<any>
     deleteTransacoes(id: number, options?: { excluir_grupo?: boolean }): Promise<any>
     getLookupsTransacoes(): Promise<LookupsTransacoes | undefined>

@@ -1,11 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { Breadcrumb, BreadcrumbItem, Col, Container, Row } from 'reactstrap'
+import { Breadcrumb, BreadcrumbItem, Button, Col, Container, Modal, ModalBody, ModalFooter, ModalHeader, Row } from 'reactstrap'
 import { useForm } from 'react-hook-form'
 import { toast } from 'react-toastify'
+import { AccessDeniedError } from 'libs/api/exceptions/AccessDeniedError'
+import { ValidationError } from 'libs/api/exceptions/ValidationError'
 import UiContent from 'Components/Common/UiContent'
 import { setActiveMenu } from 'helpers/system_helpers'
-import { isMeuResponsavelDisplay, splitValorEmParcelas, toCentavos } from 'helpers/fatura_helpers'
+import { centavosToBr, isMeuResponsavelDisplay, splitValorEmParcelas, toCentavos } from 'helpers/fatura_helpers'
 import { buildResponsavelVisualizarPath } from 'helpers/responsavel_visualizar_helpers'
 import { calcularVereditoCompra } from 'helpers/posso_comprar_helpers'
 import {
@@ -27,7 +29,23 @@ import {
 import { pessoaIdOf, PessoaListItem, toPessoaSelectOption } from 'interfaces/Pessoas/PessoasInterface'
 import { CartoesList } from 'interfaces/Cartoes/CartoesInterface'
 import { ProjecaoFaturasView } from 'interfaces/ProjecaoFaturas/ProjecaoFaturasInterface'
-import { SimuladorCompraFormValues, SimuladorParcela } from 'interfaces/SimuladorCompra/SimuladorCompraInterface'
+import {
+  SimulacaoLoteItem,
+  SimuladorCompraFormValues,
+  SimuladorOverlayResult,
+  SimuladorParcela,
+  SimuladorVeredito,
+} from 'interfaces/SimuladorCompra/SimuladorCompraInterface'
+import {
+  bloqueioTamanhoLote,
+  concluirEstaHabilitado,
+  DestinoFaturaCartao,
+  destinosFaturaDoLote,
+  indiceErroLote,
+  mensagemSucessoLote,
+  montarPayloadLote,
+  textoConfirmacaoLote,
+} from 'helpers/simulador_lote_helpers'
 import { CartaoLookup, ResponsavelLookup } from 'interfaces/Transacoes/TransacoesInterface'
 import { SelectOptions } from 'interfaces/SystemInterfaces/SelectInterface'
 import { CartoesService } from 'services/Cartoes/CartoesService'
@@ -39,8 +57,10 @@ import SimuladorCompraForm from './SimuladorCompraForm/SimuladorCompraForm'
 import SimuladorCompraImpacto from './SimuladorCompraImpacto/SimuladorCompraImpacto'
 import SimuladorCompraDetalhes from './SimuladorCompraDetalhes/SimuladorCompraDetalhes'
 import SimuladorCompraVeredito, {
+  LinhaCompraVeredito,
   SimuladorCompraVereditoSkeleton,
 } from './SimuladorCompraVeredito/SimuladorCompraVeredito'
+import SimuladorListaSomadas from './SimuladorListaSomadas/SimuladorListaSomadas'
 
 type CartaoForm = {
   id: number
@@ -89,34 +109,82 @@ const toCartaoForm = (c: Record<string, any> | CartoesList | CartaoLookup | null
   }
 }
 
+const chaveNomeCartao = (nome: string): string => nome.trim().toLocaleLowerCase('pt-BR')
+
 const mergeCartoes = (listas: Array<CartaoForm[] | undefined>): CartaoForm[] => {
   const byId = new Map<number, CartaoForm>()
+  const byNome = new Map<string, number>()
   listas.forEach((lista) => {
     (lista || []).forEach((c) => {
-      const prev = byId.get(c.id)
+      const chave = chaveNomeCartao(c.nome)
+      const idPeloNome = chave ? byNome.get(chave) : undefined
+      const prev = byId.get(c.id) ?? (idPeloNome != null ? byId.get(idPeloNome) : undefined)
       if (!prev) {
         byId.set(c.id, c)
+        if (chave) byNome.set(chave, c.id)
         return
       }
-      byId.set(c.id, {
+      const merged: CartaoForm = {
         ...prev,
         ...c,
+        id: prev.id,
+        nome: prev.nome || c.nome,
         pessoa_id: c.pessoa_id ?? prev.pessoa_id ?? null,
         pessoa_nome: c.pessoa_nome || prev.pessoa_nome,
         dia_limite_fatura: c.dia_limite_fatura ?? prev.dia_limite_fatura ?? null,
         cor_fundo: c.cor_fundo || prev.cor_fundo,
         cor_texto: c.cor_texto || prev.cor_texto,
-      })
+      }
+      byId.set(prev.id, merged)
+      if (c.id !== prev.id) byId.delete(c.id)
+      if (chave) byNome.set(chave, prev.id)
     })
   })
   return Array.from(byId.values()).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+}
+
+const mesclarOverlays = (partes: SimuladorOverlayResult[]): SimuladorOverlayResult => {
+  const n = Math.max(0, ...partes.map((parte) => parte.deltas.length))
+  const deltas = Array.from({ length: n }, (_, indice) =>
+    partes.reduce((acc, parte) => acc + Number(parte.deltas[indice] || 0), 0)
+  )
+  const parcelas = partes.flatMap((parte) => parte.parcelas)
+  const ordenadas = [...parcelas].sort((a, b) => a.ano - b.ano || a.mes - b.mes || a.parcela - b.parcela)
+  const fora = parcelas.filter((parcela) => !parcela.na_janela).length
+  return {
+    deltas,
+    parcelas,
+    parcelas_na_janela: parcelas.length - fora,
+    parcelas_fora_da_janela: fora,
+    primeira: ordenadas[0] || null,
+    ultima: ordenadas[ordenadas.length - 1] || null,
+    totais_batem: true,
+  }
+}
+
+const unirVereditos = (vereditos: SimuladorVeredito[]): SimuladorVeredito | null => {
+  if (!vereditos.length) return null
+  if (vereditos.length === 1) return vereditos[0]
+  const peso = { baixo: 0, moderado: 1, alto: 2 }
+  const pior = vereditos.reduce((atual, proximo) => (peso[proximo.nivel] > peso[atual.nivel] ? proximo : atual))
+  const porIndice = new Map<number, SimuladorVeredito['meses'][number]>()
+  vereditos.forEach((veredito) => {
+    veredito.meses.forEach((mes) => {
+      const previo = porIndice.get(mes.indice)
+      if (!previo || mes.score > previo.score) porIndice.set(mes.indice, mes)
+    })
+  })
+  return {
+    ...pior,
+    meses: Array.from(porIndice.values()).sort((a, b) => a.indice - b.indice),
+  }
 }
 
 const SimuladorCompraPage = () => {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
 
-  const { register, control, watch, setValue } = useForm<SimuladorCompraFormValues>({
+  const { register, control, watch, setValue, getValues } = useForm<SimuladorCompraFormValues>({
     defaultValues: {
       pessoa_id: null,
       cartao_id: parseQueryNumber(searchParams.get('cartao_id')),
@@ -124,6 +192,7 @@ const SimuladorCompraPage = () => {
       valor_compra: parseValorQuery(searchParams.get('valor')),
       parcelas_total: parseQueryNumber(searchParams.get('parcelas')) || 1,
       data: searchParams.get('data') || todayISO(),
+      observacoes: '',
       mes: null,
       ano: null,
     },
@@ -135,8 +204,6 @@ const SimuladorCompraPage = () => {
   const [projecaoBase, setProjecaoBase] = useState<ProjecaoFaturasView>()
   const [pessoas, setPessoas] = useState<PessoaListItem[]>([])
   const [cartoesCatalogo, setCartoesCatalogo] = useState<CartaoForm[]>([])
-  const [cartoesDoTitularApi, setCartoesDoTitularApi] = useState<CartaoForm[]>([])
-  const [loadingCartoesTitular, setLoadingCartoesTitular] = useState(false)
   const [responsaveis, setResponsaveis] = useState<ResponsavelLookup[]>([])
   const [defaultResponsavelId, setDefaultResponsavelId] = useState<number | null>(null)
   const [parcelasValores, setParcelasValores] = useState<string[]>([])
@@ -144,10 +211,20 @@ const SimuladorCompraPage = () => {
   const [dataAberta, setDataAberta] = useState(false)
   const [verTodos, setVerTodos] = useState(false)
   const [detalhesAbertos, setDetalhesAbertos] = useState(false)
+  const [itensLote, setItensLote] = useState<SimulacaoLoteItem[]>([])
+  const [indiceInvalido, setIndiceInvalido] = useState<number | null>(null)
+  const [observacoesInvalida, setObservacoesInvalida] = useState(false)
+  const [confirmacaoLoteAberta, setConfirmacaoLoteAberta] = useState(false)
+  const [gravandoLote, setGravandoLote] = useState(false)
+  const [modalSimulacaoAberto, setModalSimulacaoAberto] = useState(false)
+  const [indiceEdicao, setIndiceEdicao] = useState<number | null>(null)
+  const [destinosFatura, setDestinosFatura] = useState<DestinoFaturaCartao[] | null>(null)
 
   const defaultsApplied = useRef(false)
   const skipTitularEffect = useRef(true)
-  const formKeySimulado = useRef<string | null>(null)
+  const restaurandoItem = useRef(false)
+  const parcelasRestauradas = useRef<string[] | null>(null)
+  const cartaoRestaurado = useRef<number | null>(null)
   const pessoasDetalheCache = useRef<Map<number, PessoaListItem>>(new Map())
 
   const pessoasService = useRef(new PessoasService()).current
@@ -161,6 +238,7 @@ const SimuladorCompraPage = () => {
   const valorCompra = watch('valor_compra')
   const parcelasTotal = watch('parcelas_total')
   const dataCompra = watch('data')
+  const observacoes = watch('observacoes')
 
   const nParcelas = Math.max(1, Math.min(36, Number(parcelasTotal) || 1))
   const valorCentavos = toCentavos(valorCompra)
@@ -170,36 +248,7 @@ const SimuladorCompraPage = () => {
   const titular = pessoas.find((p) => Number(pessoaIdOf(p)) === Number(pessoaId))
   const showTitular = pessoas.length > 1
 
-  const cartoesFiltrados = useMemo(() => {
-    const titularId = pessoaId != null && pessoaId !== '' ? Number(pessoaId) : null
-    if (titularId == null || !Number.isFinite(titularId)) return []
-    const ehPrincipal = Boolean(titular?.eh_principal)
-    const doCatalogo = filtrarCartoesDoTitular(cartoesCatalogo, titularId, ehPrincipal)
-    const daApi = filtrarCartoesDoTitular(cartoesDoTitularApi, titularId, ehPrincipal)
-    const catalogoTemPessoa = cartoesCatalogo.some((c) => c.pessoa_id != null)
-    const apiSoLegado =
-      cartoesDoTitularApi.length > 0 && cartoesDoTitularApi.every((c) => c.pessoa_id == null)
-
-    if (catalogoTemPessoa) {
-      const idsCatalogo = new Set(doCatalogo.map((c) => c.id))
-      const daApiDoTitular = daApi.filter(
-        (c) => Number(c.pessoa_id) === titularId || idsCatalogo.has(c.id)
-      )
-      return mergeCartoes([doCatalogo, daApiDoTitular])
-    }
-    if (daApi.length) return mergeCartoes([daApi])
-    if (apiSoLegado) {
-      const idsApi = new Set(cartoesDoTitularApi.map((c) => c.id))
-      const pareceListaInteira =
-        cartoesCatalogo.length > 1 &&
-        cartoesCatalogo.every((c) => idsApi.has(c.id)) &&
-        cartoesDoTitularApi.length === cartoesCatalogo.length
-      if (!pareceListaInteira) return mergeCartoes([cartoesDoTitularApi])
-    }
-    return doCatalogo
-  }, [cartoesCatalogo, cartoesDoTitularApi, pessoaId, titular])
-
-  const cartaoSel = cartoesFiltrados.find((c) => Number(c.id) === Number(cartaoId))
+  const cartaoSel = cartoesCatalogo.find((c) => Number(c.id) === Number(cartaoId))
   const responsavelSel = responsaveis.find((r) => Number(r.id) === Number(responsavelId))
   const ehEu = isMeuResponsavelDisplay({
     responsavelId: responsavelId != null ? Number(responsavelId) : null,
@@ -208,21 +257,12 @@ const SimuladorCompraPage = () => {
   })
 
   const pessoasOptions: SelectOptions[] = pessoas.map(toPessoaSelectOption)
-  const cartoesOptions: SelectOptions[] = cartoesFiltrados.map((c) => ({
+  const cartoesOptions: SelectOptions[] = cartoesCatalogo.map((c) => ({
     value: c.id,
     label: c.nome,
     cor_fundo: c.cor_fundo ?? null,
     cor_texto: c.cor_texto ?? null,
   }))
-
-  const formKey = [
-    cartaoId ?? '',
-    responsavelId ?? '',
-    valorCentavos,
-    nParcelas,
-    dataCompra ?? '',
-    parcelasValores.join(','),
-  ].join('|')
 
   const podeSimular =
     Number(cartaoId) > 0 &&
@@ -231,88 +271,153 @@ const SimuladorCompraPage = () => {
     nParcelas >= 1 &&
     totaisBatem
 
-  const overlayInput = useMemo(
-    () =>
-      montarParcelasSimuladas({
-        valorCentavos,
-        nParcelas,
+  const entradasLote = useMemo(() => {
+    const colunas = projecaoBase?.colunas || []
+    return itensLote.map((item) => ({
+      item,
+      parcelas: montarParcelasSimuladas({
+        valorCentavos: toCentavos(item.valor_compra),
+        nParcelas: item.parcelas_total,
         valoresManuaisCentavos:
-          nParcelas > 1 && parcelasValores.length === nParcelas
-            ? parcelasValores.map((v) => toCentavos(v))
+          item.parcelas && item.parcelas.length === item.parcelas_total
+            ? item.parcelas.map((parcela) => toCentavos(parcela.valor))
             : undefined,
-        dataISO: dataCompra,
-        diaLimite: cartaoSel?.dia_limite_fatura ?? null,
-        colunas: projecaoBase?.colunas || [],
+        dataISO: item.data,
+        diaLimite: item.dia_limite_fatura ?? null,
+        colunas,
       }),
-    [valorCentavos, nParcelas, parcelasValores, dataCompra, cartaoSel?.dia_limite_fatura, projecaoBase]
+    }))
+  }, [itensLote, projecaoBase])
+
+  const overlayConjunto = useMemo(
+    () => (entradasLote.length ? mesclarOverlays(entradasLote.map((entrada) => entrada.parcelas)) : null),
+    [entradasLote]
   )
 
   const projecaoOverlay = useMemo(() => {
-    if (!resultadoVisivel || !projecaoBase || !podeSimular) return undefined
-    return aplicarOverlaySimulacao(projecaoBase, {
-      cartaoId: Number(cartaoId),
-      responsavelId: Number(responsavelId),
-      responsavelNome: responsavelSel?.nome || (ehEu ? 'Eu' : `Responsável #${responsavelId}`),
-      ehEu,
-      deltas: overlayInput.deltas,
+    if (!resultadoVisivel || !projecaoBase || !entradasLote.length) return undefined
+    return entradasLote.reduce((view, entrada) => {
+      const respId = entrada.item.responsavel_id != null ? Number(entrada.item.responsavel_id) : 0
+      return aplicarOverlaySimulacao(view, {
+        cartaoId: entrada.item.cartao_id,
+        responsavelId: respId,
+        responsavelNome: entrada.item.responsavel_nome || (respId ? `Responsável #${respId}` : 'Eu'),
+        ehEu: isMeuResponsavelDisplay({
+          responsavelId: entrada.item.responsavel_id ?? null,
+          responsavelNome: entrada.item.responsavel_nome,
+          defaultResponsavelId,
+        }),
+        deltas: entrada.parcelas.deltas,
+      })
+    }, projecaoBase)
+  }, [resultadoVisivel, projecaoBase, entradasLote, defaultResponsavelId])
+
+  const foco = itensLote[0]
+  const focoResponsavelId = foco?.responsavel_id != null ? Number(foco.responsavel_id) : 0
+  const focoCartaoId = foco ? Number(foco.cartao_id) : 0
+  const ehEuFoco = foco
+    ? isMeuResponsavelDisplay({
+        responsavelId: foco.responsavel_id ?? null,
+        responsavelNome: foco.responsavel_nome,
+        defaultResponsavelId,
+      })
+    : false
+
+  const impacto = useMemo(() => {
+    if (!resultadoVisivel || !projecaoBase || !projecaoOverlay || !foco || !overlayConjunto) return null
+    const deltasPessoa = mesclarOverlays(
+      entradasLote
+        .filter((entrada) => Number(entrada.item.responsavel_id) === focoResponsavelId)
+        .map((entrada) => entrada.parcelas)
+    ).deltas
+    const deltasCartao = mesclarOverlays(
+      entradasLote
+        .filter((entrada) => Number(entrada.item.cartao_id) === focoCartaoId)
+        .map((entrada) => entrada.parcelas)
+    ).deltas
+    const doCartao = calcularImpactoSimulacao({
+      base: projecaoBase,
+      overlay: projecaoOverlay,
+      cartaoId: focoCartaoId,
+      responsavelId: focoResponsavelId,
+      deltas: deltasCartao,
+      primeira: overlayConjunto.primeira,
     })
+    const daPessoa = calcularImpactoSimulacao({
+      base: projecaoBase,
+      overlay: projecaoOverlay,
+      cartaoId: focoCartaoId,
+      responsavelId: focoResponsavelId,
+      deltas: deltasPessoa,
+      primeira: overlayConjunto.primeira,
+    })
+    return {
+      ...doCartao,
+      geral_responsavel: daPessoa.geral_responsavel,
+      soma_janela_geral: daPessoa.soma_janela_geral,
+    }
   }, [
     resultadoVisivel,
     projecaoBase,
-    podeSimular,
-    cartaoId,
-    responsavelId,
-    responsavelSel,
-    ehEu,
-    overlayInput.deltas,
+    projecaoOverlay,
+    foco,
+    focoCartaoId,
+    focoResponsavelId,
+    overlayConjunto,
+    entradasLote,
   ])
 
-  const impacto = useMemo(() => {
-    if (!resultadoVisivel || !projecaoBase || !projecaoOverlay || !cartaoId || !responsavelId) return null
-    return calcularImpactoSimulacao({
-      base: projecaoBase,
-      overlay: projecaoOverlay,
-      cartaoId: Number(cartaoId),
-      responsavelId: Number(responsavelId),
-      deltas: overlayInput.deltas,
-      primeira: overlayInput.primeira,
-    })
-  }, [resultadoVisivel, projecaoBase, projecaoOverlay, cartaoId, responsavelId, overlayInput])
-
   const veredito = useMemo(() => {
-    if (!resultadoVisivel || !projecaoBase || !projecaoOverlay || !cartaoId) return null
-    return calcularVereditoCompra({
-      base: projecaoBase,
+    if (!resultadoVisivel || !projecaoBase || !projecaoOverlay || !entradasLote.length) return null
+    const grupos = new Map<number, typeof entradasLote>()
+    entradasLote.forEach((entrada) => {
+      const lista = grupos.get(entrada.item.cartao_id) || []
+      lista.push(entrada)
+      grupos.set(entrada.item.cartao_id, lista)
+    })
+    const vereditos = Array.from(grupos.values())
+      .map((grupo) => {
+        const overlayGrupo = mesclarOverlays(grupo.map((entrada) => entrada.parcelas))
+        const valor = grupo.reduce((acc, entrada) => acc + toCentavos(entrada.item.valor_compra), 0) / 100
+        const calculado = calcularVereditoCompra({
+          base: projecaoBase,
+          overlay: projecaoOverlay,
+          cartaoId: grupo[0].item.cartao_id,
+          cartaoNome: grupo[0].item.cartao_nome || '',
+          nParcelas: Math.max(...grupo.map((entrada) => entrada.item.parcelas_total)),
+          valorCompra: valor,
+          overlayInput: overlayGrupo,
+        })
+        return calculado
+      })
+      .filter((item): item is SimuladorVeredito => Boolean(item))
+    return unirVereditos(vereditos)
+  }, [resultadoVisivel, projecaoBase, projecaoOverlay, entradasLote])
+
+  const idxBreakdown =
+    overlayConjunto?.primeira?.indice_coluna ??
+    projecaoBase?.colunas.findIndex((c) => c.referencia) ??
+    0
+  const breakdown = useMemo(() => {
+    if (!resultadoVisivel || !projecaoBase || !projecaoOverlay || !foco) return []
+    return breakdownResponsavelPorCartao({
       overlay: projecaoOverlay,
-      cartaoId: Number(cartaoId),
-      cartaoNome: cartaoSel?.nome || '',
-      nParcelas,
-      valorCompra: valorCentavos / 100,
-      overlayInput,
+      base: projecaoBase,
+      responsavelId: focoResponsavelId,
+      cartaoSimuladoId: focoCartaoId,
+      cartoesSimulados: itensLote.map((item) => item.cartao_id),
+      indice: idxBreakdown >= 0 ? idxBreakdown : 0,
     })
   }, [
     resultadoVisivel,
     projecaoBase,
     projecaoOverlay,
-    cartaoId,
-    cartaoSel?.nome,
-    nParcelas,
-    valorCentavos,
-    overlayInput,
+    foco,
+    focoResponsavelId,
+    focoCartaoId,
+    itensLote,
+    idxBreakdown,
   ])
-
-  const idxBreakdown =
-    overlayInput.primeira?.indice_coluna ?? projecaoBase?.colunas.findIndex((c) => c.referencia) ?? 0
-  const breakdown = useMemo(() => {
-    if (!resultadoVisivel || !projecaoBase || !projecaoOverlay || !responsavelId || !cartaoId) return []
-    return breakdownResponsavelPorCartao({
-      overlay: projecaoOverlay,
-      base: projecaoBase,
-      responsavelId: Number(responsavelId),
-      cartaoSimuladoId: Number(cartaoId),
-      indice: idxBreakdown >= 0 ? idxBreakdown : 0,
-    })
-  }, [resultadoVisivel, projecaoBase, projecaoOverlay, responsavelId, cartaoId, idxBreakdown])
 
   const resolveDefaultResponsavel = useCallback(
     async (pessoa: PessoaListItem | undefined): Promise<number | null> => {
@@ -430,77 +535,66 @@ const SimuladorCompraPage = () => {
   ])
 
   useEffect(() => {
-    const titularId = pessoaId != null && pessoaId !== '' ? Number(pessoaId) : null
-    if (titularId == null || !Number.isFinite(titularId)) {
-      setCartoesDoTitularApi([])
-      setLoadingCartoesTitular(false)
-      return
-    }
-    let cancelled = false
-    setCartoesDoTitularApi([])
-    setLoadingCartoesTitular(true)
-    cartoesService
-      .AsyncListCartoes({ pessoa_id: titularId })
-      .then((list) => {
-        if (cancelled) return
-        const mapped = normalizeCartoesList(list)
-          .map(toCartaoForm)
-          .filter((c): c is CartaoForm => c != null)
-        setCartoesDoTitularApi(mapped)
-      })
-      .catch(() => {
-        if (!cancelled) setCartoesDoTitularApi([])
-      })
-      .finally(() => {
-        if (!cancelled) setLoadingCartoesTitular(false)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [pessoaId, cartoesService])
-
-  useEffect(() => {
     if (!defaultsApplied.current) return
     if (skipTitularEffect.current) {
       skipTitularEffect.current = false
       return
     }
-    setValue('cartao_id', null)
+    if (restaurandoItem.current) {
+      restaurandoItem.current = false
+      return
+    }
+    cartaoRestaurado.current = null
     resolveDefaultResponsavel(titular).then((id) => setValue('responsavel_id', id))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pessoaId])
 
   useEffect(() => {
     if (!defaultsApplied.current) return
-    if (loadingCartoesTitular) return
-    const atualOk = cartoesFiltrados.some((c) => Number(c.id) === Number(cartaoId))
+    if (cartaoId == null || cartaoId === '') return
+    if (cartaoRestaurado.current != null) {
+      const restaurado = cartoesCatalogo.find((c) => Number(c.id) === cartaoRestaurado.current)
+      if (restaurado) {
+        setValue('cartao_id', restaurado.id)
+        cartaoRestaurado.current = null
+      }
+      return
+    }
+    const atualOk = cartoesCatalogo.some((c) => Number(c.id) === Number(cartaoId))
     if (atualOk) return
     const qCartao = parseQueryNumber(searchParams.get('cartao_id'))
     const preferido =
-      qCartao != null ? cartoesFiltrados.find((c) => Number(c.id) === qCartao) : undefined
-    setValue('cartao_id', (preferido || cartoesFiltrados[0])?.id ?? null)
-  }, [cartoesFiltrados, loadingCartoesTitular, cartaoId, searchParams, setValue])
+      qCartao != null ? cartoesCatalogo.find((c) => Number(c.id) === qCartao) : undefined
+    setValue('cartao_id', (preferido || cartoesCatalogo[0])?.id ?? null)
+  }, [cartoesCatalogo, cartaoId, searchParams, setValue])
 
   useEffect(() => {
     if (nParcelas <= 1) {
       setParcelasValores([])
       return
     }
+    if (parcelasRestauradas.current && parcelasRestauradas.current.length === nParcelas) {
+      setParcelasValores(parcelasRestauradas.current)
+      parcelasRestauradas.current = null
+      return
+    }
     setParcelasValores(splitValorEmParcelas(valorCentavos, nParcelas))
   }, [valorCentavos, nParcelas])
 
   useEffect(() => {
-    if (resultadoVisivel && formKeySimulado.current && formKeySimulado.current !== formKey) {
-      setResultadoVisivel(false)
-      setProjecaoBase(undefined)
-    }
-  }, [formKey, resultadoVisivel])
+    if (String(observacoes || '').trim()) setObservacoesInvalida(false)
+  }, [observacoes])
 
   const handleSimular = async () => {
+    if (!String(getValues('observacoes') || '').trim()) {
+      setObservacoesInvalida(true)
+      return
+    }
     if (!podeSimular) {
       toast.warning('Preencha cartão, responsável, valor e parcelas para ver se a compra cabe.')
       return
     }
+    const item = itemDaVez()
     const diaLimite = cartaoSel?.dia_limite_fatura ?? null
     const primeira = competenciaPrimeiraParcela(dataCompra, diaLimite)
     const now = new Date()
@@ -525,7 +619,8 @@ const SimuladorCompraPage = () => {
         )
       }
       setProjecaoBase(result)
-      formKeySimulado.current = formKey
+      setItensLote([item])
+      setIndiceInvalido(null)
       setResultadoVisivel(true)
       setVerTodos(false)
       setDetalhesAbertos(false)
@@ -544,80 +639,276 @@ const SimuladorCompraPage = () => {
   }
 
   const faturaPath =
-    resultadoVisivel && responsavelId && (impacto?.competencia || overlayInput.primeira)
-      ? `/projecao-faturas/responsaveis/${responsavelId}/fatura?mes=${
-          overlayInput.primeira?.mes || impacto?.competencia?.mes
-        }&ano=${overlayInput.primeira?.ano || impacto?.competencia?.ano}`
+    resultadoVisivel && focoResponsavelId && (impacto?.competencia || overlayConjunto?.primeira)
+      ? `/projecao-faturas/responsaveis/${focoResponsavelId}/fatura?mes=${
+          overlayConjunto?.primeira?.mes || impacto?.competencia?.mes
+        }&ano=${overlayConjunto?.primeira?.ano || impacto?.competencia?.ano}`
       : undefined
   const visualizarPath =
-    resultadoVisivel && responsavelId && (impacto?.competencia || overlayInput.primeira)
+    resultadoVisivel && focoResponsavelId && (impacto?.competencia || overlayConjunto?.primeira)
       ? buildResponsavelVisualizarPath(
-          Number(responsavelId),
-          overlayInput.primeira?.mes || impacto?.competencia?.mes || new Date().getMonth() + 1,
-          overlayInput.primeira?.ano || impacto?.competencia?.ano || new Date().getFullYear()
+          focoResponsavelId,
+          overlayConjunto?.primeira?.mes || impacto?.competencia?.mes || new Date().getMonth() + 1,
+          overlayConjunto?.primeira?.ano || impacto?.competencia?.ano || new Date().getFullYear()
         )
       : undefined
 
-  const registrarCompra = () => {
-    if (!podeSimular || !cartaoId) {
-      toast.warning('Simule a compra antes de registrar.')
-      return
-    }
-    navigate('/transacoes/add', {
-      state: {
-        source: {
-          cartao_id: Number(cartaoId),
-          responsavel_id: responsavelId ? Number(responsavelId) : null,
-          valor_compra: valorCompra,
-          parcelas_total: nParcelas,
-          data: dataCompra,
-          parcelas:
-            nParcelas > 1
-              ? parcelasValores.map((valor, idx) => ({
-                  parcela: idx + 1,
-                  valor,
-                }))
-              : undefined,
-        },
-        returnTo: `/simulador${window.location.search || ''}`,
-      },
-    })
-  }
-
-  const novaSimulacao = () => {
+  const esconderVeredito = () => {
     setResultadoVisivel(false)
     setProjecaoBase(undefined)
     setVerTodos(false)
     setDetalhesAbertos(false)
-    formKeySimulado.current = null
+    setModalSimulacaoAberto(false)
+    setIndiceEdicao(null)
   }
 
-  const valorParcela = overlayInput.primeira?.valor ?? (nParcelas > 0 ? valorCentavos / 100 / nParcelas : 0)
-  const competenciaMes = overlayInput.primeira?.mes ?? impacto?.competencia?.mes
-  const competenciaAno = overlayInput.primeira?.ano ?? impacto?.competencia?.ano
+  const limparCamposForm = async () => {
+    cartaoRestaurado.current = null
+    parcelasRestauradas.current = null
+    setValue('observacoes', '')
+    setValue('valor_compra', '')
+    setValue('parcelas_total', 1)
+    setValue('data', todayISO())
+    setDataAberta(false)
+    setObservacoesInvalida(false)
+    const principal = titularPrincipal(pessoas)
+    if (principal && Number(pessoaIdOf(principal)) !== Number(pessoaId)) {
+      restaurandoItem.current = true
+      setValue('pessoa_id', pessoaIdOf(principal))
+    }
+    const resp = await resolveDefaultResponsavel(principal)
+    setValue('responsavel_id', resp)
+    setValue('cartao_id', null)
+  }
+
+  const resetarFormDaVez = async () => {
+    esconderVeredito()
+    await limparCamposForm()
+  }
+
+  const itemDaVez = (): SimulacaoLoteItem => {
+    const iguais = splitValorEmParcelas(valorCentavos, nParcelas)
+    const ajustadas =
+      nParcelas > 1 &&
+      parcelasValores.length === nParcelas &&
+      parcelasValores.some((valor, idx) => toCentavos(valor) !== toCentavos(iguais[idx]))
+    const item: SimulacaoLoteItem = {
+      observacoes: String(getValues('observacoes') || '').trim(),
+      valor_compra: centavosToBr(valorCentavos),
+      data: dataCompra || todayISO(),
+      cartao_id: Number(cartaoId),
+      cartao_nome: cartaoSel?.nome,
+      pessoa_id: pessoaId != null && pessoaId !== '' ? Number(pessoaId) : null,
+      dia_limite_fatura: cartaoSel?.dia_limite_fatura ?? null,
+      responsavel_nome: responsavelSel?.nome || null,
+      parcelas_total: nParcelas,
+      responsavel_id: responsavelId ? Number(responsavelId) : null,
+    }
+    if (ajustadas) {
+      item.parcelas = parcelasValores.map((valor, idx) => ({
+        parcela: idx + 1,
+        valor,
+      }))
+    }
+    return item
+  }
+
+  const podeIncluir = itensLote.length < 20
+  const acaoHabilitada = concluirEstaHabilitado(gravandoLote, veredito?.nivel)
+
+  const preencherForm = (item: SimulacaoLoteItem) => {
+    if (Number(item.pessoa_id) !== Number(pessoaId)) restaurandoItem.current = true
+    cartaoRestaurado.current = item.cartao_id
+    parcelasRestauradas.current =
+      item.parcelas && item.parcelas.length === item.parcelas_total
+        ? item.parcelas.map((parcela) => String(parcela.valor))
+        : null
+    setValue('pessoa_id', item.pessoa_id ?? null)
+    setValue('cartao_id', item.cartao_id)
+    setValue('responsavel_id', item.responsavel_id ?? null)
+    setValue('valor_compra', item.valor_compra)
+    setValue('parcelas_total', item.parcelas_total)
+    setValue('data', item.data)
+    setValue('observacoes', item.observacoes)
+    setDataAberta(true)
+    setObservacoesInvalida(false)
+  }
+
+  const abrirIncluir = () => {
+    if (!podeIncluir || gravandoLote) return
+    setIndiceEdicao(null)
+    setObservacoesInvalida(false)
+    setModalSimulacaoAberto(true)
+    void limparCamposForm()
+  }
+
+  const abrirEdicao = (indice: number) => {
+    const item = itensLote[indice]
+    if (!item || gravandoLote) return
+    preencherForm(item)
+    setIndiceEdicao(indice)
+    setModalSimulacaoAberto(true)
+  }
+
+  const fecharModalSimulacao = () => {
+    if (gravandoLote) return
+    setModalSimulacaoAberto(false)
+    setIndiceEdicao(null)
+    setObservacoesInvalida(false)
+  }
+
+  const salvarModal = () => {
+    if (!String(getValues('observacoes') || '').trim()) {
+      setObservacoesInvalida(true)
+      return
+    }
+    if (!podeSimular) {
+      toast.warning('Preencha cartão, responsável, valor e parcelas para ver se a compra cabe.')
+      return
+    }
+    const item = itemDaVez()
+    if (indiceEdicao != null) {
+      setItensLote((atual) => atual.map((existente, idx) => (idx === indiceEdicao ? item : existente)))
+    } else {
+      if (itensLote.length >= 20) {
+        toast.error(bloqueioTamanhoLote(21) || '')
+        return
+      }
+      setItensLote((atual) => [...atual, item])
+    }
+    setIndiceInvalido(null)
+    setModalSimulacaoAberto(false)
+    setIndiceEdicao(null)
+    setObservacoesInvalida(false)
+  }
+
+  const removerItemLote = (indice: number) => {
+    const proximos = itensLote.filter((_, idx) => idx !== indice)
+    setItensLote(proximos)
+    setIndiceInvalido(null)
+    if (!proximos.length) {
+      setResultadoVisivel(false)
+      setProjecaoBase(undefined)
+      setModalSimulacaoAberto(false)
+      setIndiceEdicao(null)
+    }
+  }
+
+  const abrirConfirmacaoLote = () => {
+    if (gravandoLote) return
+    const bloqueio = bloqueioTamanhoLote(itensLote.length)
+    if (bloqueio) {
+      toast.error(bloqueio)
+      return
+    }
+    setConfirmacaoLoteAberta(true)
+  }
+
+  const limparConjunto = () => {
+    setItensLote([])
+    setIndiceInvalido(null)
+    setObservacoesInvalida(false)
+    setConfirmacaoLoteAberta(false)
+    setModalSimulacaoAberto(false)
+    setIndiceEdicao(null)
+    void resetarFormDaVez()
+  }
+
+  const confirmarLote = async () => {
+    if (gravandoLote) return
+    const paraGravar = [...itensLote]
+    const bloqueio = bloqueioTamanhoLote(paraGravar.length)
+    if (bloqueio) {
+      toast.error(bloqueio)
+      setConfirmacaoLoteAberta(false)
+      return
+    }
+    try {
+      setGravandoLote(true)
+      const body = await transacoesService.cadastrarLote(montarPayloadLote(paraGravar).compras)
+      const gravadas = Array.isArray(body?.compras) ? body.compras.length : paraGravar.length
+      toast.success(mensagemSucessoLote(gravadas))
+      setConfirmacaoLoteAberta(false)
+      setDestinosFatura(destinosFaturaDoLote(body))
+    } catch (error: unknown) {
+      if (error instanceof AccessDeniedError) {
+        setConfirmacaoLoteAberta(false)
+        return
+      }
+      if (error instanceof ValidationError) {
+        const indice = indiceErroLote(error.errors)
+        toast.error(error.message)
+        setConfirmacaoLoteAberta(false)
+        setIndiceInvalido(indice)
+        return
+      }
+      const message = error instanceof Error ? error.message : 'Erro ao finalizar as compras.'
+      toast.error(message)
+    } finally {
+      setGravandoLote(false)
+    }
+  }
+
+  const iniciarNovaSimulacao = () => {
+    setDestinosFatura(null)
+    limparConjunto()
+  }
+
+  const abrirFaturaDoCartao = (destino: DestinoFaturaCartao) => {
+    navigate(`/faturas/view/${destino.faturaId}`)
+  }
+
+  const idxParcela =
+    overlayConjunto?.primeira?.indice_coluna != null && overlayConjunto.primeira.indice_coluna >= 0
+      ? overlayConjunto.primeira.indice_coluna
+      : 0
+  const valorParcela =
+    overlayConjunto?.deltas[idxParcela] ??
+    overlayConjunto?.primeira?.valor ??
+    0
+  const competenciaMes = overlayConjunto?.primeira?.mes ?? impacto?.competencia?.mes
+  const competenciaAno = overlayConjunto?.primeira?.ano ?? impacto?.competencia?.ano
   const competenciaLabel =
     competenciaMes && competenciaAno ? labelCompetenciaCompleta(competenciaMes, competenciaAno) : ''
   const competenciaCurta =
     competenciaMes && competenciaAno ? labelCompetencia(competenciaMes, competenciaAno) : ''
+  const linhasCompras: LinhaCompraVeredito[] =
+    entradasLote.length > 1
+      ? entradasLote.map((entrada) => {
+          const idx = overlayConjunto?.primeira?.indice_coluna
+          const entra =
+            idx != null && idx >= 0
+              ? Number(entrada.parcelas.deltas[idx] || 0)
+              : Number(entrada.parcelas.primeira?.valor || 0)
+          const parcelas = entrada.item.parcelas_total > 1 ? `${entrada.item.parcelas_total}x` : 'à vista'
+          const cartao = entrada.item.cartao_nome || ''
+          return {
+            descricao: entrada.item.observacoes || '—',
+            detalhe: cartao ? `${parcelas} · ${cartao}` : parcelas,
+            valor: toCentavos(entrada.item.valor_compra) / 100,
+            entra,
+          }
+        })
+      : []
 
-  const formEl = (
+  const renderForm = (aoSimular: () => void) => (
     <SimuladorCompraForm
       register={register}
       control={control}
       showTitular={showTitular}
       pessoasOptions={pessoasOptions}
       cartoesOptions={cartoesOptions}
-      semCartoes={!loadingLookups && !loadingCartoesTitular && cartoesFiltrados.length === 0}
-      compact={resultadoVisivel || simulando}
+      semCartoes={!loadingLookups && cartoesCatalogo.length === 0}
+      compact={false}
       responsavelNome={responsavelSel?.nome || ''}
       isMeuResponsavel={ehEu}
       dataAberta={dataAberta}
       onToggleData={() => setDataAberta((v) => !v)}
       onTrocarResponsavel={() => setResponsavelModalOpen(true)}
-      onSimular={handleSimular}
-      onNovaSimulacao={novaSimulacao}
+      onSimular={aoSimular}
       podeSimular={podeSimular}
       simulando={simulando}
+      observacoesInvalida={observacoesInvalida}
     />
   )
 
@@ -671,7 +962,6 @@ const SimuladorCompraPage = () => {
             </Row>
           ) : resultadoVisivel || simulando ? (
             <>
-              {formEl}
               <Row className="justify-content-center">
                 <Col lg={7} xl={6}>
                   {simulando ? (
@@ -681,6 +971,7 @@ const SimuladorCompraPage = () => {
                       veredito={veredito}
                       valorParcela={valorParcela}
                       competenciaLabel={competenciaLabel}
+                      linhas={linhasCompras}
                     />
                   ) : null}
                   {!simulando && resultadoVisivel && (
@@ -689,44 +980,53 @@ const SimuladorCompraPage = () => {
                         impacto={impacto}
                         valorParcela={valorParcela}
                         competenciaCurta={competenciaCurta}
-                        responsavelNome={responsavelSel?.nome || ''}
-                        ehEu={ehEu}
+                        responsavelNome={foco?.responsavel_nome || ''}
+                        ehEu={ehEuFoco}
                       />
-                      <div className="d-flex flex-wrap gap-2 mb-4">
-                        <button type="button" className="btn btn-outline-primary" onClick={registrarCompra}>
-                          <i className="ri-save-3-line me-1"></i>
-                          Registrar esta compra
-                        </button>
-                        <button type="button" className="btn btn-ghost-secondary" onClick={novaSimulacao}>
-                          Nova simulação
-                        </button>
+                      <div className="d-flex flex-wrap gap-2 mb-3">
+                        {podeIncluir && (
+                          <button type="button" className="btn btn-primary" disabled={!acaoHabilitada} onClick={abrirIncluir}>
+                            Incluir outra simulação
+                          </button>
+                        )}
+                        {itensLote.length > 0 && (
+                          <button type="button" className="btn btn-outline-primary" disabled={!acaoHabilitada} onClick={abrirConfirmacaoLote}>
+                            Finalizar
+                          </button>
+                        )}
                       </div>
+                      <SimuladorListaSomadas
+                        itens={itensLote}
+                        indiceInvalido={indiceInvalido}
+                        onEditar={abrirEdicao}
+                        onRemover={removerItemLote}
+                      />
                     </>
                   )}
                 </Col>
               </Row>
-              {!simulando && resultadoVisivel && (
+              {!simulando && resultadoVisivel && overlayConjunto && (
                 <SimuladorCompraDetalhes
                   aberto={detalhesAbertos}
                   onToggle={() => setDetalhesAbertos((v) => !v)}
                   impacto={impacto}
-                  cartaoNome={cartaoSel?.nome || ''}
+                  cartaoNome={foco?.cartao_nome || ''}
                   competenciaLabel={competenciaLabel}
                   valorParcela={valorParcela}
                   alertaLimite={Number(impacto?.fatura_cartao.percentual_em_uso_depois) > 80}
-                  parcelasFora={overlayInput.parcelas_fora_da_janela}
+                  parcelasFora={overlayConjunto.parcelas_fora_da_janela}
                   labelFimJanela={
                     projecaoBase?.colunas?.[projecaoBase.colunas.length - 1]?.label || 'o fim da janela'
                   }
-                  parcelas={overlayInput.parcelas}
+                  parcelas={overlayConjunto.parcelas}
                   onSelectParcela={scrollToColuna}
                   verTodos={verTodos}
                   onVerTodos={setVerTodos}
                   overlay={projecaoOverlay}
-                  cartaoId={cartaoId}
-                  responsavelId={responsavelId}
-                  ehEu={ehEu}
-                  responsavelNome={responsavelSel?.nome || ''}
+                  cartaoId={focoCartaoId || null}
+                  responsavelId={focoResponsavelId || null}
+                  ehEu={ehEuFoco}
+                  responsavelNome={foco?.responsavel_nome || ''}
                   breakdown={breakdown}
                   faturaPath={faturaPath}
                   visualizarPath={visualizarPath}
@@ -736,7 +1036,7 @@ const SimuladorCompraPage = () => {
           ) : (
             <Row className="justify-content-center">
               <Col lg={7} xl={6}>
-                {formEl}
+                {renderForm(handleSimular)}
                 <p className="text-muted text-center fs-13 mt-4 mb-0">
                   Escolha o cartão, o responsável, o valor e as parcelas para ver se a compra
                   cabe.
@@ -746,6 +1046,72 @@ const SimuladorCompraPage = () => {
           )}
         </Container>
       </div>
+
+      <Modal
+        isOpen={confirmacaoLoteAberta}
+        toggle={gravandoLote ? undefined : () => setConfirmacaoLoteAberta(false)}
+        centered
+        backdrop="static"
+      >
+        <ModalHeader toggle={gravandoLote ? undefined : () => setConfirmacaoLoteAberta(false)}>
+          Finalizar
+        </ModalHeader>
+        <ModalBody>
+          <p className="fs-5 mb-0">{textoConfirmacaoLote(itensLote)}</p>
+        </ModalBody>
+        <ModalFooter>
+          <Button type="button" color="light" className="border" disabled={gravandoLote} onClick={() => setConfirmacaoLoteAberta(false)}>
+            Cancelar
+          </Button>
+          <Button type="button" color="primary" disabled={gravandoLote} onClick={confirmarLote}>
+            {gravandoLote ? 'Gravando…' : 'Confirmar'}
+          </Button>
+        </ModalFooter>
+      </Modal>
+
+      <Modal isOpen={destinosFatura != null} centered backdrop="static">
+        <ModalHeader>Compras registradas</ModalHeader>
+        <ModalBody>
+          <p className="mb-3">Deseja iniciar uma nova simulação ou ver as compras na fatura?</p>
+          {destinosFatura && destinosFatura.length > 0 && (
+            <div className="d-flex flex-column gap-2">
+              <div className="text-muted fs-13">Cartões usados</div>
+              {destinosFatura.map((destino) => {
+                const competencia = destino.mes && destino.ano ? labelCompetencia(destino.mes, destino.ano) : ''
+                return (
+                  <Button
+                    key={destino.faturaId}
+                    type="button"
+                    color="light"
+                    className="border text-start"
+                    onClick={() => abrirFaturaDoCartao(destino)}
+                  >
+                    {destino.cartaoNome}
+                    {competencia ? ` · ${competencia}` : ''}
+                  </Button>
+                )
+              })}
+            </div>
+          )}
+        </ModalBody>
+        <ModalFooter>
+          <Button type="button" color="primary" onClick={iniciarNovaSimulacao}>
+            Iniciar nova simulação
+          </Button>
+        </ModalFooter>
+      </Modal>
+
+      <Modal isOpen={modalSimulacaoAberto} toggle={fecharModalSimulacao} centered size="lg" backdrop="static">
+        <ModalHeader toggle={fecharModalSimulacao}>
+          {indiceEdicao != null ? 'Editar simulação' : 'Incluir outra simulação'}
+        </ModalHeader>
+        <ModalBody>{renderForm(salvarModal)}</ModalBody>
+        <ModalFooter>
+          <Button type="button" color="light" className="border" onClick={fecharModalSimulacao}>
+            Cancelar
+          </Button>
+        </ModalFooter>
+      </Modal>
 
       <ResponsavelModal
         isOpen={responsavelModalOpen}
