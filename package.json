@@ -92,11 +92,11 @@
     "yup": "^1.3.1"
   },
   "scripts": {
-    "start_2": "react-scripts start",
-    "start": "react-scripts start",
-    "start_3": "react-scripts start",
-    "start-no-overlay": "react-scripts start",
-    "dev": "react-scripts start",
+    "start_2": "TSC_COMPILE_ON_ERROR=true ESLINT_NO_DEV_ERRORS=true react-scripts start",
+    "start": "TSC_COMPILE_ON_ERROR=true ESLINT_NO_DEV_ERRORS=true react-scripts start",
+    "start_3": "TSC_COMPILE_ON_ERROR=true ESLINT_NO_DEV_ERRORS=true react-scripts start",
+    "start-no-overlay": "TSC_COMPILE_ON_ERROR=true ESLINT_NO_DEV_ERRORS=true react-scripts start",
+    "dev": "TSC_COMPILE_ON_ERROR=true ESLINT_NO_DEV_ERRORS=true react-scripts start",
     "backendserver": "json-server ./src/database/db.json --middlewares ./src/database/server.js --port 5000",
     "backend": "json-server --watch ./src/database/db.json --port 5000",
     "build": "TSC_COMPILE_ON_ERROR=true react-scripts build",

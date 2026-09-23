@@ -22,7 +22,7 @@ description: Resolve a versão atual do front de controle de faturas a partir de
 
 | Campo | Exemplo | Uso |
 |---|---|---|
-| `version_full` | `1.0.0` | fallback local, bump, tag |
+| `version_full` | `1.0.0` | fallback local, bump no PR `v1.0/dev` → `main`, tag |
 | `version_short` | `1.0` | título Jira, prefixo de branch |
 | `version_branch_prefix` | `v1.0` | `v1.0/dev-{tela}-CTLFAT-{n}` |
 

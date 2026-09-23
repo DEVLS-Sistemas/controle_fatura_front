@@ -1,6 +1,6 @@
 ---
 name: start-jira-card
-description: Inicia um card CTLFAT — cria branch vX.Y/dev-{tela}-CTLFAT-{n}, move o card para Fazendo. Usar quando o usuário pedir para começar, iniciar ou pegar um card.
+description: Inicia um card CTLFAT no front — lê Prompt front no Jira, abre o arquivo no controle_fatura_back, cria a branch e implementa só a tela. Usar ao começar, iniciar, pegar ou implementar um card.
 ---
 
 # Iniciar card Jira (CTLFAT)
@@ -8,7 +8,9 @@ description: Inicia um card CTLFAT — cria branch vX.Y/dev-{tela}-CTLFAT-{n}, m
 ## Passos
 
 1. Obter a key (`CTLFAT-9999` ou só o número). Sem key, usar `create-jira-card` antes.
-2. `getJiraIssue` — conferir título, status e as seções **Back** e **Front**.
+2. `getJiraIssue` (`view: full`) — conferir título, status e as seções **Back** e **Front**.
+2b. Skill `ler-prompt-front`: nos **comentários**, achar `Prompt front:`. Abrir o arquivo no `controle_fatura_back` (irmão: `../controle_fatura_back/<caminho>`), copiar inteiro, implementar só o Front.
+2c. Sem comentário `Prompt front:`, usar o caminho na seção Front da descrição. Arquivo sumido → avisar; não inventar a tela.
 3. Resolver versão com `get-project-version`.
 3b. Neste repo implementar **somente a seção Front**. O back já deve ter sido iniciado antes. Se a seção Front for `Nenhuma alteração neste card.`, não abrir branch.
 4. Definir `tela` em minúsculo, sem hífen (`raiox`, `versionamento`). Inferir do título/contexto; se ambíguo, perguntar.
@@ -21,6 +23,7 @@ git checkout -b v1.0/dev-raiox-CTLFAT-9999
 ```
 
 Padrão: `v{major}.{minor}/{ambiente}-{tela}-CTLFAT-{numero}`  
+Só existem três camadas: `main` ← `v1.0/dev` ← branch do card. Não criar `v1.0/dev-build` nem outra branch de ambiente.  
 PR de feature sempre para `v1.0/dev`. Publicação (`v1.0/dev` → `main`): `create-release-pr`. Deploy/tag: `subir-deploy`.
 
 6. Transicionar para **Fazendo**: `getTransitionsForJiraIssue` e usar o **id** da transição. Nunca chutar id.

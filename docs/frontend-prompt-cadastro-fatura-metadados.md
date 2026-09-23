@@ -4,7 +4,8 @@ Use este prompt no repositório do frontend para alinhar o **cadastro de fatura*
 
 Complementa [`frontend-prompt-faturas.md`](frontend-prompt-faturas.md) e o modal de senha em [`frontend-prompt-senha-pdf-fatura.md`](frontend-prompt-senha-pdf-fatura.md).
 
-PDF no **ano certo** (não anexar 07/2024 em 07/2026): [`frontend-prompt-pdf-competencia-ano.md`](frontend-prompt-pdf-competencia-ano.md).
+PDF no **ano certo** (não anexar 07/2024 em 07/2026): [`frontend-prompt-pdf-competencia-ano.md`](frontend-prompt-pdf-competencia-ano.md).  
+PDF manda no cartão (não a tela de origem): [`frontend-prompt-modal-cartao-bandeira.md`](frontend-prompt-modal-cartao-bandeira.md).
 
 ---
 
@@ -65,8 +66,9 @@ Ordem dos modais:
 3. **Titular** (`precisa_confirmar_titular`) — se o nome do PDF não bater com as pessoas da conta — ver [`frontend-prompt-pessoas.md`](frontend-prompt-pessoas.md)
 4. **Cartão do titular** (`precisa_cartao_do_titular`) — já existe fatura do mês neste cartão para outra pessoa; cadastrar outro cartão (não sobrescreve)
 5. **Anexo duplicado** (`anexo_duplicado`) — o arquivo já está em outra fatura; substituir ou manter — [`frontend-prompt-fatura-anexo-duplicado.md`](frontend-prompt-fatura-anexo-duplicado.md)
-6. Legados (só se ainda faltar algo): `precisa_selecionar_bandeira` / `precisa_selecionar_final`
-7. Sucesso
+6. **Fatura já anexada** (`fatura_ja_anexada`) — outro arquivo, competência já tem anexo — [`frontend-prompt-substituir-fatura-existente.md`](frontend-prompt-substituir-fatura-existente.md)
+7. Legados (só se ainda faltar algo): `precisa_selecionar_bandeira` / `precisa_selecionar_final`
+8. Sucesso
 
 ---
 
@@ -144,7 +146,7 @@ Use quando `modo === "cadastrar_cartao"` ou `pode_cadastrar_cartao === true` (em
    - **Bandeira** — select com `bandeiras[]` (itens `criar: true`); pré-selecionar `sugestao.bandeira_sugerida` se houver
 4. Opcional informativo: finais detectados, valor da fatura, parser
 5. Se `sugestao.importacao_pdf_homologada === false`: banner com `aviso_parser` + checkbox “Li que os valores podem não ser os corretos”. Ver [`frontend-prompt-fatura-parser-homologado.md`](frontend-prompt-fatura-parser-homologado.md).
-6. Se `sugestao.conferencia` existir e `bate === false`, avisar que o total do PDF diverge da soma das transações (o back já usa a soma). Exibir `valor_cabecalho` vs `soma_transacoes`.
+6. Se `sugestao.conferencia` existir e `bate === false`, avisar que o total do PDF diverge da soma das transações. Exibir `valor_cabecalho` vs `soma_transacoes`. **Não** trocar o total oficial pela soma: o back grava o cabeçalho do PDF (exceto quando o valor lido era o limite do cartão, típico Inter).
 7. Botão primário: **“Cadastrar cartão e fatura”** (não só “Confirmar”)
 8. **Atalho secundário (opcional, colapsado):** “Já tenho este cartão” → aí sim mostra `cartoes[]` para vincular a um existente (`modo` passa a se comportar como confirmar: envia `cartao_id` em vez de `cadastrar_cartao`)
 

@@ -2,6 +2,7 @@ import {
     anosLookupToOptions,
     buildFaturasListagemSearchParams,
     buildFaturasListarApiParams,
+    buildProjecaoAtalhoPath,
     extractCompetenciaAtual,
     extractFaturasListagemMeta,
     extractLookupsFaturas,
@@ -9,6 +10,7 @@ import {
     parseAnoFiltro,
     parseFaturasListagemSearchParams,
     parseMesFiltro,
+    parseProjecaoRotaRecorte,
     resolveCompetenciaInicial,
 } from './fatura_listagem_helpers'
 
@@ -192,6 +194,39 @@ describe('extractCompetenciaAtual / extractFaturasListagemMeta', () => {
         expect(meta.filtros?.mes_atual_ativo).toBe(true)
         expect(meta.filtros?.mes).toBe(8)
         expect(meta.competencia_atual).toEqual(competencia)
+    })
+})
+
+describe('buildProjecaoAtalhoPath', () => {
+    it('leva mês e ano da lista para a projeção', () => {
+        expect(buildProjecaoAtalhoPath(9, 2026)).toBe('/projecao-faturas?mes=9&ano=2026')
+        expect(buildProjecaoAtalhoPath('09', '2026')).toBe('/projecao-faturas?mes=9&ano=2026')
+    })
+
+    it('sem recorte de competência vai sem query', () => {
+        expect(buildProjecaoAtalhoPath(null, null)).toBe('/projecao-faturas')
+        expect(buildProjecaoAtalhoPath('', '')).toBe('/projecao-faturas')
+    })
+
+    it('só mês ou só ano também vai sem query', () => {
+        expect(buildProjecaoAtalhoPath(9, null)).toBe('/projecao-faturas')
+        expect(buildProjecaoAtalhoPath(null, 2026)).toBe('/projecao-faturas')
+    })
+
+    it('não inclui mes_atual nem outros filtros da lista', () => {
+        expect(buildProjecaoAtalhoPath(8, 2026)).not.toContain('mes_atual')
+        expect(buildProjecaoAtalhoPath(8, 2026)).not.toContain('cartao')
+        expect(buildProjecaoAtalhoPath(8, 2026)).not.toContain('status')
+    })
+})
+
+describe('parseProjecaoRotaRecorte', () => {
+    it('só vale com mês e ano juntos', () => {
+        expect(parseProjecaoRotaRecorte(9, 2026)).toEqual({ mes: 9, ano: 2026 })
+        expect(parseProjecaoRotaRecorte('09', '2026')).toEqual({ mes: 9, ano: 2026 })
+        expect(parseProjecaoRotaRecorte(9, null)).toBeNull()
+        expect(parseProjecaoRotaRecorte(null, 2026)).toBeNull()
+        expect(parseProjecaoRotaRecorte(null, null)).toBeNull()
     })
 })
 

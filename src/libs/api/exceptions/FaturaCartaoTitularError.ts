@@ -91,6 +91,12 @@ export class FaturaCartaoTitularError extends Error {
     static isCartaoTitularBody(body?: Record<string, any> | null): boolean {
         if (!body) return false
         const codigo = body.codigo ?? body.erro_codigo
+        if (body.fatura_ja_anexada === true || codigo === 'fatura_ja_anexada') {
+            return false
+        }
+        if (body.fatura_processando === true || codigo === 'fatura_processando') {
+            return false
+        }
         return (
             body.precisa_cartao_do_titular === true
             || codigo === FATURA_CARTAO_TITULAR_CODIGO

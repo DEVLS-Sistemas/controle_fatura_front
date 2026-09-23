@@ -44,11 +44,13 @@ import FaturaSenhaPdfModal, { FaturaSenhaUnlockPayload } from 'Components/Fatura
 import FaturaTrocarAnexoPasso from 'Components/Faturas/FaturaTrocarAnexoPasso'
 import FaturaAnexoDuplicadoModal from 'Components/Faturas/FaturaAnexoDuplicadoModal'
 import { anexoDuplicadoRetryFields } from 'helpers/fatura_anexo_duplicado_helpers'
+import { deveAbrirModalSenhaPdfDeErro } from 'helpers/fatura_senha_pdf_helpers'
 
 export type FaturaRemoverAnexoModalProps = {
     isOpen: boolean
     faturaId: number | string | null
     tipo?: TipoRemoverAnexo | null
+    temSenhaPdfCartao?: boolean
     onClose: () => void
     onRemoved: (result: RemoverAnexoResult) => void | Promise<void>
     onTrocado: (result: RemoverAnexoResult) => void | Promise<void>
@@ -123,6 +125,7 @@ const FaturaRemoverAnexoModal = ({
     isOpen,
     faturaId,
     tipo = null,
+    temSenhaPdfCartao = false,
     onClose,
     onRemoved,
     onTrocado,
@@ -250,8 +253,13 @@ const FaturaRemoverAnexoModal = ({
             await onTrocadoRef.current(enriquecerResultado(result, impacto))
         } catch (error: unknown) {
             if (error instanceof PdfSenhaError) {
-                setSenhaModalMeta(error.senha_pdf ?? null)
-                setSenhaModalOpen(true)
+                if (deveAbrirModalSenhaPdfDeErro(error, temSenhaPdfCartao)) {
+                    setSenhaModalMeta(error.senha_pdf ?? null)
+                    setSenhaModalOpen(true)
+                    if (senha) throw error
+                    return
+                }
+                toast.error(error.message)
                 if (senha) throw error
                 return
             }

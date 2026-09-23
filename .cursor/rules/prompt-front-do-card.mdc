@@ -1,0 +1,19 @@
+---
+description: Ao iniciar o card, achar o Prompt front no Jira e implementar por esse arquivo
+alwaysApply: true
+---
+
+# Prompt de front no card
+
+O back grava `docs/frontend-prompt-*.md` e **comenta o caminho no Jira**. Este front não inventa a tela: executa esse prompt.
+
+Ao iniciar, implementar ou pegar um card:
+
+1. `getJiraIssue` (`view: full`) e comentários. Procurar linha que começa com `Prompt front:`.
+2. Abrir o arquivo no repo `controle_fatura_back` (irmão deste: `../controle_fatura_back/<caminho>`), na **Branch back** do comentário.
+3. Copiar o arquivo **inteiro** e implementar **somente** o que ele pede (seção Front).
+4. Sem comentário `Prompt front:`, usar o caminho na seção **Front** da descrição. Se o arquivo não existir, avisar — não improvisar a API nem a tela.
+
+Não misturar com o Back. Prompt no back, código de tela aqui.
+
+Skill: `ler-prompt-front`. Sempre usar ao iniciar ou implementar o card.

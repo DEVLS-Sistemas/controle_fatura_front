@@ -96,6 +96,12 @@ export class FaturaTitularError extends Error {
         if (body.anexo_duplicado === true || codigo === 'anexo_duplicado') {
             return false
         }
+        if (body.fatura_ja_anexada === true || codigo === 'fatura_ja_anexada') {
+            return false
+        }
+        if (body.fatura_processando === true || codigo === 'fatura_processando') {
+            return false
+        }
         return (
             body.precisa_confirmar_titular === true
             || codigo === FATURA_TITULAR_CODIGO

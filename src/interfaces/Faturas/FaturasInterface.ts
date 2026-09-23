@@ -188,6 +188,22 @@ export interface FaturasView extends FaturaResumo {
     responsavel_id?: number | null
     responsavel_nome?: string | null
     grupos_por_cartao?: FaturaGrupoPorCartao[]
+    /** Cabeçalho do PDF vs soma das linhas importadas — só no detalhe */
+    conferencia?: {
+        valor_cabecalho?: number | string | null
+        soma_transacoes?: number | string | null
+        bate?: boolean | null
+        diferenca?: number | string | null
+    } | null
+    /** Cartão da fatura — `GET /faturas/listar/{id}` (senha do PDF sem devolver o valor) */
+    cartao?: {
+        id?: number
+        nome?: string
+        banco?: string | null
+        tem_senha_pdf?: boolean
+        senha_pdf_regra?: string | null
+        senha_pdf_orientacao?: string | null
+    } | null
 }
 
 export interface FaturasModel {
@@ -224,6 +240,9 @@ export interface FaturasModel {
     /** Retry 422 `anexo_duplicado`: `substituir` reprocessa na fatura existente; `manter` não cria outra */
     confirmar_anexo_duplicado?: 'substituir' | 'manter' | null
     fatura_duplicada_id?: number | string | null
+    /** Retry 422 `fatura_ja_anexada` / CTA substituir nos metadados */
+    confirmar_substituir_fatura?: boolean
+    fatura_existente_id?: number | string | null
 }
 
 export interface ProcessarPdfParams {
@@ -414,6 +433,8 @@ export interface FaturasInterface {
         confirmar_titular?: boolean
         confirmar_anexo_duplicado?: 'substituir' | 'manter'
         fatura_duplicada_id?: number | string
+        confirmar_substituir_fatura?: boolean
+        fatura_existente_id?: number | string
     }): Promise<any>
     processarPdf(id: number, params?: ProcessarPdfParams): Promise<any>
     getImpactoRemoverAnexo(id: number | string): Promise<ImpactoRemoverAnexo>

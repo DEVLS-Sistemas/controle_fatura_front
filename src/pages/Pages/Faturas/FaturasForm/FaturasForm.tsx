@@ -20,6 +20,11 @@ import {
     anexoDuplicadoRetryFields,
     extractFaturaMessage,
 } from 'helpers/fatura_anexo_duplicado_helpers'
+import { idFaturaAposSubstituir, substituirFaturaRetryFields } from 'helpers/fatura_substituir_existente_helpers'
+import {
+    cartaoEBandeiraDoCadastro,
+    resolveModoMetadados,
+} from 'helpers/fatura_metadados_helpers'
 import { toBandeiraSelectOption } from 'helpers/cartao_helpers'
 import {
     extractFaturaId,
@@ -31,6 +36,13 @@ import {
     resolveSenhaPdfMeta,
     SenhaPdfMeta,
 } from 'interfaces/Faturas/FaturasInterface'
+import {
+    cadastroPdfNaoPersistiu,
+    cartaoTemSenhaPdfSalva,
+    deveAbrirModalSenhaPdf,
+    deveAbrirModalSenhaPdfDeErro,
+    MSG_CADASTRO_PDF_NAO_ANEXADO,
+} from 'helpers/fatura_senha_pdf_helpers'
 import { ParserHomologado, PARSERS_HOMOLOGADOS_PADRAO } from 'interfaces/Cartoes/CartoesInterface'
 import { FaturasService } from 'services/Faturas/FaturasService'
 import { CartoesService } from 'services/Cartoes/CartoesService'
@@ -40,6 +52,7 @@ import FaturaMetadadosModal from 'Components/Faturas/FaturaMetadadosModal'
 import FaturaTitularModal from 'Components/Faturas/FaturaTitularModal'
 import FaturaCartaoTitularModal from 'Components/Faturas/FaturaCartaoTitularModal'
 import FaturaAnexoDuplicadoModal from 'Components/Faturas/FaturaAnexoDuplicadoModal'
+import FaturaJaAnexadaModal from 'Components/Faturas/FaturaJaAnexadaModal'
 import FaturaParserNaoHomologadoModal from 'Components/Faturas/FaturaParserNaoHomologadoModal'
 import {
     formatParsersHomologadosLista,
@@ -56,6 +69,7 @@ import {
 import {
     FaturaMetadadosCartaoOption,
     FaturaMetadadosError,
+    FaturaMetadadosModo,
     FaturaMetadadosRetryPayload,
     FaturaMetadadosSugestao,
     isFalhaDeteccaoMetadados,
@@ -73,6 +87,8 @@ import {
     FaturaCartaoTitularRetryPayload,
 } from 'libs/api/exceptions/FaturaCartaoTitularError'
 import { FaturaAnexoDuplicadoError } from 'libs/api/exceptions/FaturaAnexoDuplicadoError'
+import { FaturaJaAnexadaError } from 'libs/api/exceptions/FaturaJaAnexadaError'
+import { FaturaProcessandoError } from 'libs/api/exceptions/FaturaProcessandoError'
 import { PessoasService } from 'services/Pessoas/PessoasService'
 import { toPessoaSelectOption } from 'interfaces/Pessoas/PessoasInterface'
 
@@ -122,6 +138,12 @@ const FaturasForm = () => {
     const [metadadosCartoes, setMetadadosCartoes] = useState<FaturaMetadadosCartaoOption[]>([])
     const [metadadosBandeiras, setMetadadosBandeiras] = useState<FaturaSelecaoBandeiraOption[]>([])
     const [metadadosPrecisaBandeira, setMetadadosPrecisaBandeira] = useState(false)
+    const [metadadosModo, setMetadadosModo] = useState<FaturaMetadadosModo | null>(null)
+    const [metadadosPodeCadastrar, setMetadadosPodeCadastrar] = useState(false)
+    const [metadadosOrientacao, setMetadadosOrientacao] = useState<string | null>(null)
+    const [metadadosAcaoSugerida, setMetadadosAcaoSugerida] = useState<string | null>(null)
+    const [metadadosFaturaExistente, setMetadadosFaturaExistente] = useState<FaturaMetadadosError['fatura_existente']>(null)
+    const [metadadosFaturaExistenteId, setMetadadosFaturaExistenteId] = useState<number | null>(null)
     const [titularModalOpen, setTitularModalOpen] = useState(false)
     const [titularLoading, setTitularLoading] = useState(false)
     const [titularTitulares, setTitularTitulares] = useState<string[]>([])
@@ -136,6 +158,9 @@ const FaturasForm = () => {
     const [anexoDuplicadoModalOpen, setAnexoDuplicadoModalOpen] = useState(false)
     const [anexoDuplicadoLoading, setAnexoDuplicadoLoading] = useState(false)
     const [anexoDuplicadoError, setAnexoDuplicadoError] = useState<FaturaAnexoDuplicadoError | null>(null)
+    const [jaAnexadaModalOpen, setJaAnexadaModalOpen] = useState(false)
+    const [jaAnexadaLoading, setJaAnexadaLoading] = useState(false)
+    const [jaAnexadaError, setJaAnexadaError] = useState<FaturaJaAnexadaError | null>(null)
     const [pessoasOptions, setPessoasOptions] = useState<SelectOptions[]>([])
     const [cartoesLookup, setCartoesLookup] = useState<CartaoLookup[]>([])
     const [parsersHomologados, setParsersHomologados] = useState<ParserHomologado[]>(PARSERS_HOMOLOGADOS_PADRAO)
@@ -150,6 +175,7 @@ const FaturasForm = () => {
     const pendingTitularRef = useRef<Partial<FaturaTitularRetryPayload>>({})
     const pendingCartaoTitularRef = useRef<{ cadastrar_cartao?: boolean; substituir_fatura?: boolean }>({})
     const pendingAnexoDuplicadoRef = useRef<{ confirmar_anexo_duplicado?: 'substituir' | 'manter'; fatura_duplicada_id?: number }>({})
+    const pendingJaAnexadaRef = useRef<{ confirmar_substituir_fatura?: boolean; fatura_existente_id?: number }>({})
     const pessoasService = useRef(new PessoasService()).current
     const fileInputRef = useRef<HTMLInputElement>(null)
     const { voltarParaRotaAnterior } = useNavegacao()
@@ -357,14 +383,39 @@ const FaturasForm = () => {
         setMetadadosCartoes(error.cartoes)
         setMetadadosBandeiras(error.bandeiras)
         setMetadadosPrecisaBandeira(error.precisa_selecionar_bandeira)
+        setMetadadosModo(resolveModoMetadados(error))
+        setMetadadosPodeCadastrar(error.pode_cadastrar_cartao)
+        setMetadadosOrientacao(error.orientacao ?? error.message ?? null)
+        setMetadadosAcaoSugerida(error.acao_sugerida)
+        setMetadadosFaturaExistente(error.fatura_existente)
+        setMetadadosFaturaExistenteId(error.fatura_existente_id)
         setMetadadosModalOpen(true)
     }
 
-    const handleCreateSuccess = (result: unknown) => {
+    const temSenhaPdfDoCartao = (meta?: SenhaPdfMeta | null) => {
+        const cartaoId = pendingMetadadosRef.current.cartao_id ?? getValues('cartao_id')
+        return cartaoTemSenhaPdfSalva({
+            senhaMeta: meta,
+            lookup: cartaoLookupById(cartaoId),
+        })
+    }
+
+    const handleCreateSuccess = (result: unknown): boolean => {
         const faturaData = extractFaturaPayload(result)
         const envelope = result as Record<string, any> | null
         const destino = destinoFaturaDoAnexo(result)
-        const newId = extractFaturaId(result) ?? destino?.id
+        const substituindo = Boolean(
+            pendingJaAnexadaRef.current.confirmar_substituir_fatura
+            || pendingMetadadosRef.current.confirmar_substituir_fatura
+        )
+        const faturaExistenteId =
+            pendingJaAnexadaRef.current.fatura_existente_id
+            ?? pendingMetadadosRef.current.fatura_existente_id
+            ?? null
+        const newId = idFaturaAposSubstituir(
+            faturaExistenteId,
+            extractFaturaId(result) ?? destino?.id,
+        )
         const form = getValues()
         const realocado = anexoFoiParaOutraFatura(
             { mes: form.mes, ano: form.ano },
@@ -372,16 +423,45 @@ const FaturasForm = () => {
         )
         const fromDuplicado = Boolean(pendingAnexoDuplicadoRef.current.confirmar_anexo_duplicado)
         pendingAnexoDuplicadoRef.current = {}
+        pendingJaAnexadaRef.current = {}
 
-        if (faturaPrecisaSenhaPdf(faturaData, envelope) && newId) {
+        const senhaMeta = resolveSenhaPdfMeta(faturaData, envelope)
+        const enviouArquivo = Boolean(arquivoFile)
+        const pdfNaoPersistiu = cadastroPdfNaoPersistiu({
+            enviouArquivo,
+            temPdf: faturaData?.tem_pdf,
+            temCsv: faturaData?.tem_csv,
+        })
+        const precisaSenha = faturaPrecisaSenhaPdf(faturaData, envelope)
+        const abrirModalSenha = deveAbrirModalSenhaPdf({
+            codigo: faturaData?.erro_codigo ?? envelope?.codigo ?? envelope?.erro_codigo,
+            motivo: senhaMeta?.motivo,
+            precisa_senha_pdf: precisaSenha,
+            temSenhaPdfCartao: temSenhaPdfDoCartao(senhaMeta),
+        })
+
+        if (enviouArquivo && pdfNaoPersistiu) {
+            if (abrirModalSenha && !pendingSenhaRef.current.senha_pdf) {
+                toast.info('Informe a senha do PDF para anexar o arquivo.')
+                openSenhaModalCadastro(senhaMeta)
+                return true
+            }
+            throw new Error(MSG_CADASTRO_PDF_NAO_ANEXADO)
+        }
+
+        if (precisaSenha && newId && abrirModalSenha) {
             toast.info('Fatura cadastrada. Informe a senha do PDF para continuar.')
-            openSenhaModalPosCadastro(newId, resolveSenhaPdfMeta(faturaData, envelope))
-            return
+            if (pdfNaoPersistiu && arquivoFile) {
+                openSenhaModalCadastro(senhaMeta)
+            } else {
+                openSenhaModalPosCadastro(newId, senhaMeta)
+            }
+            return true
         }
 
         const apiMessage = extractFaturaMessage(result)
         toast.success(
-            fromDuplicado && apiMessage
+            (fromDuplicado || substituindo) && apiMessage
                 ? apiMessage
                 : (Boolean(arquivoFile) || realocado) && formatCompetenciaMesAno(destino)
                     ? mensagemPdfVinculadoCompetencia(destino, 'Fatura cadastrada com sucesso')
@@ -396,9 +476,18 @@ const FaturasForm = () => {
         } else {
             navigate('/faturas')
         }
+        return false
     }
 
     const handleCreateError = (error: unknown): boolean => {
+        if (error instanceof FaturaProcessandoError) {
+            toast.warning(error.message)
+            setJaAnexadaModalOpen(false)
+            setJaAnexadaError(null)
+            setMetadadosModalOpen(false)
+            setAnexoDuplicadoModalOpen(false)
+            return true
+        }
         if (error instanceof FaturaMetadadosError) {
             openMetadadosModal(error)
             return true
@@ -416,12 +505,21 @@ const FaturasForm = () => {
             setAnexoDuplicadoModalOpen(true)
             return true
         }
+        if (error instanceof FaturaJaAnexadaError) {
+            setJaAnexadaError(error)
+            setJaAnexadaModalOpen(true)
+            return true
+        }
         if (error instanceof FaturaSelecaoError) {
             openSelecaoModal(error)
             return true
         }
         if (error instanceof PdfSenhaError) {
-            openSenhaModalCadastro(error.senha_pdf ?? null)
+            if (deveAbrirModalSenhaPdfDeErro(error, temSenhaPdfDoCartao(error.senha_pdf))) {
+                openSenhaModalCadastro(error.senha_pdf ?? null)
+                return true
+            }
+            toast.error(error.message || MSG_CADASTRO_PDF_NAO_ANEXADO)
             return true
         }
         if (error instanceof ValidationError && isFalhaDeteccaoMetadados(error.errors as any)) {
@@ -441,10 +539,18 @@ const FaturasForm = () => {
         cartao_nome?: string | null
         cadastrar_cartao?: boolean
         substituir_fatura?: boolean
+        confirmar_substituir_fatura?: boolean
+        fatura_existente_id?: number | string | null
         mes?: number | string | null
         ano?: number | string | null
     }) => {
-        if (params.cadastrar_cartao || params.cartao_nome || params.substituir_fatura) return
+        if (
+            params.cadastrar_cartao
+            || params.cartao_nome
+            || params.substituir_fatura
+            || params.confirmar_substituir_fatura
+            || params.fatura_existente_id
+        ) return
         if (params.cartao_id == null || params.cartao_id === '') return
         if (params.mes == null || params.mes === '' || params.ano == null || params.ano === '') return
 
@@ -461,6 +567,8 @@ const FaturasForm = () => {
             && pessoaIncoming != null
             && pessoaIncoming !== ''
             && Number(existing.pessoa_id) !== Number(pessoaIncoming)
+
+        if (!outraPessoa) return
 
         throw new FaturaCartaoTitularError({
             codigo: 'precisa_cartao_do_titular',
@@ -495,15 +603,13 @@ const FaturasForm = () => {
         pessoa_id?: number | string | null
         confirmar_anexo_duplicado?: 'substituir' | 'manter'
         fatura_duplicada_id?: number | string
+        confirmar_substituir_fatura?: boolean
+        fatura_existente_id?: number | string | null
         omitir_arquivo?: boolean
     }
 
     const submitCreate = async (extra?: FaturaCreateExtra) => {
         const data = getValues()
-        const cartaoId =
-            extra?.cartao_id
-            ?? pendingMetadadosRef.current.cartao_id
-            ?? data.cartao_id
         const cartaoNome =
             extra?.cartao_nome
             ?? pendingMetadadosRef.current.cartao_nome
@@ -514,6 +620,19 @@ const FaturasForm = () => {
             ?? pendingCartaoTitularRef.current.cadastrar_cartao
             ?? cartaoNome
         )
+        const { cartao_id: cartaoId, cartao_bandeira_id: cartaoBandeiraId } = cartaoEBandeiraDoCadastro({
+            cadastrarCartao,
+            cartaoNome,
+            cartaoIdRetry: extra?.cartao_id ?? pendingMetadadosRef.current.cartao_id,
+            bandeiraIdRetry:
+                extra?.cartao_bandeira_id
+                ?? pendingMetadadosRef.current.cartao_bandeira_id
+                ?? pendingSelecaoRef.current.cartao_bandeira_id,
+            cartaoIdFormulario: data.cartao_id,
+            bandeiraIdFormulario: data.cartao_bandeira_id,
+            temArquivo: Boolean(arquivoFile) && !extra?.omitir_arquivo,
+            bandeiraDoFormularioExplicita: showBandeiraSelect && data.cartao_bandeira_id != null && data.cartao_bandeira_id !== '',
+        })
         const substituirFatura = Boolean(
             extra?.substituir_fatura
             ?? pendingCartaoTitularRef.current.substituir_fatura
@@ -521,13 +640,29 @@ const FaturasForm = () => {
         const confirmarAnexoDuplicado =
             extra?.confirmar_anexo_duplicado
             ?? pendingAnexoDuplicadoRef.current.confirmar_anexo_duplicado
+        const confirmarSubstituirFatura = Boolean(
+            extra?.confirmar_substituir_fatura
+            ?? pendingJaAnexadaRef.current.confirmar_substituir_fatura
+            ?? pendingMetadadosRef.current.confirmar_substituir_fatura
+        )
+        const faturaExistenteId =
+            extra?.fatura_existente_id
+            ?? pendingJaAnexadaRef.current.fatura_existente_id
+            ?? pendingMetadadosRef.current.fatura_existente_id
 
-        if (!confirmarAnexoDuplicado) {
+        if (pendingSenhaRef.current.senha_pdf && !extra?.omitir_arquivo && !arquivoFile) {
+            toast.error(MSG_CADASTRO_PDF_NAO_ANEXADO)
+            throw new Error(MSG_CADASTRO_PDF_NAO_ANEXADO)
+        }
+
+        if (!confirmarAnexoDuplicado && !confirmarSubstituirFatura) {
             await assertPeriodoLivre({
-                cartao_id: cartaoNome || cadastrarCartao ? null : cartaoId,
+                cartao_id: cartaoId,
                 cartao_nome: cartaoNome,
                 cadastrar_cartao: cadastrarCartao,
                 substituir_fatura: substituirFatura,
+                confirmar_substituir_fatura: confirmarSubstituirFatura,
+                fatura_existente_id: faturaExistenteId,
                 mes: extra?.mes ?? pendingMetadadosRef.current.mes ?? data.mes,
                 ano: extra?.ano ?? pendingMetadadosRef.current.ano ?? data.ano,
             })
@@ -535,18 +670,13 @@ const FaturasForm = () => {
 
         const payload: FaturasModel = {
             ...data,
-            // Novo cartão: envia nome sem cartao_id para o back criar no mesmo POST
-            cartao_id: cartaoNome || cadastrarCartao ? null : (cartaoId ?? null),
+            cartao_id: cartaoId,
             cartao_nome: cartaoNome || undefined,
             cadastrar_cartao: cadastrarCartao || undefined,
             substituir_fatura: substituirFatura || undefined,
             mes: extra?.mes ?? pendingMetadadosRef.current.mes ?? data.mes,
             ano: extra?.ano ?? pendingMetadadosRef.current.ano ?? data.ano,
-            cartao_bandeira_id:
-                extra?.cartao_bandeira_id
-                ?? pendingMetadadosRef.current.cartao_bandeira_id
-                ?? pendingSelecaoRef.current.cartao_bandeira_id
-                ?? data.cartao_bandeira_id,
+            cartao_bandeira_id: cartaoBandeiraId,
             bandeira:
                 extra?.bandeira
                 ?? pendingMetadadosRef.current.bandeira
@@ -571,6 +701,8 @@ const FaturasForm = () => {
             fatura_duplicada_id:
                 extra?.fatura_duplicada_id
                 ?? pendingAnexoDuplicadoRef.current.fatura_duplicada_id,
+            confirmar_substituir_fatura: confirmarSubstituirFatura || undefined,
+            fatura_existente_id: faturaExistenteId ?? undefined,
             arquivo_pdf: extra?.omitir_arquivo ? null : arquivoFile,
         }
         return faturasService.createFaturas(payload)
@@ -686,13 +818,17 @@ const FaturasForm = () => {
     const handleMetadadosConfirm = async (selection: FaturaMetadadosRetryPayload) => {
         pendingMetadadosRef.current = {
             ...selection,
+            cartao_id: selection.cartao_nome || selection.cadastrar_cartao ? null : selection.cartao_id,
             cadastrar_cartao: Boolean(selection.cartao_nome) || selection.cadastrar_cartao,
+            confirmar_substituir_fatura: Boolean(selection.confirmar_substituir_fatura),
+            fatura_existente_id: selection.fatura_existente_id ?? null,
         }
         setValue('mes', selection.mes)
         setValue('ano', selection.ano)
-        if (selection.cartao_nome) {
+        if (selection.cartao_nome || selection.cadastrar_cartao) {
             setValue('cartao_id', null)
             setValue('cartao_nome', selection.cartao_nome)
+            setValue('cartao_bandeira_id', selection.cartao_bandeira_id ?? null)
         } else if (selection.cartao_id != null) {
             setValue('cartao_id', selection.cartao_id)
             setValue('cartao_nome', null)
@@ -855,7 +991,35 @@ const FaturasForm = () => {
         }
     }
 
+    const handleJaAnexadaSubstituir = async () => {
+        const existingId = jaAnexadaError?.fatura_existente_id ?? jaAnexadaError?.fatura_existente?.id
+        if (existingId == null) {
+            toast.error('Não foi possível identificar a fatura que já tem anexo.')
+            return
+        }
+        const retry = substituirFaturaRetryFields(existingId)
+        pendingJaAnexadaRef.current = retry
+        setJaAnexadaLoading(true)
+        try {
+            const result = await submitCreate(retry)
+            setJaAnexadaModalOpen(false)
+            handleCreateSuccess(result)
+        } catch (error) {
+            if (handleCreateError(error)) {
+                setJaAnexadaModalOpen(false)
+                return
+            }
+            toast.error((error as Error)?.message || 'Erro ao substituir a fatura')
+        } finally {
+            setJaAnexadaLoading(false)
+        }
+    }
+
     const handleSenhaCadastroUnlock = async (payload: FaturaSenhaUnlockPayload) => {
+        if (!arquivoFile) {
+            toast.error(MSG_CADASTRO_PDF_NAO_ANEXADO)
+            throw new Error(MSG_CADASTRO_PDF_NAO_ANEXADO)
+        }
         pendingSenhaRef.current = {
             senha_pdf: payload.senha_pdf,
             salvar_senha_pdf: payload.salvar_senha_pdf,
@@ -863,12 +1027,18 @@ const FaturasForm = () => {
         }
         try {
             const result = await submitCreate()
-            handleCreateSuccess(result)
+            const manteveSenhaModal = handleCreateSuccess(result)
+            if (!manteveSenhaModal) {
+                setSenhaModalOpen(false)
+                setSenhaCadastroMode(false)
+            }
         } catch (error) {
             if (error instanceof PdfSenhaError) {
                 throw error
             }
             if (handleCreateError(error)) {
+                setSenhaModalOpen(false)
+                setSenhaCadastroMode(false)
                 return
             }
             throw error
@@ -1024,7 +1194,13 @@ const FaturasForm = () => {
                 sugestao={metadadosSugestao}
                 cartoes={metadadosCartoes}
                 bandeiras={metadadosBandeiras}
+                modo={metadadosModo}
+                podeCadastrarCartao={metadadosPodeCadastrar}
+                orientacao={metadadosOrientacao}
                 precisaSelecionarBandeira={metadadosPrecisaBandeira}
+                acaoSugerida={metadadosAcaoSugerida}
+                faturaExistente={metadadosFaturaExistente}
+                faturaExistenteId={metadadosFaturaExistenteId}
                 loading={metadadosLoading}
                 onClose={() => setMetadadosModalOpen(false)}
                 onConfirm={handleMetadadosConfirm}
@@ -1056,6 +1232,13 @@ const FaturasForm = () => {
                 onClose={() => setAnexoDuplicadoModalOpen(false)}
                 onSubstituir={handleAnexoDuplicadoSubstituir}
                 onManter={handleAnexoDuplicadoManter}
+            />
+            <FaturaJaAnexadaModal
+                isOpen={jaAnexadaModalOpen}
+                error={jaAnexadaError}
+                loading={jaAnexadaLoading}
+                onClose={() => setJaAnexadaModalOpen(false)}
+                onSubstituir={handleJaAnexadaSubstituir}
             />
             <div className="page-content">
                 <Container fluid>

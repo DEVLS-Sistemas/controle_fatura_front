@@ -9,9 +9,11 @@ Feature → `v1.0/dev`. Se o usuário pedir PR de promoção / promover para `ma
 
 ## Base
 
-- Head: branch atual (`git branch --show-current`)
+- Head: branch **do card** atual (`v1.0/dev-{tela}-CTLFAT-{n}`)
 - Base: `v1.0/dev`
 - Promoção / `main`: `create-release-pr`
+
+Se a branch atual for `main`, `v1.0/dev` ou qualquer camada extra (`v1.0/dev-build` etc.), **parar**. Checkout da branch do card. Não abrir PR a partir dessas branches.
 
 ## Card
 

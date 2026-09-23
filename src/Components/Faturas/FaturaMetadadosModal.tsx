@@ -32,18 +32,45 @@ import { SelectOptions } from 'interfaces/SystemInterfaces/SelectInterface'
 import { buildBandeiraSelectOptions, toBandeiraSelectOption } from 'helpers/cartao_helpers'
 import {
     FaturaMetadadosCartaoOption,
+    FaturaMetadadosModo,
     FaturaMetadadosRetryPayload,
     FaturaMetadadosSugestao,
 } from 'libs/api/exceptions/FaturaMetadadosError'
+import {
+    bandeirasDoModal,
+    nomeCartaoDoPayload,
+    resolveModoMetadados,
+} from 'helpers/fatura_metadados_helpers'
+import { FaturaExistenteAnexoDuplicado } from 'libs/api/exceptions/FaturaAnexoDuplicadoError'
 import { FaturaSelecaoBandeiraOption } from 'libs/api/exceptions/FaturaSelecaoError'
 import { CartoesService } from 'services/Cartoes/CartoesService'
+import {
+    COPY_AGUARDE_PROCESSANDO_SUBSTITUIR,
+    labelCtaFaturaExistente,
+    podeSubstituirFaturaExistente,
+    resolveAcaoSugeridaFatura,
+} from 'helpers/fatura_substituir_existente_helpers'
+import {
+    rotuloCartaoBandeira,
+    rotuloCompetenciaFatura,
+    rotuloValorTransacoes,
+} from 'helpers/fatura_anexo_duplicado_helpers'
+import {
+    valoresConferenciaFatura,
+} from 'helpers/fatura_conferencia_helpers'
 
 export type FaturaMetadadosModalProps = {
     isOpen: boolean
     sugestao?: FaturaMetadadosSugestao | null
     cartoes?: FaturaMetadadosCartaoOption[]
     bandeiras?: FaturaSelecaoBandeiraOption[]
+    modo?: FaturaMetadadosModo | null
+    podeCadastrarCartao?: boolean
+    orientacao?: string | null
     precisaSelecionarBandeira?: boolean
+    acaoSugerida?: string | null
+    faturaExistente?: FaturaExistenteAnexoDuplicado | null
+    faturaExistenteId?: number | null
     loading?: boolean
     onClose: () => void
     onConfirm: (payload: FaturaMetadadosRetryPayload) => void | Promise<void>
@@ -76,29 +103,18 @@ const confiancaLabel = (confianca?: string | null): string | null => {
     }
 }
 
-const parserToNomeSugestao = (parser?: string | null, cartaoNome?: string | null): string => {
-    if (cartaoNome?.trim()) return cartaoNome.trim()
-    if (!parser) return ''
-    const map: Record<string, string> = {
-        c6: 'C6',
-        sofisa: 'Sofisa',
-        nubank: 'Nubank',
-        inter: 'Inter',
-        itau: 'Itaú',
-        bradesco: 'Bradesco',
-        santander: 'Santander',
-        xp: 'XP',
-    }
-    const key = String(parser).toLowerCase()
-    return map[key] || parser.charAt(0).toUpperCase() + parser.slice(1)
-}
-
 const FaturaMetadadosModal = ({
     isOpen,
     sugestao = null,
     cartoes = [],
     bandeiras: bandeirasIniciais = [],
+    modo: modoProp = null,
+    podeCadastrarCartao = false,
+    orientacao = null,
     precisaSelecionarBandeira = false,
+    acaoSugerida = null,
+    faturaExistente = null,
+    faturaExistenteId = null,
     loading = false,
     onClose,
     onConfirm,
@@ -147,6 +163,19 @@ const FaturaMetadadosModal = ({
     )
 
     const anosOptions = useMemo(() => AnosSelect(), [])
+    const modoResolvido = useMemo(
+        () =>
+            resolveModoMetadados({
+                modo: modoProp,
+                pode_cadastrar_cartao: podeCadastrarCartao,
+                sugestao,
+            }),
+        [modoProp, podeCadastrarCartao, sugestao]
+    )
+    const nomeIdentificado = useMemo(
+        () => nomeCartaoDoPayload(sugestao, modoResolvido),
+        [sugestao, modoResolvido]
+    )
 
     const applyBandeiras = (
         list: FaturaSelecaoBandeiraOption[],
@@ -200,15 +229,16 @@ const FaturaMetadadosModal = ({
         setMode('novo')
         setCartaoId(null)
         setBandeiraError(null)
-        setCartaoNome(nomeSugestao ?? parserToNomeSugestao(sugestao?.parser, sugestao?.cartao_nome))
-        const list =
-            bandeirasIniciais.length > 0
-                ? bandeirasIniciais
-                : bandeirasLookup.length > 0
-                    ? bandeirasLookup
-                    : []
-        // Sempre deixa o select vazio — usuário confirma a bandeira
-        applyBandeiras(list, true, { autoSelect: false })
+        setCartaoNome(nomeSugestao || nomeIdentificado)
+        const list = bandeirasDoModal({
+            modo: 'cadastrar_cartao',
+            payload: bandeirasIniciais,
+            lookup: bandeirasLookup,
+        })
+        applyBandeiras(list, true, {
+            preferLabel: sugestao?.bandeira_sugerida ?? null,
+            autoSelect: Boolean(sugestao?.bandeira_sugerida),
+        })
     }
 
     const enterExistenteMode = (id?: number | string | null) => {
@@ -272,25 +302,31 @@ const FaturaMetadadosModal = ({
         setMes(sugestao?.mes ?? null)
         setAno(sugestao?.ano ?? null)
 
-        const semCartao =
-            nextCartao == null
-            || sugestao?.confianca === 'baixa'
-
-        if (semCartao) {
-            enterNovoMode(parserToNomeSugestao(sugestao?.parser, sugestao?.cartao_nome))
+        if (modoResolvido === 'cadastrar_cartao') {
+            enterNovoMode(nomeIdentificado)
         } else {
             enterExistenteMode(nextCartao)
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isOpen, sugestao, bandeirasIniciais, precisaSelecionarBandeira])
+    }, [isOpen, sugestao, bandeirasIniciais, precisaSelecionarBandeira, modoResolvido, nomeIdentificado])
 
-    // Completa opções de bandeira do lookup sem pré-selecionar (usuário escolhe)
     useEffect(() => {
         if (!isOpen || mode !== 'novo' || bandeirasLookup.length === 0) return
-        if (bandeiras.length > 0) return
-        applyBandeiras(bandeirasLookup, true, { autoSelect: false })
+        const next = bandeirasDoModal({
+            modo: 'cadastrar_cartao',
+            payload: bandeirasIniciais,
+            lookup: bandeirasLookup,
+        })
+        const sameLabels =
+            next.length === bandeiras.length
+            && next.every((b, i) => b.label === bandeiras[i]?.label)
+        if (sameLabels) return
+        applyBandeiras(next, true, {
+            preferLabel: sugestao?.bandeira_sugerida ?? null,
+            autoSelect: Boolean(sugestao?.bandeira_sugerida),
+        })
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isOpen, mode, bandeirasLookup])
+    }, [isOpen, mode, bandeirasLookup, bandeirasIniciais])
 
     const loadBandeirasForCartao = async (id: number | string) => {
         setBandeirasLoading(true)
@@ -362,7 +398,9 @@ const FaturaMetadadosModal = ({
                 return null
             }
             const payload: FaturaMetadadosRetryPayload = {
+                cartao_id: null,
                 cartao_nome: nome,
+                cadastrar_cartao: true,
                 mes,
                 ano,
             }
@@ -384,11 +422,32 @@ const FaturaMetadadosModal = ({
         return payload
     }
 
+    const acaoCta = resolveAcaoSugeridaFatura({
+        acao_sugerida: acaoSugerida ?? sugestao?.acao_sugerida,
+        fatura_existente: faturaExistente ?? sugestao?.fatura_existente,
+    })
+    const existenteId = faturaExistenteId
+        ?? faturaExistente?.id
+        ?? sugestao?.fatura_existente_id
+        ?? sugestao?.fatura_existente?.id
+        ?? null
+    const isNovo = mode === 'novo'
+    const ctaLabel = labelCtaFaturaExistente(acaoCta, { cadastrarCartao: isNovo && acaoCta === 'cadastrar' })
+    const podeSubstituir = acaoCta !== 'substituir' || podeSubstituirFaturaExistente(faturaExistente ?? sugestao?.fatura_existente)
+    const rotuloExistente = rotuloCartaoBandeira(faturaExistente ?? sugestao?.fatura_existente)
+    const competenciaExistente = rotuloCompetenciaFatura(faturaExistente ?? sugestao?.fatura_existente)
+
     const handleSubmit = async () => {
         setError(null)
         setBandeiraError(null)
         const payload = buildPayload()
         if (!payload) return
+        if (existenteId != null) {
+            payload.fatura_existente_id = existenteId
+        }
+        if (acaoCta === 'substituir') {
+            payload.confirmar_substituir_fatura = true
+        }
         await onConfirm(payload)
     }
 
@@ -400,7 +459,6 @@ const FaturaMetadadosModal = ({
     const finais = sugestao?.ultimos_digitos?.filter(Boolean) ?? []
     const valor = sugestao?.valor_fatura
     const competenciaLida = formatCompetenciaMesAno({ mes, ano, competencia: null })
-    const isNovo = mode === 'novo'
     const cartaoSelecionado = cartoes.find((c) => Number(c.value) === Number(cartaoId))
     const homologacaoCartao = resolveCartaoHomologacao(
         isNovo
@@ -421,8 +479,7 @@ const FaturaMetadadosModal = ({
         ? homologacaoCartao.homologada === false
         : false
     const precisaAceiteValores = parserNaoHomologado || cartaoNaoHomologado
-    const conferencia = sugestao?.conferencia
-    const conferenciaDiverge = conferencia != null && conferencia.bate === false
+    const valoresConferencia = valoresConferenciaFatura(sugestao?.conferencia)
     const parserHomologadoNota =
         !precisaAceiteValores
             ? (sugestao?.parser_homologado?.nota ?? homologacaoCartao.parser?.nota)
@@ -440,20 +497,28 @@ const FaturaMetadadosModal = ({
                 {parserHomologadoNota && (
                     <p className="small text-muted mb-3">{parserHomologadoNota}</p>
                 )}
-                {conferenciaDiverge && (
-                    <Alert color="warning" className="mb-3">
-                        O total do cabeçalho da fatura ({formatCurrency(conferencia?.valor_cabecalho)})
-                        {' '}diverge da soma das transações ({formatCurrency(conferencia?.soma_transacoes)}).
-                        {' '}Vamos usar a soma das transações.
+                {valoresConferencia && (
+                    <Alert color="info" className="mb-3">
+                        Total no PDF: {formatCurrency(valoresConferencia.valorCabecalho)}.
+                        {' '}Soma das linhas: {formatCurrency(valoresConferencia.somaTransacoes)}.
+                        {valoresConferencia.diferenca != null && (
+                            <> Diferença: {formatCurrency(valoresConferencia.diferenca)}.</>
+                        )}
+                        {' '}O total da fatura continua o do PDF.
                     </Alert>
                 )}
                 {isNovo ? (
                     <>
                         <p className="mb-2">
-                            Identificamos o <strong>mês</strong> e o <strong>ano</strong> no arquivo.
-                            O cartão ainda não está vinculado — você pode <strong>cadastrá-lo agora</strong>,
+                            {nomeIdentificado
+                                ? <>Identificamos <strong>{nomeIdentificado}</strong>, o mês e o ano no arquivo.</>
+                                : <>Identificamos o <strong>mês</strong> e o <strong>ano</strong> no arquivo.</>}
+                            {' '}O cartão ainda não está vinculado — você pode <strong>cadastrá-lo agora</strong>,
                             nesta mesma tela, informando o nome e a bandeira.
                         </p>
+                        {orientacao && (
+                            <p className="small text-muted mb-2">{orientacao}</p>
+                        )}
                         <Alert color="success" className="mb-3">
                             <i className="ri-checkbox-circle-line me-1 align-middle"></i>
                             Não precisa sair para cadastrar o cartão nem anexar o arquivo de novo.
@@ -469,6 +534,35 @@ const FaturaMetadadosModal = ({
                 <Alert color="warning" className="mb-3">
                     {COPY_CONFERIR_COMPETENCIA_PDF}
                 </Alert>
+                {(faturaExistente || sugestao?.fatura_existente) && (
+                    <Alert color={acaoCta === 'substituir' ? 'warning' : 'info'} className="mb-3">
+                        {acaoCta === 'substituir' ? (
+                            <>
+                                Já existe fatura com anexo
+                                {[rotuloExistente, competenciaExistente].filter(Boolean).length
+                                    ? ` (${[rotuloExistente, competenciaExistente].filter(Boolean).join(' · ')})`
+                                    : ''}
+                                . O botão único é <strong>Substituir fatura</strong> — não cria outra linha.
+                            </>
+                        ) : (
+                            <>
+                                Há uma fatura sem anexo nesta competência
+                                {competenciaExistente ? ` (${competenciaExistente})` : ''}.
+                                {' '}O arquivo será anexado nela.
+                            </>
+                        )}
+                        {(faturaExistente ?? sugestao?.fatura_existente) && (
+                            <div className="small mt-1">
+                                {rotuloValorTransacoes(faturaExistente ?? sugestao?.fatura_existente)}
+                            </div>
+                        )}
+                    </Alert>
+                )}
+                {!podeSubstituir && (
+                    <Alert color="info" className="mb-3">
+                        {COPY_AGUARDE_PROCESSANDO_SUBSTITUIR}
+                    </Alert>
+                )}
                 {competenciaLida ? (
                     <div className="text-center mb-3">
                         <div className="text-muted small">Competência lida do arquivo</div>
@@ -683,10 +777,11 @@ const FaturaMetadadosModal = ({
                     type="button"
                     color="primary"
                     onClick={handleSubmit}
-                    disabled={loading || bandeirasLoading || (precisaAceiteValores && !aceiteValores)}
+                    disabled={loading || bandeirasLoading || !podeSubstituir || (precisaAceiteValores && !aceiteValores)}
+                    title={!podeSubstituir ? COPY_AGUARDE_PROCESSANDO_SUBSTITUIR : undefined}
                 >
                     {loading && <Spinner size="sm" className="me-2" />}
-                    {isNovo ? 'Cadastrar cartão e fatura' : 'Confirmar e cadastrar'}
+                    {ctaLabel}
                 </Button>
             </ModalFooter>
         </Modal>

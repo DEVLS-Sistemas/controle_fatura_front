@@ -7,6 +7,8 @@ description: Depois do merge do PR de promoção, lê version.json e publica a t
 
 Não abre PR e não faz merge. Só tag na `main` a partir de `version.json`.
 
+Camadas: `main` ← `v1.0/dev` ← branch do card. Não usar `v1.0/dev-build` nem outra camada extra. A versão da tag veio do PR de promoção, que alterou `version.json`.
+
 *abre o PR de promoção* / *promover para main* → `create-release-pr`.
 
 O mesmo arquivo existe no back e no front, na raiz:
