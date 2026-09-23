@@ -74,7 +74,12 @@ import {
     ImpactoRemoverAnexoCompra,
 } from 'interfaces/Faturas/FaturasInterface'
 import { NumeroListItem, ParserHomologado, PARSERS_HOMOLOGADOS_PADRAO } from 'interfaces/Cartoes/CartoesInterface'
-import { CategoriaLookup, PlataformaLookup, CandidatoConciliacao, ResponsavelLookup, TransacoesList } from 'interfaces/Transacoes/TransacoesInterface'
+import { CategoriaLookup, PlataformaLookup, CandidatoConciliacao, ResponsavelLookup, TransacoesList, TransacoesModel } from 'interfaces/Transacoes/TransacoesInterface'
+import {
+    AplicarSubcategoriaPergunta,
+    parseAplicarSubcategoria,
+} from 'helpers/aplicar_subcategoria_helpers'
+import AplicarSubcategoriaModal from 'Components/Faturas/AplicarSubcategoriaModal'
 import { FaturasService } from 'services/Faturas/FaturasService'
 import { TransacoesService } from 'services/Transacoes/TransacoesService'
 import { SubcategoriasService } from 'services/Subcategorias/SubcategoriasService'
@@ -400,6 +405,11 @@ const FaturasViewPage = () => {
     const [jaAnexadaModalOpen, setJaAnexadaModalOpen] = useState(false)
     const [jaAnexadaLoading, setJaAnexadaLoading] = useState(false)
     const [jaAnexadaError, setJaAnexadaError] = useState<FaturaJaAnexadaError | null>(null)
+    const [aplicarSubcategoria, setAplicarSubcategoria] = useState<{
+        pergunta: AplicarSubcategoriaPergunta
+        payload: TransacoesModel
+    } | null>(null)
+    const [aplicarSubcategoriaLoading, setAplicarSubcategoriaLoading] = useState(false)
     const [categoriasOptions, setCategoriasOptions] = useState<SelectOptions[]>([])
     const [categoriasLookup, setCategoriasLookup] = useState<CategoriaLookup[]>([])
     const [subcategoriasByCategoria, setSubcategoriasByCategoria] = useState<Record<number, SelectOptions[]>>({})
@@ -1655,8 +1665,7 @@ const FaturasViewPage = () => {
                 ? patch.eh_assinatura
                 : (tx.eh_assinatura ?? null)
             const { propagar_grupo: propagarGrupo, ...rowPatch } = patch
-
-            await transacoesService.editTransacoes({
+            const payload: TransacoesModel = {
                 id: tx.id,
                 transacao_id: tx.id,
                 cartao_id: tx.cartao_id ?? null,
@@ -1675,7 +1684,17 @@ const FaturasViewPage = () => {
                 responsavel_id: patch.responsavel_id !== undefined ? patch.responsavel_id : (tx.responsavel_id ?? null),
                 observacoes: patch.observacoes !== undefined ? patch.observacoes : (tx.observacoes ?? null),
                 propagar_grupo: propagarGrupo || undefined,
-            })
+            }
+
+            const resposta = await transacoesService.editTransacoes(payload)
+            const gravouClassificacao = patch.categoria_id !== undefined || patch.subcategoria_id !== undefined
+            const temCategoria = categoriaId != null && Number(categoriaId) > 0
+            const pergunta = gravouClassificacao && temCategoria
+                ? parseAplicarSubcategoria(resposta)
+                : null
+            if (pergunta) {
+                setAplicarSubcategoria({ pergunta, payload })
+            }
             setTransacoes((prev) =>
                 prev.map((item) => {
                     const sameGrupo = Boolean(
@@ -1746,6 +1765,29 @@ const FaturasViewPage = () => {
                 delete next[tx.id!]
                 return next
             })
+        }
+    }
+
+    const handleCancelarAplicarSubcategoria = () => {
+        if (aplicarSubcategoriaLoading) return
+        setAplicarSubcategoria(null)
+    }
+
+    const handleAplicarSubcategoria = async () => {
+        if (!aplicarSubcategoria || !id) return
+        setAplicarSubcategoriaLoading(true)
+        try {
+            await transacoesService.editTransacoes({
+                ...aplicarSubcategoria.payload,
+                aplicar_subcategoria_estabelecimento: true,
+            })
+            await loadTransacoes(id)
+            setAplicarSubcategoria(null)
+        } catch (error) {
+            console.error('Erro ao aplicar subcategoria:', error)
+            toast.error('Erro ao aplicar a subcategoria nas outras compras')
+        } finally {
+            setAplicarSubcategoriaLoading(false)
         }
     }
 
@@ -3191,6 +3233,14 @@ const FaturasViewPage = () => {
                             )}
                         </CardBody>
                     </Card>
+
+                    <AplicarSubcategoriaModal
+                        isOpen={aplicarSubcategoria != null}
+                        pergunta={aplicarSubcategoria?.pergunta ?? null}
+                        loading={aplicarSubcategoriaLoading}
+                        onAplicar={handleAplicarSubcategoria}
+                        onCancelar={handleCancelarAplicarSubcategoria}
+                    />
 
                     <ResponsavelModal
                         isOpen={responsavelModalOpen}
