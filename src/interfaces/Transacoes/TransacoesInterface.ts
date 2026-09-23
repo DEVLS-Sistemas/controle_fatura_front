@@ -139,6 +139,8 @@ export interface TransacoesModel {
     compra_grupo_id?: string | number | null
     /** No edit, propaga campos compartilhados para o grupo */
     propagar_grupo?: boolean
+    /** No edit da fatura, aplica a subcategoria nas outras compras do estabelecimento */
+    aplicar_subcategoria_estabelecimento?: boolean
     tipo?: string | null
     /** Canal/origem da compra — obrigatório no create */
     origem_compra?: string | null
