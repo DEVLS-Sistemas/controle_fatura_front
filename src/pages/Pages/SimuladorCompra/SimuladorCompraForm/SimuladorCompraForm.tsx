@@ -1,7 +1,7 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
-import { Control, UseFormRegister } from 'react-hook-form'
-import { Button, Card, CardBody, Col, Collapse, Label, Row } from 'reactstrap'
+import { Control, Controller, UseFormRegister } from 'react-hook-form'
+import { Button, Card, CardBody, Col, Collapse, Input, Label, Row } from 'reactstrap'
 import { InputDate } from 'Components/ComponentController/Inputs/Date/InputDate'
 import { InputTextControlled } from 'Components/ComponentController/Inputs/Text/InputTextControlled'
 import { SelectListControlled } from 'Components/ComponentController/Selects/Select/SelectListControlled'
@@ -27,6 +27,8 @@ type Props = {
   onNovaSimulacao?: () => void
   podeSimular: boolean
   simulando: boolean
+  observacoesInvalida?: boolean
+  destacado?: boolean
 }
 
 const optParcelas: SelectOptions[] = parcelasOptions.map((p) => ({
@@ -51,11 +53,13 @@ const SimuladorCompraForm = ({
   onNovaSimulacao,
   podeSimular,
   simulando,
+  observacoesInvalida,
+  destacado,
 }: Props) => {
   const responsavelLabel = isMeuResponsavel ? 'Eu' : responsavelNome || 'Selecionar'
 
   return (
-    <Card className={compact ? 'mb-3' : 'mb-0 shadow-sm'}>
+    <Card className={`${compact ? 'mb-3' : 'mb-0 shadow-sm'}${destacado ? ' border border-danger' : ''}`}>
       <CardBody className={compact ? 'py-3' : 'p-4'}>
         <Row className="g-3 align-items-end">
           {showTitular && (
@@ -117,6 +121,28 @@ const SimuladorCompraForm = ({
               options={optParcelas}
               required={required}
             />
+          </Col>
+          <Col xs={12}>
+            <Label className="form-label" htmlFor="simulador-observacoes">O que foi comprado</Label>
+            <Controller
+              name="observacoes"
+              control={control}
+              render={({ field }) => (
+                <Input
+                  id="simulador-observacoes"
+                  innerRef={field.ref}
+                  name={field.name}
+                  value={field.value ?? ''}
+                  placeholder="Ex.: Mouse Logitech"
+                  invalid={observacoesInvalida}
+                  onBlur={field.onBlur}
+                  onChange={(event) => field.onChange(event.target.value)}
+                />
+              )}
+            />
+            {observacoesInvalida && (
+              <div className="invalid-feedback d-block">Informe o que foi comprado.</div>
+            )}
           </Col>
           <Col lg={compact ? 3 : 12} md={12}>
             <button
