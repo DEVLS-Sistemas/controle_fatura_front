@@ -34,6 +34,7 @@ const GastosCriticosPage = () => {
   const [data, setData] = useState<GastosCriticosView>()
   const [criterio, setCriterio] = useState<GastosCriticosRankingCriterio>('gasto')
   const [dimensao, setDimensao] = useState<GastosCriticosDimensao>('lojas')
+  const [exibirSemCategoria, setExibirSemCategoria] = useState(false)
   const [cartoesOptions, setCartoesOptions] = useState<SelectOptions[]>([{ value: '', label: 'Todos' }])
   const [responsaveisOptions, setResponsaveisOptions] = useState<SelectOptions[]>([
     { value: '', label: 'Todos' },
@@ -54,6 +55,7 @@ const GastosCriticosPage = () => {
 
   const loadGastos = async (filters: GastosCriticosSearch) => {
     lastFiltersRef.current = filters
+    setExibirSemCategoria(false)
     persistGastosCriticosSearch(filters)
     persistUrl(filters)
     setLoading(true)
@@ -181,7 +183,11 @@ const GastosCriticosPage = () => {
                     onCriterioChange={handleCriterioChange}
                     onDimensaoChange={setDimensao}
                   />
-                  <GastosCriticosSemCategoria data={data} />
+                  <GastosCriticosSemCategoria
+                    data={data}
+                    aberto={exibirSemCategoria}
+                    onToggle={() => setExibirSemCategoria((atual) => !atual)}
+                  />
                 </>
               ) : null}
             </>
