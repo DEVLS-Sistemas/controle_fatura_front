@@ -2525,11 +2525,11 @@ const FaturasViewPage = () => {
                             </div>
 
                             <div className="bg-light rounded p-3 mb-3">
-                                <Row className="g-3 text-center text-md-start">
+                                <Row className="g-3 text-center">
                                     <Col xs={6} md={3}>
                                         <small className="text-muted text-uppercase d-block">Total da fatura</small>
                                         <span
-                                            className={`fw-semibold ${totaisConciliacao.temComprasNaoConciliadas ? 'text-warning' : 'text-primary'} ${VALOR_TEXT_CLASS} d-block`}
+                                            className={`fw-semibold ${totaisConciliacao.temComprasNaoConciliadas ? 'text-warning' : 'text-primary'} d-block`}
                                             style={{ fontSize: '1.5rem', lineHeight: 1.2 }}
                                         >
                                             {formatCurrency(totaisConciliacao.valorTotalComPendencias)}
@@ -2538,7 +2538,7 @@ const FaturasViewPage = () => {
                                     <Col xs={6} md={3}>
                                         <small className="text-muted text-uppercase d-block">Total pago</small>
                                         <span
-                                            className={`fw-semibold text-success ${VALOR_TEXT_CLASS} d-block`}
+                                            className="fw-semibold text-success d-block"
                                             style={{ fontSize: '1.5rem', lineHeight: 1.2 }}
                                         >
                                             {formatCurrency(fatura.valor_pago)}
@@ -2547,17 +2547,16 @@ const FaturasViewPage = () => {
                                     <Col xs={6} md={3}>
                                         <small className="text-muted text-uppercase d-block">Restante</small>
                                         <span
-                                            className={`fw-semibold ${Number(fatura.valor_restante ?? 0) > 0 ? 'text-warning' : 'text-muted'} ${VALOR_TEXT_CLASS} d-block`}
+                                            className={`fw-semibold ${Number(fatura.valor_restante ?? 0) > 0 ? 'text-warning' : 'text-muted'} d-block`}
                                             style={{ fontSize: '1.5rem', lineHeight: 1.2 }}
                                         >
                                             {formatCurrency(fatura.valor_restante)}
                                         </span>
                                     </Col>
-                                    <Col xs={6} md={3} className="d-flex flex-column justify-content-center">
+                                    <Col xs={6} md={3} className="d-flex flex-column align-items-center justify-content-center">
                                         <small className="text-muted text-uppercase d-block mb-1">Status</small>
                                         <Badge
                                             color={faturaQuitacaoColor(fatura.pago)}
-                                            className="align-self-md-start"
                                             style={{ fontSize: '0.95rem' }}
                                         >
                                             {faturaQuitacaoLabel(fatura.pago)}
