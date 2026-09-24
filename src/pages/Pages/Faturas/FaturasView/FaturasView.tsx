@@ -79,6 +79,7 @@ import {
     AplicarSubcategoriaPergunta,
     parseAplicarSubcategoria,
 } from 'helpers/aplicar_subcategoria_helpers'
+import { linhaFaturaSemCategoria } from 'helpers/fatura_categoria_operacional_helpers'
 import AplicarSubcategoriaModal from 'Components/Faturas/AplicarSubcategoriaModal'
 import { FaturasService } from 'services/Faturas/FaturasService'
 import { TransacoesService } from 'services/Transacoes/TransacoesService'
@@ -2918,6 +2919,7 @@ const FaturasViewPage = () => {
                                                         const precisaConciliar = precisaConciliarCompra(tx)
                                                         const sugestaoConciliacao = temSugestaoConciliacao(tx)
                                                         const contaNoTotal = contaNoTotalLinha(tx)
+                                                        const semCategoria = linhaFaturaSemCategoria(tx)
                                                         const rowClass = precisaConciliar
                                                             ? 'table-warning'
                                                             : sugestaoConciliacao
@@ -3053,6 +3055,9 @@ const FaturasViewPage = () => {
                                                                 ) : null}
                                                             </td>
                                                             <td style={{ minWidth: 160 }}>
+                                                                {semCategoria ? (
+                                                                    <span>{resolveTipoTransacaoLabel(tx.tipo, tx.tipo_label)}</span>
+                                                                ) : (
                                                                 <div className="d-flex gap-1 align-items-center">
                                                                     <Input
                                                                         type="select"
@@ -3087,8 +3092,10 @@ const FaturasViewPage = () => {
                                                                         <i className="ri-add-line"></i>
                                                                     </Button>
                                                                 </div>
+                                                                )}
                                                             </td>
                                                             <td style={{ minWidth: 160 }}>
+                                                                {semCategoria ? null : (
                                                                 <div className="d-flex gap-1 align-items-center">
                                                                     <Input
                                                                         type="select"
@@ -3123,6 +3130,7 @@ const FaturasViewPage = () => {
                                                                         <i className="ri-add-line"></i>
                                                                     </Button>
                                                                 </div>
+                                                                )}
                                                             </td>
                                                             <td style={{ minWidth: 160 }}>
                                                                 <div className="d-flex gap-1 align-items-center">
