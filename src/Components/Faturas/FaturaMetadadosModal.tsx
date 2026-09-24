@@ -453,6 +453,9 @@ const FaturaMetadadosModal = ({
             payload.bandeira = String(bandeiraValue).slice(CRIAR_PREFIX.length)
         } else {
             payload.cartao_bandeira_id = bandeiraValue
+            const escolhida = bandeiras.find((b) => toBandeiraSelectValue(b) === String(bandeiraValue))
+            const nome = String(escolhida?.label ?? '').trim()
+            if (nome) payload.bandeira = nome
         }
         return true
     }

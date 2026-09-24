@@ -92,6 +92,7 @@ import SubcategoriaRapidoModal, { SubcategoriaRapidoConfirm } from 'pages/Pages/
 import PlataformaRapidoModal, { PlataformaRapidoConfirm } from 'pages/Pages/Transacoes/PlataformaRapidoModal/PlataformaRapidoModal'
 import FaturaSenhaPdfModal, { FaturaSenhaUnlockPayload } from 'Components/Faturas/FaturaSenhaPdfModal'
 import FaturaSelecaoModal, { FaturaSelecaoStep } from 'Components/Faturas/FaturaSelecaoModal'
+import { nomeBandeiraParaExibicao } from 'helpers/fatura_metadados_helpers'
 import FaturaTitularModal from 'Components/Faturas/FaturaTitularModal'
 import FaturaAnexoDuplicadoModal from 'Components/Faturas/FaturaAnexoDuplicadoModal'
 import FaturaJaAnexadaModal from 'Components/Faturas/FaturaJaAnexadaModal'
@@ -949,6 +950,17 @@ const FaturasViewPage = () => {
         if (error.precisa_selecionar_final || error.codigo === 'precisa_selecionar_final') {
             setSelecaoStep('final')
             setSelecaoNumeros(error.numeros)
+            const nomeDaFatura = error.cartao_bandeira_id == null
+                || fatura?.cartao_bandeira_id == null
+                || Number(fatura.cartao_bandeira_id) === Number(error.cartao_bandeira_id)
+                ? fatura?.bandeira
+                : null
+            const nome = nomeBandeiraParaExibicao({
+                nome: pendingSelecaoRef.current.bandeira ?? nomeDaFatura,
+                cartaoBandeiraId: error.cartao_bandeira_id,
+                opcoes: [...error.bandeiras, ...selecaoBandeiras],
+            })
+            if (nome) setSelecaoBandeiraNome(nome)
             if (error.cartao_bandeira_id != null) {
                 setSelecaoCartaoBandeiraId(error.cartao_bandeira_id)
                 pendingSelecaoRef.current = {
@@ -1240,6 +1252,17 @@ const FaturasViewPage = () => {
                 if (error.precisa_selecionar_final || error.codigo === 'precisa_selecionar_final') {
                     setSelecaoStep('final')
                     setSelecaoNumeros(error.numeros)
+                    const nomeDaFatura = error.cartao_bandeira_id == null
+                        || fatura?.cartao_bandeira_id == null
+                        || Number(fatura.cartao_bandeira_id) === Number(error.cartao_bandeira_id)
+                        ? fatura?.bandeira
+                        : null
+                    const nome = nomeBandeiraParaExibicao({
+                        nome: pendingSelecaoRef.current.bandeira ?? nomeDaFatura,
+                        cartaoBandeiraId: error.cartao_bandeira_id,
+                        opcoes: error.bandeiras,
+                    })
+                    if (nome) setSelecaoBandeiraNome(nome)
                     if (error.cartao_bandeira_id != null) {
                         setSelecaoCartaoBandeiraId(error.cartao_bandeira_id)
                         pendingSelecaoRef.current = {

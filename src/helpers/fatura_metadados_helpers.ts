@@ -111,6 +111,27 @@ const normalizarBandeira = (valor?: string | null): string => (
     String(valor ?? '').trim().toLowerCase()
 )
 
+/**
+ * Rótulo do modal de final. O id recém-criado (ex.: 111) não substitui o nome
+ * que o usuário escolheu ao cadastrar o cartão.
+ */
+export const nomeBandeiraParaExibicao = (input: {
+    nome?: string | null
+    cartaoBandeiraId?: number | string | null
+    opcoes?: Array<{ value?: number | string | null; label?: string | null }> | null
+}): string | null => {
+    const direto = String(input.nome ?? '').trim()
+    if (direto) return direto
+    if (input.cartaoBandeiraId == null || input.cartaoBandeiraId === '') return null
+    const opt = (input.opcoes ?? []).find((item) => (
+        item.value != null
+        && item.value !== ''
+        && String(item.value) === String(input.cartaoBandeiraId)
+    ))
+    const label = String(opt?.label ?? '').trim()
+    return label || null
+}
+
 /** Fatura do mês cuja bandeira é a que está no select. */
 export const faturaDoPeriodoPelaBandeira = (
     periodo: FaturaNoPeriodo[] | null | undefined,
