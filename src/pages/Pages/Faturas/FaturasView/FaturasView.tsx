@@ -81,6 +81,7 @@ import {
 } from 'helpers/aplicar_subcategoria_helpers'
 import { linhaFaturaSemCategoria } from 'helpers/fatura_categoria_operacional_helpers'
 import AplicarSubcategoriaModal from 'Components/Faturas/AplicarSubcategoriaModal'
+import AplicarFinalCartaoModal from 'Components/Faturas/AplicarFinalCartaoModal'
 import { FaturasService } from 'services/Faturas/FaturasService'
 import { TransacoesService } from 'services/Transacoes/TransacoesService'
 import { SubcategoriasService } from 'services/Subcategorias/SubcategoriasService'
@@ -411,6 +412,11 @@ const FaturasViewPage = () => {
         payload: TransacoesModel
     } | null>(null)
     const [aplicarSubcategoriaLoading, setAplicarSubcategoriaLoading] = useState(false)
+    const [finalCartaoPendente, setFinalCartaoPendente] = useState<{
+        tx: TransacoesList
+        cartaoNumeroId: number
+    } | null>(null)
+    const [finalCartaoSaving, setFinalCartaoSaving] = useState(false)
     const [categoriasOptions, setCategoriasOptions] = useState<SelectOptions[]>([])
     const [categoriasLookup, setCategoriasLookup] = useState<CategoriaLookup[]>([])
     const [subcategoriasByCategoria, setSubcategoriasByCategoria] = useState<Record<number, SelectOptions[]>>({})
@@ -1857,68 +1863,40 @@ const FaturasViewPage = () => {
         await saveTransacao(tx, { eh_assinatura: next })
     }
 
-    const handleUpdateFinal = async (tx: TransacoesList, value: string) => {
-        if (!tx.id || !id) return
-        const parsed = value === '' ? null : Number(value)
-        const current = finalSelecionados[tx.id] !== undefined
-            ? finalSelecionados[tx.id]
-            : (tx.cartao_numero_id ?? tx.cartao_numero?.id ?? null)
-        if ((current == null && parsed == null) || Number(current) === Number(parsed)) return
-
-        let propagarGrupo = false
-        if (tx.compra_grupo_id && parsed != null) {
-            propagarGrupo = window.confirm(
-                'Esta compra é parcelada. Deseja aplicar o final a todas as parcelas?'
-            )
-        }
-
+    const persistirFinal = async (
+        tx: TransacoesList,
+        cartaoNumeroId: number | null,
+        propagar: boolean,
+    ): Promise<boolean> => {
+        if (!tx.id || !id) return false
         setSavingIds((prev) => ({ ...prev, [tx.id!]: true }))
         try {
             await transacoesService.editTransacoes({
                 id: tx.id,
-                transacao_id: tx.id,
-                cartao_id: tx.cartao_id ?? fatura?.cartao_id ?? null,
-                fatura_id: tx.fatura_id ?? Number(id),
-                estabelecimento_id: tx.estabelecimento_id ?? null,
-                estabelecimento: tx.estabelecimento_id ? undefined : (tx.estabelecimento ?? null),
-                valor: tx.valor ?? null,
-                valor_parcela: tx.valor ?? null,
-                data: tx.data ?? null,
-                tipo: tx.tipo ?? null,
-                origem_compra: tx.origem_compra ?? null,
-                categoria_id: tx.categoria_id ?? null,
-                subcategoria_id: tx.subcategoria_id ?? null,
-                plataforma_id: tx.plataforma_id ?? null,
-                responsavel_id: tx.responsavel_id ?? null,
-                observacoes: tx.observacoes ?? null,
-                cartao_numero_id: parsed,
-                propagar_grupo: propagarGrupo,
-            })
+                cartao_numero_id: cartaoNumeroId,
+                ...(propagar ? { propagar_grupo: true } : {}),
+            } as TransacoesModel)
 
-            // Mantém a linha em “Pagamentos e Financiamentos”; redistribui só ao atualizar a tela
-            setFinalSelecionados((prev) => {
-                const next = { ...prev, [tx.id!]: parsed }
-                if (propagarGrupo && tx.compra_grupo_id) {
-                    transacoes.forEach((item) => {
-                        if (
-                            item.id != null
-                            && item.compra_grupo_id === tx.compra_grupo_id
-                            && (item.cartao_numero_id == null && item.cartao_numero?.id == null)
-                        ) {
-                            next[item.id] = parsed
-                        }
-                    })
-                }
-                return next
-            })
+            if (propagar) {
+                await loadTransacoes(id)
+                toast.success('Final aplicado em todas as parcelas.')
+                return true
+            }
+
+            setFinalSelecionados((prev) => ({ ...prev, [tx.id!]: cartaoNumeroId }))
+            const parcelada = Number(tx.parcelas_total ?? 0) > 1
             toast.success(
-                parsed == null
+                cartaoNumeroId == null
                     ? 'Final removido. Atualize a tela para redistribuir.'
-                    : 'Final salvo. Atualize a tela para redistribuir as transações.'
+                    : parcelada
+                        ? 'Final salvo nesta parcela. Atualize a tela para redistribuir.'
+                        : 'Final salvo. Atualize a tela para redistribuir as transações.'
             )
+            return true
         } catch (error) {
             console.error('Erro ao atualizar final do cartão:', error)
             toast.error('Erro ao atualizar final do cartão')
+            return false
         } finally {
             setSavingIds((prev) => {
                 const next = { ...prev }
@@ -1926,6 +1904,38 @@ const FaturasViewPage = () => {
                 return next
             })
         }
+    }
+
+    const handleUpdateFinal = async (tx: TransacoesList, value: string) => {
+        if (!tx.id || !id || finalCartaoSaving) return
+        const parsed = value === '' ? null : Number(value)
+        const current = finalSelecionados[tx.id] !== undefined
+            ? finalSelecionados[tx.id]
+            : (tx.cartao_numero_id ?? tx.cartao_numero?.id ?? null)
+        if ((current == null && parsed == null) || Number(current) === Number(parsed)) return
+
+        if (Number(tx.parcelas_total ?? 0) > 1 && parsed != null) {
+            setFinalCartaoPendente({ tx, cartaoNumeroId: parsed })
+            return
+        }
+
+        await persistirFinal(tx, parsed, false)
+    }
+
+    const handleFinalCartaoSim = async () => {
+        if (!finalCartaoPendente || finalCartaoSaving) return
+        setFinalCartaoSaving(true)
+        const ok = await persistirFinal(finalCartaoPendente.tx, finalCartaoPendente.cartaoNumeroId, true)
+        setFinalCartaoSaving(false)
+        if (ok) setFinalCartaoPendente(null)
+    }
+
+    const handleFinalCartaoNao = async () => {
+        if (!finalCartaoPendente || finalCartaoSaving) return
+        setFinalCartaoSaving(true)
+        const ok = await persistirFinal(finalCartaoPendente.tx, finalCartaoPendente.cartaoNumeroId, false)
+        setFinalCartaoSaving(false)
+        if (ok) setFinalCartaoPendente(null)
     }
 
     const handleValorBlur = async (tx: TransacoesList) => {
@@ -2945,7 +2955,7 @@ const FaturasViewPage = () => {
                                                                                 bsSize="sm"
                                                                                 style={{ maxWidth: 320 }}
                                                                                 value={selectFinalValue}
-                                                                                disabled={!!savingIds[tx.id!]}
+                                                                                disabled={!!savingIds[tx.id!] || finalCartaoPendente != null}
                                                                                 className={finalSalvo == null ? 'border-warning' : undefined}
                                                                                 title="Definir final do cartão"
                                                                                 onChange={(e) => handleUpdateFinal(tx, e.target.value)}
@@ -3240,6 +3250,13 @@ const FaturasViewPage = () => {
                             )}
                         </CardBody>
                     </Card>
+
+                    <AplicarFinalCartaoModal
+                        isOpen={finalCartaoPendente != null}
+                        loading={finalCartaoSaving}
+                        onSim={handleFinalCartaoSim}
+                        onNao={handleFinalCartaoNao}
+                    />
 
                     <AplicarSubcategoriaModal
                         isOpen={aplicarSubcategoria != null}
