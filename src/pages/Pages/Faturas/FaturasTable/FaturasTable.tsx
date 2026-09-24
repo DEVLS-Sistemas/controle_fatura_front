@@ -270,7 +270,7 @@ export const FaturasTable = ({ data, getData, setPerPage, perPage, filters }: Fa
                                                                 <th scope="col" className={VALOR_TEXT_CLASS}>Total</th>
                                                                 <th scope="col" className={VALOR_TEXT_CLASS}>Pago</th>
                                                                 <th scope="col" className={VALOR_TEXT_CLASS}>Restante</th>
-                                                                <th scope="col">Quitação</th>
+                                                                <th scope="col" className={VALOR_TEXT_CLASS}>Quitação</th>
                                                                 <th scope="col">Status PDF</th>
                                                                 <th scope="col">Processado em</th>
                                                                 <th scope="col">Lançamentos</th>
@@ -388,7 +388,7 @@ export const FaturasTable = ({ data, getData, setPerPage, perPage, filters }: Fa
                                                                         <td className={VALOR_TEXT_CLASS}>
                                                                             {formatCurrency(row.valor_restante)}
                                                                         </td>
-                                                                        <td>
+                                                                        <td className={VALOR_TEXT_CLASS}>
                                                                             <span className={`badge bg-${faturaQuitacaoColor(row.pago)}`}>
                                                                                 {faturaQuitacaoLabel(row.pago)}
                                                                             </span>
