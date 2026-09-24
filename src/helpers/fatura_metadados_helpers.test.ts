@@ -4,6 +4,7 @@ import {
     bandeirasDoModal,
     cartaoEBandeiraDoCadastro,
     competenciaExigeSelectBandeira,
+    nomeBandeiraParaExibicao,
     nomeCartaoDoPayload,
     nomeDoParserFatura,
     resolveModoMetadados,
@@ -34,6 +35,30 @@ const bodySofisaNovo = {
     },
     bandeiras: lookupCompleto,
 }
+
+describe('nomeBandeiraParaExibicao', () => {
+    it('usa o nome escolhido no cadastro, não o id novo', () => {
+        expect(nomeBandeiraParaExibicao({
+            nome: 'Mastercard',
+            cartaoBandeiraId: 111,
+            opcoes: lookupCompleto,
+        })).toBe('Mastercard')
+    })
+
+    it('resolve o nome pela opção quando só veio o id', () => {
+        expect(nomeBandeiraParaExibicao({
+            cartaoBandeiraId: 9,
+            opcoes: [bandeiraMastercardPicPay],
+        })).toBe('Mastercard')
+    })
+
+    it('não inventa rótulo com o id', () => {
+        expect(nomeBandeiraParaExibicao({
+            cartaoBandeiraId: 111,
+            opcoes: lookupCompleto,
+        })).toBeNull()
+    })
+})
 
 describe('nomeCartaoDoPayload', () => {
     it('usa cartao_nome_sugerido (Sofisa), não o PicPay da tela', () => {

@@ -27,6 +27,7 @@ import {
 } from 'helpers/fatura_substituir_existente_helpers'
 import {
     cartaoEBandeiraDoCadastro,
+    nomeBandeiraParaExibicao,
     resolveModoMetadados,
 } from 'helpers/fatura_metadados_helpers'
 import { toBandeiraSelectOption } from 'helpers/cartao_helpers'
@@ -338,6 +339,12 @@ const FaturasForm = () => {
         if (error.precisa_selecionar_final || error.codigo === 'precisa_selecionar_final') {
             setSelecaoStep('final')
             setSelecaoNumeros(error.numeros)
+            const nome = nomeBandeiraParaExibicao({
+                nome: pendingSelecaoRef.current.bandeira ?? pendingMetadadosRef.current.bandeira,
+                cartaoBandeiraId: error.cartao_bandeira_id,
+                opcoes: [...error.bandeiras, ...selecaoBandeiras],
+            })
+            if (nome) setSelecaoBandeiraNome(nome)
             if (error.cartao_bandeira_id != null) {
                 setSelecaoCartaoBandeiraId(error.cartao_bandeira_id)
                 pendingSelecaoRef.current = {
@@ -882,6 +889,12 @@ const FaturasForm = () => {
                 if (error.precisa_selecionar_final || error.codigo === 'precisa_selecionar_final') {
                     setSelecaoStep('final')
                     setSelecaoNumeros(error.numeros)
+                    const nome = nomeBandeiraParaExibicao({
+                        nome: pendingSelecaoRef.current.bandeira,
+                        cartaoBandeiraId: error.cartao_bandeira_id,
+                        opcoes: error.bandeiras,
+                    })
+                    if (nome) setSelecaoBandeiraNome(nome)
                     if (error.cartao_bandeira_id != null) {
                         setSelecaoCartaoBandeiraId(error.cartao_bandeira_id)
                         pendingSelecaoRef.current = {
@@ -928,18 +941,16 @@ const FaturasForm = () => {
         }
         if (selection.cartao_bandeira_id != null) {
             setValue('cartao_bandeira_id', selection.cartao_bandeira_id)
+        }
+        if (selection.bandeira || selection.cartao_bandeira_id != null) {
             pendingSelecaoRef.current = {
                 ...pendingSelecaoRef.current,
-                cartao_bandeira_id: selection.cartao_bandeira_id,
-                bandeira: undefined,
+                cartao_bandeira_id: selection.cartao_bandeira_id ?? pendingSelecaoRef.current.cartao_bandeira_id,
+                bandeira: selection.bandeira ?? pendingSelecaoRef.current.bandeira,
             }
         }
         if (selection.bandeira) {
-            pendingSelecaoRef.current = {
-                ...pendingSelecaoRef.current,
-                bandeira: selection.bandeira,
-                cartao_bandeira_id: selection.cartao_bandeira_id ?? undefined,
-            }
+            setSelecaoBandeiraNome(selection.bandeira)
         }
 
         setMetadadosLoading(true)
@@ -993,6 +1004,14 @@ const FaturasForm = () => {
             ano: selection.ano,
             bandeira: selection.bandeira,
             cartao_bandeira_id: selection.cartao_bandeira_id,
+        }
+        if (selection.bandeira) {
+            setSelecaoBandeiraNome(selection.bandeira)
+            pendingSelecaoRef.current = {
+                ...pendingSelecaoRef.current,
+                bandeira: selection.bandeira,
+                cartao_bandeira_id: selection.cartao_bandeira_id ?? pendingSelecaoRef.current.cartao_bandeira_id,
+            }
         }
         setValue('cartao_id', null)
         setValue('cartao_nome', selection.cartao_nome)
