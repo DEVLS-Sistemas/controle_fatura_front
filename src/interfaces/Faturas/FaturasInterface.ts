@@ -99,6 +99,10 @@ export interface FaturaResumo {
     nome_original_pdf?: string | null
     /** Nome original do CSV, quando PDF e CSV coexistirem */
     nome_original_csv?: string | null
+    /** Nome enviado no upload do PDF. Null sem linha no catálogo de anexos. */
+    anexo_pdf_nome?: string | null
+    /** Nome enviado no upload do CSV (ou do outro tipo nesse slot). */
+    anexo_csv_nome?: string | null
     /** true se tem PDF ou CSV e status !== processando */
     pode_remover_anexo?: boolean
     status?: string

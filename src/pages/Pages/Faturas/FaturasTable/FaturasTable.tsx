@@ -14,7 +14,7 @@ import {
     formatCurrency, formatDateBr, formatProcessadoEm, faturaStatusColor,
     faturaQuitacaoLabel, faturaQuitacaoColor, VALOR_TEXT_CLASS,
     resolveFaturaAnexo, downloadFaturaAnexo, FaturaAnexoDownloadTipo, FaturaAnexoDownloadMeta,
-    faturaAnexoDownloadMetaFrom, rotulosFaturaAnexoNomes,
+    faturaAnexoDownloadMetaFrom, nomeAnexoFaturaExibicao,
 } from "helpers/fatura_helpers"
 import { TOOLTIP_ICONE_PDF_LISTAGEM } from "helpers/fatura_competencia_pdf_helpers"
 import { parseAnoFiltro, parseMesFiltro } from "helpers/fatura_listagem_helpers"
@@ -287,6 +287,8 @@ export const FaturasTable = ({ data, getData, setPerPage, perPage, filters }: Fa
                                                             ) : (
                                                                 rows.map((row, index) => {
                                                                     const anexo = resolveFaturaAnexo(row)
+                                                                    const nomePdf = nomeAnexoFaturaExibicao(row, 'pdf')
+                                                                    const nomeCsv = nomeAnexoFaturaExibicao(row, 'csv')
                                                                     const multiBandeira = row.cartao_id != null
                                                                         && (bandeirasPorCartao.get(row.cartao_id)?.size ?? 0) > 1
                                                                     const cores = resolveCartaoCores({
@@ -331,9 +333,9 @@ export const FaturasTable = ({ data, getData, setPerPage, perPage, filters }: Fa
                                                                         </td>
                                                                         <td>
                                                                             {(anexo.temPdf || anexo.temCsv) ? (
-                                                                                <div className="d-inline-flex flex-column align-items-center gap-1">
-                                                                                    <div className="d-inline-flex align-items-center gap-1">
-                                                                                        {anexo.temPdf && (
+                                                                                <div className="d-inline-flex align-items-center gap-2 flex-wrap">
+                                                                                    {anexo.temPdf && (
+                                                                                        <div className="d-inline-flex align-items-center gap-1">
                                                                                             <button
                                                                                                 type="button"
                                                                                                 className="btn btn-link p-0 border-0"
@@ -342,8 +344,19 @@ export const FaturasTable = ({ data, getData, setPerPage, perPage, filters }: Fa
                                                                                             >
                                                                                                 <i className="mdi mdi-file-pdf-box text-danger fs-4" />
                                                                                             </button>
-                                                                                        )}
-                                                                                        {anexo.temCsv && (
+                                                                                            {nomePdf && (
+                                                                                                <span
+                                                                                                    className="small text-muted text-truncate d-inline-block"
+                                                                                                    style={{ maxWidth: 180 }}
+                                                                                                    title={nomePdf}
+                                                                                                >
+                                                                                                    {nomePdf}
+                                                                                                </span>
+                                                                                            )}
+                                                                                        </div>
+                                                                                    )}
+                                                                                    {anexo.temCsv && (
+                                                                                        <div className="d-inline-flex align-items-center gap-1">
                                                                                             <button
                                                                                                 type="button"
                                                                                                 className="btn btn-link p-0 border-0"
@@ -352,18 +365,17 @@ export const FaturasTable = ({ data, getData, setPerPage, perPage, filters }: Fa
                                                                                             >
                                                                                                 <i className="las la-file-csv text-success fs-4" />
                                                                                             </button>
-                                                                                        )}
-                                                                                    </div>
-                                                                                    {rotulosFaturaAnexoNomes(row).map((nome) => (
-                                                                                        <div
-                                                                                            key={nome}
-                                                                                            className="small text-muted text-truncate"
-                                                                                            style={{ maxWidth: 200 }}
-                                                                                            title={nome}
-                                                                                        >
-                                                                                            {nome}
+                                                                                            {nomeCsv && (
+                                                                                                <span
+                                                                                                    className="small text-muted text-truncate d-inline-block"
+                                                                                                    style={{ maxWidth: 180 }}
+                                                                                                    title={nomeCsv}
+                                                                                                >
+                                                                                                    {nomeCsv}
+                                                                                                </span>
+                                                                                            )}
                                                                                         </div>
-                                                                                    ))}
+                                                                                    )}
                                                                                 </div>
                                                                             ) : null}
                                                                         </td>

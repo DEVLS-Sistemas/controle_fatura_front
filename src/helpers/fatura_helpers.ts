@@ -242,6 +242,7 @@ export { resolveFaturaAnexo } from './fatura_anexo_flags'
 export type { FaturaAnexoNomeSource, FaturaAnexoDownloadTipo, FaturaAnexoDownloadMeta } from './fatura_anexo_nome_helpers'
 export {
   resolveFaturaAnexoNomeOriginal,
+  nomeAnexoFaturaExibicao,
   rotulosFaturaAnexoNomes,
   faturaAnexoDownloadMetaFrom,
   resolveFaturaAnexoDownloadFilename,
