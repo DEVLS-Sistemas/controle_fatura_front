@@ -17,7 +17,7 @@ import {
     origemCompraLabel,
     isTransacaoOperacional,
     FATURA_FILE_ACCEPT, isValidFaturaFile, resolveFaturaAnexo, downloadFaturaAnexo,
-    faturaAnexoDownloadMetaFrom, resolveFaturaAnexoNomeOriginal, rotulosFaturaAnexoNomes,
+    faturaAnexoDownloadMetaFrom, nomeAnexoFaturaExibicao,
     getCategoriaFieldStyle, getSubcategoriaFieldStyle, getPlataformaFieldStyle, VALOR_TEXT_CLASS, isMeuResponsavelDisplay, nomeResponsavelPadraoNaoEu,
 } from 'helpers/fatura_helpers'
 import {
@@ -2224,9 +2224,8 @@ const FaturasViewPage = () => {
     const isProcessing = fatura.status === 'pendente' || fatura.status === 'processando'
     const precisaSenhaPdf = deveAbrirModalSenhaPdfDeFatura(fatura, cartoesLookup.find((c) => Number(c.id) === Number(fatura.cartao_id)))
     const anexo = resolveFaturaAnexo(fatura)
-    const nomesAnexo = rotulosFaturaAnexoNomes(fatura)
-    const nomePdf = resolveFaturaAnexoNomeOriginal(fatura, 'pdf')
-    const nomeCsv = resolveFaturaAnexoNomeOriginal(fatura, 'csv')
+    const nomePdf = nomeAnexoFaturaExibicao(fatura, 'pdf')
+    const nomeCsv = nomeAnexoFaturaExibicao(fatura, 'csv')
     const podeRemover = podeRemoverAnexo(fatura)
     const competenciaAtual = fatura.competencia ?? formatPeriodo(fatura.mes, fatura.ano)
     const bandeiraLabel = fatura.bandeira || fatura.cartao_bandeira
@@ -3337,11 +3336,6 @@ const FaturasViewPage = () => {
                             <div className="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
                                 <div>
                                     <h5 className="card-title mb-0">Anexos da fatura</h5>
-                                    {nomesAnexo.length > 0 && (
-                                        <div className="small text-muted mt-1">
-                                            {nomesAnexo.join(' · ')}
-                                        </div>
-                                    )}
                                 </div>
                                 <div className="d-flex flex-wrap gap-2">
                                     {anexo.temPdf && (
@@ -3349,10 +3343,19 @@ const FaturasViewPage = () => {
                                             color="danger"
                                             outline
                                             size="sm"
+                                            className="d-inline-flex align-items-center"
                                             onClick={() => handleDownloadAnexo('pdf')}
                                         >
                                             <i className="mdi mdi-file-pdf-box me-1"></i>
-                                            Baixar PDF
+                                            {nomePdf ? (
+                                                <span
+                                                    className="text-truncate d-inline-block"
+                                                    style={{ maxWidth: 220 }}
+                                                    title={nomePdf}
+                                                >
+                                                    {nomePdf}
+                                                </span>
+                                            ) : 'Baixar PDF'}
                                         </Button>
                                     )}
                                     {anexo.temCsv && (
@@ -3360,10 +3363,19 @@ const FaturasViewPage = () => {
                                             color="success"
                                             outline
                                             size="sm"
+                                            className="d-inline-flex align-items-center"
                                             onClick={() => handleDownloadAnexo('csv')}
                                         >
                                             <i className="las la-file-csv me-1"></i>
-                                            Baixar CSV
+                                            {nomeCsv ? (
+                                                <span
+                                                    className="text-truncate d-inline-block"
+                                                    style={{ maxWidth: 220 }}
+                                                    title={nomeCsv}
+                                                >
+                                                    {nomeCsv}
+                                                </span>
+                                            ) : 'Baixar CSV'}
                                         </Button>
                                     )}
                                     {podeRemover && anexo.temPdf && anexo.temCsv ? (
