@@ -23,10 +23,12 @@ import {
   fatiasSubcategoria,
   barrasCategoria,
   barrasSubcategoria,
+  listaCategorias,
   buildPageSearchParams,
   buildSelectOptions,
   centroValorOrigem,
   encontrarCategoria,
+  isSelecaoAtiva,
   persistGastosPorCategoriaSearch,
   resolveGastosPorCategoriaSearch,
   resolveGastosPorCategoriaSelecao,
@@ -52,9 +54,12 @@ const GastosPorCategoriaPage = () => {
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [data, setData] = useState<GastosPorCategoriaView>()
-  const [selecao, setSelecao] = useState<GastosPorCategoriaSelecao>(() =>
-    resolveGastosPorCategoriaSelecao(searchParams)
-  )
+  const [selecao, setSelecao] = useState<GastosPorCategoriaSelecao>(() => {
+    const inicial = resolveGastosPorCategoriaSelecao(searchParams)
+    if (inicial.categoria_chave === 'categoria-0') return { ...GastosPorCategoriaSelecaoVazia }
+    return inicial
+  })
+  const [exibirSemCategoria, setExibirSemCategoria] = useState(false)
   const [cartoesOptions, setCartoesOptions] = useState<SelectOptions[]>([{ value: '', label: 'Todos' }])
   const [responsaveisOptions, setResponsaveisOptions] = useState<SelectOptions[]>([
     { value: '', label: 'Todos' },
@@ -94,6 +99,7 @@ const GastosPorCategoriaPage = () => {
     persistGastosPorCategoriaSearch(next)
     const nextSelecao = opts?.keepSelecao ? selecaoRef.current : { ...GastosPorCategoriaSelecaoVazia }
     if (!opts?.keepSelecao) setSelecao(nextSelecao)
+    setExibirSemCategoria(false)
     persistUrl(next, nextSelecao)
     setLoading(true)
     setLoadError(null)
@@ -147,6 +153,14 @@ const GastosPorCategoriaPage = () => {
     })
   }
 
+  const alternarSemCategoria = () => {
+    const next = !exibirSemCategoria
+    setExibirSemCategoria(next)
+    if (!next && selecao.categoria_chave === 'categoria-0') {
+      aplicarSelecao({ ...GastosPorCategoriaSelecaoVazia })
+    }
+  }
+
   const abrirAtalho = (atalho?: Parameters<typeof atalhoToPath>[0]) => {
     const path = atalhoToPath(atalho)
     if (!path) return
@@ -166,10 +180,23 @@ const GastosPorCategoriaPage = () => {
   const periodoFim = data?.periodo?.fim ? formatDateBr(data.periodo.fim) : null
   const skeleton = loading && !data
 
-  const kpis = useMemo(() => resolveKpis(data, selecao), [data, selecao])
-  const categoriasChart = useMemo(() => fatiasCategoria(data), [data])
+  const kpis = useMemo(
+    () => resolveKpis(data, selecao, { incluirSemCategoria: exibirSemCategoria }),
+    [data, selecao, exibirSemCategoria]
+  )
+  const categoriasChart = useMemo(
+    () => fatiasCategoria(data, { incluirSemCategoria: exibirSemCategoria }),
+    [data, exibirSemCategoria]
+  )
   const subcategoriasChart = useMemo(() => fatiasSubcategoria(data, selecao), [data, selecao])
-  const categoriasBarras = useMemo(() => barrasCategoria(data), [data])
+  const categoriasBarras = useMemo(
+    () => barrasCategoria(data, { incluirSemCategoria: exibirSemCategoria }),
+    [data, exibirSemCategoria]
+  )
+  const categoriasLista = useMemo(
+    () => listaCategorias(data, { incluirSemCategoria: exibirSemCategoria }),
+    [data, exibirSemCategoria]
+  )
   const subcategoriasBarras = useMemo(() => barrasSubcategoria(data, selecao), [data, selecao])
   const porOrigem = useMemo(
     () => fatiasOrigem(resolvePorOrigemSelecao(data, selecao)),
@@ -248,6 +275,11 @@ const GastosPorCategoriaPage = () => {
                 loading={skeleton}
                 onVerCompras={kpis.atalho ? () => abrirAtalho(kpis.atalho) : undefined}
               />
+              <GastosPorCategoriaSemCategoria
+                data={data}
+                aberto={exibirSemCategoria}
+                onToggle={alternarSemCategoria}
+              />
               <GastosPorCategoriaDashboards
                 categorias={categoriasChart}
                 subcategorias={subcategoriasChart}
@@ -261,6 +293,9 @@ const GastosPorCategoriaPage = () => {
                 tituloOrigem={tituloOrigemCard}
                 tituloPlataforma={tituloPlataformaCard}
                 centroValor={kpis.valor_total}
+                centroValorSubcategoria={
+                  isSelecaoAtiva(selecao) ? kpis.valor_total : data?.totais?.valor_total
+                }
                 centroLabel={kpis.label}
                 centroValorOrigem={origemCentro.valor}
                 centroLabelOrigem={origemCentro.label}
@@ -295,14 +330,13 @@ const GastosPorCategoriaPage = () => {
               {skeleton ? <GastosPorCategoriaLista loading /> : null}
               {data ? (
                 <>
-                  <GastosPorCategoriaLista categorias={data.categorias} />
+                  <GastosPorCategoriaLista categorias={categoriasLista} />
                   <GastosPorCategoriaEvolucao
                     meses={data.evolucao?.por_mes}
                     porCategoria={data.evolucao?.por_categoria}
                     categoriaId={selecao.categoria_id}
                     categoriaNome={categoriaSelecionada?.nome}
                   />
-                  <GastosPorCategoriaSemCategoria data={data} />
                 </>
               ) : null}
             </>

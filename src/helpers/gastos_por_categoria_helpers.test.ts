@@ -442,6 +442,47 @@ describe('seleção Power BI', () => {
     expect(percentualFatia(sub, true)).toBe(56.3)
   })
 
+  it('esconde Sem categoria da rosca e dos KPIs até incluir de novo', () => {
+    const comSem = {
+      ...data,
+      totais: {
+        valor_total: 1000,
+        compras: 10,
+        ticket_medio: 100,
+        variacao_valor_percentual: 12,
+        sem_categoria: { valor_total: 200, compras: 2, percentual_gasto: 20 },
+      },
+      categorias: [
+        ...data.categorias,
+        {
+          chave: 'categoria-0',
+          categoria_id: null,
+          nome: 'Sem categoria',
+          cor: '#9ca3af',
+          valor_total: 200,
+          compras: 2,
+          percentual_gasto: 20,
+        },
+      ],
+    }
+    const escondido = { incluirSemCategoria: false }
+    expect(fatiasCategoria(comSem, escondido).map((item) => item.categoria_id)).toEqual([2, 3])
+    expect(fatiasCategoria(comSem, escondido)[0].percentual_gasto).toBe(68.1)
+    expect(barrasCategoria(comSem, escondido).map((item) => item.chave)).toEqual(['categoria-2', 'categoria-3'])
+    expect(barrasCategoria(comSem, escondido)[0].percentual_gasto).toBe(68.1)
+    expect(resolveKpis(comSem, GastosPorCategoriaSelecaoVazia, escondido)).toMatchObject({
+      valor_total: 800,
+      compras: 8,
+      ticket_medio: 100,
+      mostrarVariacao: false,
+    })
+    expect(fatiasCategoria(comSem).some((item) => item.chave === 'categoria-0')).toBe(true)
+    expect(resolveKpis(comSem, GastosPorCategoriaSelecaoVazia)).toMatchObject({
+      valor_total: 1000,
+      compras: 10,
+    })
+  })
+
   it('KPIs e tipos acompanham a seleção', () => {
     const cat = { categoria_id: 2, categoria_chave: 'categoria-2', subcategoria_id: null }
     const sub = { categoria_id: 2, categoria_chave: 'categoria-2', subcategoria_id: 10 }
