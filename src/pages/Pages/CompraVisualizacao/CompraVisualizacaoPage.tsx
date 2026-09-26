@@ -216,11 +216,8 @@ const CompraVisualizacaoPage = () => {
   }
 
   useEffect(() => {
-    if (fromAssinaturas) setActiveMenu('/assinaturas')
-    else if (fromTransacoes) setActiveMenu('/transacoes')
-    else if (fromFatura) setActiveMenu('/faturas')
-    else setActiveMenu('/parceladas')
-  }, [fromAssinaturas, fromTransacoes, fromFatura])
+    setActiveMenu('/assinaturas')
+  }, [])
 
   useEffect(() => {
     if (identificador) {
