@@ -126,12 +126,6 @@ const VerticalLayout = (props : any) => {
 
     const removeActivation = (items :any) => {
         items.forEach((item : any) => {
-            if (item.classList.contains("menu-link") || item.classList.contains("nav-link")) {
-                if (item.nextElementSibling) {
-                    item.nextElementSibling.classList.remove("show");
-                }
-                item.setAttribute("aria-expanded", "false");
-            }
             item.classList.remove("active");
         });
     };

@@ -143,6 +143,18 @@ const DashboardsHome = () => {
                   </p>
                 </div>
                 <div className="d-flex gap-2 flex-wrap">
+                  <Link to="/faturas" className="btn btn-soft-primary mb-1">
+                    <i className="ri-file-list-3-line align-middle me-1"></i>
+                    Faturas
+                  </Link>
+                  <Link to="/transacoes" className="btn btn-soft-secondary mb-1">
+                    <i className="ri-list-check-2 align-middle me-1"></i>
+                    Transações
+                  </Link>
+                  <Link to="/cartoes" className="btn btn-soft-dark mb-1">
+                    <i className="ri-bank-card-line align-middle me-1"></i>
+                    Cartões
+                  </Link>
                   <Link to="/raio-x" className="btn btn-soft-success mb-1">
                     <i className="ri-pulse-line align-middle me-1"></i>
                     Raio-X
