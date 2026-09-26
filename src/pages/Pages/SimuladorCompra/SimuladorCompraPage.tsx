@@ -37,13 +37,19 @@ import {
   SimuladorVeredito,
 } from 'interfaces/SimuladorCompra/SimuladorCompraInterface'
 import {
+  bandeiraEscolhida,
+  bandeirasAtivasDoCartao,
+  BandeiraAtiva,
   bloqueioTamanhoLote,
+  cartaoExigeBandeira,
   concluirEstaHabilitado,
   DestinoFaturaCartao,
   destinosFaturaDoLote,
   indiceErroLote,
+  MENSAGEM_BANDEIRA_FATURA,
   mensagemSucessoLote,
   montarPayloadLote,
+  primeiroIndiceSemBandeira,
   textoConfirmacaoLote,
 } from 'helpers/simulador_lote_helpers'
 import { CartaoLookup, ResponsavelLookup } from 'interfaces/Transacoes/TransacoesInterface'
@@ -62,6 +68,8 @@ import SimuladorCompraVeredito, {
 } from './SimuladorCompraVeredito/SimuladorCompraVeredito'
 import SimuladorListaSomadas from './SimuladorListaSomadas/SimuladorListaSomadas'
 
+const BANDEIRAS_VAZIAS: BandeiraAtiva[] = []
+
 type CartaoForm = {
   id: number
   nome: string
@@ -71,6 +79,7 @@ type CartaoForm = {
   dia_vencimento_fatura?: number | null
   pessoa_id?: number | null
   pessoa_nome?: string | null
+  bandeiras: BandeiraAtiva[]
 }
 
 const parsePessoaIdCartao = (c: Record<string, any>): number | null => {
@@ -106,6 +115,7 @@ const toCartaoForm = (c: Record<string, any> | CartoesList | CartaoLookup | null
     dia_vencimento_fatura: raw.dia_vencimento_fatura ?? null,
     pessoa_id: parsePessoaIdCartao(raw),
     pessoa_nome: raw.pessoa_nome ?? raw.pessoa?.nome_completo ?? raw.pessoa?.nome ?? null,
+    bandeiras: bandeirasAtivasDoCartao(raw.bandeiras),
   }
 }
 
@@ -134,6 +144,7 @@ const mergeCartoes = (listas: Array<CartaoForm[] | undefined>): CartaoForm[] => 
         dia_limite_fatura: c.dia_limite_fatura ?? prev.dia_limite_fatura ?? null,
         cor_fundo: c.cor_fundo || prev.cor_fundo,
         cor_texto: c.cor_texto || prev.cor_texto,
+        bandeiras: c.bandeiras.length > 0 ? c.bandeiras : prev.bandeiras,
       }
       byId.set(prev.id, merged)
       if (c.id !== prev.id) byId.delete(c.id)
@@ -188,6 +199,7 @@ const SimuladorCompraPage = () => {
     defaultValues: {
       pessoa_id: null,
       cartao_id: parseQueryNumber(searchParams.get('cartao_id')),
+      cartao_bandeira_id: null,
       responsavel_id: parseQueryNumber(searchParams.get('responsavel_id')),
       valor_compra: parseValorQuery(searchParams.get('valor')),
       parcelas_total: parseQueryNumber(searchParams.get('parcelas')) || 1,
@@ -213,7 +225,9 @@ const SimuladorCompraPage = () => {
   const [detalhesAbertos, setDetalhesAbertos] = useState(false)
   const [itensLote, setItensLote] = useState<SimulacaoLoteItem[]>([])
   const [indiceInvalido, setIndiceInvalido] = useState<number | null>(null)
+  const [mensagemIndiceInvalido, setMensagemIndiceInvalido] = useState<string | null>(null)
   const [observacoesInvalida, setObservacoesInvalida] = useState(false)
+  const [bandeiraInvalida, setBandeiraInvalida] = useState(false)
   const [confirmacaoLoteAberta, setConfirmacaoLoteAberta] = useState(false)
   const [gravandoLote, setGravandoLote] = useState(false)
   const [modalSimulacaoAberto, setModalSimulacaoAberto] = useState(false)
@@ -234,6 +248,7 @@ const SimuladorCompraPage = () => {
 
   const pessoaId = watch('pessoa_id')
   const cartaoId = watch('cartao_id')
+  const bandeiraId = watch('cartao_bandeira_id')
   const responsavelId = watch('responsavel_id')
   const valorCompra = watch('valor_compra')
   const parcelasTotal = watch('parcelas_total')
@@ -249,6 +264,16 @@ const SimuladorCompraPage = () => {
   const showTitular = pessoas.length > 1
 
   const cartaoSel = cartoesCatalogo.find((c) => Number(c.id) === Number(cartaoId))
+  const bandeirasDoCartao = (id: number): readonly BandeiraAtiva[] =>
+    cartoesCatalogo.find((cartao) => Number(cartao.id) === Number(id))?.bandeiras ?? []
+  const bandeirasDoForm = cartaoSel?.bandeiras ?? BANDEIRAS_VAZIAS
+  const exibeBandeira = cartaoExigeBandeira(bandeirasDoForm)
+  const bandeiraOptions: SelectOptions[] = bandeirasDoForm.map((bandeira) => ({
+    value: bandeira.id,
+    label: bandeira.bandeira,
+    cor_principal: bandeira.cor_principal,
+    cor_secundaria: bandeira.cor_secundaria,
+  }))
   const responsavelSel = responsaveis.find((r) => Number(r.id) === Number(responsavelId))
   const ehEu = isMeuResponsavelDisplay({
     responsavelId: responsavelId != null ? Number(responsavelId) : null,
@@ -585,9 +610,38 @@ const SimuladorCompraPage = () => {
     if (String(observacoes || '').trim()) setObservacoesInvalida(false)
   }, [observacoes])
 
+  useEffect(() => {
+    if (bandeiraEscolhida(bandeirasDoForm, bandeiraId)) setBandeiraInvalida(false)
+  }, [bandeiraId, bandeirasDoForm])
+
+  useEffect(() => {
+    if (!cartaoExigeBandeira(bandeirasDoForm)) {
+      if (bandeiraId != null && bandeiraId !== '') setValue('cartao_bandeira_id', null)
+      setBandeiraInvalida(false)
+      return
+    }
+    if (bandeiraId != null && bandeiraId !== '' && !bandeiraEscolhida(bandeirasDoForm, bandeiraId)) {
+      setValue('cartao_bandeira_id', null)
+    }
+  }, [cartaoId, bandeirasDoForm, bandeiraId, setValue])
+
+  const marcarIndiceInvalido = (indice: number | null, message: string | null) => {
+    setIndiceInvalido(indice)
+    setMensagemIndiceInvalido(
+      indice != null && message === MENSAGEM_BANDEIRA_FATURA ? `${message}. Use Editar.` : message
+    )
+  }
+
+  const faltaBandeiraNoForm = (): boolean =>
+    cartaoExigeBandeira(bandeirasDoForm) && bandeiraEscolhida(bandeirasDoForm, getValues('cartao_bandeira_id')) == null
+
   const handleSimular = async () => {
     if (!String(getValues('observacoes') || '').trim()) {
       setObservacoesInvalida(true)
+      return
+    }
+    if (faltaBandeiraNoForm()) {
+      setBandeiraInvalida(true)
       return
     }
     if (!podeSimular) {
@@ -620,7 +674,7 @@ const SimuladorCompraPage = () => {
       }
       setProjecaoBase(result)
       setItensLote([item])
-      setIndiceInvalido(null)
+      marcarIndiceInvalido(null, null)
       setResultadoVisivel(true)
       setVerTodos(false)
       setDetalhesAbertos(false)
@@ -679,6 +733,8 @@ const SimuladorCompraPage = () => {
     const resp = await resolveDefaultResponsavel(principal)
     setValue('responsavel_id', resp)
     setValue('cartao_id', null)
+    setValue('cartao_bandeira_id', null)
+    setBandeiraInvalida(false)
   }
 
   const resetarFormDaVez = async () => {
@@ -704,6 +760,11 @@ const SimuladorCompraPage = () => {
       parcelas_total: nParcelas,
       responsavel_id: responsavelId ? Number(responsavelId) : null,
     }
+    const escolhida = bandeiraEscolhida(bandeirasDoForm, getValues('cartao_bandeira_id'))
+    if (escolhida) {
+      item.cartao_bandeira_id = escolhida.id
+      item.bandeira_nome = escolhida.bandeira
+    }
     if (ajustadas) {
       item.parcelas = parcelasValores.map((valor, idx) => ({
         parcela: idx + 1,
@@ -725,6 +786,7 @@ const SimuladorCompraPage = () => {
         : null
     setValue('pessoa_id', item.pessoa_id ?? null)
     setValue('cartao_id', item.cartao_id)
+    setValue('cartao_bandeira_id', item.cartao_bandeira_id ?? null)
     setValue('responsavel_id', item.responsavel_id ?? null)
     setValue('valor_compra', item.valor_compra)
     setValue('parcelas_total', item.parcelas_total)
@@ -732,12 +794,14 @@ const SimuladorCompraPage = () => {
     setValue('observacoes', item.observacoes)
     setDataAberta(true)
     setObservacoesInvalida(false)
+    setBandeiraInvalida(false)
   }
 
   const abrirIncluir = () => {
     if (!podeIncluir || gravandoLote) return
     setIndiceEdicao(null)
     setObservacoesInvalida(false)
+    setBandeiraInvalida(false)
     setModalSimulacaoAberto(true)
     void limparCamposForm()
   }
@@ -746,6 +810,10 @@ const SimuladorCompraPage = () => {
     const item = itensLote[indice]
     if (!item || gravandoLote) return
     preencherForm(item)
+    const bandeiras = bandeirasDoCartao(item.cartao_id)
+    setBandeiraInvalida(
+      cartaoExigeBandeira(bandeiras) && bandeiraEscolhida(bandeiras, item.cartao_bandeira_id) == null
+    )
     setIndiceEdicao(indice)
     setModalSimulacaoAberto(true)
   }
@@ -755,11 +823,16 @@ const SimuladorCompraPage = () => {
     setModalSimulacaoAberto(false)
     setIndiceEdicao(null)
     setObservacoesInvalida(false)
+    setBandeiraInvalida(false)
   }
 
   const salvarModal = () => {
     if (!String(getValues('observacoes') || '').trim()) {
       setObservacoesInvalida(true)
+      return
+    }
+    if (faltaBandeiraNoForm()) {
+      setBandeiraInvalida(true)
       return
     }
     if (!podeSimular) {
@@ -776,16 +849,17 @@ const SimuladorCompraPage = () => {
       }
       setItensLote((atual) => [...atual, item])
     }
-    setIndiceInvalido(null)
+    marcarIndiceInvalido(null, null)
     setModalSimulacaoAberto(false)
     setIndiceEdicao(null)
     setObservacoesInvalida(false)
+    setBandeiraInvalida(false)
   }
 
   const removerItemLote = (indice: number) => {
     const proximos = itensLote.filter((_, idx) => idx !== indice)
     setItensLote(proximos)
-    setIndiceInvalido(null)
+    marcarIndiceInvalido(null, null)
     if (!proximos.length) {
       setResultadoVisivel(false)
       setProjecaoBase(undefined)
@@ -801,13 +875,24 @@ const SimuladorCompraPage = () => {
       toast.error(bloqueio)
       return
     }
+    const semBandeira = primeiroIndiceSemBandeira(itensLote, bandeirasDoCartao)
+    if (semBandeira) {
+      toast.error(semBandeira.message)
+      marcarIndiceInvalido(semBandeira.indice, semBandeira.message)
+      return
+    }
+    if (faltaBandeiraNoForm() && modalSimulacaoAberto) {
+      setBandeiraInvalida(true)
+      return
+    }
     setConfirmacaoLoteAberta(true)
   }
 
   const limparConjunto = () => {
     setItensLote([])
-    setIndiceInvalido(null)
+    marcarIndiceInvalido(null, null)
     setObservacoesInvalida(false)
+    setBandeiraInvalida(false)
     setConfirmacaoLoteAberta(false)
     setModalSimulacaoAberto(false)
     setIndiceEdicao(null)
@@ -823,9 +908,18 @@ const SimuladorCompraPage = () => {
       setConfirmacaoLoteAberta(false)
       return
     }
+    const semBandeira = primeiroIndiceSemBandeira(paraGravar, bandeirasDoCartao)
+    if (semBandeira) {
+      toast.error(semBandeira.message)
+      setConfirmacaoLoteAberta(false)
+      marcarIndiceInvalido(semBandeira.indice, semBandeira.message)
+      return
+    }
     try {
       setGravandoLote(true)
-      const body = await transacoesService.cadastrarLote(montarPayloadLote(paraGravar).compras)
+      const body = await transacoesService.cadastrarLote(
+        montarPayloadLote(paraGravar, bandeirasDoCartao).compras
+      )
       const gravadas = Array.isArray(body?.compras) ? body.compras.length : paraGravar.length
       toast.success(mensagemSucessoLote(gravadas))
       setConfirmacaoLoteAberta(false)
@@ -839,7 +933,14 @@ const SimuladorCompraPage = () => {
         const indice = indiceErroLote(error.errors)
         toast.error(error.message)
         setConfirmacaoLoteAberta(false)
-        setIndiceInvalido(indice)
+        marcarIndiceInvalido(indice, error.message)
+        if (
+          indice != null &&
+          error.message === MENSAGEM_BANDEIRA_FATURA &&
+          indiceEdicao === indice
+        ) {
+          setBandeiraInvalida(true)
+        }
         return
       }
       const message = error instanceof Error ? error.message : 'Erro ao finalizar as compras.'
@@ -898,6 +999,9 @@ const SimuladorCompraPage = () => {
       showTitular={showTitular}
       pessoasOptions={pessoasOptions}
       cartoesOptions={cartoesOptions}
+      exibeBandeira={exibeBandeira}
+      bandeiraOptions={bandeiraOptions}
+      bandeiraInvalida={bandeiraInvalida}
       semCartoes={!loadingLookups && cartoesCatalogo.length === 0}
       compact={false}
       responsavelNome={responsavelSel?.nome || ''}
@@ -998,6 +1102,7 @@ const SimuladorCompraPage = () => {
                       <SimuladorListaSomadas
                         itens={itensLote}
                         indiceInvalido={indiceInvalido}
+                        mensagemInvalida={mensagemIndiceInvalido}
                         onEditar={abrirEdicao}
                         onRemover={removerItemLote}
                       />

@@ -4,6 +4,14 @@ import { SimulacaoLoteItem, SimuladorVereditoNivel } from 'interfaces/SimuladorC
 export const LOTE_MIN = 1
 export const LOTE_MAX = 20
 export const MENSAGEM_TAMANHO_LOTE = 'Envie entre 1 e 20 compras'
+export const MENSAGEM_BANDEIRA_FATURA = 'Selecione a bandeira da fatura'
+
+export type BandeiraAtiva = {
+  id: number
+  bandeira: string
+  cor_principal?: string | null
+  cor_secundaria?: string | null
+}
 
 export type CompraLotePayload = {
   cartao_id: number
@@ -12,6 +20,7 @@ export type CompraLotePayload = {
   data: string
   tipo: 'purchase'
   parcelas_total: number
+  cartao_bandeira_id?: number
   cartao_numero_id?: number
   origem_compra?: string
   plataforma_id?: number
@@ -30,6 +39,57 @@ const idPositivo = (value: unknown): number | null => {
   const n = Number(value)
   if (!Number.isFinite(n) || n <= 0) return null
   return n
+}
+
+/** Bandeiras ativas do lookup do cartão. Inativa, sem id ou sem nome fica de fora. */
+export const bandeirasAtivasDoCartao = (raw: unknown): BandeiraAtiva[] => {
+  if (!Array.isArray(raw)) return []
+  const lista: BandeiraAtiva[] = []
+  raw.forEach((item) => {
+    if (!item || typeof item !== 'object') return
+    const rec = item as Record<string, unknown>
+    const ativo = rec.ativo
+    if (ativo === false || ativo === 0 || ativo === '0') return
+    if (rec.deleted_at) return
+    const id = idPositivo(rec.id)
+    const bandeira = texto(rec.bandeira)
+    if (id == null || !bandeira) return
+    lista.push({
+      id,
+      bandeira,
+      cor_principal: rec.cor_principal != null ? String(rec.cor_principal) : null,
+      cor_secundaria: rec.cor_secundaria != null ? String(rec.cor_secundaria) : null,
+    })
+  })
+  return lista
+}
+
+export const cartaoExigeBandeira = (bandeiras: readonly BandeiraAtiva[]): boolean =>
+  bandeiras.length >= 2
+
+export const bandeiraEscolhida = (
+  bandeiras: readonly BandeiraAtiva[],
+  value: unknown
+): BandeiraAtiva | null => {
+  if (!cartaoExigeBandeira(bandeiras)) return null
+  const id = idPositivo(value)
+  if (id == null) return null
+  return bandeiras.find((bandeira) => bandeira.id === id) ?? null
+}
+
+export const primeiroIndiceSemBandeira = (
+  itens: SimulacaoLoteItem[],
+  bandeirasDe: (cartaoId: number) => readonly BandeiraAtiva[]
+): { indice: number; message: string } | null => {
+  for (let indice = 0; indice < itens.length; indice += 1) {
+    const item = itens[indice]
+    const bandeiras = bandeirasDe(Number(item.cartao_id))
+    if (!cartaoExigeBandeira(bandeiras)) continue
+    if (bandeiraEscolhida(bandeiras, item.cartao_bandeira_id) == null) {
+      return { indice, message: MENSAGEM_BANDEIRA_FATURA }
+    }
+  }
+  return null
 }
 
 /** 1..36; vazio ou inválido vira 1. Acima de 36 permanece para a validação barrar. */
@@ -118,7 +178,10 @@ const atribuirOpcional = (
   if (id != null) (payload as Record<string, unknown>)[key] = id
 }
 
-export const montarCompraLote = (item: SimulacaoLoteItem): CompraLotePayload => {
+export const montarCompraLote = (
+  item: SimulacaoLoteItem,
+  exigeBandeira = false
+): CompraLotePayload => {
   const parcelas = Math.min(36, parcelasTotalInformado(item.parcelas_total))
   const payload: CompraLotePayload = {
     cartao_id: idPositivo(item.cartao_id) || 0,
@@ -129,6 +192,9 @@ export const montarCompraLote = (item: SimulacaoLoteItem): CompraLotePayload => 
     parcelas_total: parcelas,
   }
 
+  if (exigeBandeira) {
+    atribuirOpcional(payload, 'cartao_bandeira_id', item.cartao_bandeira_id)
+  }
   atribuirOpcional(payload, 'cartao_numero_id', item.cartao_numero_id)
   atribuirOpcional(payload, 'origem_compra', item.origem_compra)
   atribuirOpcional(payload, 'plataforma_id', item.plataforma_id)
@@ -150,8 +216,17 @@ export const montarCompraLote = (item: SimulacaoLoteItem): CompraLotePayload => 
   return payload
 }
 
-export const montarPayloadLote = (itens: SimulacaoLoteItem[]): { compras: CompraLotePayload[] } => ({
-  compras: itens.map(montarCompraLote),
+export const montarPayloadLote = (
+  itens: SimulacaoLoteItem[],
+  bandeirasDe?: (cartaoId: number) => readonly BandeiraAtiva[]
+): { compras: CompraLotePayload[] } => ({
+  compras: itens.map((item) => {
+    const bandeiras = bandeirasDe ? bandeirasDe(Number(item.cartao_id)) : []
+    const exige = bandeirasDe
+      ? cartaoExigeBandeira(bandeiras) && bandeiraEscolhida(bandeiras, item.cartao_bandeira_id) != null
+      : false
+    return montarCompraLote(item, exige)
+  }),
 })
 
 export type DestinoFaturaCartao = {

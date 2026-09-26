@@ -190,6 +190,14 @@ export interface ResponsavelLookup {
     tipo?: string
 }
 
+export interface CartaoBandeiraLookup {
+    id?: number
+    bandeira?: string
+    ativo?: boolean
+    cor_principal?: string | null
+    cor_secundaria?: string | null
+}
+
 export interface CartaoLookup {
     id?: number
     nome?: string
@@ -200,6 +208,7 @@ export interface CartaoLookup {
     pessoa_id?: number | null
     pessoa_nome?: string | null
     pessoa_eh_principal?: boolean
+    bandeiras?: CartaoBandeiraLookup[]
 }
 
 export interface FaturaLookup {

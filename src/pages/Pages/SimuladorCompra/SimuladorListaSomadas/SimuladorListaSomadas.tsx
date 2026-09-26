@@ -7,11 +7,24 @@ import { SimulacaoLoteItem } from 'interfaces/SimuladorCompra/SimuladorCompraInt
 type Props = {
   itens: SimulacaoLoteItem[]
   indiceInvalido: number | null
+  mensagemInvalida?: string | null
   onEditar: (indice: number) => void
   onRemover: (indice: number) => void
 }
 
-const SimuladorListaSomadas = ({ itens, indiceInvalido, onEditar, onRemover }: Props) => {
+const rotuloCartao = (item: SimulacaoLoteItem): string => {
+  const cartao = item.cartao_nome || `Cartão ${item.cartao_id}`
+  const bandeira = String(item.bandeira_nome || '').trim()
+  return bandeira ? `${cartao} · ${bandeira}` : cartao
+}
+
+const SimuladorListaSomadas = ({
+  itens,
+  indiceInvalido,
+  mensagemInvalida,
+  onEditar,
+  onRemover,
+}: Props) => {
   if (!itens.length) return null
 
   return (
@@ -40,7 +53,12 @@ const SimuladorListaSomadas = ({ itens, indiceInvalido, onEditar, onRemover }: P
                   <td>{item.observacoes || '—'}</td>
                   <td>{formatCurrency(toCentavos(item.valor_compra) / 100)}</td>
                   <td>{parcelas}</td>
-                  <td>{item.cartao_nome || `Cartão ${item.cartao_id}`}</td>
+                  <td>
+                    {rotuloCartao(item)}
+                    {invalido && mensagemInvalida ? (
+                      <div className="text-danger fs-13">{mensagemInvalida}</div>
+                    ) : null}
+                  </td>
                   <td className="text-end text-nowrap">
                     <Button type="button" color="light" size="sm" className="border me-1" onClick={() => onEditar(indice)}>
                       Editar
