@@ -16,6 +16,9 @@ type Props = {
   showTitular: boolean
   pessoasOptions: SelectOptions[]
   cartoesOptions: SelectOptions[]
+  exibeBandeira?: boolean
+  bandeiraOptions?: SelectOptions[]
+  bandeiraInvalida?: boolean
   semCartoes: boolean
   compact: boolean
   responsavelNome: string
@@ -42,6 +45,9 @@ const SimuladorCompraForm = ({
   showTitular,
   pessoasOptions,
   cartoesOptions,
+  exibeBandeira = false,
+  bandeiraOptions = [],
+  bandeiraInvalida = false,
   semCartoes,
   compact,
   responsavelNome,
@@ -89,6 +95,18 @@ const SimuladorCompraForm = ({
               />
             )}
           </Col>
+          {exibeBandeira && (
+            <Col lg={compact ? 2 : 12} md={6}>
+              <Label className="form-label">Bandeira</Label>
+              <SelectListControlled<SimuladorCompraFormValues>
+                field="cartao_bandeira_id"
+                control={control}
+                options={bandeiraOptions}
+                placeholder="Selecione a bandeira"
+                errors={bandeiraInvalida ? { message: 'Selecione a bandeira da fatura' } : undefined}
+              />
+            </Col>
+          )}
           <Col lg={compact ? 2 : 12} md={6}>
             <Label className="form-label">Responsável</Label>
             <Button

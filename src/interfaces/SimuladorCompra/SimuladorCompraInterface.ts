@@ -5,6 +5,7 @@ import { ResponsavelLookup } from 'interfaces/Transacoes/TransacoesInterface'
 export interface SimuladorCompraFormValues {
   pessoa_id: number | string | null
   cartao_id: number | string | null
+  cartao_bandeira_id: number | string | null
   responsavel_id: number | string | null
   valor_compra: string | number | null
   parcelas_total: number | string | null
@@ -119,6 +120,8 @@ export interface SimulacaoLoteItem {
   data: string
   cartao_id: number
   cartao_nome?: string
+  cartao_bandeira_id?: number | null
+  bandeira_nome?: string | null
   pessoa_id?: number | null
   dia_limite_fatura?: number | null
   responsavel_nome?: string | null

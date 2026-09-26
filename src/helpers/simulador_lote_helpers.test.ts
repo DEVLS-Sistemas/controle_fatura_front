@@ -13,7 +13,9 @@ jest.mock('axios', () => ({
 import { formatCurrency } from 'helpers/fatura_helpers'
 import { SimulacaoLoteItem } from 'interfaces/SimuladorCompra/SimuladorCompraInterface'
 import {
+  bandeirasAtivasDoCartao,
   bloqueioTamanhoLote,
+  cartaoExigeBandeira,
   concluirEstaHabilitado,
   fraseSomando,
   destinosFaturaDoLote,
@@ -22,6 +24,7 @@ import {
   montarCompraLote,
   montarPayloadLote,
   primeiroIndiceInvalido,
+  primeiroIndiceSemBandeira,
   textoConfirmacaoLote,
   textoTotalLista,
 } from './simulador_lote_helpers'
@@ -102,6 +105,70 @@ describe('montarCompraLote', () => {
       item({ observacoes: 'B', cartao_id: 2 }),
     ])
     expect(body.compras.map((c) => c.observacoes)).toEqual(['A', 'B'])
+  })
+
+  it('omite cartao_bandeira_id no cartão de uma bandeira e envia no de duas', () => {
+    const nubank = [{ id: 9, bandeira: 'Mastercard' }]
+    const sofisa = [
+      { id: 115, bandeira: 'Visa' },
+      { id: 124, bandeira: 'Mastercard' },
+    ]
+    const body = montarPayloadLote(
+      [
+        item({ cartao_id: 163, observacoes: 'Mouse', cartao_bandeira_id: 9 }),
+        item({ cartao_id: 164, observacoes: 'Teclado', cartao_bandeira_id: 115 }),
+      ],
+      (cartaoId) => (cartaoId === 164 ? sofisa : nubank)
+    )
+    expect(body.compras[0]).not.toHaveProperty('cartao_bandeira_id')
+    expect(body.compras[1].cartao_bandeira_id).toBe(115)
+  })
+
+  it('omite a chave quando a bandeira está vazia', () => {
+    const sofisa = [
+      { id: 115, bandeira: 'Visa' },
+      { id: 124, bandeira: 'Mastercard' },
+    ]
+    const payload = montarPayloadLote(
+      [item({ cartao_id: 164, cartao_bandeira_id: null })],
+      () => sofisa
+    )
+    expect(payload.compras[0]).not.toHaveProperty('cartao_bandeira_id')
+    expect(montarCompraLote(item({ cartao_bandeira_id: '' as unknown as number }), true))
+      .not.toHaveProperty('cartao_bandeira_id')
+  })
+})
+
+describe('bandeira da fatura', () => {
+  const sofisa = [
+    { id: 115, bandeira: 'Visa' },
+    { id: 124, bandeira: 'Mastercard' },
+  ]
+  const nubank = [{ id: 9, bandeira: 'Mastercard' }]
+
+  it('considera só bandeiras ativas com id e nome', () => {
+    expect(bandeirasAtivasDoCartao([
+      { id: 115, bandeira: 'Visa', ativo: true },
+      { id: 124, bandeira: 'Mastercard', ativo: false },
+      { bandeira: 'Elo' },
+    ])).toEqual([{ id: 115, bandeira: 'Visa', cor_principal: null, cor_secundaria: null }])
+    expect(cartaoExigeBandeira(sofisa)).toBe(true)
+    expect(cartaoExigeBandeira(nubank)).toBe(false)
+    expect(cartaoExigeBandeira([])).toBe(false)
+  })
+
+  it('aponta só o item de cartão com duas bandeiras sem escolha', () => {
+    const bandeirasDe = (cartaoId: number) => (cartaoId === 164 ? sofisa : nubank)
+    expect(primeiroIndiceSemBandeira([
+      item({ cartao_id: 163 }),
+      item({ cartao_id: 164 }),
+    ], bandeirasDe)).toEqual({ indice: 1, message: 'Selecione a bandeira da fatura' })
+    expect(primeiroIndiceSemBandeira([
+      item({ cartao_id: 164, cartao_bandeira_id: 115 }),
+    ], bandeirasDe)).toBeNull()
+    expect(primeiroIndiceSemBandeira([
+      item({ cartao_id: 163 }),
+    ], bandeirasDe)).toBeNull()
   })
 })
 
