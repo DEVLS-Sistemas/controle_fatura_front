@@ -159,11 +159,12 @@ export class FaturaMetadadosError extends Error {
         this.faturas_periodo = parseFaturasPeriodo(
             body?.faturas_periodo ?? this.sugestao.faturas_periodo
         )
-        this.cartoes = Array.isArray(body?.cartoes) ? body.cartoes : []
-        this.bandeiras = Array.isArray(body?.bandeiras) ? body.bandeiras : []
-        this.candidatos_cartao = Array.isArray(body?.candidatos_cartao)
-            ? body.candidatos_cartao
-            : []
+        const cartoes = body?.cartoes
+        const bandeiras = body?.bandeiras
+        const candidatosCartao = body?.candidatos_cartao
+        this.cartoes = Array.isArray(cartoes) ? cartoes : []
+        this.bandeiras = Array.isArray(bandeiras) ? bandeiras : []
+        this.candidatos_cartao = Array.isArray(candidatosCartao) ? candidatosCartao : []
         this.body = body ?? undefined
     }
 

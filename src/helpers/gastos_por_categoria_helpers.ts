@@ -729,8 +729,9 @@ const flattenTopSubcategorias = (
 export const listaSubcategorias = (
   data?: GastosPorCategoriaView | null
 ): GastosPorCategoriaSubcategoriaBarra[] => {
-  if (Array.isArray(data?.subcategorias) && data.subcategorias.length > 0) {
-    return data.subcategorias
+  const subcategorias = data?.subcategorias
+  if (Array.isArray(subcategorias) && subcategorias.length > 0) {
+    return subcategorias
   }
   return flattenTopSubcategorias(data?.categorias)
 }
@@ -761,15 +762,17 @@ export const comFatiaOutros = <T extends GastosPorCategoriaDashboardBarra>(
     percentual_gasto: percentual,
     percentual_da_categoria: percentual,
     atalho: null,
-  } as T
+  } as unknown as T
   return [...top, outros]
 }
 
 export const fonteCategorias = (
   data?: GastosPorCategoriaView | null
 ): GastosPorCategoriaDashboardBarra[] => {
-  if (Array.isArray(data?.categorias) && data.categorias.length > 0) return data.categorias
-  return Array.isArray(data?.dashboards?.categorias) ? data.dashboards.categorias : []
+  const categorias = data?.categorias
+  if (Array.isArray(categorias) && categorias.length > 0) return categorias
+  const categoriasDash = data?.dashboards?.categorias
+  return Array.isArray(categoriasDash) ? categoriasDash : []
 }
 
 export const fonteSubcategorias = (
@@ -779,9 +782,11 @@ export const fonteSubcategorias = (
   if (selecao?.categoria_chave) {
     return listaSubcategorias(data).filter((item) => mesmaCategoria(item, selecao))
   }
-  if (Array.isArray(data?.subcategorias) && data.subcategorias.length > 0) return data.subcategorias
-  if (Array.isArray(data?.dashboards?.subcategorias) && data.dashboards.subcategorias.length > 0) {
-    return data.dashboards.subcategorias
+  const subcategorias = data?.subcategorias
+  if (Array.isArray(subcategorias) && subcategorias.length > 0) return subcategorias
+  const subcategoriasDash = data?.dashboards?.subcategorias
+  if (Array.isArray(subcategoriasDash) && subcategoriasDash.length > 0) {
+    return subcategoriasDash
   }
   return listaSubcategorias(data)
 }
@@ -1009,7 +1014,8 @@ export const resolvePorOrigemSelecao = (
 ): GastosPorCategoriaOrigemItem[] => {
   const cat = encontrarCategoria(data, selecao)
   if (cat && 'por_origem' in cat && Array.isArray(cat.por_origem)) return cat.por_origem
-  return Array.isArray(data?.por_origem) ? data.por_origem : []
+  const porOrigem = data?.por_origem
+  return Array.isArray(porOrigem) ? porOrigem : []
 }
 
 export const resolvePorPlataformaSelecao = (
@@ -1018,7 +1024,8 @@ export const resolvePorPlataformaSelecao = (
 ): GastosPorCategoriaPlataformaItem[] => {
   const cat = encontrarCategoria(data, selecao)
   if (cat && 'por_plataforma' in cat && Array.isArray(cat.por_plataforma)) return cat.por_plataforma
-  return Array.isArray(data?.por_plataforma) ? data.por_plataforma : []
+  const porPlataforma = data?.por_plataforma
+  return Array.isArray(porPlataforma) ? porPlataforma : []
 }
 
 export const buildSelectOptions = (

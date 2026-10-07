@@ -117,8 +117,8 @@ export const AsyncSelectList = (props: AsyncSelectListInterface) => {
                     loadOptions={callback}
                     onChange={(e: any) => props.onChange(e && e.value)}
                     className="react-select-container"
-                    getOptionLabel={(option) => option.label}
-                    getOptionValue={(option) => option.value}
+                    getOptionLabel={(option) => option.label ?? ''}
+                    getOptionValue={(option) => String(option.value ?? '')}
                 />
             </div>
             {props.errors && <div className="text-danger">{props.errors.message}</div>}

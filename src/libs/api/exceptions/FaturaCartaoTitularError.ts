@@ -83,8 +83,10 @@ export class FaturaCartaoTitularError extends Error {
         this.sugestao = (body?.sugestao && typeof body.sugestao === 'object')
             ? body.sugestao
             : {}
-        this.pessoas = Array.isArray(body?.pessoas) ? body.pessoas : []
-        this.bandeiras = Array.isArray(body?.bandeiras) ? body.bandeiras : []
+        const pessoas = body?.pessoas
+        const bandeiras = body?.bandeiras
+        this.pessoas = Array.isArray(pessoas) ? pessoas : []
+        this.bandeiras = Array.isArray(bandeiras) ? bandeiras : []
         this.body = body ?? undefined
     }
 

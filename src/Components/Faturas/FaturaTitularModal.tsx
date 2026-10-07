@@ -69,7 +69,7 @@ const FaturaTitularModal = ({
     }, [titulares, nomeNoCartao, sugestao])
 
     const pessoaOptions: SelectOptions[] = useMemo(
-        () => pessoas.map((p) => toPessoaSelectOption(p)),
+        () => pessoas.map((p) => toPessoaSelectOption({ ...p, value: p.value ?? undefined })),
         [pessoas]
     )
 

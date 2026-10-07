@@ -44,7 +44,7 @@ export const mergeFonte = (a?: ProjecaoFonte, b?: ProjecaoFonte): ProjecaoFonte 
 }
 
 const soma = (itens: Array<number | null | undefined>): number =>
-  itens.reduce((acc, v) => acc + Number(v || 0), 0)
+  itens.reduce<number>((acc, v) => acc + Number(v || 0), 0)
 
 const mergeSplit = (
   partes: Array<ProjecaoSplitParte | null | undefined>,
@@ -219,9 +219,9 @@ const mergeResponsaveis = (listas: ProjecaoPorResponsavel[][]): ProjecaoPorRespo
   })
 }
 
-const aplicarParticipacao = (
-  cartao: ProjecaoPorCartaoResponsavel
-): ProjecaoPorCartaoResponsavel => ({
+const aplicarParticipacao = <T extends ProjecaoPorCartaoResponsavel>(
+  cartao: T
+): T => ({
   ...cartao,
   por_responsavel: (cartao.por_responsavel || []).map((resp) => ({
     ...resp,
@@ -233,7 +233,7 @@ const aplicarParticipacao = (
       }
     }),
   })),
-})
+}) as T
 
 export const agruparCruzamentoPorNome = (
   linhas: ProjecaoPorCartaoResponsavel[]

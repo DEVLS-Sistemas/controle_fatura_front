@@ -428,7 +428,7 @@ export const compraToEditSource = (compra: CompraVisualizacaoView): Partial<Tran
   return {
     id: transacaoId ?? undefined,
     transacao_id: transacaoId,
-    cartao_id: compra.cartao?.id ?? null,
+    cartao_id: compra.cartao?.id ?? undefined,
     cartao_numero_id: compra.cartao_numero?.id ?? null,
     cartao_numero: compra.cartao_numero
       ? {
@@ -440,15 +440,15 @@ export const compraToEditSource = (compra: CompraVisualizacaoView): Partial<Tran
         }
       : null,
     fatura_id: faturaId ?? undefined,
-    data: compra.data_compra ?? null,
+    data: compra.data_compra ?? undefined,
     estabelecimento_id: compra.estabelecimento?.id ?? null,
-    estabelecimento: compra.estabelecimento?.nome ?? null,
+    estabelecimento: compra.estabelecimento?.nome ?? undefined,
     estabelecimento_nome: compra.estabelecimento?.nome,
     loja_nome: compra.estabelecimento?.loja_nome,
-    valor: valorLinha ?? null,
+    valor: valorLinha ?? undefined,
     valor_compra: compra.valor_total ?? null,
     parcelas_total: compra.parcelas_total ?? 1,
-    parcela_atual: compra.parcela_atual ?? null,
+    parcela_atual: compra.parcela_atual ?? undefined,
     compra_grupo_id: compra.compra_grupo_id ?? null,
     tipo: compra.tipo ?? 'purchase',
     origem_compra: compra.origem_compra ?? null,
@@ -463,7 +463,7 @@ export const compraToEditSource = (compra: CompraVisualizacaoView): Partial<Tran
     responsavel_id: compra.responsavel?.id ?? null,
     responsavel_nome: compra.responsavel?.nome,
     responsavel_tipo: compra.responsavel?.tipo ?? undefined,
-    observacoes: compra.observacoes ?? compra.texto_compra ?? compra.descricao ?? compra.titulo ?? null,
+    observacoes: compra.observacoes ?? compra.texto_compra ?? compra.descricao ?? compra.titulo ?? undefined,
     descricao: compra.descricao ?? compra.texto_compra ?? compra.observacoes ?? null,
     cartao_nome: compra.cartao?.nome,
   }
@@ -687,7 +687,7 @@ export const validarFormularioCompra = (
         erros[`parcela_${idx + 1}`] = mensagemParcelaObrigatoria(idx + 1)
       }
     })
-    const soma = input.parcelas.reduce((acc, valor) => acc + centavosDoValor(valor), 0)
+    const soma = input.parcelas.reduce<number>((acc, valor) => acc + centavosDoValor(valor), 0)
     const total = centavosDoValor(input.valor_compra)
     if (Math.abs(soma - total) > 1) {
       erros.parcelas = MENSAGEM_CAMPO_COMPRA.soma_parcelas

@@ -12,8 +12,8 @@ const NonAuthLayout = ({ children } : any) => {
     const token = getAuthToken();
 
     const nonauthData = createSelector(
-        (state) => state.Layout.layoutModeType,
-        (layoutModeType) => layoutModeType
+        (state: { Layout: { layoutModeType: string } }) => state.Layout.layoutModeType,
+        (layoutModeType: string) => layoutModeType
       );
     // Inside your component
     const layoutModeType = useSelector(nonauthData);

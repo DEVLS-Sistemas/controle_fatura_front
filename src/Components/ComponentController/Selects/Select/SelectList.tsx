@@ -1,5 +1,5 @@
 import { SelectOptions, SelectProps } from 'interfaces/SystemInterfaces/SelectInterface';
-import Select, { FormatOptionLabelMeta } from 'react-select'
+import Select from 'react-select'
 import { BandeiraChip, CartaoChip } from 'helpers/cartao_helpers'
 
 const customStyles = {
@@ -25,10 +25,7 @@ const customStyles = {
     }),
 }
 
-const formatOptionLabel = (
-    option: SelectOptions,
-    _meta: FormatOptionLabelMeta<SelectOptions>
-) => (
+const formatOptionLabel = (option: SelectOptions) => (
     <div className="d-flex align-items-center gap-2">
         {option.cor_principal ? (
             <BandeiraChip

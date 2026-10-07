@@ -124,5 +124,5 @@ export const rotulosFaturaAnexoNomes = (
     resolveFaturaAnexoNomeOriginal(fatura, 'pdf'),
     resolveFaturaAnexoNomeOriginal(fatura, 'csv'),
   ].filter((nome): nome is string => Boolean(nome))
-  return [...new Set(nomes)]
+  return Array.from(new Set(nomes))
 }

@@ -128,7 +128,7 @@ export const filtrarCartoesDoTitular = <T extends { pessoa_id?: number | string 
   pessoaId: number | null | undefined,
   ehPrincipal: boolean
 ): T[] => {
-  if (!cartoes?.length || pessoaId == null || pessoaId === '') return []
+  if (!cartoes?.length || pessoaId == null) return []
   const titularId = Number(pessoaId)
   if (!Number.isFinite(titularId)) return []
   const temTitularNaLista = cartoes.some((c) => pessoaIdCartao(c.pessoa_id) != null)

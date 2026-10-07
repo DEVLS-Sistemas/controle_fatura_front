@@ -1,4 +1,4 @@
-import { GASTOS_POR_CATEGORIA_MESES_STORAGE_KEY } from 'interfaces/GastosPorCategoria/GastosPorCategoriaInterface'
+import { GASTOS_POR_CATEGORIA_MESES_STORAGE_KEY, GastosPorCategoriaDashboardBarra } from 'interfaces/GastosPorCategoria/GastosPorCategoriaInterface'
 import { GastosPorCategoriaSelecaoVazia } from 'interfaces/GastosPorCategoria/GastosPorCategoriaInterface'
 import {
   aplicarCliqueCategoria,
@@ -378,7 +378,7 @@ describe('seleção Power BI', () => {
   })
 
   it('fecha a pizza com fatia Outros quando passa do limite', () => {
-    const itens = Array.from({ length: 12 }, (_, i) => ({
+    const itens: GastosPorCategoriaDashboardBarra[] = Array.from({ length: 12 }, (_, i) => ({
       categoria_id: i + 1,
       nome: `Cat ${i + 1}`,
       valor_total: 100,

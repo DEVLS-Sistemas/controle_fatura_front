@@ -1,5 +1,3 @@
-import { MenuPlacement } from "react-select";
-
 export type SelectOptions = {
     value: string | number | undefined | null;
     label: string | undefined;
@@ -30,6 +28,6 @@ export type SelectProps = {
     errors?: any
     required?: any
     name?: string
-    menuPlacement?: MenuPlacement
+    menuPlacement?: 'auto' | 'bottom' | 'top'
     closeMenuOnSelect?: boolean
 };

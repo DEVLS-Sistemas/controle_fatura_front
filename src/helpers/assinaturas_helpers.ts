@@ -1,5 +1,6 @@
 import { SelectOptions } from 'interfaces/SystemInterfaces/SelectInterface'
 import {
+  AssinaturaAcao,
   AssinaturaCobranca,
   AssinaturaItem,
   AssinaturaLookupOption,

@@ -58,8 +58,10 @@ export class FaturaSelecaoError extends Error {
             body?.precisa_selecionar_final
             || codigo === 'precisa_selecionar_final'
         )
-        this.bandeiras = Array.isArray(body?.bandeiras) ? body.bandeiras : []
-        this.numeros = Array.isArray(body?.numeros) ? body.numeros : []
+        const bandeiras = body?.bandeiras
+        const numeros = body?.numeros
+        this.bandeiras = Array.isArray(bandeiras) ? bandeiras : []
+        this.numeros = Array.isArray(numeros) ? numeros : []
         this.cartao_bandeira_id =
             body?.cartao_bandeira_id != null ? Number(body.cartao_bandeira_id) : null
         this.body = body ?? undefined

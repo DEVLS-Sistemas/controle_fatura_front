@@ -428,7 +428,7 @@ export const ajustaMoedaBanco = (valor: string): number => {
         const valor_ajustado = parseFloat(numericValue) / 100;
         return valor_ajustado
     }
-    return valor;
+    return 0
 
 } 
 export const formatarParaMoedaReal = (valor: number): string => {

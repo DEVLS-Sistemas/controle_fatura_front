@@ -73,7 +73,8 @@ export class FaturaTitularError extends Error {
         )
         this.nome_no_cartao = body?.nome_no_cartao ?? body?.sugestao?.nome_no_cartao ?? null
         this.perfil_nome = body?.perfil_nome ?? null
-        this.pessoas = Array.isArray(body?.pessoas) ? body.pessoas : []
+        const pessoas = body?.pessoas
+        this.pessoas = Array.isArray(pessoas) ? pessoas : []
         this.sugestao = (body?.sugestao && typeof body.sugestao === 'object')
             ? body.sugestao
             : {}

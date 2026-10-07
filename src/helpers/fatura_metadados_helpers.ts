@@ -52,7 +52,7 @@ export const resolveModoMetadados = (input: {
         return 'confirmar_cartao'
     }
     const id = input.sugestao?.cartao_id
-    if (id == null || id === '' || input.sugestao?.confianca === 'baixa') {
+    if (id == null || input.sugestao?.confianca === 'baixa') {
         return 'cadastrar_cartao'
     }
     return 'confirmar_cartao'
