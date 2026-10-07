@@ -58,10 +58,10 @@ const UsuarioFilter = ({ getRemoteUsuarioList }: UsuarioFilterProps) => {
         ];
 
 
-        const opt: { value: string | number | undefined; label: string | undefined }[] = [{ value: '', label: 'Selecione' }]
+        const opt: SelectOptions[] = [{ value: '', label: 'Selecione' }]
         if (optSelectList) {
             optSelectList.forEach((item: UsuarioModel) => {
-                opt.push({ value: item.id, label: item.nome })
+                opt.push({ value: item.id ?? '', label: item.nome ?? '' })
             });
         }
         return opt
