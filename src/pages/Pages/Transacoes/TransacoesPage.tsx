@@ -145,10 +145,9 @@ const TransacoesPage = () => {
     }
 
     const getRemoteTransacoesList: SubmitHandler<any> = async (data): Promise<void> => {
-        Object.keys(data).reduce(
-            (acc, k) => (!data[k] && data[k] !== 0 && data[k] !== false && delete acc[k], acc),
-            data
-        )
+        Object.keys(data).forEach((k) => {
+            if (!data[k] && data[k] !== 0 && data[k] !== false) delete data[k]
+        })
         data.perPage = perPage
         const list = await transacoesService.listTransacoesPaginate({ ...data, perPage })
         syncContext(data)
@@ -219,10 +218,12 @@ const TransacoesPage = () => {
     useEffect(() => {
         setTimeout(() => setDisplay(true), 300)
         loadLookups()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
     useEffect(() => {
         getRemoteTransacoesList(transacoesContext)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [perPage])
 
     return (

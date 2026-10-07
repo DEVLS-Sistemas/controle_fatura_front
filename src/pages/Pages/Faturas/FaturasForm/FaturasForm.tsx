@@ -1252,6 +1252,7 @@ const FaturasForm = () => {
 
     useEffect(() => {
         getLookups()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
     const divergeAbertoRef = useRef(false)

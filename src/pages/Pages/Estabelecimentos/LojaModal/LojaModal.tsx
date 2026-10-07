@@ -97,6 +97,7 @@ const LojaModal = ({
         return () => {
             if (debounceRef.current) clearTimeout(debounceRef.current)
         }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [busca, isOpen])
 
     const finishWith = async (loja: LojaModalResult) => {

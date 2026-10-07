@@ -33,6 +33,7 @@ const CategoriasViewPage = () => {
         if (id && !state?.source) {
             loadRecord(id)
         }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [id])
 
     if (!record) {

@@ -46,7 +46,6 @@ const BarraHorizontalChart = ({
 
   if (barras.length === 0) return null
 
-  const labels = barras.map((item) => item.nome || '—')
   const valores = barras.map((item) => Number(item.valor_total ?? 0))
   const cores = barras.map((item) => {
     const ativa = selecionada ? selecionada(item) : false

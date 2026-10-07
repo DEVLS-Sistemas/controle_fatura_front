@@ -1,5 +1,5 @@
 import { ValidatorForm } from "Components/ComponentController/ValidatorForm/ValidatorForm"
-import { Control, FieldValues, Path, UseFormRegister } from "react-hook-form"
+import { FieldValues, Path, UseFormRegister } from "react-hook-form"
 
 interface InputDateTimeProps<T extends FieldValues> {
     label?: string

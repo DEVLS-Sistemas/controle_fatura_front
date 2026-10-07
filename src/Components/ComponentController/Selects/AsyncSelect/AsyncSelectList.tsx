@@ -2,7 +2,6 @@ import { SelectOptions } from 'interfaces/SystemInterfaces/SelectInterface';
 import { useEffect, useRef } from 'react';
 
 import AsyncSelect from 'react-select/async';
-import { GroupBase } from 'react-select';
 import './AsyncSelecStyle.css';
 
 

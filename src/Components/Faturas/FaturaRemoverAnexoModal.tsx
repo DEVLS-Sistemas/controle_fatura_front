@@ -383,7 +383,6 @@ const FaturaRemoverAnexoModal = ({
                                         type="button"
                                         role="radio"
                                         aria-checked={selected}
-                                        aria-pressed={selected}
                                         className={`w-100 text-start border rounded p-3 ${
                                             selected ? 'border-primary bg-primary-subtle' : 'bg-transparent'
                                         }`}

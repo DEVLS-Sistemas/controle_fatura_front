@@ -20,15 +20,15 @@ const optTipo: SelectOptions[] = [
 
 const ResponsaveisForm = () => {
     const { state } = useLocation()
-    const [record, setRecord] = useState<ResponsaveisModel>(
+    const [record] = useState<ResponsaveisModel>(
         state?.source
             ? { ...state.source, responsavel_id: state.source.responsavel_id ?? state.source.id }
             : ResponsaveisDefaultValues
     )
-    const { register, handleSubmit, control, setValue, formState: { errors } } = useForm<ResponsaveisModel>({
+    const { register, handleSubmit, control } = useForm<ResponsaveisModel>({
         defaultValues: record
     })
-    const [display, setDisplay] = useState<boolean>(false)
+    const [, setDisplay] = useState<boolean>(false)
     const { voltarParaRotaAnterior } = useNavegacao()
     const navigate = useNavigate()
     const responsaveisService = new ResponsaveisService()

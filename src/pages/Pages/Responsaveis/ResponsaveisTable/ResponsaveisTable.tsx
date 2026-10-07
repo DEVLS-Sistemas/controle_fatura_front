@@ -73,6 +73,7 @@ export const ResponsaveisTable = ({ data, getData, setPerPage, perPage, filters 
 
     useEffect(() => {
         if (data) handleThisRoute(data.first_page_url)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [perPage])
 
     const rowId = (row: ResponsaveisList) => row.responsavel_id ?? row.id

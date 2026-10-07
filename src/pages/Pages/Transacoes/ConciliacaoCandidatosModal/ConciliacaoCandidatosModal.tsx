@@ -62,6 +62,7 @@ const ConciliacaoCandidatosModal = ({
     return () => {
       cancelled = true
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, identificador])
 
   return (

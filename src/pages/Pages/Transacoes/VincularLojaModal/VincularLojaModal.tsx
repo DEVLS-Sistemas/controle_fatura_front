@@ -115,6 +115,7 @@ const VincularLojaModal = ({ isOpen, toggle, filters, onLinked }: VincularLojaMo
         setLojasResultados([])
         setItens([])
         loadEstabelecimentos(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isOpen])
 
     useEffect(() => {
@@ -126,6 +127,7 @@ const VincularLojaModal = ({ isOpen, toggle, filters, onLinked }: VincularLojaMo
         return () => {
             if (debounceRef.current) clearTimeout(debounceRef.current)
         }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [buscaLoja, isOpen])
 
     const allSelected = itens.length > 0 && selectedIds.size === itens.length

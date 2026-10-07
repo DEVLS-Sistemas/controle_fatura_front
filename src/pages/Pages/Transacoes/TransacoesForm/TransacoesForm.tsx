@@ -886,6 +886,7 @@ const TransacoesForm = () => {
 
     useEffect(() => {
         getLookups()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
     useEffect(() => {
@@ -1016,6 +1017,7 @@ const TransacoesForm = () => {
         resolverEstabelecimento(estabelecimentoId).then((est) => {
             if (est) aplicarPadroesEstabelecimento(est)
         })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [estabelecimentoId])
 
     useEffect(() => {
@@ -1030,6 +1032,7 @@ const TransacoesForm = () => {
             return
         }
         setValue('subcategoria_id', null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [categoriaId])
 
     useEffect(() => {

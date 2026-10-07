@@ -114,12 +114,14 @@ const CategoriasForm = () => {
     useEffect(() => {
         setActiveMenu('/categorias')
         loadLookups()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
     useEffect(() => {
         if (paramId) {
             loadRecord(paramId)
         }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [paramId])
 
     return (

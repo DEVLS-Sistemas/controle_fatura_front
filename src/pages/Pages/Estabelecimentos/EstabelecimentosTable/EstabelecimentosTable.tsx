@@ -92,6 +92,7 @@ export const EstabelecimentosTable = ({ data, getData, setPerPage, perPage, filt
 
     useEffect(() => {
         if (data) handleThisRoute(data.first_page_url)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [perPage])
 
     return (

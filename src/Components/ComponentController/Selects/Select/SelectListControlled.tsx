@@ -1,7 +1,6 @@
 import { ValidatorForm } from 'Components/ComponentController/ValidatorForm/ValidatorForm'
 import { SelectOptions } from 'interfaces/SystemInterfaces/SelectInterface'
-import { useEffect } from 'react'
-import { Path, Controller, FieldValues, Control, Validate, PathValue } from 'react-hook-form'
+import { Path, Controller, FieldValues, Control } from 'react-hook-form'
 import { SelectList } from './SelectList'
 
 export type SelectListProps<T extends FieldValues> = {

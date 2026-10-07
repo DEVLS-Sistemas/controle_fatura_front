@@ -67,6 +67,7 @@ const PlataformaRapidoModal = ({
                 setTemas(resolverTemasCategoria())
             }
         })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isOpen])
 
     const handleSubmit = async (e: React.FormEvent) => {

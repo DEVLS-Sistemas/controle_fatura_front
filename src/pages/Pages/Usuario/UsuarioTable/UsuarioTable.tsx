@@ -1,6 +1,6 @@
 import UiContent from "Components/Common/UiContent";
 import { useNavegacao } from 'helpers/functions_helpers';
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Card, CardBody, Col, DropdownItem, Label, Row } from "reactstrap";
 import './UsuarioTableCss.css';
@@ -18,7 +18,7 @@ export interface UsuarioTableProps {
 }
 
 export const UsuarioTable = ({ data, getData, setPerPage, setPage, perPage, }: UsuarioTableProps) => {
-    const [optPerPage, setOptPerPage] = useState<PerPageProps[]>([
+    const [optPerPage] = useState<PerPageProps[]>([
         { value: 5, label: "5" },
         { value: 10, label: "10" },
         { value: 20, label: "20" },
@@ -60,14 +60,11 @@ export const UsuarioTable = ({ data, getData, setPerPage, setPage, perPage, }: U
         if (data) {
             handleThisRoute(data.first_page_url)
         }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [perPage])
 
     // Botão Voltar
     const { voltarParaRotaAnterior } = useNavegacao();
-    const gotoPage = async (item: any) => {
-
-    };
-
     return (
         <React.Fragment>
             <UiContent />
@@ -76,7 +73,7 @@ export const UsuarioTable = ({ data, getData, setPerPage, setPage, perPage, }: U
                     <Card>
                         <CardBody>
                             <div className="live-preview mt-1">
-                                {!data || data.total == 0 ?
+                                {!data || data.total === 0 ?
                                     <div className="bg-primary text-white border-0 alert alert-primary fade show text-center" >INFORME OS FILTROS DESEJADOS E CLIQUE EM BUSCAR!</div>
                                     :
                                     !data.data ?
@@ -177,13 +174,13 @@ export const UsuarioTable = ({ data, getData, setPerPage, setPage, perPage, }: U
                                                                 switch (key) {
                                                                     case 0:
                                                                         return (
-                                                                            <li key={item.label} className={data.current_page == 1 ? "page-item disabled" : "page-item"}>
+                                                                            <li key={item.label} className={data.current_page === 1 ? "page-item disabled" : "page-item"}>
                                                                                 <Link to="#" className="page-link" onClick={() => handleThisRoute(item.url)}>Anterior</Link>
                                                                             </li>
                                                                         )
                                                                     case data.links.length - 1:
                                                                         return (
-                                                                            <li className={data.last_page == data.current_page ? "page-item disabled" : "page-item"}>
+                                                                            <li className={data.last_page === data.current_page ? "page-item disabled" : "page-item"}>
                                                                                 <Link to="#" className="page-link" onClick={() => handleThisRoute(item.url)}>Próximo</Link>
                                                                             </li>
                                                                         )

@@ -87,6 +87,7 @@ const LojasViewPage = () => {
             loadRecord(id)
             loadStats(id, periodo)
         }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [id])
 
     if (!record && !id) {

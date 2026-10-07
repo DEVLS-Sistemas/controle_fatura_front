@@ -653,6 +653,7 @@ const CartoesForm = () => {
 
     useEffect(() => {
         getLookups()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
     useEffect(() => {
@@ -660,6 +661,7 @@ const CartoesForm = () => {
             // Sempre carrega o detalhe completo (listagem pode vir sem árvore)
             loadRecord(paramId)
         }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [paramId])
 
     // Pré-seleciona regra de senha PDF quando o banco sugere (ex.: C6)

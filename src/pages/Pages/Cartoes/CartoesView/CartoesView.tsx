@@ -40,6 +40,7 @@ const CartoesViewPage = () => {
             // Sempre carrega detalhe completo (listagem pode vir sem árvore)
             loadRecord(id)
         }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [id])
 
     if (!record) {

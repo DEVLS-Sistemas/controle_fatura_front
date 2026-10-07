@@ -1,15 +1,14 @@
 import UiContent from "Components/Common/UiContent";
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { useForm } from "react-hook-form";
-import { Breadcrumb, BreadcrumbItem, Button, ButtonGroup, Card, CardHeader, Col, Collapse, DropdownItem, DropdownMenu, DropdownToggle, Form, Input, Label, Modal, ModalBody, ModalHeader, Row, UncontrolledDropdown } from "reactstrap";
+import { Breadcrumb, BreadcrumbItem, Button, ButtonGroup, Card, CardHeader, Col, Collapse, DropdownItem, DropdownMenu, DropdownToggle, Label, Row, UncontrolledDropdown } from "reactstrap";
 import { UsuarioModel, UsuarioSearch } from "interfaces/UsuarioInterface";
 import { InputTextControlled } from "Components/ComponentController/Inputs/Text/InputTextControlled";
 import { InputDate } from "Components/ComponentController/Inputs/Date/InputDate";
 import { SelectListControlled } from "Components/ComponentController/Selects/Select/SelectListControlled";
 import { SelectOptions } from "interfaces/SystemInterfaces/SelectInterface";
 // import { AsyncSelectListControlled } from "Components/ComponentController/Selects/AsyncSelect/AsyncSelectListControlled";
-import { UsuarioService } from "services/UsuarioService";
 import { AsyncSelectListControlled } from "Components/ComponentController/Selects/AsyncSelect/AsyncSelectListControlled";
 import { InputCheckbox } from "Components/ComponentController/Inputs/Checkbox/InputCheckbox";
 import { InputRadio } from "Components/ComponentController/Inputs/Radio/InputRadio";
@@ -22,8 +21,7 @@ export interface UsuarioFilterProps {
 
 const UsuarioFilter = ({ getRemoteUsuarioList }: UsuarioFilterProps) => {
 
-    const { handleSubmit, control, setValue, register, watch } = useForm<UsuarioSearch>({ defaultValues: {} })
-    const usuarioService = new UsuarioService();
+    const { handleSubmit, control, register } = useForm<UsuarioSearch>({ defaultValues: {} })
     // Exibe menu de filtros
     const [showFilter, setShowFilter] = useState<boolean>(false);
     const handleShowFilter = () => {
@@ -60,10 +58,9 @@ const UsuarioFilter = ({ getRemoteUsuarioList }: UsuarioFilterProps) => {
         ];
 
 
-        let opt = new Array
-        opt.push({ value: '', label: 'Selecione' })
+        const opt: { value: string | number | undefined; label: string | undefined }[] = [{ value: '', label: 'Selecione' }]
         if (optSelectList) {
-            optSelectList.map((item: UsuarioModel) => {
+            optSelectList.forEach((item: UsuarioModel) => {
                 opt.push({ value: item.id, label: item.nome })
             });
         }

@@ -72,6 +72,7 @@ const CartaoRapidoModal = ({
                 // fallbacks já preenchidos
             }
         })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isOpen])
 
     const handleDigitos = (raw: string) => {

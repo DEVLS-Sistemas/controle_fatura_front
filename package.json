@@ -132,6 +132,7 @@
     "autoprefixer": "10.4.5"
   },
   "devDependencies": {
+    "@babel/plugin-proposal-private-property-in-object": "7.21.11",
     "@types/feather-icons": "^4.29.1",
     "eslint": "^8.51.0",
     "json-server": "^0.17.4"

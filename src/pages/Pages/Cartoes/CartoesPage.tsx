@@ -34,10 +34,9 @@ const CartoesPage = () => {
     const [page, setPage] = useState(1)
 
     const getRemoteCartoesList: SubmitHandler<any> = async (data): Promise<void> => {
-        Object.keys(data).reduce(
-            (acc, k) => (!data[k] && data[k] !== 0 && data[k] !== false && delete acc[k], acc),
-            data
-        )
+        Object.keys(data).forEach((k) => {
+            if (!data[k] && data[k] !== 0 && data[k] !== false) delete data[k]
+        })
         data.perPage = perPage
         const list = await cartoesService.listCartoesPaginate({ ...data, perPage })
         cartoesContext.palavra_chave = data.palavra_chave
@@ -55,6 +54,7 @@ const CartoesPage = () => {
 
     useEffect(() => {
         getRemoteCartoesList(cartoesContext)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [perPage])
 
     return (

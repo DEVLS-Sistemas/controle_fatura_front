@@ -1,5 +1,4 @@
 import React from 'react';
-import { ProjectsStatusChart, StoreVisitsChart, MyPortfolioCharts, UsersByDeviceCharts } from './Dunut';
 import { UsersByDeviceLegendsCharts } from './Legend';
 
 interface Props {

@@ -44,7 +44,7 @@ export const maskType = (opt: string) => {
 export type maskOptions = 'cpf' | 'cnpj' | 'cpf_cnpj' | 'tel' | 'cep' | 'numero' | 'real' | 'preco' | 'percentual'
 
 export const mask = (type: maskOptions, value: string | undefined) => {
-    value == null || value == undefined ? (value = "") : (value = value);
+    if (value === null || value === undefined) value = ""
 
     switch (type) {
         case "cpf_cnpj":
@@ -95,12 +95,12 @@ export const mask = (type: maskOptions, value: string | undefined) => {
                 .replace(/(-\d{3})\d+?$/, "$1");
         case "real":
         case "preco":
-            if (typeof value == 'string') {
+            if (typeof value === 'string') {
 
                 const inputValue = value;
 
                 // Se o valor estiver vazio, define para "0.00"
-                if (!inputValue || Number(inputValue) == 0) {
+                if (!inputValue || Number(inputValue) === 0) {
                     return '0,00';
                 }
 
@@ -130,11 +130,11 @@ export const mask = (type: maskOptions, value: string | undefined) => {
             }
             break
         case "percentual":
-            if (typeof value == 'string') {
+            if (typeof value === 'string') {
                 const inputValue = value;
 
                 // Se o valor estiver vazio, define para "0,00"
-                if (!inputValue || Number(inputValue) == 0) {
+                if (!inputValue || Number(inputValue) === 0) {
                     return '0,00';
                 }
 
@@ -172,7 +172,7 @@ export const mask = (type: maskOptions, value: string | undefined) => {
             }
             break;
         case "numero":
-            if (typeof value == 'string') {
+            if (typeof value === 'string') {
                 const inputValue = value;
 
                 // Remove caracteres não numéricos

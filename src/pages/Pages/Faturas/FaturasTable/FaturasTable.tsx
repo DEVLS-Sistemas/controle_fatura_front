@@ -204,6 +204,7 @@ export const FaturasTable = ({ data, getData, setPerPage, perPage, filters }: Fa
 
     useEffect(() => {
         if (data) handleThisRoute(data.first_page_url)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [perPage])
 
     return (

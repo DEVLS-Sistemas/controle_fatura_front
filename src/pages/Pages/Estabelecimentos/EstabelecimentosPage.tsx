@@ -38,10 +38,9 @@ const EstabelecimentosPage = () => {
     const [page, setPage] = useState(1)
 
     const getRemoteEstabelecimentosList: SubmitHandler<any> = async (data): Promise<void> => {
-        Object.keys(data).reduce(
-            (acc, k) => (!data[k] && data[k] !== 0 && data[k] !== false && delete acc[k], acc),
-            data
-        )
+        Object.keys(data).forEach((k) => {
+            if (!data[k] && data[k] !== 0 && data[k] !== false) delete data[k]
+        })
         data.perPage = perPage
         const list = await estabelecimentosService.listEstabelecimentosPaginate({ ...data, perPage })
         estabelecimentosContext.palavra_chave = data.palavra_chave
@@ -63,6 +62,7 @@ const EstabelecimentosPage = () => {
 
     useEffect(() => {
         getRemoteEstabelecimentosList(estabelecimentosContext)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [perPage])
 
     return (

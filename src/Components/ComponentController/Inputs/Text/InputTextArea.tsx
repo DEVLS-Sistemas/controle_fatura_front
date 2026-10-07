@@ -1,6 +1,6 @@
 import { ValidatorForm } from "../../ValidatorForm/ValidatorForm"
 import React from 'react'
-import { FieldValue, FieldValues, Path, UseFormRegister } from 'react-hook-form'
+import { FieldValues, Path, UseFormRegister } from 'react-hook-form'
 
 interface InputTextAreaProps<T extends FieldValues> {
     field: Path<T>

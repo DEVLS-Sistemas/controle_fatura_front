@@ -17,7 +17,7 @@ import ButtonToTop from 'Components/ComponentController/Buttons/ButtonToTop/Butt
 const UsuarioForm = () => {
     const { state } = useLocation();
     const [usuario] = useState<UsuarioModel>(state ? state.source : UsuarioDefaultValues);
-    const { register, handleSubmit, control, getValues, setValue, formState: { errors } } = useForm<UsuarioModel>({
+    const { register, handleSubmit, control, getValues, setValue } = useForm<UsuarioModel>({
         defaultValues: usuario
     });
 

@@ -9,6 +9,7 @@ const Section = (props:any) => {
         if (typeof props.rightClickBtn === 'function') {
           props.rightClickBtn(false); // chama a função com false ao montar o componente
         }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
       }, []);
 
       const today = new Date();

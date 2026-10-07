@@ -163,6 +163,7 @@ const EstabelecimentosForm = () => {
         setActiveMenu('/estabelecimentos')
         loadCategorias()
         loadPlataformas()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
     useEffect(() => {
@@ -171,6 +172,7 @@ const EstabelecimentosForm = () => {
         } else if (record.categoria_padrao_id) {
             loadSubcategorias(record.categoria_padrao_id)
         }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [paramId])
 
     useEffect(() => {
@@ -178,6 +180,7 @@ const EstabelecimentosForm = () => {
         if (!categoriaPadraoId) {
             setValue('subcategoria_padrao_id', null)
         }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [categoriaPadraoId])
 
     return (

@@ -58,7 +58,7 @@ const FaturaCartaoTitularModal = ({
     const [formError, setFormError] = useState<string | null>(null)
 
     const anosOptions = useMemo(() => AnosSelect(), [])
-    const bandeiras = error?.bandeiras ?? []
+    const bandeiras = useMemo(() => error?.bandeiras ?? [], [error])
     const bandeiraOptions: SelectOptions[] = useMemo(
         () => bandeiras.map((b) => toBandeiraSelectOption(toBandeiraSelectValue(b), b.label, b)),
         [bandeiras]

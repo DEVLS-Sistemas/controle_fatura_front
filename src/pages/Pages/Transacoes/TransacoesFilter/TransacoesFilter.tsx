@@ -99,6 +99,7 @@ const TransacoesFilter = ({
             }
         }
         load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [categoriaId])
 
     const syncFiltersToRef = () => {
@@ -111,10 +112,9 @@ const TransacoesFilter = ({
         setExporting(true)
         try {
             const filters = syncFiltersToRef()
-            Object.keys(filters).reduce(
-                (acc, k) => (!filters[k as keyof TransacoesSearch] && filters[k as keyof TransacoesSearch] !== 0 && delete acc[k], acc),
-                filters as Record<string, unknown>
-            )
+            Object.keys(filters).forEach((k) => {
+                if (!filters[k as keyof TransacoesSearch] && filters[k as keyof TransacoesSearch] !== 0) delete (filters as Record<string, unknown>)[k]
+            })
             const blob = await transacoesService.exportCsv(filters)
             const url = URL.createObjectURL(blob)
             const a = document.createElement('a')

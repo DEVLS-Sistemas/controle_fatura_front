@@ -19,10 +19,9 @@ import {
 
 const cleanSearchParams = (params: TransacoesSearch): Record<string, unknown> => {
     const clean: Record<string, unknown> = { ...params }
-    Object.keys(clean).reduce(
-        (acc, k) => (!clean[k] && clean[k] !== 0 && clean[k] !== false && delete acc[k], acc),
-        clean
-    )
+    Object.keys(clean).forEach((k) => {
+        if (!clean[k] && clean[k] !== 0 && clean[k] !== false) delete clean[k]
+    })
     delete clean.page
     delete clean.perPage
     return clean
@@ -196,10 +195,9 @@ export class TransacoesService implements TransacoesInterface {
     async exportCsv(params: TransacoesSearch): Promise<Blob> {
         const { ApiConfig } = await import('../../libs/api/ApiConfig')
         const cleanParams: Record<string, unknown> = { ...params }
-        Object.keys(cleanParams).reduce(
-            (acc, k) => (!cleanParams[k] && cleanParams[k] !== 0 && delete acc[k], acc),
-            cleanParams
-        )
+        Object.keys(cleanParams).forEach((k) => {
+            if (!cleanParams[k] && cleanParams[k] !== 0) delete cleanParams[k]
+        })
         const response = await ApiConfig.get(`${this.url}/exportar`, {
             params: cleanParams,
             responseType: 'blob',

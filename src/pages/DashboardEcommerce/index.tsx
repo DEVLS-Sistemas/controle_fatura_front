@@ -3,11 +3,8 @@ import { Col, Container, Row } from "reactstrap";
 import Widget from "./Widgets";
 import BestSellingProducts from "./BestSellingProducts";
 import RecentActivity from "./RecentActivity";
-import RecentOrders from "./RecentOrders";
 import Revenue from "./Revenue";
-import SalesByLocations from "./SalesByLocations";
 import Section from "./Section";
-import StoreVisits from "./StoreVisits";
 import TopSellers from "./TopSellers";
 
 const DashboardEcommerce = () => {
@@ -33,16 +30,11 @@ const DashboardEcommerce = () => {
                   <Col xl={12}>
                     <Revenue />
                   </Col>
-                  {/* <SalesByLocations /> */}
                 </Row>
                 <Row>
                   <BestSellingProducts />
                   <TopSellers />
                 </Row>
-                {/* <Row>
-                  <StoreVisits />
-                  <RecentOrders />
-                </Row> */}
               </div>
             </Col>
             <RecentActivity rightColumn={rightColumn} hideRightColumn={toggleRightColumn} />

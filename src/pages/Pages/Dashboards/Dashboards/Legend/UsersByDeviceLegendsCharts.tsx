@@ -1,4 +1,3 @@
-import { formatarParaMoedaSemSimbolo } from 'helpers/functions_helpers';
 import React from 'react';
 import CountUp from 'react-countup';
 

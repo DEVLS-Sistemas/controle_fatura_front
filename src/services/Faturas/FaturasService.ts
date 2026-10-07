@@ -4,7 +4,6 @@ import { UnexpectedError } from "../../libs/api/exceptions/UnexpectedError"
 import { ValidationError } from "../../libs/api/exceptions/ValidationError"
 import {
     ExcluirTodasFaturasResponse,
-    FaturasCartaoGroup,
     FaturasInterface,
     FaturasModel,
     FaturasPaginate,

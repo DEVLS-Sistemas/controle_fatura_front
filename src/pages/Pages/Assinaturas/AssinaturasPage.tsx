@@ -165,6 +165,7 @@ const AssinaturasPage = () => {
   useEffect(() => {
     loadLookups()
     setActiveMenu('/assinaturas')
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   return (

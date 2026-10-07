@@ -555,10 +555,6 @@ export const calcularImpactoSimulacao = (opts: {
   const respGeralBase = (opts.base.por_responsavel || []).find(
     (r) => Number(r.responsavel_id) === opts.responsavelId
   )
-  const respGeralOver = (opts.overlay.por_responsavel || []).find(
-    (r) => Number(r.responsavel_id) === opts.responsavelId
-  )
-
   const nesteAntes = cellTotal(respCartaoBase?.valores, idx)
   const geralAntes = cellTotal(respGeralBase?.valores, idx)
   const outrosAntes = roundMoney(geralAntes - nesteAntes)

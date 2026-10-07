@@ -107,6 +107,7 @@ export const CartoesTable = ({ data, getData, setPerPage, perPage, filters }: Ca
 
     useEffect(() => {
         if (data) handleThisRoute(data.first_page_url)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [perPage])
 
     return (

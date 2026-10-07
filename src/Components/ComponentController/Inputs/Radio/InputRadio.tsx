@@ -23,7 +23,6 @@ export const InputRadio = <T extends Record<keyof T, any>>({ disabled, required,
     const customSetValue = (value: any) => {
         return value && value.toString()
     }
-    const isDisabled = disabled ? { backgroundColor: '#f1f1f1', opacity: 1 } : {}
     return (
         < >
             {

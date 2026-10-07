@@ -1,7 +1,6 @@
 import { ValidatorForm } from 'Components/ComponentController/ValidatorForm/ValidatorForm'
 import { FieldValues, UseFormRegister } from 'react-hook-form'
 import { Path } from 'react-hook-form'
-import { Input } from 'reactstrap'
 
 export interface CheckboxInputProps<T extends FieldValues> {
     field: Path<T>

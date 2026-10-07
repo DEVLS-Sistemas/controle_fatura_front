@@ -15,13 +15,6 @@ interface CustomModalProps {
     required?: boolean;
     onConfirmDelete?: () => void;
 }
-interface DeleteModalProps {
-    show?: boolean;
-    onDeleteClick?: () => void;
-    onCloseClick?: () => void;
-    recordId?: string;
-}
-
 const CustomModal = ({ isOpen, toggle, title, body, position, centered, fullScreen, size, static: isStatic, delete: isDelete = false, required: isRequired = false,onConfirmDelete, }: CustomModalProps) => {
 
     return (

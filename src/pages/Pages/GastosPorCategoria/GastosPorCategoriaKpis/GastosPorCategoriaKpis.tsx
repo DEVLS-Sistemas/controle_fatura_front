@@ -1,7 +1,7 @@
 import React from 'react'
 import { Card, CardBody, Col, Row } from 'reactstrap'
 import { formatCurrency, VALOR_TEXT_CLASS } from 'helpers/fatura_helpers'
-import { formatPercentualApi, formatVariacao } from 'helpers/gastos_criticos_helpers'
+import { formatVariacao } from 'helpers/gastos_criticos_helpers'
 import { GastosPorCategoriaKpiView } from 'helpers/gastos_por_categoria_helpers'
 
 interface GastosPorCategoriaKpisProps {

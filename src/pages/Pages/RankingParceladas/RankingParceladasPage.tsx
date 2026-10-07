@@ -154,6 +154,7 @@ const RankingParceladasPage = () => {
     setVisualizacao(readVisualizacaoRanking())
     loadLookups()
     setActiveMenu('/parceladas')
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   return (

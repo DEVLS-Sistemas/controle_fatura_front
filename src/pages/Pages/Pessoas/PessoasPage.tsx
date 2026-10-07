@@ -34,7 +34,9 @@ const PessoasPage = () => {
     const [page, setPage] = useState(1)
 
     const getRemotePessoasList: SubmitHandler<any> = async (data): Promise<void> => {
-        Object.keys(data).reduce((acc, k) => (!data[k] && data[k] !== 0 && data[k] !== false && delete acc[k], acc), data)
+        Object.keys(data).forEach((k) => {
+            if (!data[k] && data[k] !== 0 && data[k] !== false) delete data[k]
+        })
         data.perPage = perPage
         const list = await pessoasService.listPessoasPaginate({ ...data, perPage })
         pessoasContext.palavra_chave = data.palavra_chave
@@ -49,6 +51,7 @@ const PessoasPage = () => {
 
     useEffect(() => {
         getRemotePessoasList(pessoasContext)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [perPage])
 
     return (

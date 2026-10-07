@@ -89,6 +89,7 @@ const LojasForm = () => {
         } else if (paramId && state?.source && !state.source.estabelecimentos) {
             loadRecord(paramId)
         }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [paramId])
 
     return (

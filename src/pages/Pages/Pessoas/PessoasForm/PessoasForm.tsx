@@ -94,6 +94,7 @@ const PessoasForm = () => {
         if (routeId && !state?.source) {
             loadRecord(routeId)
         }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [routeId])
 
     const title = isView ? 'Visualizar' : isEdit ? 'Editar' : 'Adicionar'

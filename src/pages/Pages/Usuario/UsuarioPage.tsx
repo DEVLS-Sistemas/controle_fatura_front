@@ -1,10 +1,7 @@
-import BreadCrumb from 'Components/Common/BreadCrumb';
-import React, { createContext, useContext, useEffect, useLayoutEffect, useState } from "react"
+import React, { createContext, useContext, useEffect, useState } from "react"
 import { Container, Spinner } from 'reactstrap';
 import UsuarioTable from './UsuarioTable/UsuarioTable';
 import UsuarioFilter from './UsuarioFilter/UsuarioFilter';
-import { UsuarioService } from 'services/UsuarioService';
-
 import { UsuarioList, UsuarioSearch } from 'interfaces/UsuarioInterface';
 import { SubmitHandler } from 'react-hook-form';
 import { PaginateInterface, PaginateSearch } from 'interfaces/SystemInterfaces/PaginateInterface';
@@ -33,16 +30,16 @@ const UsuarioPage = () => {
     // document.title = "Widgets | Velzon - React Admin & Dashboard Template";
     const [display, setDisplay] = useState<boolean>(false)
     const usuarioContext = useContext(UsuarioFilterContext)
-    const usuarioService = new UsuarioService();
     const [usuarioList, setUsuariosList] = useState<PaginateInterface<UsuarioList>>()
     const [perPage, setPerPage] = useState<number>(5);
     const [page, setPage] = useState(1)
 
     const getRemoteUsuarioList: SubmitHandler<any> = async (data): Promise<void> => {
-        Object.keys(data).reduce((acc, k) => (!data[k] && delete acc[k], acc), data)
+        Object.keys(data).forEach((k) => {
+            if (!data[k]) delete data[k]
+        })
 
         data.perPage = perPage
-        // const list = await usuarioService.listUsuariosPaginate({ ...data, perPage: perPage })
         usuarioContext.page = data.page
         usuarioContext.perPage = data.perPage
 
@@ -223,6 +220,7 @@ const UsuarioPage = () => {
 
     useEffect(() => {
         getRemoteUsuarioList(usuarioContext)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [perPage])
     return (
         <React.Fragment>

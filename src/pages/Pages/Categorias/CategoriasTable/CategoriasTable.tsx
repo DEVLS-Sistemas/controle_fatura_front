@@ -8,7 +8,6 @@ import {
 import { PaginateInterface, PaginateSearch, PerPageProps } from "interfaces/SystemInterfaces/PaginateInterface"
 import CustomModal from "Components/ComponentController/Modal/CustomModal"
 import TableActionsDropdown from "Components/Common/TableActionsDropdown"
-import { useNavegacao } from "helpers/functions_helpers"
 import { CategoriasList, CategoriasSearch } from "interfaces/Categorias/CategoriasInterface"
 import { CategoriasService } from "services/Categorias/CategoriasService"
 import { corCategoria } from "helpers/cores_tema_helpers"
@@ -34,8 +33,6 @@ export const CategoriasTable = ({ data, getData, setPerPage, setPage, perPage, f
     const categoriasService = new CategoriasService()
     const [modalIsOpen, setModalIsOpen] = useState(false)
     const [selectedId, setSelectedId] = useState<number | null>(null)
-    const { voltarParaRotaAnterior } = useNavegacao()
-
     const toggleModal = () => setModalIsOpen(!modalIsOpen)
 
     const handleRemoteDelete = async (id: number) => {
@@ -67,6 +64,7 @@ export const CategoriasTable = ({ data, getData, setPerPage, setPage, perPage, f
 
     useEffect(() => {
         if (data) handleThisRoute(data.first_page_url)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [perPage])
 
     return (
