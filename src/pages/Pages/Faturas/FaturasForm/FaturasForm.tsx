@@ -129,7 +129,7 @@ const FaturasForm = () => {
             cartao_bandeira_id: source.cartao_bandeira_id ?? null,
         }
     })
-    const { register, handleSubmit, control, setValue, watch, getValues, formState: { errors } } = useForm<FaturasModel>({
+    const { register, handleSubmit, control, setValue, watch, getValues, reset, formState: { errors } } = useForm<FaturasModel>({
         defaultValues: record
     })
     const [cartoesOptions, setCartoesOptions] = useState<SelectOptions[]>([])
@@ -203,7 +203,8 @@ const FaturasForm = () => {
     const navigate = useNavigate()
     const faturasService = useRef(new FaturasService()).current
     const cartoesService = useRef(new CartoesService()).current
-    const isEdit = Boolean(record.fatura_id)
+    const isEdit = Boolean(editRouteId || record.fatura_id)
+    const faturaIdEdicao = record.fatura_id ?? (editRouteId ? Number(editRouteId) : null)
     const cartaoId = watch('cartao_id')
 
     const camposManualObrigatorios = isEdit || !arquivoFile || exigeMetadadosManuais
@@ -839,11 +840,11 @@ const FaturasForm = () => {
             if (isEdit) {
                 await faturasService.editFaturas({
                     ...data,
-                    fatura_id: record.fatura_id,
-                    id: record.fatura_id,
+                    fatura_id: faturaIdEdicao,
+                    id: faturaIdEdicao,
                 })
                 toast.success('Fatura atualizada com sucesso')
-                navigate(`/faturas/view/${record.fatura_id}`)
+                navigate(`/faturas/view/${faturaIdEdicao}`)
                 return
             }
 
@@ -1254,6 +1255,30 @@ const FaturasForm = () => {
         getLookups()
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
+
+    useEffect(() => {
+        if (!editRouteId || state?.source) return
+        let cancelado = false
+        ;(async () => {
+            try {
+                const fatura = await faturasService.getViewFaturas({ id: editRouteId })
+                if (cancelado || !fatura) return
+                reset({
+                    ...FaturasDefaultValues,
+                    fatura_id: Number(fatura.id ?? editRouteId),
+                    cartao_id: fatura.cartao_id ?? null,
+                    cartao_bandeira_id: fatura.cartao_bandeira_id ?? null,
+                    mes: fatura.mes ?? null,
+                    ano: fatura.ano ?? null,
+                    pessoa_id: fatura.pessoa_id ?? null,
+                })
+            } catch {
+                if (!cancelado) toast.error('Não foi possível carregar a fatura para edição')
+            }
+        })()
+        return () => { cancelado = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [editRouteId])
 
     const divergeAbertoRef = useRef(false)
     useEffect(() => {

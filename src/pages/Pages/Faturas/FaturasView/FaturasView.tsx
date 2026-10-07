@@ -744,16 +744,7 @@ const FaturasViewPage = () => {
         cartoesLookup.find((c) => Number(c.id) === Number(cartaoId))
 
     const handlePdfSenhaError = (error: PdfSenhaError, opts?: { viaUpload?: boolean }): boolean => {
-        const temSenha = cartaoTemSenhaPdfSalva({
-            senhaMeta: error.senha_pdf ?? fatura?.senha_pdf,
-            cartao: fatura?.cartao,
-            lookup: lookupDoCartao(fatura?.cartao_id),
-        })
-        if (deveAbrirModalSenhaPdfDeErro(error, temSenha)) {
-            openSenhaModal(error.senha_pdf ?? null, { viaUpload: opts?.viaUpload })
-            return true
-        }
-        toast.error(error.message)
+        openSenhaModal(error.senha_pdf ?? null, { viaUpload: opts?.viaUpload })
         return true
     }
 
@@ -1007,20 +998,9 @@ const FaturasViewPage = () => {
             temCsv: faturaData?.tem_csv,
         })
         const precisaSenha = faturaPrecisaSenhaPdf(faturaData, envelope)
-        const temSenha = cartaoTemSenhaPdfSalva({
-            senhaMeta,
-            cartao: faturaData?.cartao ?? fatura?.cartao,
-            lookup: lookupDoCartao(faturaData?.cartao_id ?? fatura?.cartao_id),
-        })
-        const abrirModalSenha = deveAbrirModalSenhaPdf({
-            codigo: faturaData?.erro_codigo ?? envelope?.codigo ?? envelope?.erro_codigo,
-            motivo: senhaMeta?.motivo,
-            precisa_senha_pdf: precisaSenha,
-            temSenhaPdfCartao: temSenha,
-        })
 
         if (enviouArquivo && pdfNaoPersistiu) {
-            if (abrirModalSenha) {
+            if (precisaSenha) {
                 toast.info('Informe a senha do PDF para anexar o arquivo.')
                 if (realocado && destino?.id != null) {
                     navigate(`/faturas/view/${destino.id}`)
@@ -1036,7 +1016,7 @@ const FaturasViewPage = () => {
         if (fileInputRef.current) fileInputRef.current.value = ''
         pendingUploadFileRef.current = null
 
-        if (precisaSenha && abrirModalSenha) {
+        if (precisaSenha) {
             toast.info('Arquivo enviado. Informe a senha do PDF para continuar.')
             if (realocado && destino?.id != null) {
                 navigate(`/faturas/view/${destino.id}`)
@@ -1178,7 +1158,7 @@ const FaturasViewPage = () => {
                 return
             }
             if (error instanceof PdfSenhaError) {
-                handlePdfSenhaError(error, { viaUpload: true })
+                openSenhaModal(error.senha_pdf ?? null, { viaUpload: true })
                 return
             }
             toast.error((error as Error)?.message || 'Erro ao enviar arquivo')
@@ -2640,7 +2620,21 @@ const FaturasViewPage = () => {
                                         <button type="button" className="btn btn-soft-success" onClick={voltarParaRotaAnterior}>
                                             Voltar
                                         </button>
-                                        <Link to={`/faturas/edit/${id}`} className="btn btn-soft-primary">
+                                        <Link
+                                            to={`/faturas/edit/${id}`}
+                                            state={{
+                                                source: {
+                                                    id: fatura.id ?? id,
+                                                    fatura_id: fatura.id ?? id,
+                                                    cartao_id: fatura.cartao_id,
+                                                    cartao_bandeira_id: fatura.cartao_bandeira_id,
+                                                    mes: fatura.mes,
+                                                    ano: fatura.ano,
+                                                    pessoa_id: fatura.pessoa_id,
+                                                },
+                                            }}
+                                            className="btn btn-soft-primary"
+                                        >
                                             Editar
                                         </Link>
                                         {precisaSenhaPdf ? (
