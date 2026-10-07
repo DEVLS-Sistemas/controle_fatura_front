@@ -7,7 +7,8 @@ import { Link } from 'react-router-dom';
 import withRouter from '../../Components/Common/withRouter';
 import * as Yup from 'yup';
 import { useFormik } from 'formik';
-import logoLight from '../../assets/images/logo-light.png';
+import logoLight from '../../assets/images/logo-colorido.png';
+
 import { AuthService } from 'services/Auth';
 import { AUTH_LEMBRAR_EMAIL_KEY } from 'helpers/auth_session';
 import { toast } from 'react-toastify';
