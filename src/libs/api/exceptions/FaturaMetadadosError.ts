@@ -30,6 +30,15 @@ export type FaturaMetadadosConfianca =
 
 export type FaturaMetadadosModo = 'cadastrar_cartao' | 'confirmar_cartao'
 
+/** Outra fatura do mesmo cartão na mesma competência (Visa e Mastercard coexistem). */
+export type FaturaNoPeriodo = {
+    id: number
+    cartao_bandeira_id?: number | null
+    bandeira?: string | null
+    tem_anexo?: boolean
+    competencia?: string | null
+}
+
 export type FaturaMetadadosSugestao = {
     cartao_id?: number | null
     cartao_nome?: string | null
@@ -49,6 +58,7 @@ export type FaturaMetadadosSugestao = {
     acao_sugerida?: AcaoSugeridaFatura | string | null
     fatura_existente_id?: number | null
     fatura_existente?: FaturaExistenteAnexoDuplicado | null
+    faturas_periodo?: FaturaNoPeriodo[] | null
 }
 
 /** Campos reenviados no retry após confirmar metadados */
@@ -71,6 +81,26 @@ export type FaturaMetadadosRetryPayload = {
 
 export const FATURA_METADADOS_CODIGO = 'precisa_confirmar_metadados' as const
 
+export const parseFaturasPeriodo = (raw: unknown): FaturaNoPeriodo[] => {
+    if (!Array.isArray(raw)) return []
+    const lista: FaturaNoPeriodo[] = []
+    for (const item of raw) {
+        if (!item || typeof item !== 'object') continue
+        const rec = item as Record<string, unknown>
+        const id = Number(rec.id)
+        if (!Number.isFinite(id) || id <= 0) continue
+        const bandeiraId = Number(rec.cartao_bandeira_id)
+        lista.push({
+            id,
+            cartao_bandeira_id: Number.isFinite(bandeiraId) && bandeiraId > 0 ? bandeiraId : null,
+            bandeira: typeof rec.bandeira === 'string' ? rec.bandeira : null,
+            tem_anexo: Boolean(rec.tem_anexo),
+            competencia: typeof rec.competencia === 'string' ? rec.competencia : null,
+        })
+    }
+    return lista
+}
+
 /** Erro 422 — back leu cartão/mês/ano do arquivo e pede confirmação */
 export class FaturaMetadadosError extends Error {
     codigo?: string
@@ -82,6 +112,7 @@ export class FaturaMetadadosError extends Error {
     acao_sugerida: AcaoSugeridaFatura | null
     fatura_existente: FaturaExistenteAnexoDuplicado | null
     fatura_existente_id: number | null
+    faturas_periodo: FaturaNoPeriodo[]
     sugestao: FaturaMetadadosSugestao
     cartoes: FaturaMetadadosCartaoOption[]
     bandeiras: FaturaSelecaoBandeiraOption[]
@@ -125,6 +156,9 @@ export class FaturaMetadadosError extends Error {
         this.fatura_existente_id = Number.isFinite(existenteId) && existenteId > 0
             ? existenteId
             : (this.fatura_existente?.id ?? null)
+        this.faturas_periodo = parseFaturasPeriodo(
+            body?.faturas_periodo ?? this.sugestao.faturas_periodo
+        )
         this.cartoes = Array.isArray(body?.cartoes) ? body.cartoes : []
         this.bandeiras = Array.isArray(body?.bandeiras) ? body.bandeiras : []
         this.candidatos_cartao = Array.isArray(body?.candidatos_cartao)

@@ -102,6 +102,21 @@ export const resolveFaturaAnexoNomeOriginal = (
   return generico
 }
 
+/** Rótulo da tela: só `anexo_pdf_nome` / `anexo_csv_nome`. Null não inventa nome nem usa o path. */
+export const nomeAnexoFaturaExibicao = (
+  fatura: {
+    anexo_pdf_nome?: string | null
+    anexo_csv_nome?: string | null
+  } | null | undefined,
+  tipo: 'pdf' | 'csv',
+): string | null => {
+  if (!fatura) return null
+  const raw = tipo === 'pdf' ? fatura.anexo_pdf_nome : fatura.anexo_csv_nome
+  if (typeof raw !== 'string') return null
+  const nome = raw.trim()
+  return nome || null
+}
+
 export const rotulosFaturaAnexoNomes = (
   fatura: FaturaAnexoNomeSource | null | undefined,
 ): string[] => {

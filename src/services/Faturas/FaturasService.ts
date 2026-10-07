@@ -28,6 +28,7 @@ import { FaturaTitularError } from "../../libs/api/exceptions/FaturaTitularError
 import { FaturaCartaoTitularError } from "../../libs/api/exceptions/FaturaCartaoTitularError"
 import { FaturaAnexoDuplicadoError } from "../../libs/api/exceptions/FaturaAnexoDuplicadoError"
 import { FaturaJaAnexadaError } from "../../libs/api/exceptions/FaturaJaAnexadaError"
+import { FaturaArquivoDivergeAlvoError } from "../../libs/api/exceptions/FaturaArquivoDivergeAlvoError"
 import { FaturaProcessandoError } from "../../libs/api/exceptions/FaturaProcessandoError"
 
 export class FaturasService implements FaturasInterface {
@@ -99,6 +100,7 @@ export class FaturasService implements FaturasInterface {
     async createFaturas(params: FaturasModel) {
         const form = new FormData()
         Object.entries(params).forEach(([k, v]) => {
+            if (k === 'id' || k === 'fatura_id') return
             if (v === null || v === undefined) return
             if (k === 'arquivo_pdf' && v instanceof File) form.append('arquivo_pdf', v)
             else form.append(k, String(v))
@@ -129,6 +131,9 @@ export class FaturasService implements FaturasInterface {
                 }
                 if (FaturaProcessandoError.isFaturaProcessandoBody(body)) {
                     throw new FaturaProcessandoError(body)
+                }
+                if (FaturaArquivoDivergeAlvoError.isArquivoDivergeAlvoBody(body)) {
+                    throw new FaturaArquivoDivergeAlvoError(body)
                 }
                 if (FaturaJaAnexadaError.isFaturaJaAnexadaBody(body)) {
                     throw new FaturaJaAnexadaError(body)
@@ -321,6 +326,9 @@ export class FaturasService implements FaturasInterface {
                 }
                 if (FaturaProcessandoError.isFaturaProcessandoBody(body)) {
                     throw new FaturaProcessandoError(body)
+                }
+                if (FaturaArquivoDivergeAlvoError.isArquivoDivergeAlvoBody(body)) {
+                    throw new FaturaArquivoDivergeAlvoError(body)
                 }
                 if (FaturaJaAnexadaError.isFaturaJaAnexadaBody(body)) {
                     throw new FaturaJaAnexadaError(body)

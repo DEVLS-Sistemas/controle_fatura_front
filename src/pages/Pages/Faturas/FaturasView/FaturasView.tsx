@@ -10,14 +10,14 @@ import {
 } from 'reactstrap'
 import { toast } from 'react-toastify'
 import {
-    formatCurrency, formatDateBr, faturaStatusColor,
+    formatCurrency, formatDateBr, formatProcessadoEm, faturaStatusColor,
     faturaQuitacaoLabel, faturaQuitacaoColor,
     tipoTransacaoColor,
     resolveTipoTransacaoLabel,
     origemCompraLabel,
     isTransacaoOperacional,
     FATURA_FILE_ACCEPT, isValidFaturaFile, resolveFaturaAnexo, downloadFaturaAnexo,
-    faturaAnexoDownloadMetaFrom, resolveFaturaAnexoNomeOriginal, rotulosFaturaAnexoNomes,
+    faturaAnexoDownloadMetaFrom, nomeAnexoFaturaExibicao,
     getCategoriaFieldStyle, getSubcategoriaFieldStyle, getPlataformaFieldStyle, VALOR_TEXT_CLASS, isMeuResponsavelDisplay, nomeResponsavelPadraoNaoEu,
 } from 'helpers/fatura_helpers'
 import {
@@ -41,7 +41,7 @@ import {
     anexoDuplicadoRetryFields,
     extractFaturaMessage,
 } from 'helpers/fatura_anexo_duplicado_helpers'
-import { idFaturaAposSubstituir, substituirFaturaRetryFields, totalLancamentosAposReprocesso } from 'helpers/fatura_substituir_existente_helpers'
+import { idFaturaAposSubstituir, idFaturaEscolhida, substituirFaturaRetryFields, totalLancamentosAposReprocesso } from 'helpers/fatura_substituir_existente_helpers'
 import { isCompraAvista, isEhAssinatura } from 'helpers/assinaturas_helpers'
 import {
     contaNoTotalLinha,
@@ -74,7 +74,14 @@ import {
     ImpactoRemoverAnexoCompra,
 } from 'interfaces/Faturas/FaturasInterface'
 import { NumeroListItem, ParserHomologado, PARSERS_HOMOLOGADOS_PADRAO } from 'interfaces/Cartoes/CartoesInterface'
-import { CategoriaLookup, PlataformaLookup, CandidatoConciliacao, ResponsavelLookup, TransacoesList } from 'interfaces/Transacoes/TransacoesInterface'
+import { CategoriaLookup, PlataformaLookup, CandidatoConciliacao, ResponsavelLookup, TransacoesList, TransacoesModel } from 'interfaces/Transacoes/TransacoesInterface'
+import {
+    AplicarSubcategoriaPergunta,
+    parseAplicarSubcategoria,
+} from 'helpers/aplicar_subcategoria_helpers'
+import { linhaFaturaSemCategoria } from 'helpers/fatura_categoria_operacional_helpers'
+import AplicarSubcategoriaModal from 'Components/Faturas/AplicarSubcategoriaModal'
+import AplicarFinalCartaoModal from 'Components/Faturas/AplicarFinalCartaoModal'
 import { FaturasService } from 'services/Faturas/FaturasService'
 import { TransacoesService } from 'services/Transacoes/TransacoesService'
 import { SubcategoriasService } from 'services/Subcategorias/SubcategoriasService'
@@ -85,6 +92,7 @@ import SubcategoriaRapidoModal, { SubcategoriaRapidoConfirm } from 'pages/Pages/
 import PlataformaRapidoModal, { PlataformaRapidoConfirm } from 'pages/Pages/Transacoes/PlataformaRapidoModal/PlataformaRapidoModal'
 import FaturaSenhaPdfModal, { FaturaSenhaUnlockPayload } from 'Components/Faturas/FaturaSenhaPdfModal'
 import FaturaSelecaoModal, { FaturaSelecaoStep } from 'Components/Faturas/FaturaSelecaoModal'
+import { nomeBandeiraParaExibicao } from 'helpers/fatura_metadados_helpers'
 import FaturaTitularModal from 'Components/Faturas/FaturaTitularModal'
 import FaturaAnexoDuplicadoModal from 'Components/Faturas/FaturaAnexoDuplicadoModal'
 import FaturaJaAnexadaModal from 'Components/Faturas/FaturaJaAnexadaModal'
@@ -111,6 +119,7 @@ import {
 } from 'libs/api/exceptions/FaturaTitularError'
 import { FaturaAnexoDuplicadoError } from 'libs/api/exceptions/FaturaAnexoDuplicadoError'
 import { FaturaJaAnexadaError } from 'libs/api/exceptions/FaturaJaAnexadaError'
+import { FaturaArquivoDivergeAlvoError } from 'libs/api/exceptions/FaturaArquivoDivergeAlvoError'
 import { FaturaProcessandoError } from 'libs/api/exceptions/FaturaProcessandoError'
 import { getApiBaseUrl } from 'libs/api/ApiConfig'
 import { getAuthToken, handleUnauthorizedSession } from 'helpers/auth_session'
@@ -399,6 +408,16 @@ const FaturasViewPage = () => {
     const [jaAnexadaModalOpen, setJaAnexadaModalOpen] = useState(false)
     const [jaAnexadaLoading, setJaAnexadaLoading] = useState(false)
     const [jaAnexadaError, setJaAnexadaError] = useState<FaturaJaAnexadaError | null>(null)
+    const [aplicarSubcategoria, setAplicarSubcategoria] = useState<{
+        pergunta: AplicarSubcategoriaPergunta
+        payload: TransacoesModel
+    } | null>(null)
+    const [aplicarSubcategoriaLoading, setAplicarSubcategoriaLoading] = useState(false)
+    const [finalCartaoPendente, setFinalCartaoPendente] = useState<{
+        tx: TransacoesList
+        cartaoNumeroId: number
+    } | null>(null)
+    const [finalCartaoSaving, setFinalCartaoSaving] = useState(false)
     const [categoriasOptions, setCategoriasOptions] = useState<SelectOptions[]>([])
     const [categoriasLookup, setCategoriasLookup] = useState<CategoriaLookup[]>([])
     const [subcategoriasByCategoria, setSubcategoriasByCategoria] = useState<Record<number, SelectOptions[]>>({})
@@ -931,6 +950,17 @@ const FaturasViewPage = () => {
         if (error.precisa_selecionar_final || error.codigo === 'precisa_selecionar_final') {
             setSelecaoStep('final')
             setSelecaoNumeros(error.numeros)
+            const nomeDaFatura = error.cartao_bandeira_id == null
+                || fatura?.cartao_bandeira_id == null
+                || Number(fatura.cartao_bandeira_id) === Number(error.cartao_bandeira_id)
+                ? fatura?.bandeira
+                : null
+            const nome = nomeBandeiraParaExibicao({
+                nome: pendingSelecaoRef.current.bandeira ?? nomeDaFatura,
+                cartaoBandeiraId: error.cartao_bandeira_id,
+                opcoes: [...error.bandeiras, ...selecaoBandeiras],
+            })
+            if (nome) setSelecaoBandeiraNome(nome)
             if (error.cartao_bandeira_id != null) {
                 setSelecaoCartaoBandeiraId(error.cartao_bandeira_id)
                 pendingSelecaoRef.current = {
@@ -1051,6 +1081,36 @@ const FaturasViewPage = () => {
         await loadLookups()
     }
 
+    const abrirCadastroSeArquivoDiverge = (error: unknown): boolean => {
+        if (!(error instanceof FaturaArquivoDivergeAlvoError)) return false
+        setJaAnexadaModalOpen(false)
+        setJaAnexadaError(null)
+        setAnexoDuplicadoModalOpen(false)
+        setSelecaoModalOpen(false)
+        setTitularModalOpen(false)
+        pendingJaAnexadaIdRef.current = null
+        const file = pendingUploadFileRef.current ?? fileInputRef.current?.files?.[0] ?? null
+        navigate('/faturas/add', {
+            state: {
+                source: {
+                    mes: error.sugestao?.mes ?? null,
+                    ano: error.sugestao?.ano ?? null,
+                },
+                arquivoDiverge: error.body ?? {
+                    error: true,
+                    codigo: 'arquivo_diverge_alvo',
+                    arquivo_diverge_alvo: true,
+                    acao_sugerida: 'cadastrar',
+                    message: error.message,
+                    orientacao: error.orientacao,
+                    sugestao: error.sugestao,
+                },
+                arquivoPendente: file,
+            },
+        })
+        return true
+    }
+
     const handleUploadPdf = async (opts?: { skipHomologConfirm?: boolean }) => {
         const file = fileInputRef.current?.files?.[0] ?? pendingUploadFileRef.current
         if (!file || !id) {
@@ -1092,6 +1152,7 @@ const FaturasViewPage = () => {
             })
             await handleUploadSuccess(result)
         } catch (error) {
+            if (abrirCadastroSeArquivoDiverge(error)) return
             if (avisarFaturaProcessando(error)) return
             if (error instanceof FaturaTitularError) {
                 setTitularTitulares(error.titulares)
@@ -1185,11 +1246,23 @@ const FaturasViewPage = () => {
             setSelecaoModalOpen(false)
             await handleUploadSuccess(result)
         } catch (error) {
+            if (abrirCadastroSeArquivoDiverge(error)) return
             if (avisarFaturaProcessando(error)) return
             if (error instanceof FaturaSelecaoError) {
                 if (error.precisa_selecionar_final || error.codigo === 'precisa_selecionar_final') {
                     setSelecaoStep('final')
                     setSelecaoNumeros(error.numeros)
+                    const nomeDaFatura = error.cartao_bandeira_id == null
+                        || fatura?.cartao_bandeira_id == null
+                        || Number(fatura.cartao_bandeira_id) === Number(error.cartao_bandeira_id)
+                        ? fatura?.bandeira
+                        : null
+                    const nome = nomeBandeiraParaExibicao({
+                        nome: pendingSelecaoRef.current.bandeira ?? nomeDaFatura,
+                        cartaoBandeiraId: error.cartao_bandeira_id,
+                        opcoes: error.bandeiras,
+                    })
+                    if (nome) setSelecaoBandeiraNome(nome)
                     if (error.cartao_bandeira_id != null) {
                         setSelecaoCartaoBandeiraId(error.cartao_bandeira_id)
                         pendingSelecaoRef.current = {
@@ -1256,6 +1329,7 @@ const FaturasViewPage = () => {
             setTitularModalOpen(false)
             await handleUploadSuccess(result)
         } catch (error) {
+            if (abrirCadastroSeArquivoDiverge(error)) return
             if (avisarFaturaProcessando(error)) return
             if (error instanceof FaturaSelecaoError) {
                 setTitularModalOpen(false)
@@ -1314,6 +1388,7 @@ const FaturasViewPage = () => {
             setAnexoDuplicadoModalOpen(false)
             await handleUploadSuccess(result)
         } catch (error) {
+            if (abrirCadastroSeArquivoDiverge(error)) return
             if (avisarFaturaProcessando(error)) return
             if (error instanceof FaturaAnexoDuplicadoError) {
                 setAnexoDuplicadoError(error)
@@ -1353,7 +1428,7 @@ const FaturasViewPage = () => {
 
     const handleJaAnexadaSubstituir = async () => {
         const file = pendingUploadFileRef.current ?? fileInputRef.current?.files?.[0]
-        const existingId = jaAnexadaError?.fatura_existente_id ?? jaAnexadaError?.fatura_existente?.id
+        const existingId = idFaturaEscolhida(jaAnexadaError?.fatura_existente) ?? jaAnexadaError?.fatura_existente_id
         if (!file || existingId == null) {
             toast.warning('Selecione um arquivo PDF ou CSV')
             return
@@ -1374,6 +1449,7 @@ const FaturasViewPage = () => {
             await handleUploadSuccess(result)
         } catch (error) {
             pendingJaAnexadaIdRef.current = null
+            if (abrirCadastroSeArquivoDiverge(error)) return
             if (avisarFaturaProcessando(error)) return
             if (error instanceof FaturaJaAnexadaError) {
                 setJaAnexadaError(error)
@@ -1430,6 +1506,7 @@ const FaturasViewPage = () => {
             setAnexoDuplicadoModalOpen(false)
             await handleUploadSuccess(result)
         } catch (error) {
+            if (abrirCadastroSeArquivoDiverge(error)) return
             if (error instanceof FaturaAnexoDuplicadoError) {
                 setAnexoDuplicadoError(error)
                 return
@@ -1618,8 +1695,7 @@ const FaturasViewPage = () => {
                 ? patch.eh_assinatura
                 : (tx.eh_assinatura ?? null)
             const { propagar_grupo: propagarGrupo, ...rowPatch } = patch
-
-            await transacoesService.editTransacoes({
+            const payload: TransacoesModel = {
                 id: tx.id,
                 transacao_id: tx.id,
                 cartao_id: tx.cartao_id ?? null,
@@ -1638,7 +1714,17 @@ const FaturasViewPage = () => {
                 responsavel_id: patch.responsavel_id !== undefined ? patch.responsavel_id : (tx.responsavel_id ?? null),
                 observacoes: patch.observacoes !== undefined ? patch.observacoes : (tx.observacoes ?? null),
                 propagar_grupo: propagarGrupo || undefined,
-            })
+            }
+
+            const resposta = await transacoesService.editTransacoes(payload)
+            const gravouClassificacao = patch.categoria_id !== undefined || patch.subcategoria_id !== undefined
+            const temCategoria = categoriaId != null && Number(categoriaId) > 0
+            const pergunta = gravouClassificacao && temCategoria
+                ? parseAplicarSubcategoria(resposta)
+                : null
+            if (pergunta) {
+                setAplicarSubcategoria({ pergunta, payload })
+            }
             setTransacoes((prev) =>
                 prev.map((item) => {
                     const sameGrupo = Boolean(
@@ -1712,6 +1798,29 @@ const FaturasViewPage = () => {
         }
     }
 
+    const handleCancelarAplicarSubcategoria = () => {
+        if (aplicarSubcategoriaLoading) return
+        setAplicarSubcategoria(null)
+    }
+
+    const handleAplicarSubcategoria = async () => {
+        if (!aplicarSubcategoria || !id) return
+        setAplicarSubcategoriaLoading(true)
+        try {
+            await transacoesService.editTransacoes({
+                ...aplicarSubcategoria.payload,
+                aplicar_subcategoria_estabelecimento: true,
+            })
+            await loadTransacoes(id)
+            setAplicarSubcategoria(null)
+        } catch (error) {
+            console.error('Erro ao aplicar subcategoria:', error)
+            toast.error('Erro ao aplicar a subcategoria nas outras compras')
+        } finally {
+            setAplicarSubcategoriaLoading(false)
+        }
+    }
+
     const handleUpdateSelect = async (
         tx: TransacoesList,
         field: 'categoria_id' | 'subcategoria_id' | 'responsavel_id' | 'plataforma_id',
@@ -1777,68 +1886,40 @@ const FaturasViewPage = () => {
         await saveTransacao(tx, { eh_assinatura: next })
     }
 
-    const handleUpdateFinal = async (tx: TransacoesList, value: string) => {
-        if (!tx.id || !id) return
-        const parsed = value === '' ? null : Number(value)
-        const current = finalSelecionados[tx.id] !== undefined
-            ? finalSelecionados[tx.id]
-            : (tx.cartao_numero_id ?? tx.cartao_numero?.id ?? null)
-        if ((current == null && parsed == null) || Number(current) === Number(parsed)) return
-
-        let propagarGrupo = false
-        if (tx.compra_grupo_id && parsed != null) {
-            propagarGrupo = window.confirm(
-                'Esta compra é parcelada. Deseja aplicar o final a todas as parcelas?'
-            )
-        }
-
+    const persistirFinal = async (
+        tx: TransacoesList,
+        cartaoNumeroId: number | null,
+        propagar: boolean,
+    ): Promise<boolean> => {
+        if (!tx.id || !id) return false
         setSavingIds((prev) => ({ ...prev, [tx.id!]: true }))
         try {
             await transacoesService.editTransacoes({
                 id: tx.id,
-                transacao_id: tx.id,
-                cartao_id: tx.cartao_id ?? fatura?.cartao_id ?? null,
-                fatura_id: tx.fatura_id ?? Number(id),
-                estabelecimento_id: tx.estabelecimento_id ?? null,
-                estabelecimento: tx.estabelecimento_id ? undefined : (tx.estabelecimento ?? null),
-                valor: tx.valor ?? null,
-                valor_parcela: tx.valor ?? null,
-                data: tx.data ?? null,
-                tipo: tx.tipo ?? null,
-                origem_compra: tx.origem_compra ?? null,
-                categoria_id: tx.categoria_id ?? null,
-                subcategoria_id: tx.subcategoria_id ?? null,
-                plataforma_id: tx.plataforma_id ?? null,
-                responsavel_id: tx.responsavel_id ?? null,
-                observacoes: tx.observacoes ?? null,
-                cartao_numero_id: parsed,
-                propagar_grupo: propagarGrupo,
-            })
+                cartao_numero_id: cartaoNumeroId,
+                ...(propagar ? { propagar_grupo: true } : {}),
+            } as TransacoesModel)
 
-            // Mantém a linha em “Pagamentos e Financiamentos”; redistribui só ao atualizar a tela
-            setFinalSelecionados((prev) => {
-                const next = { ...prev, [tx.id!]: parsed }
-                if (propagarGrupo && tx.compra_grupo_id) {
-                    transacoes.forEach((item) => {
-                        if (
-                            item.id != null
-                            && item.compra_grupo_id === tx.compra_grupo_id
-                            && (item.cartao_numero_id == null && item.cartao_numero?.id == null)
-                        ) {
-                            next[item.id] = parsed
-                        }
-                    })
-                }
-                return next
-            })
+            if (propagar) {
+                await loadTransacoes(id)
+                toast.success('Final aplicado em todas as parcelas.')
+                return true
+            }
+
+            setFinalSelecionados((prev) => ({ ...prev, [tx.id!]: cartaoNumeroId }))
+            const parcelada = Number(tx.parcelas_total ?? 0) > 1
             toast.success(
-                parsed == null
+                cartaoNumeroId == null
                     ? 'Final removido. Atualize a tela para redistribuir.'
-                    : 'Final salvo. Atualize a tela para redistribuir as transações.'
+                    : parcelada
+                        ? 'Final salvo nesta parcela. Atualize a tela para redistribuir.'
+                        : 'Final salvo. Atualize a tela para redistribuir as transações.'
             )
+            return true
         } catch (error) {
             console.error('Erro ao atualizar final do cartão:', error)
             toast.error('Erro ao atualizar final do cartão')
+            return false
         } finally {
             setSavingIds((prev) => {
                 const next = { ...prev }
@@ -1846,6 +1927,38 @@ const FaturasViewPage = () => {
                 return next
             })
         }
+    }
+
+    const handleUpdateFinal = async (tx: TransacoesList, value: string) => {
+        if (!tx.id || !id || finalCartaoSaving) return
+        const parsed = value === '' ? null : Number(value)
+        const current = finalSelecionados[tx.id] !== undefined
+            ? finalSelecionados[tx.id]
+            : (tx.cartao_numero_id ?? tx.cartao_numero?.id ?? null)
+        if ((current == null && parsed == null) || Number(current) === Number(parsed)) return
+
+        if (Number(tx.parcelas_total ?? 0) > 1 && parsed != null) {
+            setFinalCartaoPendente({ tx, cartaoNumeroId: parsed })
+            return
+        }
+
+        await persistirFinal(tx, parsed, false)
+    }
+
+    const handleFinalCartaoSim = async () => {
+        if (!finalCartaoPendente || finalCartaoSaving) return
+        setFinalCartaoSaving(true)
+        const ok = await persistirFinal(finalCartaoPendente.tx, finalCartaoPendente.cartaoNumeroId, true)
+        setFinalCartaoSaving(false)
+        if (ok) setFinalCartaoPendente(null)
+    }
+
+    const handleFinalCartaoNao = async () => {
+        if (!finalCartaoPendente || finalCartaoSaving) return
+        setFinalCartaoSaving(true)
+        const ok = await persistirFinal(finalCartaoPendente.tx, finalCartaoPendente.cartaoNumeroId, false)
+        setFinalCartaoSaving(false)
+        if (ok) setFinalCartaoPendente(null)
     }
 
     const handleValorBlur = async (tx: TransacoesList) => {
@@ -2134,9 +2247,8 @@ const FaturasViewPage = () => {
     const isProcessing = fatura.status === 'pendente' || fatura.status === 'processando'
     const precisaSenhaPdf = deveAbrirModalSenhaPdfDeFatura(fatura, cartoesLookup.find((c) => Number(c.id) === Number(fatura.cartao_id)))
     const anexo = resolveFaturaAnexo(fatura)
-    const nomesAnexo = rotulosFaturaAnexoNomes(fatura)
-    const nomePdf = resolveFaturaAnexoNomeOriginal(fatura, 'pdf')
-    const nomeCsv = resolveFaturaAnexoNomeOriginal(fatura, 'csv')
+    const nomePdf = nomeAnexoFaturaExibicao(fatura, 'pdf')
+    const nomeCsv = nomeAnexoFaturaExibicao(fatura, 'csv')
     const podeRemover = podeRemoverAnexo(fatura)
     const competenciaAtual = fatura.competencia ?? formatPeriodo(fatura.mes, fatura.ano)
     const bandeiraLabel = fatura.bandeira || fatura.cartao_bandeira
@@ -2298,6 +2410,8 @@ const FaturasViewPage = () => {
                                     state={{
                                         source: {
                                             cartao_id: fatura.cartao_id ?? null,
+                                            mes: fatura.mes ?? null,
+                                            ano: fatura.ano ?? null,
                                         },
                                     }}
                                 >
@@ -2437,18 +2551,18 @@ const FaturasViewPage = () => {
                                         </Badge>
                                     </span>
                                     <span><strong>Lançamentos:</strong> {totalTransacoes}</span>
-                                    {fatura.processado_em && (
-                                        <span><strong>Processado em:</strong> {formatDateBr(fatura.processado_em)}</span>
+                                    {formatProcessadoEm(fatura.processado_em) && (
+                                        <span><strong>Processado em:</strong> {formatProcessadoEm(fatura.processado_em)}</span>
                                     )}
                                 </div>
                             </div>
 
                             <div className="bg-light rounded p-3 mb-3">
-                                <Row className="g-3 text-center text-md-start">
+                                <Row className="g-3 text-center">
                                     <Col xs={6} md={3}>
                                         <small className="text-muted text-uppercase d-block">Total da fatura</small>
                                         <span
-                                            className={`fw-semibold ${totaisConciliacao.temComprasNaoConciliadas ? 'text-warning' : 'text-primary'} ${VALOR_TEXT_CLASS} d-block`}
+                                            className={`fw-semibold ${totaisConciliacao.temComprasNaoConciliadas ? 'text-warning' : 'text-primary'} d-block`}
                                             style={{ fontSize: '1.5rem', lineHeight: 1.2 }}
                                         >
                                             {formatCurrency(totaisConciliacao.valorTotalComPendencias)}
@@ -2457,7 +2571,7 @@ const FaturasViewPage = () => {
                                     <Col xs={6} md={3}>
                                         <small className="text-muted text-uppercase d-block">Total pago</small>
                                         <span
-                                            className={`fw-semibold text-success ${VALOR_TEXT_CLASS} d-block`}
+                                            className="fw-semibold text-success d-block"
                                             style={{ fontSize: '1.5rem', lineHeight: 1.2 }}
                                         >
                                             {formatCurrency(fatura.valor_pago)}
@@ -2466,17 +2580,16 @@ const FaturasViewPage = () => {
                                     <Col xs={6} md={3}>
                                         <small className="text-muted text-uppercase d-block">Restante</small>
                                         <span
-                                            className={`fw-semibold ${Number(fatura.valor_restante ?? 0) > 0 ? 'text-warning' : 'text-muted'} ${VALOR_TEXT_CLASS} d-block`}
+                                            className={`fw-semibold ${Number(fatura.valor_restante ?? 0) > 0 ? 'text-warning' : 'text-muted'} d-block`}
                                             style={{ fontSize: '1.5rem', lineHeight: 1.2 }}
                                         >
                                             {formatCurrency(fatura.valor_restante)}
                                         </span>
                                     </Col>
-                                    <Col xs={6} md={3} className="d-flex flex-column justify-content-center">
+                                    <Col xs={6} md={3} className="d-flex flex-column align-items-center justify-content-center">
                                         <small className="text-muted text-uppercase d-block mb-1">Status</small>
                                         <Badge
                                             color={faturaQuitacaoColor(fatura.pago)}
-                                            className="align-self-md-start"
                                             style={{ fontSize: '0.95rem' }}
                                         >
                                             {faturaQuitacaoLabel(fatura.pago)}
@@ -2838,6 +2951,7 @@ const FaturasViewPage = () => {
                                                         const precisaConciliar = precisaConciliarCompra(tx)
                                                         const sugestaoConciliacao = temSugestaoConciliacao(tx)
                                                         const contaNoTotal = contaNoTotalLinha(tx)
+                                                        const semCategoria = linhaFaturaSemCategoria(tx)
                                                         const rowClass = precisaConciliar
                                                             ? 'table-warning'
                                                             : sugestaoConciliacao
@@ -2863,7 +2977,7 @@ const FaturasViewPage = () => {
                                                                                 bsSize="sm"
                                                                                 style={{ maxWidth: 320 }}
                                                                                 value={selectFinalValue}
-                                                                                disabled={!!savingIds[tx.id!]}
+                                                                                disabled={!!savingIds[tx.id!] || finalCartaoPendente != null}
                                                                                 className={finalSalvo == null ? 'border-warning' : undefined}
                                                                                 title="Definir final do cartão"
                                                                                 onChange={(e) => handleUpdateFinal(tx, e.target.value)}
@@ -2973,6 +3087,9 @@ const FaturasViewPage = () => {
                                                                 ) : null}
                                                             </td>
                                                             <td style={{ minWidth: 160 }}>
+                                                                {semCategoria ? (
+                                                                    <span>{resolveTipoTransacaoLabel(tx.tipo, tx.tipo_label)}</span>
+                                                                ) : (
                                                                 <div className="d-flex gap-1 align-items-center">
                                                                     <Input
                                                                         type="select"
@@ -3007,8 +3124,10 @@ const FaturasViewPage = () => {
                                                                         <i className="ri-add-line"></i>
                                                                     </Button>
                                                                 </div>
+                                                                )}
                                                             </td>
                                                             <td style={{ minWidth: 160 }}>
+                                                                {semCategoria ? null : (
                                                                 <div className="d-flex gap-1 align-items-center">
                                                                     <Input
                                                                         type="select"
@@ -3043,6 +3162,7 @@ const FaturasViewPage = () => {
                                                                         <i className="ri-add-line"></i>
                                                                     </Button>
                                                                 </div>
+                                                                )}
                                                             </td>
                                                             <td style={{ minWidth: 160 }}>
                                                                 <div className="d-flex gap-1 align-items-center">
@@ -3153,6 +3273,21 @@ const FaturasViewPage = () => {
                         </CardBody>
                     </Card>
 
+                    <AplicarFinalCartaoModal
+                        isOpen={finalCartaoPendente != null}
+                        loading={finalCartaoSaving}
+                        onSim={handleFinalCartaoSim}
+                        onNao={handleFinalCartaoNao}
+                    />
+
+                    <AplicarSubcategoriaModal
+                        isOpen={aplicarSubcategoria != null}
+                        pergunta={aplicarSubcategoria?.pergunta ?? null}
+                        loading={aplicarSubcategoriaLoading}
+                        onAplicar={handleAplicarSubcategoria}
+                        onCancelar={handleCancelarAplicarSubcategoria}
+                    />
+
                     <ResponsavelModal
                         isOpen={responsavelModalOpen}
                         toggle={() => {
@@ -3224,11 +3359,6 @@ const FaturasViewPage = () => {
                             <div className="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
                                 <div>
                                     <h5 className="card-title mb-0">Anexos da fatura</h5>
-                                    {nomesAnexo.length > 0 && (
-                                        <div className="small text-muted mt-1">
-                                            {nomesAnexo.join(' · ')}
-                                        </div>
-                                    )}
                                 </div>
                                 <div className="d-flex flex-wrap gap-2">
                                     {anexo.temPdf && (
@@ -3236,10 +3366,19 @@ const FaturasViewPage = () => {
                                             color="danger"
                                             outline
                                             size="sm"
+                                            className="d-inline-flex align-items-center"
                                             onClick={() => handleDownloadAnexo('pdf')}
                                         >
                                             <i className="mdi mdi-file-pdf-box me-1"></i>
-                                            Baixar PDF
+                                            {nomePdf ? (
+                                                <span
+                                                    className="text-truncate d-inline-block"
+                                                    style={{ maxWidth: 220 }}
+                                                    title={nomePdf}
+                                                >
+                                                    {nomePdf}
+                                                </span>
+                                            ) : 'Baixar PDF'}
                                         </Button>
                                     )}
                                     {anexo.temCsv && (
@@ -3247,10 +3386,19 @@ const FaturasViewPage = () => {
                                             color="success"
                                             outline
                                             size="sm"
+                                            className="d-inline-flex align-items-center"
                                             onClick={() => handleDownloadAnexo('csv')}
                                         >
                                             <i className="las la-file-csv me-1"></i>
-                                            Baixar CSV
+                                            {nomeCsv ? (
+                                                <span
+                                                    className="text-truncate d-inline-block"
+                                                    style={{ maxWidth: 220 }}
+                                                    title={nomeCsv}
+                                                >
+                                                    {nomeCsv}
+                                                </span>
+                                            ) : 'Baixar CSV'}
                                         </Button>
                                     )}
                                     {podeRemover && anexo.temPdf && anexo.temCsv ? (

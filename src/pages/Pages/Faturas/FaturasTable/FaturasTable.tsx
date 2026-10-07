@@ -11,10 +11,10 @@ import TableActionsDropdown from "Components/Common/TableActionsDropdown"
 import TablePagination from "Components/Common/TablePagination"
 import { useNavegacao } from "helpers/functions_helpers"
 import {
-    formatCurrency, formatDateBr, faturaStatusColor,
+    formatCurrency, formatDateBr, formatProcessadoEm, faturaStatusColor,
     faturaQuitacaoLabel, faturaQuitacaoColor, VALOR_TEXT_CLASS,
     resolveFaturaAnexo, downloadFaturaAnexo, FaturaAnexoDownloadTipo, FaturaAnexoDownloadMeta,
-    faturaAnexoDownloadMetaFrom, rotulosFaturaAnexoNomes,
+    faturaAnexoDownloadMetaFrom, nomeAnexoFaturaExibicao,
 } from "helpers/fatura_helpers"
 import { TOOLTIP_ICONE_PDF_LISTAGEM } from "helpers/fatura_competencia_pdf_helpers"
 import { parseAnoFiltro, parseMesFiltro } from "helpers/fatura_listagem_helpers"
@@ -270,8 +270,9 @@ export const FaturasTable = ({ data, getData, setPerPage, perPage, filters }: Fa
                                                                 <th scope="col" className={VALOR_TEXT_CLASS}>Total</th>
                                                                 <th scope="col" className={VALOR_TEXT_CLASS}>Pago</th>
                                                                 <th scope="col" className={VALOR_TEXT_CLASS}>Restante</th>
-                                                                <th scope="col">Quitação</th>
+                                                                <th scope="col" className={VALOR_TEXT_CLASS}>Quitação</th>
                                                                 <th scope="col">Status PDF</th>
+                                                                <th scope="col">Processado em</th>
                                                                 <th scope="col">Lançamentos</th>
                                                                 <th scope="col" style={{ width: "220px" }}>Ações</th>
                                                             </tr>
@@ -279,13 +280,15 @@ export const FaturasTable = ({ data, getData, setPerPage, perPage, filters }: Fa
                                                         <tbody>
                                                             {rows.length === 0 ? (
                                                                 <tr>
-                                                                    <td colSpan={12} className="text-muted py-4">
+                                                                    <td colSpan={13} className="text-muted py-4">
                                                                         Nenhuma fatura neste período
                                                                     </td>
                                                                 </tr>
                                                             ) : (
                                                                 rows.map((row, index) => {
                                                                     const anexo = resolveFaturaAnexo(row)
+                                                                    const nomePdf = nomeAnexoFaturaExibicao(row, 'pdf')
+                                                                    const nomeCsv = nomeAnexoFaturaExibicao(row, 'csv')
                                                                     const multiBandeira = row.cartao_id != null
                                                                         && (bandeirasPorCartao.get(row.cartao_id)?.size ?? 0) > 1
                                                                     const cores = resolveCartaoCores({
@@ -330,9 +333,9 @@ export const FaturasTable = ({ data, getData, setPerPage, perPage, filters }: Fa
                                                                         </td>
                                                                         <td>
                                                                             {(anexo.temPdf || anexo.temCsv) ? (
-                                                                                <div className="d-inline-flex flex-column align-items-center gap-1">
-                                                                                    <div className="d-inline-flex align-items-center gap-1">
-                                                                                        {anexo.temPdf && (
+                                                                                <div className="d-inline-flex align-items-center gap-2 flex-wrap">
+                                                                                    {anexo.temPdf && (
+                                                                                        <div className="d-inline-flex align-items-center gap-1">
                                                                                             <button
                                                                                                 type="button"
                                                                                                 className="btn btn-link p-0 border-0"
@@ -341,8 +344,19 @@ export const FaturasTable = ({ data, getData, setPerPage, perPage, filters }: Fa
                                                                                             >
                                                                                                 <i className="mdi mdi-file-pdf-box text-danger fs-4" />
                                                                                             </button>
-                                                                                        )}
-                                                                                        {anexo.temCsv && (
+                                                                                            {nomePdf && (
+                                                                                                <span
+                                                                                                    className="small text-muted text-truncate d-inline-block"
+                                                                                                    style={{ maxWidth: 180 }}
+                                                                                                    title={nomePdf}
+                                                                                                >
+                                                                                                    {nomePdf}
+                                                                                                </span>
+                                                                                            )}
+                                                                                        </div>
+                                                                                    )}
+                                                                                    {anexo.temCsv && (
+                                                                                        <div className="d-inline-flex align-items-center gap-1">
                                                                                             <button
                                                                                                 type="button"
                                                                                                 className="btn btn-link p-0 border-0"
@@ -351,18 +365,17 @@ export const FaturasTable = ({ data, getData, setPerPage, perPage, filters }: Fa
                                                                                             >
                                                                                                 <i className="las la-file-csv text-success fs-4" />
                                                                                             </button>
-                                                                                        )}
-                                                                                    </div>
-                                                                                    {rotulosFaturaAnexoNomes(row).map((nome) => (
-                                                                                        <div
-                                                                                            key={nome}
-                                                                                            className="small text-muted text-truncate"
-                                                                                            style={{ maxWidth: 200 }}
-                                                                                            title={nome}
-                                                                                        >
-                                                                                            {nome}
+                                                                                            {nomeCsv && (
+                                                                                                <span
+                                                                                                    className="small text-muted text-truncate d-inline-block"
+                                                                                                    style={{ maxWidth: 180 }}
+                                                                                                    title={nomeCsv}
+                                                                                                >
+                                                                                                    {nomeCsv}
+                                                                                                </span>
+                                                                                            )}
                                                                                         </div>
-                                                                                    ))}
+                                                                                    )}
                                                                                 </div>
                                                                             ) : null}
                                                                         </td>
@@ -387,7 +400,7 @@ export const FaturasTable = ({ data, getData, setPerPage, perPage, filters }: Fa
                                                                         <td className={VALOR_TEXT_CLASS}>
                                                                             {formatCurrency(row.valor_restante)}
                                                                         </td>
-                                                                        <td>
+                                                                        <td className={VALOR_TEXT_CLASS}>
                                                                             <span className={`badge bg-${faturaQuitacaoColor(row.pago)}`}>
                                                                                 {faturaQuitacaoLabel(row.pago)}
                                                                             </span>
@@ -397,6 +410,7 @@ export const FaturasTable = ({ data, getData, setPerPage, perPage, filters }: Fa
                                                                                 {statusLabel[row.status ?? ''] ?? row.status}
                                                                             </span>
                                                                         </td>
+                                                                        <td>{formatProcessadoEm(row.processado_em)}</td>
                                                                         <td>
                                                                             <span className="text-muted">
                                                                                 {row.total_transacoes ?? 0}

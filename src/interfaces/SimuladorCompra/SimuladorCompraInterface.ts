@@ -5,10 +5,12 @@ import { ResponsavelLookup } from 'interfaces/Transacoes/TransacoesInterface'
 export interface SimuladorCompraFormValues {
   pessoa_id: number | string | null
   cartao_id: number | string | null
+  cartao_bandeira_id: number | string | null
   responsavel_id: number | string | null
   valor_compra: string | number | null
   parcelas_total: number | string | null
   data: string | null
+  observacoes: string
   mes: number | null
   ano: number | null
 }
@@ -105,3 +107,34 @@ export interface SimuladorVeredito {
 export type SimuladorTitular = PessoaListItem
 export type SimuladorCartao = ProjecaoPorCartao
 export type SimuladorResponsavel = ResponsavelLookup
+
+/** Item da lista da etapa 1, já com o mínimo da compra rápida. */
+export interface SimulacaoLoteParcela {
+  parcela: number
+  valor: string
+}
+
+export interface SimulacaoLoteItem {
+  observacoes: string
+  valor_compra: string | number
+  data: string
+  cartao_id: number
+  cartao_nome?: string
+  cartao_bandeira_id?: number | null
+  bandeira_nome?: string | null
+  pessoa_id?: number | null
+  dia_limite_fatura?: number | null
+  responsavel_nome?: string | null
+  parcelas_total: number
+  parcelas?: SimulacaoLoteParcela[]
+  cartao_numero_id?: number | null
+  origem_compra?: string | null
+  plataforma_id?: number | null
+  categoria_id?: number | null
+  subcategoria_id?: number | null
+  responsavel_id?: number | null
+  fatura_id?: number | null
+  eh_assinatura?: boolean | null
+}
+
+export type FaseSimulacaoLote = 'idle' | 'lista' | 'resultado'

@@ -152,6 +152,20 @@ export class TransacoesService implements TransacoesInterface {
         }
     }
 
+    async cadastrarLote(compras: Record<string, unknown>[]) {
+        const response = await this.httpClient.post({
+            url: this.url + '/cadastrar-lote',
+            body: { compras },
+        })
+        switch (response.statusCode) {
+            case HttpStatusCode.ok: return response.body
+            case HttpStatusCode.noContent: return
+            case HttpStatusCode.unauthorized: throw new AccessDeniedError()
+            case HttpStatusCode.invalidForm: throw new ValidationError(response.body)
+            default: throw new UnexpectedError(response.message)
+        }
+    }
+
     async editTransacoes(params: TransacoesModel) {
         const response = await this.httpClient.put({
             url: this.url + '/editar', body: params

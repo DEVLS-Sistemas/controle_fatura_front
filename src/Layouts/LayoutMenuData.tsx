@@ -1,80 +1,36 @@
 import React, { useEffect, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import { pathIn } from "./menuPath";
 
+const RELATORIOS_PATHS = ["/gastos-criticos", "/gastos-por-categoria", "/relatorios"];
+const RECORRENTE_PATHS = ["/parceladas", "/assinaturas", "/compras"];
+const CADASTROS_PATHS = ["/categorias", "/subcategorias", "/plataformas", "/estabelecimentos", "/lojas", "/pessoas", "/responsaveis"];
+
 const Navdata = () => {
-    const history = useNavigate();
     const location = useLocation();
     const path = location.pathname;
 
-    const [isAnalises, setIsAnalises] = useState<boolean>(false);
-    const [isPlanejamento, setIsPlanejamento] = useState<boolean>(false);
-    const [isLancamentos, setIsLancamentos] = useState<boolean>(false);
-    const [isCadastros, setIsCadastros] = useState<boolean>(false);
-    const [iscurrentState, setIscurrentState] = useState("Dashboard");
+    const [isRelatorios, setIsRelatorios] = useState<boolean>(() => pathIn(path, RELATORIOS_PATHS));
+    const [isRecorrente, setIsRecorrente] = useState<boolean>(() => pathIn(path, RECORRENTE_PATHS));
+    const [isCadastros, setIsCadastros] = useState<boolean>(() => pathIn(path, CADASTROS_PATHS));
 
     const isDashboardActive = pathIn(path, ["/dashboard"]);
-    const isAnalisesActive = pathIn(path, ["/raio-x", "/gastos-criticos", "/gastos-por-categoria", "/relatorios"]);
-    const isPlanejamentoActive = pathIn(path, ["/projecao-faturas", "/simulador", "/parceladas", "/assinaturas", "/compras"]);
-    const isLancamentosActive = pathIn(path, ["/cartoes", "/faturas", "/transacoes"]);
-    const isCadastrosActive = pathIn(path, ["/categorias", "/subcategorias", "/plataformas", "/estabelecimentos", "/lojas", "/pessoas", "/responsaveis"]);
-
-    function updateIconSidebar(e: any) {
-        if (e && e.target && e.target.getAttribute("sub-items")) {
-            const ul: any = document.getElementById("two-column-menu");
-            if (!ul) return;
-            const iconItems: any = ul.querySelectorAll(".nav-icon.active");
-            let activeIconItems = [...iconItems];
-            activeIconItems.forEach((item) => {
-                item.classList.remove("active");
-                var id = item.getAttribute("sub-items");
-                const getID = document.getElementById(id) as HTMLElement;
-                if (getID) getID.classList.remove("show");
-            });
-        }
-    }
+    const isFaturasActive = pathIn(path, ["/faturas"]);
+    const isTransacoesActive = pathIn(path, ["/transacoes"]);
+    const isCartoesActive = pathIn(path, ["/cartoes"]);
+    const isRaioXActive = pathIn(path, ["/raio-x"]);
+    const isProjecaoActive = pathIn(path, ["/projecao-faturas"]);
+    const isSimuladorActive = pathIn(path, ["/simulador"]);
+    const isRelatoriosActive = pathIn(path, RELATORIOS_PATHS);
+    const isRecorrenteActive = pathIn(path, RECORRENTE_PATHS);
+    const isCadastrosActive = pathIn(path, CADASTROS_PATHS);
 
     useEffect(() => {
         document.body.classList.remove("twocolumn-panel");
-
-        if (pathIn(path, ["/raio-x", "/gastos-criticos", "/gastos-por-categoria", "/relatorios"])) {
-            setIscurrentState("Analises");
-            setIsAnalises(true);
-            setIsPlanejamento(false);
-            setIsLancamentos(false);
-            setIsCadastros(false);
-            return;
-        }
-        if (pathIn(path, ["/projecao-faturas", "/simulador", "/parceladas", "/assinaturas", "/compras"])) {
-            setIscurrentState("Planejamento");
-            setIsPlanejamento(true);
-            setIsAnalises(false);
-            setIsLancamentos(false);
-            setIsCadastros(false);
-            return;
-        }
-        if (pathIn(path, ["/cartoes", "/faturas", "/transacoes"])) {
-            setIscurrentState("Lancamentos");
-            setIsLancamentos(true);
-            setIsAnalises(false);
-            setIsPlanejamento(false);
-            setIsCadastros(false);
-            return;
-        }
-        if (pathIn(path, ["/categorias", "/subcategorias", "/plataformas", "/estabelecimentos", "/lojas", "/pessoas", "/responsaveis"])) {
-            setIscurrentState("Cadastros");
-            setIsCadastros(true);
-            setIsAnalises(false);
-            setIsPlanejamento(false);
-            setIsLancamentos(false);
-            return;
-        }
-        setIscurrentState("Dashboard");
-        setIsAnalises(false);
-        setIsPlanejamento(false);
-        setIsLancamentos(false);
-        setIsCadastros(false);
-    }, [path]);
+        if (isRelatoriosActive) setIsRelatorios(true);
+        if (isRecorrenteActive) setIsRecorrente(true);
+        if (isCadastrosActive) setIsCadastros(true);
+    }, [path, isRelatoriosActive, isRecorrenteActive, isCadastrosActive]);
 
     const menuItems: any = [
         {
@@ -87,79 +43,80 @@ const Navdata = () => {
             icon: "ri-dashboard-2-line",
             link: "/dashboard",
             isActive: isDashboardActive,
-            click: function (e: any) {
-                e.preventDefault();
-                setIscurrentState("Dashboard");
-                updateIconSidebar(e);
-                history("/dashboard");
-            },
         },
         {
-            id: "analises",
-            label: "Análises",
-            icon: "ri-pulse-line",
-            link: "/#",
-            isActive: isAnalisesActive,
-            click: function (e: any) {
-                e.preventDefault();
-                setIsAnalises(!isAnalises);
-                setIsPlanejamento(false);
-                setIsLancamentos(false);
-                setIsCadastros(false);
-                setIscurrentState("Analises");
-                updateIconSidebar(e);
-            },
-            stateVariables: isAnalises,
-            subItems: [
-                { id: "raio-x", label: "Raio-X Financeiro", link: "/raio-x", parentId: "analises", isActive: pathIn(path, ["/raio-x"]) },
-                { id: "gastos-criticos", label: "Gastos críticos", link: "/gastos-criticos", parentId: "analises", isActive: pathIn(path, ["/gastos-criticos"]) },
-                { id: "gastos-por-categoria", label: "Gastos por categoria", link: "/gastos-por-categoria", parentId: "analises", isActive: pathIn(path, ["/gastos-por-categoria"]) },
-                { id: "relatorios", label: "Relatórios", link: "/relatorios", parentId: "analises", isActive: pathIn(path, ["/relatorios"]) },
-            ],
-        },
-        {
-            id: "planejamento",
-            label: "Planejamento",
-            icon: "ri-calendar-check-line",
-            link: "/#",
-            isActive: isPlanejamentoActive,
-            click: function (e: any) {
-                e.preventDefault();
-                setIsPlanejamento(!isPlanejamento);
-                setIsAnalises(false);
-                setIsLancamentos(false);
-                setIsCadastros(false);
-                setIscurrentState("Planejamento");
-                updateIconSidebar(e);
-            },
-            stateVariables: isPlanejamento,
-            subItems: [
-                { id: "projecao-faturas", label: "Projeção", link: "/projecao-faturas", parentId: "planejamento", isActive: pathIn(path, ["/projecao-faturas"]) },
-                { id: "simulador", label: "Posso comprar?", link: "/simulador", parentId: "planejamento", isActive: pathIn(path, ["/simulador"]) },
-                { id: "parceladas", label: "Parceladas", link: "/parceladas", parentId: "planejamento", isActive: pathIn(path, ["/parceladas"]) },
-                { id: "assinaturas", label: "Assinaturas", link: "/assinaturas", parentId: "planejamento", isActive: pathIn(path, ["/assinaturas", "/compras"]) },
-            ],
-        },
-        {
-            id: "lancamentos",
-            label: "Lançamentos",
+            id: "faturas",
+            label: "Faturas",
             icon: "ri-file-list-3-line",
+            link: "/faturas",
+            isActive: isFaturasActive,
+        },
+        {
+            id: "transacoes",
+            label: "Transações",
+            icon: "ri-list-check-2",
+            link: "/transacoes",
+            isActive: isTransacoesActive,
+        },
+        {
+            id: "cartoes",
+            label: "Cartões",
+            icon: "ri-bank-card-line",
+            link: "/cartoes",
+            isActive: isCartoesActive,
+        },
+        {
+            id: "raio-x",
+            label: "Raio-X",
+            icon: "ri-pulse-line",
+            link: "/raio-x",
+            isActive: isRaioXActive,
+        },
+        {
+            id: "projecao-faturas",
+            label: "Projeção",
+            icon: "ri-calendar-check-line",
+            link: "/projecao-faturas",
+            isActive: isProjecaoActive,
+        },
+        {
+            id: "simulador",
+            label: "Posso comprar?",
+            icon: "ri-shopping-cart-2-line",
+            link: "/simulador",
+            isActive: isSimuladorActive,
+        },
+        {
+            id: "relatorios-menu",
+            label: "Relatórios",
+            icon: "ri-pie-chart-2-line",
             link: "/#",
-            isActive: isLancamentosActive,
+            isActive: isRelatoriosActive,
             click: function (e: any) {
                 e.preventDefault();
-                setIsLancamentos(!isLancamentos);
-                setIsAnalises(false);
-                setIsPlanejamento(false);
-                setIsCadastros(false);
-                setIscurrentState("Lancamentos");
-                updateIconSidebar(e);
+                setIsRelatorios((open) => !open);
             },
-            stateVariables: isLancamentos,
+            stateVariables: isRelatorios,
             subItems: [
-                { id: "cartoes", label: "Cartões", link: "/cartoes", parentId: "lancamentos", isActive: pathIn(path, ["/cartoes"]) },
-                { id: "faturas", label: "Faturas", link: "/faturas", parentId: "lancamentos", isActive: pathIn(path, ["/faturas"]) },
-                { id: "transacoes", label: "Transações", link: "/transacoes", parentId: "lancamentos", isActive: pathIn(path, ["/transacoes"]) },
+                { id: "gastos-criticos", label: "Gastos críticos", link: "/gastos-criticos", parentId: "relatorios-menu", isActive: pathIn(path, ["/gastos-criticos"]) },
+                { id: "gastos-por-categoria", label: "Gastos por categoria", link: "/gastos-por-categoria", parentId: "relatorios-menu", isActive: pathIn(path, ["/gastos-por-categoria"]) },
+                { id: "relatorios", label: "Relatórios", link: "/relatorios", parentId: "relatorios-menu", isActive: pathIn(path, ["/relatorios"]) },
+            ],
+        },
+        {
+            id: "recorrente",
+            label: "Recorrente",
+            icon: "ri-refresh-line",
+            link: "/#",
+            isActive: isRecorrenteActive,
+            click: function (e: any) {
+                e.preventDefault();
+                setIsRecorrente((open) => !open);
+            },
+            stateVariables: isRecorrente,
+            subItems: [
+                { id: "parceladas", label: "Parceladas", link: "/parceladas", parentId: "recorrente", isActive: pathIn(path, ["/parceladas"]) },
+                { id: "assinaturas", label: "Assinaturas", link: "/assinaturas", parentId: "recorrente", isActive: pathIn(path, ["/assinaturas", "/compras"]) },
             ],
         },
         {
@@ -170,12 +127,7 @@ const Navdata = () => {
             isActive: isCadastrosActive,
             click: function (e: any) {
                 e.preventDefault();
-                setIsCadastros(!isCadastros);
-                setIsAnalises(false);
-                setIsPlanejamento(false);
-                setIsLancamentos(false);
-                setIscurrentState("Cadastros");
-                updateIconSidebar(e);
+                setIsCadastros((open) => !open);
             },
             stateVariables: isCadastros,
             subItems: [

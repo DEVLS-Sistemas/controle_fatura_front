@@ -64,6 +64,66 @@ export const substituirFaturaRetryFields = (
     fatura_existente_id: faturaId,
 })
 
+export type CamposFormularioFatura = {
+    cartao_id?: number | string | null
+    cartao_bandeira_id?: number | string | null
+    mes?: number | string | null
+    ano?: number | string | null
+}
+
+export type AlvoSubstituirFatura = CamposFormularioFatura & {
+    id: number
+}
+
+const idPositivo = (raw: unknown): number | null => {
+    const id = Number(raw)
+    return Number.isFinite(id) && id > 0 ? id : null
+}
+
+/** Id do retry: só `fatura_existente.id`. O id da fatura aberta na tela não entra. */
+export const idFaturaEscolhida = (
+    fatura?: { id?: number | null } | null,
+): number | null => idPositivo(fatura?.id)
+
+/**
+ * Retry de Substituir: flag + id da fatura do form.
+ * Cartão, bandeira, mês e ano são os da escolha (os de `fatura_existente` quando a API os manda).
+ */
+export type RetrySubstituirFaturaEscolhida = FaturaJaAnexadaRetryPayload & {
+    cartao_id?: number | string
+    cartao_bandeira_id?: number | string
+    mes?: number | string
+    ano?: number | string
+}
+
+export const retrySubstituirFaturaEscolhida = (
+    fatura: AlvoSubstituirFatura,
+    form: CamposFormularioFatura,
+): RetrySubstituirFaturaEscolhida => {
+    const preenchido = (raw: unknown): number | string | undefined => (
+        raw == null || raw === '' ? undefined : raw as number | string
+    )
+    return {
+        confirmar_substituir_fatura: true,
+        fatura_existente_id: fatura.id,
+        cartao_id: preenchido(idPositivo(fatura.cartao_id) ?? form.cartao_id),
+        cartao_bandeira_id: preenchido(idPositivo(fatura.cartao_bandeira_id) ?? form.cartao_bandeira_id),
+        mes: preenchido(idPositivo(fatura.mes) ?? form.mes),
+        ano: preenchido(idPositivo(fatura.ano) ?? form.ano),
+    }
+}
+
+const CHAVES_FATURA_ABERTA = ['id', 'fatura_id', 'fatura_existente_id', 'confirmar_substituir_fatura'] as const
+
+/** Primeiro POST de Adicionar fatura: não manda o id da fatura que estava aberta. */
+export const payloadAdicionarFatura = <T extends Record<string, unknown>>(params: T): T => {
+    const next = { ...params }
+    for (const chave of CHAVES_FATURA_ABERTA) {
+        delete next[chave]
+    }
+    return next
+}
+
 const parseFaturaId = (raw: unknown): number | string | null => {
     if (raw == null || raw === '') return null
     const id = Number(raw)

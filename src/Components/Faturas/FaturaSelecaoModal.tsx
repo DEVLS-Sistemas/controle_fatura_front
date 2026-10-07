@@ -14,6 +14,7 @@ import {
 import { SelectList } from 'Components/ComponentController/Selects/Select/SelectList'
 import { SelectOptions } from 'interfaces/SystemInterfaces/SelectInterface'
 import { BandeiraChip, toBandeiraSelectOption } from 'helpers/cartao_helpers'
+import { nomeBandeiraParaExibicao } from 'helpers/fatura_metadados_helpers'
 import {
     FaturaSelecaoBandeiraOption,
     FaturaSelecaoNumeroOption,
@@ -102,7 +103,12 @@ const FaturaSelecaoModal = ({
         if (String(bandeiraValue).startsWith(CRIAR_PREFIX)) {
             return { bandeira: String(bandeiraValue).slice(CRIAR_PREFIX.length) }
         }
-        return { cartao_bandeira_id: bandeiraValue }
+        const escolhida = bandeiras.find((b) => toBandeiraSelectValue(b) === String(bandeiraValue))
+        const nome = String(escolhida?.label ?? '').trim()
+        return {
+            cartao_bandeira_id: bandeiraValue,
+            ...(nome ? { bandeira: nome } : {}),
+        }
     }
 
     const buildFinalPayload = (): FaturaSelecaoRetryPayload | null => {
@@ -137,6 +143,12 @@ const FaturaSelecaoModal = ({
         await onConfirm(payload)
     }
 
+    const nomeBandeira = nomeBandeiraParaExibicao({
+        nome: bandeiraNome,
+        cartaoBandeiraId,
+        opcoes: bandeiras,
+    })
+
     const titulo =
         step === 'final' ? 'Final do cartão' : 'Bandeira da fatura'
 
@@ -151,15 +163,11 @@ const FaturaSelecaoModal = ({
             <ModalBody>
                 <p className="mb-3">{explicacao}</p>
 
-                {step === 'final' && (bandeiraNome || cartaoBandeiraId) && (
+                {step === 'final' && nomeBandeira && (
                     <Alert color="info" className="mb-3">
                         <i className="ri-information-line me-1 align-middle"></i>
                         Bandeira:{' '}
-                        {bandeiraNome ? (
-                            <BandeiraChip bandeira={bandeiraNome} label={bandeiraNome} />
-                        ) : (
-                            `ID ${cartaoBandeiraId}`
-                        )}
+                        <BandeiraChip bandeira={nomeBandeira} label={nomeBandeira} />
                     </Alert>
                 )}
 

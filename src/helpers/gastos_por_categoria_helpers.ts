@@ -559,6 +559,39 @@ export const dashboardLimite = (data?: GastosPorCategoriaView | null): number =>
   return Number.isFinite(n) && n > 0 ? n : 10
 }
 
+export const isBucketSemCategoria = (item?: {
+  chave?: string | null
+  categoria_id?: number | null
+} | null): boolean => {
+  if (!item || item.chave === 'outros') return false
+  if (item.chave === 'categoria-0') return true
+  return item.categoria_id == null && (item.chave == null || item.chave === '')
+}
+
+export const temGastoSemCategoria = (sem?: {
+  valor_total?: number | null
+  compras?: number | null
+} | null): boolean => {
+  if (!sem) return false
+  return Number(sem.valor_total ?? 0) > 0 || Number(sem.compras ?? 0) > 0
+}
+
+const semBucketCategoria = <T extends { chave?: string | null; categoria_id?: number | null }>(
+  itens: T[],
+  incluirSemCategoria: boolean
+): T[] => (incluirSemCategoria ? itens : itens.filter((item) => !isBucketSemCategoria(item)))
+
+const comPercentualDoConjunto = <T extends { valor_total?: number | null; percentual_gasto?: number | null }>(
+  itens: T[]
+): T[] => {
+  const total = itens.reduce((acc, item) => acc + Number(item.valor_total ?? 0), 0)
+  return itens.map((item) => ({
+    ...item,
+    percentual_gasto:
+      total > 0 ? Math.round((Number(item.valor_total ?? 0) / total) * 1000) / 10 : 0,
+  }))
+}
+
 export const chaveCategoria = (item?: {
   chave?: string | null
   categoria_id?: number | null
@@ -754,9 +787,14 @@ export const fonteSubcategorias = (
 }
 
 export const fatiasCategoria = (
-  data?: GastosPorCategoriaView | null
-): GastosPorCategoriaDashboardBarra[] =>
-  comFatiaOutros(fonteCategorias(data), dashboardLimite(data))
+  data?: GastosPorCategoriaView | null,
+  opcoes?: { incluirSemCategoria?: boolean }
+): GastosPorCategoriaDashboardBarra[] => {
+  const incluir = opcoes?.incluirSemCategoria !== false
+  const base = semBucketCategoria(fonteCategorias(data), incluir)
+  const fatias = comFatiaOutros(base, dashboardLimite(data))
+  return incluir ? fatias : comPercentualDoConjunto(fatias)
+}
 
 export const fatiasSubcategoria = (
   data?: GastosPorCategoriaView | null,
@@ -765,9 +803,23 @@ export const fatiasSubcategoria = (
   comFatiaOutros(fonteSubcategorias(data, selecao), dashboardLimite(data))
 
 export const barrasCategoria = (
-  data?: GastosPorCategoriaView | null
-): GastosPorCategoriaDashboardBarra[] =>
-  fonteCategorias(data).slice(0, dashboardLimite(data))
+  data?: GastosPorCategoriaView | null,
+  opcoes?: { incluirSemCategoria?: boolean }
+): GastosPorCategoriaDashboardBarra[] => {
+  const incluir = opcoes?.incluirSemCategoria !== false
+  const filtradas = semBucketCategoria(fonteCategorias(data), incluir)
+  const base = incluir ? filtradas : comPercentualDoConjunto(filtradas)
+  return base.slice(0, dashboardLimite(data))
+}
+
+export const listaCategorias = (
+  data?: GastosPorCategoriaView | null,
+  opcoes?: { incluirSemCategoria?: boolean }
+): GastosPorCategoriaItem[] => {
+  const incluir = opcoes?.incluirSemCategoria !== false
+  const lista = semBucketCategoria(data?.categorias ?? [], incluir)
+  return incluir ? lista : comPercentualDoConjunto(lista)
+}
 
 export const barrasSubcategoria = (
   data?: GastosPorCategoriaView | null,
@@ -886,9 +938,43 @@ export interface GastosPorCategoriaKpiView {
   atalho?: GastosPorCategoriaAtalho | null
 }
 
+const kpisDoPeriodo = (
+  data?: GastosPorCategoriaView | null,
+  incluirSemCategoria = true
+): GastosPorCategoriaKpiView => {
+  const totais = data?.totais
+  const sem = totais?.sem_categoria
+  const esconder =
+    !incluirSemCategoria &&
+    (Number(sem?.valor_total ?? 0) !== 0 || Number(sem?.compras ?? 0) !== 0)
+  if (!esconder) {
+    return {
+      valor_total: totais?.valor_total,
+      compras: totais?.compras,
+      ticket_medio: totais?.ticket_medio,
+      variacao_valor_percentual: totais?.variacao_valor_percentual,
+      mostrarVariacao: true,
+      label: 'No período',
+      atalho: null,
+    }
+  }
+  const valor = Math.round((Number(totais?.valor_total ?? 0) - Number(sem?.valor_total ?? 0)) * 100) / 100
+  const compras = Math.max(0, Number(totais?.compras ?? 0) - Number(sem?.compras ?? 0))
+  return {
+    valor_total: valor,
+    compras,
+    ticket_medio: compras > 0 ? Math.round((valor / compras) * 100) / 100 : 0,
+    variacao_valor_percentual: null,
+    mostrarVariacao: false,
+    label: 'No período',
+    atalho: null,
+  }
+}
+
 export const resolveKpis = (
   data?: GastosPorCategoriaView | null,
-  selecao?: GastosPorCategoriaSelecao | null
+  selecao?: GastosPorCategoriaSelecao | null,
+  opcoes?: { incluirSemCategoria?: boolean }
 ): GastosPorCategoriaKpiView => {
   const sub = encontrarSubcategoria(data, selecao)
   if (sub) {
@@ -914,15 +1000,7 @@ export const resolveKpis = (
       atalho: cat.atalho,
     }
   }
-  return {
-    valor_total: data?.totais?.valor_total,
-    compras: data?.totais?.compras,
-    ticket_medio: data?.totais?.ticket_medio,
-    variacao_valor_percentual: data?.totais?.variacao_valor_percentual,
-    mostrarVariacao: true,
-    label: 'No período',
-    atalho: null,
-  }
+  return kpisDoPeriodo(data, opcoes?.incluirSemCategoria !== false)
 }
 
 export const resolvePorOrigemSelecao = (

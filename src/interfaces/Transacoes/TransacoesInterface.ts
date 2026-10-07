@@ -139,6 +139,8 @@ export interface TransacoesModel {
     compra_grupo_id?: string | number | null
     /** No edit, propaga campos compartilhados para o grupo */
     propagar_grupo?: boolean
+    /** No edit da fatura, aplica a subcategoria nas outras compras do estabelecimento */
+    aplicar_subcategoria_estabelecimento?: boolean
     tipo?: string | null
     /** Canal/origem da compra — obrigatório no create */
     origem_compra?: string | null
@@ -188,6 +190,14 @@ export interface ResponsavelLookup {
     tipo?: string
 }
 
+export interface CartaoBandeiraLookup {
+    id?: number
+    bandeira?: string
+    ativo?: boolean
+    cor_principal?: string | null
+    cor_secundaria?: string | null
+}
+
 export interface CartaoLookup {
     id?: number
     nome?: string
@@ -198,6 +208,7 @@ export interface CartaoLookup {
     pessoa_id?: number | null
     pessoa_nome?: string | null
     pessoa_eh_principal?: boolean
+    bandeiras?: CartaoBandeiraLookup[]
 }
 
 export interface FaturaLookup {
@@ -243,6 +254,7 @@ export interface TransacoesInterface {
     AsyncListTransacoes(params: TransacoesSearch): Promise<TransacoesModel[] | undefined>
     listEstabelecimentosDoFiltro(params: TransacoesSearch): Promise<EstabelecimentoDoFiltro[]>
     createTransacoes(params: TransacoesModel): Promise<any>
+    cadastrarLote(compras: Record<string, unknown>[]): Promise<any>
     editTransacoes(params: TransacoesModel): Promise<any>
     deleteTransacoes(id: number, options?: { excluir_grupo?: boolean }): Promise<any>
     getLookupsTransacoes(): Promise<LookupsTransacoes | undefined>

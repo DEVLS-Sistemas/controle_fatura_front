@@ -1,4 +1,5 @@
 import {
+    nomeAnexoFaturaExibicao,
     resolveFaturaAnexoNomeOriginal,
     rotulosFaturaAnexoNomes,
 } from './fatura_anexo_nome_helpers'
@@ -47,6 +48,32 @@ describe('resolveFaturaAnexoNomeOriginal', () => {
             tem_csv: true,
             tipo_arquivo: 'pdf',
         }, 'csv')).toBeNull()
+    })
+})
+
+describe('nomeAnexoFaturaExibicao', () => {
+    it('usa o nome do slot e ignora path e nome legado', () => {
+        const fatura = {
+            anexo_pdf_nome: 'Fatura Nubank setembro.pdf',
+            anexo_csv_nome: 'nubank-09-2026.csv',
+            arquivo_pdf: 'faturas/1/abc.pdf',
+            arquivo_csv: 'faturas/1/abc.csv',
+            nome_original: 'outro.pdf',
+        }
+        expect(nomeAnexoFaturaExibicao(fatura, 'pdf')).toBe('Fatura Nubank setembro.pdf')
+        expect(nomeAnexoFaturaExibicao(fatura, 'csv')).toBe('nubank-09-2026.csv')
+    })
+
+    it('não inventa nome quando o campo vem null ou vazio', () => {
+        const fatura = {
+            anexo_pdf_nome: null,
+            anexo_csv_nome: '  ',
+            arquivo_pdf: 'faturas/1/abc.pdf',
+            nome_original: 'fatura.pdf',
+        }
+        expect(nomeAnexoFaturaExibicao(fatura, 'pdf')).toBeNull()
+        expect(nomeAnexoFaturaExibicao(fatura, 'csv')).toBeNull()
+        expect(nomeAnexoFaturaExibicao(null, 'pdf')).toBeNull()
     })
 })
 

@@ -245,6 +245,7 @@ interface GastosPorCategoriaDashboardsProps {
   tituloOrigem: string
   tituloPlataforma: string
   centroValor?: number | null
+  centroValorSubcategoria?: number | null
   centroLabel?: string
   centroValorOrigem?: number | null
   centroLabelOrigem?: string
@@ -283,6 +284,7 @@ const GastosPorCategoriaDashboards = ({
   tituloOrigem,
   tituloPlataforma,
   centroValor,
+  centroValorSubcategoria,
   centroLabel,
   centroValorOrigem,
   centroLabelOrigem,
@@ -439,7 +441,7 @@ const GastosPorCategoriaDashboards = ({
                     daCat ? ` · ${daCat} da categoria` : ''
                   }</div>`
                 }}
-                centroValor={centroValor}
+                centroValor={centroValorSubcategoria ?? centroValor}
                 centroLabel={centroLabel}
                 onClique={onCliqueSubcategoria}
                 onDuploClique={onDuploCliqueSubcategoria}

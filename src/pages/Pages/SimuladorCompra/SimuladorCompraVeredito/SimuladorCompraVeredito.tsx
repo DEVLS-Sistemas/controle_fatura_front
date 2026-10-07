@@ -4,10 +4,19 @@ import { formatCurrency } from 'helpers/fatura_helpers'
 import { formatPctVeredito, formatTotalCurto } from 'helpers/posso_comprar_helpers'
 import { SimuladorVeredito, SimuladorVereditoNivel, SimuladorVereditoScore } from 'interfaces/SimuladorCompra/SimuladorCompraInterface'
 
+export type LinhaCompraVeredito = {
+  descricao: string
+  detalhe: string
+  valor: number
+  entra: number
+}
+
 type Props = {
   veredito: SimuladorVeredito
   valorParcela: number
   competenciaLabel: string
+  linhaSomando?: string | null
+  linhas?: LinhaCompraVeredito[]
 }
 
 const TONE: Record<
@@ -59,8 +68,16 @@ export const SimuladorCompraVereditoSkeleton = () => (
   </Card>
 )
 
-const SimuladorCompraVeredito = ({ veredito, valorParcela, competenciaLabel }: Props) => {
+const SimuladorCompraVeredito = ({
+  veredito,
+  valorParcela,
+  competenciaLabel,
+  linhaSomando,
+  linhas = [],
+}: Props) => {
   const tone = TONE[veredito.nivel]
+  const varias = linhas.length > 1
+  const somaValores = linhas.reduce((acc, linha) => acc + linha.valor, 0)
 
   return (
     <Card className={`mb-3 shadow-sm ${tone.card}`}>
@@ -92,11 +109,40 @@ const SimuladorCompraVeredito = ({ veredito, valorParcela, competenciaLabel }: P
             {veredito.frase}
           </p>
 
+          {varias ? (
+            <div className="mb-3">
+              {linhas.map((linha, indice) => (
+                <div
+                  key={`${linha.descricao}-${indice}`}
+                  className="d-flex justify-content-between align-items-baseline gap-3 py-2 border-bottom border-opacity-25"
+                >
+                  <div className="me-auto">
+                    <div className="fw-medium">{linha.descricao}</div>
+                    <div className="text-muted fs-13">{linha.detalhe}</div>
+                  </div>
+                  <div className="text-end">
+                    <div className="fw-semibold">{formatCurrency(linha.valor)}</div>
+                    <div className="text-muted fs-13">nesta fatura {formatCurrency(linha.entra)}</div>
+                  </div>
+                </div>
+              ))}
+              <div className="d-flex justify-content-between align-items-baseline gap-3 pt-3">
+                <span className="fw-semibold">Soma</span>
+                <span className="fw-bold fs-5">{formatCurrency(somaValores)}</span>
+              </div>
+            </div>
+          ) : (
+            <>
           {veredito.contexto && (
-            <p className="text-muted fs-13 mb-3">{veredito.contexto}</p>
+            <p className={`text-muted fs-13 ${linhaSomando ? 'mb-1' : 'mb-3'}`}>{veredito.contexto}</p>
+          )}
+          {linhaSomando && (
+            <p className="text-muted fs-13 mb-3">{linhaSomando}</p>
+          )}
+            </>
           )}
 
-          {veredito.motivos.length > 0 && (
+          {!varias && veredito.motivos.length > 0 && (
             <div className="d-flex flex-wrap gap-2 mb-4">
               {veredito.motivos.map((motivo) => (
                 <span
@@ -161,7 +207,7 @@ const SimuladorCompraVeredito = ({ veredito, valorParcela, competenciaLabel }: P
         )}
 
         <div className="pt-3 border-top border-opacity-25">
-          <div className="text-muted fs-13 mb-1">Entra nesta fatura</div>
+          <div className="text-muted fs-13 mb-1">{varias ? 'Entram nesta fatura' : 'Entra nesta fatura'}</div>
           <div
             className="fw-bold mb-1"
             style={{ fontSize: 'clamp(1.5rem, 4vw, 2.15rem)', lineHeight: 1.1, letterSpacing: '-0.02em' }}

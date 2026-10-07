@@ -600,6 +600,7 @@ export const breakdownResponsavelPorCartao = (opts: {
   base: ProjecaoFaturasView
   responsavelId: number
   cartaoSimuladoId: number
+  cartoesSimulados?: number[]
   indice: number
 }): Array<{
   cartao_id: number
@@ -625,7 +626,11 @@ export const breakdownResponsavelPorCartao = (opts: {
       )
       const depois = cellTotal(respOver?.valores, opts.indice)
       const antes = cellTotal(respBase?.valores, opts.indice)
-      const eh = Number(grupo.cartao_id) === Number(opts.cartaoSimuladoId)
+      const idsSimulados = (opts.cartoesSimulados?.length
+        ? opts.cartoesSimulados
+        : [opts.cartaoSimuladoId]
+      ).map(Number)
+      const eh = idsSimulados.includes(Number(grupo.cartao_id))
       if (depois <= 0 && antes <= 0 && !eh) return null
       return {
         cartao_id: grupo.cartao_id,
