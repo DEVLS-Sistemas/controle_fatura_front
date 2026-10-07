@@ -7,7 +7,11 @@ interface Props {
   series: number[];
   dataLabelText: string[]; 
   dataColors: string[];
-  option: {};
+  option: {
+    legenda?: boolean
+    total?: boolean
+    percentual?: boolean
+  };
 }
 
 const DynamicLegendDashboard: React.FC<Props> = ({ type, series, dataLabelText, dataColors, option }) => {

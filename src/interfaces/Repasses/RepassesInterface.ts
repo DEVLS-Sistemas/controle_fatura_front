@@ -102,6 +102,12 @@ export interface RepasseQuitarCompetenciaPayload {
   data_pagamento: string
 }
 
+export interface RepasseQuitarCompetenciaResult {
+  quantidade?: number
+  qtd?: number
+  repasses?: unknown[]
+}
+
 export interface LookupsRepasses {
   status_repasse?: Array<{ value: StatusRepasse; label: string }>
   responsaveis?: Array<{ id?: number; nome?: string; tipo?: string }>
@@ -114,7 +120,7 @@ export interface RepassesInterface {
   createRepasse(params: RepasseModel): Promise<any>
   editRepasse(params: RepasseModel): Promise<any>
   deleteRepasse(id: number): Promise<any>
-  quitarCompetencia(params: RepasseQuitarCompetenciaPayload): Promise<any>
+  quitarCompetencia(params: RepasseQuitarCompetenciaPayload): Promise<RepasseQuitarCompetenciaResult | undefined>
   getLookups(): Promise<LookupsRepasses | undefined>
 }
 

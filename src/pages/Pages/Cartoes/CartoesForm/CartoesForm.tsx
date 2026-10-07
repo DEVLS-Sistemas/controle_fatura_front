@@ -1169,7 +1169,7 @@ const CartoesForm = () => {
                                                     }
                                                 >
                                                     {tiposOptions.map((opt) => (
-                                                        <option key={String(opt.value)} value={opt.value}>
+                                                        <option key={String(opt.value)} value={opt.value ?? ''}>
                                                             {opt.label}
                                                         </option>
                                                     ))}

@@ -13,7 +13,7 @@ export interface FaturasSearch {
     mes_atual?: 0 | 1 | boolean | null
     status?: string | null
     pessoa_id?: string | number | null
-    palavra_chave?: string | null | unknown
+    palavra_chave?: string | null
     page?: number
     perPage?: number
 }

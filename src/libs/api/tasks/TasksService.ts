@@ -10,7 +10,7 @@ interface Itarefa{
 
 const getAll = async (): Promise<Itarefa[] | ApiException> => {
     try {
-        const { data } = await ApiConfig().get('/tarefas');
+        const { data } = await ApiConfig.get('/tarefas');
         return data;
     }catch (error: any){
         return new ApiException(error.message || "Erro ao consultar registros.")
@@ -20,7 +20,7 @@ const getAll = async (): Promise<Itarefa[] | ApiException> => {
 
 const getById = async (id: number): Promise<Itarefa | ApiException> => {
     try {
-        const { data } = await ApiConfig().get(`/tarefas/${id}`);
+        const { data } = await ApiConfig.get(`/tarefas/${id}`);
         return data;
     }catch (error: any){
         return new ApiException(error.message || "Erro ao consultar registro.")
@@ -29,7 +29,7 @@ const getById = async (id: number): Promise<Itarefa | ApiException> => {
 
 const create = async (dataToCreate: Omit<Itarefa, 'id'>): Promise<Itarefa | ApiException> => {
     try {
-        const { data } = await ApiConfig().post('/tarefas', dataToCreate);
+        const { data } = await ApiConfig.post('/tarefas', dataToCreate);
         return data;
     }catch (error: any){
         return new ApiException(error.message || "Erro ao atualizar registro.")
@@ -39,7 +39,7 @@ const create = async (dataToCreate: Omit<Itarefa, 'id'>): Promise<Itarefa | ApiE
 
 const updateById = async (id: string, dataToUpdate: Itarefa): Promise<Itarefa | ApiException> => {
     try {
-        const { data } = await ApiConfig().put(`/tarefas/${id}`, dataToUpdate);
+        const { data } = await ApiConfig.put(`/tarefas/${id}`, dataToUpdate);
         return data;
     }catch (error: any){
         return new ApiException(error.message || "Erro ao cadastrar registro.")
@@ -48,7 +48,7 @@ const updateById = async (id: string, dataToUpdate: Itarefa): Promise<Itarefa | 
 
 const deleteById = async (id: number): Promise<Itarefa | ApiException> => {
     try {
-        const { data } = await ApiConfig().delete(`/tarefas/${id}`);
+        const { data } = await ApiConfig.delete(`/tarefas/${id}`);
         return data;
     }catch (error: any){
         return new ApiException(error.message || "Erro ao apagar registro.")

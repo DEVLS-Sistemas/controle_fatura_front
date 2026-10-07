@@ -1118,7 +1118,7 @@ const FaturaResponsavelView = () => {
                                     >
                                         <option value="">Todos os cartões</option>
                                         {cartoesFiltroOptions.map((opt) => (
-                                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                            <option key={String(opt.value)} value={opt.value ?? ''}>{opt.label}</option>
                                         ))}
                                     </Input>
                                 </Col>

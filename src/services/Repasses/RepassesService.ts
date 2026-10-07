@@ -8,6 +8,7 @@ import {
   RepasseMatrizView,
   RepasseModel,
   RepasseQuitarCompetenciaPayload,
+  RepasseQuitarCompetenciaResult,
   RepassesInterface,
   RepassesSearch,
 } from 'interfaces/Repasses/RepassesInterface'
@@ -142,7 +143,7 @@ export class RepassesService implements RepassesInterface {
     }
   }
 
-  async quitarCompetencia(params: RepasseQuitarCompetenciaPayload) {
+  async quitarCompetencia(params: RepasseQuitarCompetenciaPayload): Promise<RepasseQuitarCompetenciaResult | undefined> {
     const response = await this.httpClient.post({
       url: `${this.url}/quitar-competencia`,
       body: params,
@@ -150,7 +151,7 @@ export class RepassesService implements RepassesInterface {
     switch (response.statusCode) {
       case HttpStatusCode.ok:
       case HttpStatusCode.created:
-        return unwrap(response.body)
+        return unwrap<RepasseQuitarCompetenciaResult>(response.body)
       case HttpStatusCode.noContent:
         return
       case HttpStatusCode.unauthorized:

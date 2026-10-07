@@ -116,7 +116,7 @@ const PizzaChart = ({
               toolbar: { show: false },
               animations: { enabled: false },
               events: {
-                dataPointSelection: (_event, _ctx, config) => aoClicarFatia(config),
+                dataPointSelection: (_event: unknown, _ctx: unknown, config: { dataPointIndex?: number }) => aoClicarFatia(config),
               },
             },
             labels,

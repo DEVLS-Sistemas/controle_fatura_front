@@ -381,13 +381,17 @@ const CompraVisualizacaoPage = () => {
               {mostrarConciliacao ? (
                 <CompraVisualizacaoConciliacao
                   compra={compra}
-                  onChanged={() => identificador && loadCompra(identificador)}
+                  onChanged={() => {
+                    if (identificador) void loadCompra(identificador)
+                  }}
                 />
               ) : null}
               <CompraVisualizacaoDados compra={compra} />
               <CompraVisualizacaoAnexos
                 compra={compra}
-                onChanged={() => identificador && loadCompra(identificador)}
+                onChanged={() => {
+                  if (identificador) void loadCompra(identificador)
+                }}
               />
               <CompraVisualizacaoHistorico compra={compra} />
               <CompraVisualizacaoParcelas compra={compra} />

@@ -248,7 +248,7 @@ const ResponsaveisVisualizarPage = () => {
                                 onChange={(e) => goCompetencia(mes, Number(e.target.value))}
                             >
                                 {optAnos.map((item) => (
-                                    <option key={String(item.value)} value={item.value}>{item.label}</option>
+                                    <option key={String(item.value)} value={item.value ?? ''}>{item.label}</option>
                                 ))}
                             </Input>
                             <span className="text-muted small">

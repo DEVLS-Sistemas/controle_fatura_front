@@ -6,7 +6,11 @@ export interface UsersByDeviceLegendsChartsProps {
     series: number[];
     dataLabelText: string[]; 
     dataColors: string[];
-    option: {};
+    option: {
+        legenda?: boolean
+        total?: boolean
+        percentual?: boolean
+    };
 }
 
 const UsersByDeviceLegendsCharts = ({ series, dataColors, dataLabelText, option }: UsersByDeviceLegendsChartsProps) => {

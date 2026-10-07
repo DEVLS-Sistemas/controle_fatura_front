@@ -3,7 +3,7 @@ export type ProjecaoFonte = 'fatura' | 'parcial' | 'projecao' | 'misto' | 'vazio
 export interface ProjecaoFaturasSearch {
   mes?: number | null
   ano?: number | null
-  palavra_chave?: string | null | undefined | unknown
+  palavra_chave?: string | null
 }
 
 export interface ProjecaoColuna {

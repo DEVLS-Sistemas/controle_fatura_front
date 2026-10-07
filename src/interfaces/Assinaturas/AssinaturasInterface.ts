@@ -31,7 +31,7 @@ export interface LookupsAssinaturas {
 export interface AssinaturasSearch {
   status?: AssinaturaStatusFiltro | string | null
   periodicidade?: string | null
-  palavra_chave?: string | null | unknown
+  palavra_chave?: string | null
   ordenar?: string | null
   cartao_id?: number | string | null
   responsavel_id?: number | string | null

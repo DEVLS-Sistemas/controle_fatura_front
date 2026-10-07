@@ -212,11 +212,11 @@ const CompraVisualizacaoDados = ({ compra }: CompraVisualizacaoDadosProps) => {
                 <span className="d-inline-flex align-items-center gap-1">
                   <span
                     className="d-inline-block rounded-circle"
-                    title={subcategoriaHex}
+                    title={subcategoriaHex ?? undefined}
                     style={{
                       width: 8,
                       height: 8,
-                      backgroundColor: subcategoriaHex,
+                      backgroundColor: subcategoriaHex ?? undefined,
                     }}
                   />
                   {compra.subcategoria.nome}

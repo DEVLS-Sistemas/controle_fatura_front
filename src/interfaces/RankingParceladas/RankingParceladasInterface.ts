@@ -18,7 +18,7 @@ export interface RankingParceladasSearch {
   categoria_id?: number | string | null
   apenas_abertas?: boolean | number | string | null
   ordenar?: RankingParceladasOrdenar | string | null
-  palavra_chave?: string | null | unknown
+  palavra_chave?: string | null
 }
 
 export interface RankingParceladaParcelaResumo {

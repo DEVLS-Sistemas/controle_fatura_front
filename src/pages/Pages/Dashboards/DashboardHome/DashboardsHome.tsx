@@ -246,7 +246,7 @@ const DashboardsHome = () => {
                           chart: {
                             toolbar: { show: false },
                             events: {
-                              dataPointSelection: (_event, _ctx, config) => {
+                              dataPointSelection: (_event: unknown, _ctx: unknown, config: { dataPointIndex?: number }) => {
                                 handleBarClick(Number(config.dataPointIndex) + 1)
                               },
                             },
@@ -294,8 +294,9 @@ const DashboardsHome = () => {
                             legend: { position: 'bottom' },
                             chart: {
                               events: {
-                                dataPointSelection: (_event, _ctx, config) => {
-                                  const item = resumo?.por_categoria?.[config.dataPointIndex]
+                                dataPointSelection: (_event: unknown, _ctx: unknown, config: { dataPointIndex?: number }) => {
+                                  const index = config.dataPointIndex
+                                  const item = index == null ? undefined : resumo?.por_categoria?.[index]
                                   if (item?.categoria_id) {
                                     navigate(`/gastos-por-categoria?selecao_categoria=${item.categoria_id}`)
                                     return

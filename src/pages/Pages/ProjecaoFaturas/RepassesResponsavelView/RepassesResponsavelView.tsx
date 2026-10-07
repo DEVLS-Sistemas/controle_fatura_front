@@ -547,7 +547,7 @@ const RepassesResponsavelViewInner = () => {
                 >
                   <option value="">Todos os cartões</option>
                   {cartoesOptions.map((opt) => (
-                    <option key={String(opt.value)} value={opt.value}>{opt.label}</option>
+                    <option key={String(opt.value)} value={opt.value ?? ''}>{opt.label}</option>
                   ))}
                 </Input>
               </Col>

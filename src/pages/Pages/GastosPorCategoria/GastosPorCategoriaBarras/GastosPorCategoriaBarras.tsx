@@ -72,7 +72,7 @@ const BarraHorizontalChart = ({
             toolbar: { show: false },
             animations: { enabled: true, speed: 250 },
             events: {
-              dataPointSelection: (_event, _ctx, config) => {
+              dataPointSelection: (_event: unknown, _ctx: unknown, config: { dataPointIndex?: number }) => {
                 const index = config.dataPointIndex
                 if (index == null || index < 0) return
                 const now = Date.now()

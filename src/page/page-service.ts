@@ -1,8 +1,24 @@
-import { PaginateInterface } from "../../interfaces/default"
-import { PageInterface, PageList, PageSearch, PageView } from "../../interfaces/page"
-import { AxiosHttpClient, HttpStatusCode } from "../../libs/api/ApiConfig"
-import { AccessDeniedError } from "../../libs/api/exceptions/AccessDeniedError"
-import { UnexpectedError } from "../../libs/api/exceptions/UnexpectedError"
+import { PaginateInterface } from "../interfaces/SystemInterfaces/PaginateInterface"
+import { AxiosHttpClient, HttpStatusCode } from "../libs/api/ApiConfig"
+import { AccessDeniedError } from "../libs/api/exceptions/AccessDeniedError"
+import { UnexpectedError } from "../libs/api/exceptions/UnexpectedError"
+
+export interface PageView {
+    id?: number
+}
+
+export interface PageList {
+    id?: number
+}
+
+export interface PageSearch {
+    page?: number
+}
+
+export interface PageInterface {
+    getViewPage(params: { id?: number | string }): Promise<PageView | undefined>
+    listProjetosPaginate(params: PageSearch): Promise<PaginateInterface<PageList> | undefined>
+}
 
 export class PageService implements PageInterface {
     private readonly url: string
