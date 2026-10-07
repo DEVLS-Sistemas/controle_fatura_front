@@ -220,7 +220,9 @@ export class FaturasService implements FaturasInterface {
             body: { confirmar: true },
         })
         switch (response.statusCode) {
-            case HttpStatusCode.ok: return response.body
+            case HttpStatusCode.ok:
+                if (!response.body) throw new UnexpectedError(response.message)
+                return response.body
             case HttpStatusCode.unauthorized: throw new AccessDeniedError()
             case HttpStatusCode.invalidForm: throw new ValidationError(response.body)
             default: throw new UnexpectedError(response.message)

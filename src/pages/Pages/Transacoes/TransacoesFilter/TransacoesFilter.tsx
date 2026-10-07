@@ -1,7 +1,7 @@
 import UiContent from "Components/Common/UiContent"
 import React, { useEffect, useState } from "react"
 import { Link } from "react-router-dom"
-import { useForm, useWatch } from "react-hook-form"
+import { DefaultValues, useForm, useWatch } from "react-hook-form"
 import { toast } from "react-toastify"
 import {
     Breadcrumb, BreadcrumbItem, Button, Card, CardHeader, Col, Collapse, Label, Row
@@ -45,7 +45,7 @@ const TransacoesFilter = ({
     onAfterVincularLoja,
 }: TransacoesFilterProps) => {
     const { handleSubmit, control, register, getValues, setValue } = useForm<TransacoesSearch>({
-        defaultValues: filtersRef,
+        defaultValues: filtersRef as DefaultValues<TransacoesSearch>,
     })
     const [showFilter, setShowFilter] = useState<boolean>(false)
     const [exporting, setExporting] = useState(false)

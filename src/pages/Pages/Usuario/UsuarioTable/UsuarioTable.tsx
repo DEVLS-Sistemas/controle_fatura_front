@@ -10,7 +10,7 @@ import TableActionsDropdown from "Components/Common/TableActionsDropdown";
 
 export interface UsuarioTableProps {
     data: PaginateInterface<UsuarioList> | undefined,
-    getData: (data: PaginateSearch & UsuarioSearch) => void,
+    getData: (data: PaginateSearch & Partial<UsuarioSearch>) => void,
     setPerPage: (perPage: number) => void
     setPage: (page: number) => void
     page: number
@@ -31,10 +31,7 @@ export const UsuarioTable = ({ data, getData, setPerPage, setPage, perPage, }: U
             const new_url = new URL(url);
 
             await getData({
-                nome: new_url.searchParams.get('nome'),
-                nascimento: new_url.searchParams.get('nascimento'),
-                sexo: Number(new_url.searchParams.get('sexo')),
-                ativo: Boolean(new_url.searchParams.get('ativo')),
+                palavra_chave: new_url.searchParams.get('palavra_chave'),
                 page: Number(new_url.searchParams.get('page'))
             })
         } catch (error) {
@@ -79,7 +76,7 @@ export const UsuarioTable = ({ data, getData, setPerPage, setPage, perPage, }: U
                     <Card>
                         <CardBody>
                             <div className="live-preview mt-1">
-                                {data && data.total == 0 ?
+                                {!data || data.total == 0 ?
                                     <div className="bg-primary text-white border-0 alert alert-primary fade show text-center" >INFORME OS FILTROS DESEJADOS E CLIQUE EM BUSCAR!</div>
                                     :
                                     !data.data ?

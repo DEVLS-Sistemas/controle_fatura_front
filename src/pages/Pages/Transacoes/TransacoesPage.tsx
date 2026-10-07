@@ -240,7 +240,9 @@ const TransacoesPage = () => {
                             origensCompraOptions={origensCompraOptions}
                             statusConciliacaoOptions={statusConciliacaoOptions}
                             filtersRef={transacoesContext}
-                            onAfterVincularLoja={() => getRemoteTransacoesList(transacoesContext)}
+                            onAfterVincularLoja={() => {
+                                void getRemoteTransacoesList(transacoesContext)
+                            }}
                         />
                         {display ? (
                             <TransacoesTable
