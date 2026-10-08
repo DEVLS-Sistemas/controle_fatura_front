@@ -430,6 +430,11 @@ const FaturasViewPage = () => {
     const [plataformasLookup, setPlataformasLookup] = useState<PlataformaLookup[]>([])
     const [numerosOptions, setNumerosOptions] = useState<SelectOptions[]>([])
     const [numerosLoading, setNumerosLoading] = useState(false)
+    const [modoClassificar, setModoClassificar] = useState(false)
+    const [selecionadasClassificar, setSelecionadasClassificar] = useState<number[]>([])
+    const [classificarTipo, setClassificarTipo] = useState('')
+    const [classificarFinal, setClassificarFinal] = useState('')
+    const [classificarSaving, setClassificarSaving] = useState(false)
     const [defaultResponsavelId, setDefaultResponsavelId] = useState<number | null>(null)
     const [responsavelModalOpen, setResponsavelModalOpen] = useState(false)
     const [rowForResponsavel, setRowForResponsavel] = useState<TransacoesList | null>(null)
@@ -1925,6 +1930,53 @@ const FaturasViewPage = () => {
         await persistirFinal(tx, parsed, false)
     }
 
+    const sairModoClassificar = () => {
+        setModoClassificar(false)
+        setSelecionadasClassificar([])
+        setClassificarTipo('')
+        setClassificarFinal('')
+    }
+
+    const toggleSelecionadaClassificar = (txId?: number) => {
+        if (!txId) return
+        setSelecionadasClassificar((prev) => (
+            prev.includes(txId) ? prev.filter((id) => id !== txId) : [...prev, txId]
+        ))
+    }
+
+    const handleSalvarClassificacao = async () => {
+        if (!id || classificarSaving || selecionadasClassificar.length === 0) return
+        if (!classificarTipo && !classificarFinal) {
+            toast.error('Escolha o tipo ou o final do cartão')
+            return
+        }
+        setClassificarSaving(true)
+        try {
+            await transacoesService.classificarTransacoes({
+                ids: selecionadasClassificar,
+                ...(classificarTipo ? { tipo: classificarTipo } : {}),
+                ...(classificarFinal === 'sem'
+                    ? { cartao_numero_id: null }
+                    : classificarFinal
+                        ? { cartao_numero_id: Number(classificarFinal) }
+                        : {}),
+            })
+            await Promise.all([
+                loadFatura({ silent: true }),
+                loadTransacoes(id),
+            ])
+            toast.success('Transações classificadas. A fatura foi reorganizada.')
+            setSelecionadasClassificar([])
+            setClassificarTipo('')
+            setClassificarFinal('')
+        } catch (error) {
+            console.error('Erro ao classificar transações:', error)
+            toast.error('Erro ao classificar as transações')
+        } finally {
+            setClassificarSaving(false)
+        }
+    }
+
     const handleFinalCartaoSim = async () => {
         if (!finalCartaoPendente || finalCartaoSaving) return
         setFinalCartaoSaving(true)
@@ -2225,6 +2277,7 @@ const FaturasViewPage = () => {
     }
 
     const isProcessing = fatura.status === 'pendente' || fatura.status === 'processando'
+    const colSpanTransacoes = modoClassificar ? 13 : 12
     const precisaSenhaPdf = deveAbrirModalSenhaPdfDeFatura(fatura, cartoesLookup.find((c) => Number(c.id) === Number(fatura.cartao_id)))
     const anexo = resolveFaturaAnexo(fatura)
     const nomePdf = nomeAnexoFaturaExibicao(fatura, 'pdf')
@@ -2824,6 +2877,19 @@ const FaturasViewPage = () => {
                                     </Link>
                                     <Button
                                         type="button"
+                                        color={modoClassificar ? 'warning' : 'light'}
+                                        className={modoClassificar ? '' : 'border'}
+                                        disabled={transacoes.length === 0}
+                                        onClick={() => {
+                                            if (modoClassificar) sairModoClassificar()
+                                            else setModoClassificar(true)
+                                        }}
+                                    >
+                                        <i className="ri-checkbox-multiple-line align-middle me-1"></i>
+                                        {modoClassificar ? 'Sair da classificação' : 'Classificar'}
+                                    </Button>
+                                    <Button
+                                        type="button"
                                         color="secondary"
                                         outline
                                         onClick={handleExportCsv}
@@ -2861,6 +2927,68 @@ const FaturasViewPage = () => {
                                     ))}
                                 </div>
                             )}
+                            {modoClassificar && (
+                                <div className="border rounded p-3 mb-3 bg-light">
+                                    <div className="fw-semibold mb-1">
+                                        {selecionadasClassificar.length === 0
+                                            ? 'Marque as transações na tabela'
+                                            : `${selecionadasClassificar.length} selecionada${selecionadasClassificar.length === 1 ? '' : 's'}`}
+                                    </div>
+                                    <p className="small text-muted mb-2">
+                                        Estorno, pagamento, encargo, antecipação e saldo anterior vão para Operacionais.
+                                        Compra soma na fatura; estorno abate. O final muda o grupo do cartão.
+                                    </p>
+                                    <div className="d-flex flex-wrap gap-2 align-items-end">
+                                        <div>
+                                            <Label className="small mb-1">Tipo</Label>
+                                            <Input
+                                                type="select"
+                                                bsSize="sm"
+                                                value={classificarTipo}
+                                                disabled={classificarSaving}
+                                                onChange={(e) => setClassificarTipo(e.target.value)}
+                                                style={{ minWidth: 240 }}
+                                            >
+                                                <option value="">Não alterar o tipo</option>
+                                                <option value="purchase">Compra</option>
+                                                <option value="refund">Estorno</option>
+                                                <option value="payment">Pagamento</option>
+                                                <option value="fee">Encargo</option>
+                                                <option value="advance">Antecipação</option>
+                                                <option value="carryover">Saldo anterior</option>
+                                            </Input>
+                                        </div>
+                                        <div>
+                                            <Label className="small mb-1">Final do cartão</Label>
+                                            <Input
+                                                type="select"
+                                                bsSize="sm"
+                                                value={classificarFinal}
+                                                disabled={classificarSaving || numerosLoading}
+                                                onChange={(e) => setClassificarFinal(e.target.value)}
+                                                style={{ minWidth: 240 }}
+                                            >
+                                                <option value="">Não alterar o final</option>
+                                                <option value="sem">Sem final</option>
+                                                {numerosOptions.map((opt) => (
+                                                    <option key={String(opt.value)} value={opt.value ?? ''}>
+                                                        {opt.label}
+                                                    </option>
+                                                ))}
+                                            </Input>
+                                        </div>
+                                        <Button
+                                            type="button"
+                                            color="primary"
+                                            size="sm"
+                                            disabled={classificarSaving || selecionadasClassificar.length === 0}
+                                            onClick={() => { void handleSalvarClassificacao() }}
+                                        >
+                                            {classificarSaving ? 'Salvando...' : 'Salvar e organizar'}
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
                             {transacoes.length === 0 ? (
                                 <div className="text-center text-muted py-5">
                                     {isProcessing
@@ -2872,6 +3000,27 @@ const FaturasViewPage = () => {
                                     <Table striped className="align-middle mb-0">
                                         <thead className="table-light">
                                             <tr>
+                                                {modoClassificar && (
+                                                    <th style={{ width: 36 }}>
+                                                        <Input
+                                                            type="checkbox"
+                                                            checked={(() => {
+                                                                const ids = gruposVisiveis.flatMap((grupo) =>
+                                                                    grupo.items.map((item) => item.id).filter((itemId): itemId is number => itemId != null)
+                                                                )
+                                                                return ids.length > 0 && ids.every((itemId) => selecionadasClassificar.includes(itemId))
+                                                            })()}
+                                                            onChange={() => {
+                                                                const ids = gruposVisiveis.flatMap((grupo) =>
+                                                                    grupo.items.map((item) => item.id).filter((itemId): itemId is number => itemId != null)
+                                                                )
+                                                                const todos = ids.every((itemId) => selecionadasClassificar.includes(itemId))
+                                                                setSelecionadasClassificar(todos ? [] : ids)
+                                                            }}
+                                                            title="Selecionar as transações visíveis"
+                                                        />
+                                                    </th>
+                                                )}
                                                 <th>Data</th>
                                                 <th>Compra</th>
                                                 <th className={VALOR_TEXT_CLASS} style={{ minWidth: 150, maxWidth: 50 }}>Valor</th>
@@ -2900,7 +3049,7 @@ const FaturasViewPage = () => {
                                                 return (
                                                 <React.Fragment key={grupo.key}>
                                                     <tr className="table-secondary">
-                                                        <td colSpan={12} className="py-2">
+                                                        <td colSpan={colSpanTransacoes} className="py-2">
                                                             <div className="d-flex flex-wrap align-items-center justify-content-between gap-2">
                                                                 <span className="fw-semibold">
                                                                     {grupo.label}
@@ -2918,7 +3067,7 @@ const FaturasViewPage = () => {
                                                 <React.Fragment key={`${grupo.key}_${secao.key}`}>
                                                     {showSecaoTitulo && secao.titulo && (
                                                     <tr className="table-light">
-                                                        <td colSpan={12} className="py-1">
+                                                        <td colSpan={colSpanTransacoes} className="py-1">
                                                             <span className="small fw-semibold text-uppercase text-muted">
                                                                 {secao.titulo}
                                                             </span>
@@ -2955,7 +3104,7 @@ const FaturasViewPage = () => {
                                                         <React.Fragment key={rowKey}>
                                                         {isPagamentosGrupo && (
                                                             <tr className="table-warning">
-                                                                <td colSpan={12} className="py-2">
+                                                                <td colSpan={colSpanTransacoes} className="py-2">
                                                                     <div className="d-flex flex-wrap align-items-center gap-2">
                                                                         <span className="text-muted small text-nowrap">
                                                                             <i className="ri-bank-card-line me-1"></i>
@@ -2994,6 +3143,16 @@ const FaturasViewPage = () => {
                                                             </tr>
                                                         )}
                                                         <tr className={rowClass}>
+                                                            {modoClassificar && (
+                                                                <td>
+                                                                    <Input
+                                                                        type="checkbox"
+                                                                        checked={tx.id != null && selecionadasClassificar.includes(tx.id)}
+                                                                        onChange={() => toggleSelecionadaClassificar(tx.id)}
+                                                                        title="Selecionar transação"
+                                                                    />
+                                                                </td>
+                                                            )}
                                                             <td>{formatDateBr(tx.data)}</td>
                                                             <td className="text-start">
                                                                 <div className="fw-medium">{titulo}</div>

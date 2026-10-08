@@ -165,6 +165,24 @@ export class TransacoesService implements TransacoesInterface {
         }
     }
 
+    async classificarTransacoes(params: {
+        ids: number[]
+        tipo?: string | null
+        cartao_numero_id?: number | null
+    }) {
+        const response = await this.httpClient.post({
+            url: this.url + '/classificar',
+            body: params,
+        })
+        switch (response.statusCode) {
+            case HttpStatusCode.ok: return response.body
+            case HttpStatusCode.noContent: return
+            case HttpStatusCode.unauthorized: throw new AccessDeniedError()
+            case HttpStatusCode.invalidForm: throw new ValidationError(response.body)
+            default: throw new UnexpectedError(response.message)
+        }
+    }
+
     async editTransacoes(params: TransacoesModel) {
         const response = await this.httpClient.put({
             url: this.url + '/editar', body: params
