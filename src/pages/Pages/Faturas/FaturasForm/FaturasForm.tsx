@@ -756,8 +756,8 @@ const FaturasForm = () => {
                 substituir_fatura: substituirFatura,
                 confirmar_substituir_fatura: confirmarSubstituirFatura,
                 fatura_existente_id: faturaExistenteId,
-                mes: extra?.mes ?? pendingMetadadosRef.current.mes ?? data.mes,
-                ano: extra?.ano ?? pendingMetadadosRef.current.ano ?? data.ano,
+                mes: extra?.mes ?? data.mes ?? pendingMetadadosRef.current.mes,
+                ano: extra?.ano ?? data.ano ?? pendingMetadadosRef.current.ano,
             })
         }
 
@@ -767,8 +767,8 @@ const FaturasForm = () => {
             cartao_nome: cartaoNome || undefined,
             cadastrar_cartao: cadastrarCartao || undefined,
             substituir_fatura: substituirFatura || undefined,
-            mes: extra?.mes ?? pendingMetadadosRef.current.mes ?? data.mes,
-            ano: extra?.ano ?? pendingMetadadosRef.current.ano ?? data.ano,
+            mes: extra?.mes ?? data.mes ?? pendingMetadadosRef.current.mes,
+            ano: extra?.ano ?? data.ano ?? pendingMetadadosRef.current.ano,
             cartao_bandeira_id: cartaoBandeiraId,
             bandeira:
                 extra?.bandeira

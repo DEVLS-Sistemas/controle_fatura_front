@@ -375,6 +375,12 @@ const FaturasViewPage = () => {
     const fileInputRef = useRef<HTMLInputElement>(null)
 
     const [fatura, setFatura] = useState<FaturasView | null>(null)
+    const competenciaDaFaturaAberta = () => {
+        const mes = fatura?.mes
+        const ano = fatura?.ano
+        if (mes == null || mes === '' || ano == null || ano === '') return {}
+        return { mes, ano }
+    }
     const [transacoes, setTransacoes] = useState<TransacoesList[]>([])
     const [loading, setLoading] = useState(true)
     const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null)
@@ -1129,6 +1135,7 @@ const FaturasViewPage = () => {
                 id: Number(id),
                 arquivo_pdf: file,
                 processar_automatico: processarAuto,
+                ...competenciaDaFaturaAberta(),
             })
             await handleUploadSuccess(result)
         } catch (error) {
@@ -1180,6 +1187,7 @@ const FaturasViewPage = () => {
             senha_pdf_regra: payload.senha_pdf_regra,
             ...pendingSelecaoRef.current,
             ...pendingTitularRef.current,
+            ...competenciaDaFaturaAberta(),
         })
         await handleUploadSuccess(result)
         if (cadastroPdfNaoPersistiu({
@@ -1222,6 +1230,7 @@ const FaturasViewPage = () => {
                 processar_automatico: processarAuto,
                 ...merged,
                 ...pendingTitularRef.current,
+                ...competenciaDaFaturaAberta(),
             })
             setSelecaoModalOpen(false)
             await handleUploadSuccess(result)
@@ -1305,6 +1314,7 @@ const FaturasViewPage = () => {
                 processar_automatico: processarAuto,
                 ...pendingSelecaoRef.current,
                 ...selection,
+                ...competenciaDaFaturaAberta(),
             })
             setTitularModalOpen(false)
             await handleUploadSuccess(result)
@@ -1364,6 +1374,7 @@ const FaturasViewPage = () => {
                 ...pendingSelecaoRef.current,
                 ...pendingTitularRef.current,
                 ...retry,
+                ...competenciaDaFaturaAberta(),
             })
             setAnexoDuplicadoModalOpen(false)
             await handleUploadSuccess(result)
@@ -1424,6 +1435,7 @@ const FaturasViewPage = () => {
                 ...pendingSelecaoRef.current,
                 ...pendingTitularRef.current,
                 ...retry,
+                ...competenciaDaFaturaAberta(),
             })
             setJaAnexadaModalOpen(false)
             await handleUploadSuccess(result)
@@ -1482,6 +1494,7 @@ const FaturasViewPage = () => {
                 ...pendingSelecaoRef.current,
                 ...pendingTitularRef.current,
                 ...retry,
+                ...competenciaDaFaturaAberta(),
             })
             setAnexoDuplicadoModalOpen(false)
             await handleUploadSuccess(result)
