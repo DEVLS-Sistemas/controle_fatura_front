@@ -72,9 +72,9 @@ export const isGuestPath = (pathname: string): boolean => {
   return GUEST_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`))
 }
 
-export const getAuthSession = (): StoredAuthSession | null => {
+const readStoredSession = (storage: Storage): StoredAuthSession | null => {
   try {
-    const raw = sessionStorage.getItem(AUTH_SESSION_KEY)
+    const raw = storage.getItem(AUTH_SESSION_KEY)
     if (!raw) return null
     const parsed = JSON.parse(raw)
     if (!parsed?.token) return null
@@ -82,6 +82,31 @@ export const getAuthSession = (): StoredAuthSession | null => {
   } catch {
     return null
   }
+}
+
+/** Sessão no localStorage: abas do mesmo navegador leem o mesmo token. */
+const writeSharedSession = (stored: StoredAuthSession): void => {
+  localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(stored))
+  try {
+    sessionStorage.removeItem(AUTH_SESSION_KEY)
+  } catch {
+    // ignore
+  }
+}
+
+export const getAuthSession = (): StoredAuthSession | null => {
+  const shared = readStoredSession(localStorage)
+  if (shared) return shared
+
+  const legacy = readStoredSession(sessionStorage)
+  if (!legacy) return null
+
+  try {
+    writeSharedSession(legacy)
+  } catch {
+    // private mode: a aba atual continua com a sessão antiga
+  }
+  return legacy
 }
 
 export const getAuthToken = (): string | null => {
@@ -176,7 +201,7 @@ export const persistAuthUser = (user: SessionUser): StoredAuthSession | null => 
   const current = getAuthSession()
   if (!current?.token) return null
   const stored = buildStoredSession(current.token, user)
-  sessionStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(stored))
+  writeSharedSession(stored)
   emitAuthSessionUpdated()
   return stored
 }
@@ -202,7 +227,7 @@ const clearAxiosAuthorization = (): void => {
 export const persistAuthSession = (payload: SessionPayload): StoredAuthSession => {
   clearUserScopedStorage()
   const stored = buildStoredSession(payload.token, payload.user)
-  sessionStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(stored))
+  writeSharedSession(stored)
   handlingUnauthorized = false
   validatedToken = null
   emitAuthSessionUpdated()
@@ -211,6 +236,7 @@ export const persistAuthSession = (payload: SessionPayload): StoredAuthSession =
 
 export const clearAuthSession = (): void => {
   try {
+    localStorage.removeItem(AUTH_SESSION_KEY)
     sessionStorage.removeItem(AUTH_SESSION_KEY)
   } catch {
     // ignore
@@ -237,4 +263,23 @@ export const handleUnauthorizedSession = (): void => {
   }
 
   window.location.assign('/login')
+}
+
+/** Outra aba removeu o token: esta também volta ao login. O evento `storage` não dispara na aba que alterou. */
+const onSharedAuthStorage = (event: StorageEvent): void => {
+  if (event.key !== AUTH_SESSION_KEY) return
+  if (event.storageArea && event.storageArea !== localStorage) return
+
+  validatedToken = null
+  emitAuthSessionUpdated()
+
+  if (event.newValue) return
+
+  clearAxiosAuthorization()
+  if (isGuestPath(window.location.pathname)) return
+  window.location.assign('/login')
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', onSharedAuthStorage)
 }
