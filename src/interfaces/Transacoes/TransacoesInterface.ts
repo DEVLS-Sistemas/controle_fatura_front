@@ -256,6 +256,11 @@ export interface TransacoesInterface {
     createTransacoes(params: TransacoesModel): Promise<any>
     cadastrarLote(compras: Record<string, unknown>[]): Promise<any>
     editTransacoes(params: TransacoesModel): Promise<any>
+    classificarTransacoes(params: {
+        ids: number[]
+        tipo?: string | null
+        cartao_numero_id?: number | null
+    }): Promise<any>
     deleteTransacoes(id: number, options?: { excluir_grupo?: boolean }): Promise<any>
     getLookupsTransacoes(): Promise<LookupsTransacoes | undefined>
     exportCsv(params: TransacoesSearch): Promise<Blob>
