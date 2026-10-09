@@ -4,7 +4,7 @@ import {
 } from 'reactstrap'
 import { toast } from 'react-toastify'
 import { Link, useNavigate } from 'react-router-dom'
-import logoLight from '../../assets/images/logo-light.png'
+import logoLight from '../../assets/images/logo-colorido.png'
 import ParticlesAuth from '../AuthenticationInner/ParticlesAuth'
 import { AuthService } from 'services/Auth'
 
