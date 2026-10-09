@@ -1,7 +1,7 @@
 {
   "files": {
     "main.css": "/static/css/main.319b1e6c.css",
-    "main.js": "/static/js/main.de6a642d.js",
+    "main.js": "/static/js/main.a011bccc.js",
     "static/js/496.e1761a4c.chunk.js": "/static/js/496.e1761a4c.chunk.js",
     "static/media/img-5.gif": "/static/media/img-5.bfb4402d4c7cd4dff7fa.gif",
     "static/media/remixicon.svg?t=1590207869815": "/static/media/remixicon.9cedd2150922ead84869.svg",
@@ -45,7 +45,6 @@
     "static/media/la-solid-900.woff": "/static/media/la-solid-900.893634871a6cbff72157.woff",
     "static/media/remixicon.woff2?t=1590207869815": "/static/media/remixicon.90668f6f9b3c2c18a090.woff2",
     "static/media/img-10.jpg": "/static/media/img-10.b951fa5106513cf25b23.jpg",
-    "static/media/logo-light.png": "/static/media/logo-light.3e2a2058422eeeac72d2.png",
     "static/media/bo.svg": "/static/media/bo.b05a77cfd0991012bfd10cd15980ca60.svg",
     "static/media/img-4.png": "/static/media/img-4.96f3b0d655aa68212997.png",
     "static/media/boxicons.woff2": "/static/media/boxicons.60f603cccbdff82a523c.woff2",
@@ -389,11 +388,11 @@
     "static/media/de.svg": "/static/media/de.0fce3f5135eaf251a726573f8471b664.svg",
     "static/media/bd.svg": "/static/media/bd.5ec0fab3bc8aa5078e1610b715b7427c.svg",
     "main.319b1e6c.css.map": "/static/css/main.319b1e6c.css.map",
-    "main.de6a642d.js.map": "/static/js/main.de6a642d.js.map",
+    "main.a011bccc.js.map": "/static/js/main.a011bccc.js.map",
     "496.e1761a4c.chunk.js.map": "/static/js/496.e1761a4c.chunk.js.map"
   },
   "entrypoints": [
     "static/css/main.319b1e6c.css",
-    "static/js/main.de6a642d.js"
+    "static/js/main.a011bccc.js"
   ]
 }
