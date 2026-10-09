@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useEffect, useRef, useState } from "react"
+import React, { createContext, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react"
 import { useSearchParams } from "react-router-dom"
 import { Container, Spinner } from 'reactstrap'
 import { SubmitHandler } from 'react-hook-form'
@@ -57,6 +57,7 @@ const FaturasPage = () => {
     const [faturasList, setFaturasList] = useState<FaturasPaginate>()
     const faturasService = useRef(new FaturasService()).current
     const bootedRef = useRef(false)
+    const listaAtivaRef = useRef(true)
 
     const [competenciaAtual, setCompetenciaAtual] = useState<CompetenciaAtual | null>(null)
     const competenciaAtualRef = useRef<CompetenciaAtual | null>(null)
@@ -69,7 +70,11 @@ const FaturasPage = () => {
     const [perPage, setPerPage] = useState<number>(5)
     const [page, setPage] = useState(faturasContext.page ?? 1)
 
+    const listagemSegueNaTela = () =>
+        listaAtivaRef.current && window.location.pathname === '/faturas'
+
     const persistUrl = (filters: FaturasSearch & PaginateSearch) => {
+        if (!listagemSegueNaTela()) return
         const next = buildFaturasListagemSearchParams(filters)
         const nextQs = next.toString()
         const currentQs = new URLSearchParams(window.location.search).toString()
@@ -128,6 +133,7 @@ const FaturasPage = () => {
             page: data.page ?? 1,
         })
         const list = await faturasService.listFaturasPaginate(apiParams)
+        if (!listagemSegueNaTela()) return
         applyListMeta(list, apiParams, competenciaAtualRef.current)
         persistUrl({
             ...faturasContext,
@@ -143,6 +149,7 @@ const FaturasPage = () => {
         let competencia: CompetenciaAtual | null = null
         try {
             const lookups = await faturasService.getLookupsFaturas()
+            if (!listagemSegueNaTela()) return
             competencia = extractCompetenciaAtual(lookups)
             if (competencia) {
                 competenciaAtualRef.current = competencia
@@ -166,6 +173,8 @@ const FaturasPage = () => {
         } catch (error) {
             console.error('Erro ao carregar lookups de faturas:', error)
         }
+
+        if (!listagemSegueNaTela()) return
 
         const url = parseFaturasListagemSearchParams(searchParams)
         const resolved = resolveCompetenciaInicial(url, competencia)
@@ -192,13 +201,23 @@ const FaturasPage = () => {
                 perPage,
             })
         } finally {
-            bootedRef.current = true
+            if (listagemSegueNaTela()) bootedRef.current = true
         }
     }
 
+    useLayoutEffect(() => {
+        listaAtivaRef.current = true
+        return () => {
+            listaAtivaRef.current = false
+        }
+    }, [])
+
     useEffect(() => {
-        setTimeout(() => setDisplay(true), 300)
+        const displayTimer = window.setTimeout(() => {
+            if (listaAtivaRef.current) setDisplay(true)
+        }, 300)
         boot()
+        return () => window.clearTimeout(displayTimer)
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
