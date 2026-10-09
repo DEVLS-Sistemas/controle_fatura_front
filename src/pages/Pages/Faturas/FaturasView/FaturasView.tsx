@@ -80,6 +80,7 @@ import {
     parseAplicarSubcategoria,
 } from 'helpers/aplicar_subcategoria_helpers'
 import { linhaFaturaSemCategoria } from 'helpers/fatura_categoria_operacional_helpers'
+import { transacaoFaturaSecaoOperacionais } from 'helpers/fatura_operacionais_secao_helpers'
 import AplicarSubcategoriaModal from 'Components/Faturas/AplicarSubcategoriaModal'
 import AplicarFinalCartaoModal from 'Components/Faturas/AplicarFinalCartaoModal'
 import { FaturasService } from 'services/Faturas/FaturasService'
@@ -199,6 +200,7 @@ const getTxCartaoGrupoKey = (tx: TransacoesList): string | null => {
 }
 
 const getTxGrupoKey = (tx: TransacoesList): string => {
+    if (transacaoFaturaSecaoOperacionais(tx)) return OPERACIONAIS_KEY
     const cartaoKey = getTxCartaoGrupoKey(tx)
     if (cartaoKey) return cartaoKey
     if (tx.grupo_chave === 'operacionais' || isTransacaoOperacional(tx)) return OPERACIONAIS_KEY
@@ -257,19 +259,7 @@ type TransacaoGrupo = {
     label: string
     ordem: number
     items: TransacoesList[]
-    compras: TransacoesList[]
-    operacionais: TransacoesList[]
     subtotal: number
-}
-
-const splitComprasOperacionais = (items: TransacoesList[]) => {
-    const compras: TransacoesList[] = []
-    const operacionais: TransacoesList[] = []
-    items.forEach((tx) => {
-        if (isTransacaoOperacional(tx)) operacionais.push(tx)
-        else compras.push(tx)
-    })
-    return { compras, operacionais }
 }
 
 const groupTransacoesPorFinal = (
@@ -309,8 +299,6 @@ const groupTransacoesPorFinal = (
                     : ((found ? formatGrupoLabel(found.meta) : null) || (tx ? getTxNumeroLabel(tx) : 'Cartão')),
             ordem: found?.ordem ?? (isOperacionais ? 2000 : isPagamentos ? 1000 : 0),
             items: [],
-            compras: [],
-            operacionais: [],
             subtotal: 0,
         }
     }
@@ -348,10 +336,6 @@ const groupTransacoesPorFinal = (
     })
 
     return Array.from(map.values())
-        .map((g) => {
-            const { compras, operacionais } = splitComprasOperacionais(g.items)
-            return { ...g, compras, operacionais }
-        })
         .filter((g) => g.items.length > 0)
         .sort((a, b) => {
             const faixaDiff = faixaGrupo(a.grupoChave) - faixaGrupo(b.grupoChave)
@@ -2860,7 +2844,7 @@ const FaturasViewPage = () => {
                                 <div>
                                     <h5 className="card-title mb-1">Transações</h5>
                                     <small className="text-muted">
-                                        Agrupadas por final do cartão. Compras sem final ficam em “Pagamentos e Financiamentos”; pagamentos e saldo anterior ficam em “Operacionais”.
+                                        Agrupadas por final do cartão. Compras sem final ficam em “Pagamentos e Financiamentos”. Estorno, pagamento, encargo, antecipação e saldo anterior ficam em “Operacionais”, mesmo com final.
                                     </small>
                                 </div>
                                 <div className="d-flex flex-wrap gap-2">
@@ -3051,14 +3035,7 @@ const FaturasViewPage = () => {
                                         <tbody>
                                             {gruposVisiveis.map((grupo) => {
                                                 const isPagamentosGrupo = grupo.grupoChave === 'pagamentos_financiamentos'
-                                                const isCartaoGrupo = grupo.grupoChave === 'cartao'
-                                                const secoes = isCartaoGrupo
-                                                    ? [
-                                                        { key: 'compras', titulo: 'Compras', items: grupo.compras },
-                                                        { key: 'operacionais', titulo: 'Operacionais', items: grupo.operacionais },
-                                                    ].filter((secao) => secao.items.length > 0)
-                                                    : [{ key: 'all', titulo: null as string | null, items: grupo.items }]
-                                                const showSecaoTitulo = isCartaoGrupo && secoes.length > 1
+                                                const secoes = [{ key: 'all', titulo: null as string | null, items: grupo.items }]
                                                 return (
                                                 <React.Fragment key={grupo.key}>
                                                     <tr className="table-secondary">
@@ -3078,15 +3055,6 @@ const FaturasViewPage = () => {
                                                     </tr>
                                                     {secoes.map((secao) => (
                                                 <React.Fragment key={`${grupo.key}_${secao.key}`}>
-                                                    {showSecaoTitulo && secao.titulo && (
-                                                    <tr className="table-light">
-                                                        <td colSpan={colSpanTransacoes} className="py-1">
-                                                            <span className="small fw-semibold text-uppercase text-muted">
-                                                                {secao.titulo}
-                                                            </span>
-                                                        </td>
-                                                    </tr>
-                                                    )}
                                                     {secao.items.map((tx, idx) => {
                                                         const subOptions = tx.categoria_id
                                                             ? (subcategoriasByCategoria[tx.categoria_id] ?? [])
