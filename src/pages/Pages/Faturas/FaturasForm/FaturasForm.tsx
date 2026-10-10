@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { setActiveMenu } from 'helpers/system_helpers'
 import { AnosSelect, useNavegacao } from 'helpers/functions_helpers'
-import { Breadcrumb, BreadcrumbItem, Card, CardBody, Col, Container, Input, Label, Row } from 'reactstrap'
+import { Breadcrumb, BreadcrumbItem, Card, CardBody, Col, Container, Input, Label, Row, Spinner } from 'reactstrap'
 import { SubmitHandler, useForm } from 'react-hook-form'
 import { toast } from 'react-toastify'
 import { InputCheckbox } from 'Components/ComponentController/Inputs/Checkbox/InputCheckbox'
@@ -137,6 +137,8 @@ const FaturasForm = () => {
     const [showBandeiraSelect, setShowBandeiraSelect] = useState(false)
     const [bandeirasLoading, setBandeirasLoading] = useState(false)
     const [arquivoFile, setArquivoFile] = useState<File | null>(null)
+    const [enviandoAnexo, setEnviandoAnexo] = useState(false)
+    const enviandoAnexoRef = useRef(false)
     /** Quando o back não detecta metadados no anexo, força cartão/mês/ano */
     const [exigeMetadadosManuais, setExigeMetadadosManuais] = useState(false)
     const [senhaModalOpen, setSenhaModalOpen] = useState(false)
@@ -835,6 +837,18 @@ const FaturasForm = () => {
         return true
     }
 
+    const iniciarEnvioAnexo = (): boolean => {
+        if (enviandoAnexoRef.current) return false
+        enviandoAnexoRef.current = true
+        setEnviandoAnexo(true)
+        return true
+    }
+
+    const encerrarEnvioAnexo = () => {
+        enviandoAnexoRef.current = false
+        setEnviandoAnexo(false)
+    }
+
     const onSubmit: SubmitHandler<FaturasModel> = async (data) => {
         try {
             if (isEdit) {
@@ -857,8 +871,15 @@ const FaturasForm = () => {
                 return
             }
 
-            const result = await submitCreate()
-            handleCreateSuccess(result)
+            const enviaArquivo = Boolean(arquivoFile)
+            if (enviaArquivo && !iniciarEnvioAnexo()) return
+
+            try {
+                const result = await submitCreate()
+                handleCreateSuccess(result)
+            } finally {
+                if (enviaArquivo) encerrarEnvioAnexo()
+            }
         } catch (error: any) {
             if (handleCreateError(error)) return
             toast.error(error?.message || 'Erro ao salvar fatura')
@@ -1220,14 +1241,18 @@ const FaturasForm = () => {
 
         setPendingHomologFile(null)
         if (homologIntent === 'submit') {
+            const data = getValues()
+            if (!validateCreateSubmit(data)) return
+            const enviaArquivo = Boolean(file)
+            if (enviaArquivo && !iniciarEnvioAnexo()) return
             try {
-                const data = getValues()
-                if (!validateCreateSubmit(data)) return
                 const result = await submitCreate()
                 handleCreateSuccess(result)
             } catch (error: any) {
                 if (handleCreateError(error)) return
                 toast.error(error?.message || 'Erro ao salvar fatura')
+            } finally {
+                if (enviaArquivo) encerrarEnvioAnexo()
             }
         }
     }
@@ -1450,6 +1475,7 @@ const FaturasForm = () => {
                                                             type="file"
                                                             accept={FATURA_FILE_ACCEPT}
                                                             onChange={handleFileChange}
+                                                            disabled={enviandoAnexo}
                                                         />
                                                         <small className="text-muted d-block">
                                                             Formatos aceitos: PDF ou CSV (máx. 10MB).
@@ -1583,9 +1609,11 @@ const FaturasForm = () => {
                                                     <button
                                                         type="submit"
                                                         className="btn btn-primary"
-                                                        disabled={!isEdit && bandeirasLoading}
+                                                        disabled={enviandoAnexo || (!isEdit && bandeirasLoading)}
+                                                        aria-busy={enviandoAnexo}
                                                     >
-                                                        {isEdit ? 'Salvar' : 'Cadastrar'}
+                                                        {enviandoAnexo && <Spinner size="sm" className="me-2" />}
+                                                        {enviandoAnexo ? 'Enviando…' : (isEdit ? 'Salvar' : 'Cadastrar')}
                                                     </button>
                                                     <button type="button" className="btn btn-soft-success" onClick={voltarParaRotaAnterior}>Voltar</button>
                                                 </div>
