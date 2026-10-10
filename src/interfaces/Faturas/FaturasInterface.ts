@@ -151,7 +151,7 @@ export type FaturasPaginate = PaginateInterface<FaturasCartaoGroup> & {
 
 export type FaturaGrupoChave = 'cartao' | 'pagamentos_financiamentos'
 
-/** Grupo de transações por final do cartão — `GET /faturas/listar/{id}` */
+/** Grupo de transações por final do cartão — `GET /faturas/listar/{id}/grupos` */
 export interface FaturaGrupoPorCartao {
     cartao_numero_id?: number | null
     ultimos_digitos?: string | null
@@ -208,6 +208,31 @@ export interface FaturasView extends FaturaResumo {
         senha_pdf_regra?: string | null
         senha_pdf_orientacao?: string | null
     } | null
+}
+
+/** `GET /faturas/listar/{id}/grupos` */
+export interface FaturaGruposBloco {
+    grupos_por_cartao: FaturaGrupoPorCartao[]
+}
+
+/** `GET /faturas/listar/{id}/quitacao` */
+export interface FaturaQuitacao {
+    pago?: boolean
+    valor_pago?: number | string
+    valor_restante?: number | string
+    pagamentos_total?: number | string
+    pagamentos_abatido_anterior?: number | string
+    pagamentos_antecipado?: number | string
+}
+
+/** `GET /faturas/listar/{id}/conferencia` */
+export interface FaturaConferenciaBloco {
+    valor_extrato?: number | string | null
+    valor_nao_conciliado?: number | string | null
+    valor_total_com_pendencias?: number | string | null
+    tem_compras_nao_conciliadas?: boolean | null
+    compras_nao_conciliadas_label?: string | null
+    conferencia?: FaturasView['conferencia']
 }
 
 export interface FaturasModel {
@@ -413,6 +438,9 @@ export interface ComprasParaReconcilia {
 
 export interface FaturasInterface {
     getViewFaturas(params: any): Promise<FaturasView | undefined>
+    getFaturaGrupos(id: number | string): Promise<FaturaGruposBloco | undefined>
+    getFaturaQuitacao(id: number | string): Promise<FaturaQuitacao | undefined>
+    getFaturaConferencia(id: number | string): Promise<FaturaConferenciaBloco | undefined>
     listFaturasPaginate(params: FaturasSearch): Promise<FaturasPaginate | undefined>
     AsyncListFaturas(params: FaturasSearch): Promise<FaturasModel[] | undefined>
     createFaturas(params: FaturasModel): Promise<any>
@@ -533,6 +561,57 @@ export const extractComprasParaReconcilia = (result: unknown): ComprasParaReconc
         status: (candidate.status as string | null) ?? null,
         compras_para_conciliar: compras,
     }
+}
+
+const asBlocoRecord = (value: unknown): Record<string, unknown> | null => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+    return value as Record<string, unknown>
+}
+
+/** Corpo direto ou envelopado em `data` — grupos, quitação e conferência. */
+const blocoFatura = (body: unknown): Record<string, unknown> | null => {
+    const record = asBlocoRecord(body)
+    if (!record) return null
+    const nested = asBlocoRecord(record.data)
+    if (
+        nested
+        && (
+            'grupos_por_cartao' in nested
+            || 'pago' in nested
+            || 'valor_restante' in nested
+            || 'valor_extrato' in nested
+            || 'conferencia' in nested
+            || 'valor_total_com_pendencias' in nested
+        )
+    ) {
+        return nested
+    }
+    return record
+}
+
+export const extractFaturaGrupos = (body: unknown): FaturaGruposBloco | undefined => {
+    const record = blocoFatura(body)
+    if (!record || !Array.isArray(record.grupos_por_cartao)) return undefined
+    return { grupos_por_cartao: record.grupos_por_cartao as FaturaGrupoPorCartao[] }
+}
+
+export const extractFaturaQuitacao = (body: unknown): FaturaQuitacao | undefined => {
+    const record = blocoFatura(body)
+    if (!record || (!('pago' in record) && !('valor_restante' in record))) return undefined
+    return record as unknown as FaturaQuitacao
+}
+
+export const extractFaturaConferencia = (body: unknown): FaturaConferenciaBloco | undefined => {
+    const record = blocoFatura(body)
+    if (!record) return undefined
+    if (
+        !('valor_extrato' in record)
+        && !('conferencia' in record)
+        && !('valor_total_com_pendencias' in record)
+    ) {
+        return undefined
+    }
+    return record as unknown as FaturaConferenciaBloco
 }
 
 /** Extrai payload de fatura aninhado em respostas `result.fatura` / `fatura.data` */

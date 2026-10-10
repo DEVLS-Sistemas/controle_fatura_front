@@ -1,5 +1,5 @@
 import React from 'react'
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import FaturasPage from './FaturasPage'
@@ -12,7 +12,14 @@ jest.mock('services/Faturas/FaturasService', () => ({
     FaturasService: jest.fn(),
 }))
 
-jest.mock('./FaturasTable/FaturasTable', () => () => null)
+jest.mock('./FaturasTable/FaturasTable', () => (props: { loading?: boolean }) => {
+    const React = require('react')
+    return React.createElement(
+        'div',
+        { role: 'status' },
+        props.loading ? 'Carregando faturas' : 'Lista de faturas',
+    )
+})
 
 jest.mock('./FaturasFilter/FaturasFilter', () => {
     const React = require('react')
@@ -101,6 +108,40 @@ describe('Adicionar fatura enquanto a lista carrega', () => {
             expect(window.location.pathname).toBe('/faturas')
             expect(window.location.search).toContain('mes=10')
             expect(window.location.search).toContain('ano=2026')
+        })
+    })
+
+    it('mostra filtros e a área da lista antes das linhas', async () => {
+        const liberarLista = adiarLista()
+        renderPagina()
+
+        expect(await screen.findByRole('link', { name: /adicionar fatura/i })).toBeInTheDocument()
+        expect(screen.getByRole('status')).toHaveTextContent('Carregando faturas')
+        expect(screen.queryByText('Lista de faturas')).not.toBeInTheDocument()
+
+        liberarLista()
+
+        expect(await screen.findByText('Lista de faturas')).toBeInTheDocument()
+        expect(screen.queryByText('Carregando faturas')).not.toBeInTheDocument()
+    })
+
+    it('busca a lista sem esperar os lookups', async () => {
+        let resolveLookups: (value: unknown) => void = () => undefined
+        mockGetLookupsFaturas.mockImplementation(() => new Promise((resolve) => {
+            resolveLookups = resolve
+        }))
+        mockListFaturasPaginate.mockResolvedValue(respostaLista)
+        renderPagina()
+
+        await waitFor(() => {
+            expect(mockListFaturasPaginate).toHaveBeenCalled()
+        })
+        await act(async () => {
+            resolveLookups({
+                competencia_atual: { mes: 10, ano: 2026, label: '10/2026' },
+                anos: [{ value: 2026, label: '2026' }],
+                cartoes: [],
+            })
         })
     })
 })
