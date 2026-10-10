@@ -41,6 +41,7 @@ export interface FaturasTableProps {
     page: number
     perPage: number
     filters: any
+    loading?: boolean
 }
 
 type FaturaRow = FaturaResumo & {
@@ -90,7 +91,19 @@ const flattenFaturas = (grupos: FaturasCartaoGroup[]): FaturaRow[] => {
     )
 }
 
-export const FaturasTable = ({ data, getData, setPerPage, perPage, filters }: FaturasTableProps) => {
+const LinhasFaturaSkeleton = () => (
+    <>
+        {Array.from({ length: 5 }, (_, index) => (
+            <tr key={`fatura-skeleton-${index}`}>
+                <td colSpan={13} className="placeholder-glow">
+                    <span className="placeholder col-12" />
+                </td>
+            </tr>
+        ))}
+    </>
+)
+
+export const FaturasTable = ({ data, getData, setPerPage, perPage, filters, loading = false }: FaturasTableProps) => {
     const [optPerPage] = useState<PerPageProps[]>([
         { value: 5, label: "5" },
         { value: 10, label: "10" },
@@ -224,13 +237,13 @@ export const FaturasTable = ({ data, getData, setPerPage, perPage, filters }: Fa
                     <Card>
                         <CardBody>
                             <div className="live-preview mt-1">
-                                {data && data.total === 0 ? (
+                                {!loading && data && data.total === 0 ? (
                                     <div className="bg-primary text-white border-0 alert alert-primary fade show text-center">
                                         {temFiltroPeriodo
                                             ? 'Nenhuma fatura neste período'
                                             : 'Nenhuma fatura encontrada. Cadastre uma compra ou importe um PDF/CSV.'}
                                     </div>
-                                ) : !data ? (
+                                ) : !loading && !data ? (
                                     <div className="bg-danger text-white border-0 alert alert-danger fade show text-center">
                                         NENHUM RESULTADO ENCONTRADO!
                                     </div>
@@ -278,8 +291,14 @@ export const FaturasTable = ({ data, getData, setPerPage, perPage, filters }: Fa
                                                                 <th scope="col" style={{ width: "220px" }}>Ações</th>
                                                             </tr>
                                                         </thead>
-                                                        <tbody>
-                                                            {rows.length === 0 ? (
+                                                        <tbody
+                                                            aria-busy={loading || undefined}
+                                                            role={loading ? 'status' : undefined}
+                                                            aria-label={loading ? 'Carregando faturas' : undefined}
+                                                        >
+                                                            {loading ? (
+                                                                <LinhasFaturaSkeleton />
+                                                            ) : rows.length === 0 ? (
                                                                 <tr>
                                                                     <td colSpan={13} className="text-muted py-4">
                                                                         Nenhuma fatura neste período
@@ -487,6 +506,7 @@ export const FaturasTable = ({ data, getData, setPerPage, perPage, filters }: Fa
                                             </Col>
                                         </Row>
 
+                                        {data && (
                                         <TablePagination
                                             currentPage={data.current_page}
                                             lastPage={data.last_page}
@@ -502,6 +522,7 @@ export const FaturasTable = ({ data, getData, setPerPage, perPage, filters }: Fa
                                                 </>
                                             }
                                         />
+                                        )}
                                     </>
                                 )}
                             </div>

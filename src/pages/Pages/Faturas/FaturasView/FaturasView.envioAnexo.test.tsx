@@ -91,6 +91,22 @@ beforeEach(() => {
     mockGetViewFaturas.mockResolvedValue(faturaAberta)
     ;(FaturasService as unknown as jest.Mock).mockImplementation(() => ({
         getViewFaturas: (...args: unknown[]) => mockGetViewFaturas(...args),
+        getFaturaGrupos: jest.fn().mockResolvedValue({ grupos_por_cartao: [] }),
+        getFaturaQuitacao: jest.fn().mockResolvedValue({
+            pago: true,
+            valor_pago: 0,
+            valor_restante: 0,
+            pagamentos_total: 0,
+            pagamentos_abatido_anterior: 0,
+            pagamentos_antecipado: 0,
+        }),
+        getFaturaConferencia: jest.fn().mockResolvedValue({
+            valor_extrato: 0,
+            valor_nao_conciliado: 0,
+            valor_total_com_pendencias: 0,
+            tem_compras_nao_conciliadas: false,
+            conferencia: null,
+        }),
         getLookupsFaturas: jest.fn().mockResolvedValue({ cartoes: [], parsers_homologados: [] }),
         uploadPdf: (...args: unknown[]) => mockUploadPdf(...args),
         listFaturasPaginate: jest.fn().mockResolvedValue({ data: [] }),
