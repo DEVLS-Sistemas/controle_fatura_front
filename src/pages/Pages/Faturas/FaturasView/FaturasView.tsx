@@ -379,6 +379,8 @@ const FaturasViewPage = () => {
     const pendingSelecaoRef = useRef<FaturaSelecaoRetryPayload>({})
     const pendingTitularRef = useRef<Partial<FaturaTitularRetryPayload>>({})
     const pendingUploadFileRef = useRef<File | null>(null)
+    const enviandoAnexoRef = useRef(false)
+    const [enviandoAnexo, setEnviandoAnexo] = useState(false)
     const [titularModalOpen, setTitularModalOpen] = useState(false)
     const [titularLoading, setTitularLoading] = useState(false)
     const [titularTitulares, setTitularTitulares] = useState<string[]>([])
@@ -1080,7 +1082,20 @@ const FaturasViewPage = () => {
         return true
     }
 
+    const iniciarEnvioAnexo = (): boolean => {
+        if (enviandoAnexoRef.current) return false
+        enviandoAnexoRef.current = true
+        setEnviandoAnexo(true)
+        return true
+    }
+
+    const encerrarEnvioAnexo = () => {
+        enviandoAnexoRef.current = false
+        setEnviandoAnexo(false)
+    }
+
     const handleUploadPdf = async (opts?: { skipHomologConfirm?: boolean }) => {
+        if (enviandoAnexoRef.current) return
         const file = fileInputRef.current?.files?.[0] ?? pendingUploadFileRef.current
         if (!file || !id) {
             toast.warning('Selecione um arquivo PDF ou CSV')
@@ -1113,6 +1128,7 @@ const FaturasViewPage = () => {
             }
         }
 
+        if (!iniciarEnvioAnexo()) return
         try {
             const result = await faturasService.uploadPdf({
                 id: Number(id),
@@ -1151,6 +1167,8 @@ const FaturasViewPage = () => {
                 return
             }
             toast.error((error as Error)?.message || 'Erro ao enviar arquivo')
+        } finally {
+            encerrarEnvioAnexo()
         }
     }
 
@@ -2700,6 +2718,7 @@ const FaturasViewPage = () => {
                                         innerRef={fileInputRef}
                                         type="file"
                                         accept={FATURA_FILE_ACCEPT}
+                                        disabled={enviandoAnexo}
                                         onChange={(e) => {
                                             pendingUploadFileRef.current = e.target.files?.[0] ?? null
                                         }}
@@ -2725,8 +2744,15 @@ const FaturasViewPage = () => {
                                     </div>
                                 </Col>
                                 <Col md={2}>
-                                    <button type="button" className="btn btn-primary mt-2" onClick={() => { void handleUploadPdf() }}>
-                                        Enviar arquivo
+                                    <button
+                                        type="button"
+                                        className="btn btn-primary mt-2"
+                                        disabled={enviandoAnexo}
+                                        aria-busy={enviandoAnexo}
+                                        onClick={() => { void handleUploadPdf() }}
+                                    >
+                                        {enviandoAnexo && <Spinner size="sm" className="me-2" />}
+                                        {enviandoAnexo ? 'Enviando…' : 'Enviar arquivo'}
                                     </button>
                                 </Col>
                             </Row>
