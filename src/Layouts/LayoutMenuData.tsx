@@ -10,9 +10,12 @@ const Navdata = () => {
     const location = useLocation();
     const path = location.pathname;
 
-    const [isRelatorios, setIsRelatorios] = useState<boolean>(() => pathIn(path, RELATORIOS_PATHS));
-    const [isRecorrente, setIsRecorrente] = useState<boolean>(() => pathIn(path, RECORRENTE_PATHS));
-    const [isCadastros, setIsCadastros] = useState<boolean>(() => pathIn(path, CADASTROS_PATHS));
+    const [manualOpen, setManualOpen] = useState<{
+        path: string;
+        relatorios: boolean;
+        recorrente: boolean;
+        cadastros: boolean;
+    } | null>(null);
 
     const isDashboardActive = pathIn(path, ["/dashboard"]);
     const isFaturasActive = pathIn(path, ["/faturas"]);
@@ -25,12 +28,23 @@ const Navdata = () => {
     const isRecorrenteActive = pathIn(path, RECORRENTE_PATHS);
     const isCadastrosActive = pathIn(path, CADASTROS_PATHS);
 
+    const manualDaRota = manualOpen?.path === path ? manualOpen : null;
+    const isRelatorios = manualDaRota ? manualDaRota.relatorios : isRelatoriosActive;
+    const isRecorrente = manualDaRota ? manualDaRota.recorrente : isRecorrenteActive;
+    const isCadastros = manualDaRota ? manualDaRota.cadastros : isCadastrosActive;
+
+    const alternarGrupo = (grupo: "relatorios" | "recorrente" | "cadastros") => {
+        setManualOpen({
+            path,
+            relatorios: grupo === "relatorios" ? !isRelatorios : isRelatorios,
+            recorrente: grupo === "recorrente" ? !isRecorrente : isRecorrente,
+            cadastros: grupo === "cadastros" ? !isCadastros : isCadastros,
+        });
+    };
+
     useEffect(() => {
         document.body.classList.remove("twocolumn-panel");
-        if (isRelatoriosActive) setIsRelatorios(true);
-        if (isRecorrenteActive) setIsRecorrente(true);
-        if (isCadastrosActive) setIsCadastros(true);
-    }, [path, isRelatoriosActive, isRecorrenteActive, isCadastrosActive]);
+    }, [path]);
 
     const menuItems: any = [
         {
@@ -94,7 +108,7 @@ const Navdata = () => {
             isActive: isRelatoriosActive,
             click: function (e: any) {
                 e.preventDefault();
-                setIsRelatorios((open) => !open);
+                alternarGrupo("relatorios");
             },
             stateVariables: isRelatorios,
             subItems: [
@@ -111,7 +125,7 @@ const Navdata = () => {
             isActive: isRecorrenteActive,
             click: function (e: any) {
                 e.preventDefault();
-                setIsRecorrente((open) => !open);
+                alternarGrupo("recorrente");
             },
             stateVariables: isRecorrente,
             subItems: [
@@ -127,7 +141,7 @@ const Navdata = () => {
             isActive: isCadastrosActive,
             click: function (e: any) {
                 e.preventDefault();
-                setIsCadastros((open) => !open);
+                alternarGrupo("cadastros");
             },
             stateVariables: isCadastros,
             subItems: [

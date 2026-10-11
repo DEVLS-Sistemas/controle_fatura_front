@@ -63,7 +63,9 @@ import { SelectOptions } from 'interfaces/SystemInterfaces/SelectInterface'
 import {
     extractFaturaPayload,
     faturaPrecisaSenhaPdf,
+    FaturaConferenciaBloco,
     FaturaGrupoPorCartao,
+    FaturaQuitacao,
     FaturasView,
     CartaoLookup,
     resolveSenhaPdfMeta,
@@ -347,6 +349,42 @@ const groupTransacoesPorFinal = (
         })
 }
 
+const LinhasSkeleton = ({ label, lines = 4 }: { label: string; lines?: number }) => (
+    <div className="placeholder-glow" role="status" aria-busy="true" aria-label={label}>
+        {Array.from({ length: lines }, (_, index) => (
+            <span
+                key={index}
+                className={`placeholder ${index === lines - 1 ? 'col-8' : 'col-12'} mb-2 d-block`}
+            />
+        ))}
+    </div>
+)
+
+const FaturaDetalheCarregando = () => (
+    <div className="page-content">
+        <Container fluid>
+            <div className="page-title-box d-sm-flex align-items-center justify-content-between">
+                <div className="d-flex align-items-center">
+                    <Link to="/faturas" className="me-2">
+                        <i className="bx bx-arrow-back bx-sm"></i>
+                    </Link>
+                    <h4 className="mb-0">Detalhe da Fatura</h4>
+                </div>
+            </div>
+            <Card className="mb-4">
+                <CardBody>
+                    <LinhasSkeleton label="Carregando cabeçalho da fatura" />
+                </CardBody>
+            </Card>
+            <Card className="mb-4">
+                <CardBody>
+                    <LinhasSkeleton label="Carregando lançamentos" lines={5} />
+                </CardBody>
+            </Card>
+        </Container>
+    </div>
+)
+
 const FaturasViewPage = () => {
     const { id } = useParams<{ id: string }>()
     const navigate = useNavigate()
@@ -357,16 +395,52 @@ const FaturasViewPage = () => {
     const cartoesService = useRef(new CartoesService()).current
     const loadedSubcategoriasRef = useRef<Set<number>>(new Set())
     const fileInputRef = useRef<HTMLInputElement>(null)
+    const cargaSeqRef = useRef(0)
 
-    const [fatura, setFatura] = useState<FaturasView | null>(null)
+    const [cabecalho, setCabecalho] = useState<FaturasView | null>(null)
+    const [gruposPorCartao, setGruposPorCartao] = useState<FaturaGrupoPorCartao[] | undefined>(undefined)
+    const [quitacao, setQuitacao] = useState<FaturaQuitacao | undefined>(undefined)
+    const [conferenciaBloco, setConferenciaBloco] = useState<FaturaConferenciaBloco | undefined>(undefined)
+    const [transacoes, setTransacoes] = useState<TransacoesList[]>([])
+    const [loadingCabecalho, setLoadingCabecalho] = useState(true)
+    const [loadingGrupos, setLoadingGrupos] = useState(true)
+    const [loadingQuitacao, setLoadingQuitacao] = useState(true)
+    const [loadingConferencia, setLoadingConferencia] = useState(true)
+    const [loadingTransacoes, setLoadingTransacoes] = useState(true)
+    const [faturaCarregadaId, setFaturaCarregadaId] = useState(id)
+
+    if (faturaCarregadaId !== id) {
+        setFaturaCarregadaId(id)
+        cargaSeqRef.current += 1
+        setCabecalho(null)
+        setGruposPorCartao(undefined)
+        setQuitacao(undefined)
+        setConferenciaBloco(undefined)
+        setTransacoes([])
+        setLoadingCabecalho(true)
+        setLoadingGrupos(true)
+        setLoadingQuitacao(true)
+        setLoadingConferencia(true)
+        setLoadingTransacoes(true)
+    }
+
+    const fatura = useMemo<FaturasView | null>(() => {
+        if (!cabecalho) return null
+        return {
+            ...cabecalho,
+            ...(quitacao ?? {}),
+            ...(conferenciaBloco ?? {}),
+            ...(gruposPorCartao !== undefined ? { grupos_por_cartao: gruposPorCartao } : {}),
+        }
+    }, [cabecalho, quitacao, conferenciaBloco, gruposPorCartao])
+
     const competenciaDaFaturaAberta = () => {
         const mes = fatura?.mes
         const ano = fatura?.ano
         if (mes == null || mes === '' || ano == null || ano === '') return {}
         return { mes, ano }
     }
-    const [transacoes, setTransacoes] = useState<TransacoesList[]>([])
-    const [loading, setLoading] = useState(true)
+
     const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null)
     const [showPdfPreview, setShowPdfPreview] = useState(false)
     const [loadingPdf, setLoadingPdf] = useState(false)
@@ -385,6 +459,8 @@ const FaturasViewPage = () => {
     const pendingSelecaoRef = useRef<FaturaSelecaoRetryPayload>({})
     const pendingTitularRef = useRef<Partial<FaturaTitularRetryPayload>>({})
     const pendingUploadFileRef = useRef<File | null>(null)
+    const enviandoAnexoRef = useRef(false)
+    const [enviandoAnexo, setEnviandoAnexo] = useState(false)
     const [titularModalOpen, setTitularModalOpen] = useState(false)
     const [titularLoading, setTitularLoading] = useState(false)
     const [titularTitulares, setTitularTitulares] = useState<string[]>([])
@@ -551,13 +627,16 @@ const FaturasViewPage = () => {
         }
     }, [subcategoriasService])
 
-    const loadTransacoes = useCallback(async (faturaId: string) => {
+    const loadTransacoes = useCallback(async (faturaId: string, seq?: number) => {
+        const token = seq ?? cargaSeqRef.current
+        setLoadingTransacoes(true)
         try {
             const response = await transacoesService.listTransacoesPaginate({
                 fatura_id: faturaId,
                 perPage: 200,
                 page: 1,
             } as any)
+            if (token !== cargaSeqRef.current) return
             const rows = response?.data ?? []
             setTransacoes(rows)
             const drafts: Record<number, string> = {}
@@ -580,6 +659,9 @@ const FaturasViewPage = () => {
             await Promise.all(Array.from(categoriaIds).map((catId) => loadSubcategoriasForCategoria(catId)))
         } catch (error) {
             console.error('Erro ao carregar transações:', error)
+        } finally {
+            if (token !== cargaSeqRef.current) return
+            setLoadingTransacoes(false)
         }
     }, [transacoesService, loadSubcategoriasForCategoria])
 
@@ -743,22 +825,64 @@ const FaturasViewPage = () => {
         return true
     }
 
+    const loadGrupos = useCallback(async (faturaId: string, seq: number) => {
+        setLoadingGrupos(true)
+        try {
+            const payload = await faturasService.getFaturaGrupos(faturaId)
+            if (seq !== cargaSeqRef.current) return
+            if (payload) setGruposPorCartao(payload.grupos_por_cartao ?? [])
+        } catch (error) {
+            console.error('Erro ao carregar grupos da fatura:', error)
+        } finally {
+            if (seq === cargaSeqRef.current) setLoadingGrupos(false)
+        }
+    }, [faturasService])
+
+    const loadQuitacao = useCallback(async (faturaId: string, seq: number) => {
+        setLoadingQuitacao(true)
+        try {
+            const payload = await faturasService.getFaturaQuitacao(faturaId)
+            if (seq !== cargaSeqRef.current) return
+            if (payload) setQuitacao(payload)
+        } catch (error) {
+            console.error('Erro ao carregar quitação da fatura:', error)
+        } finally {
+            if (seq === cargaSeqRef.current) setLoadingQuitacao(false)
+        }
+    }, [faturasService])
+
+    const loadConferencia = useCallback(async (faturaId: string, seq: number) => {
+        setLoadingConferencia(true)
+        try {
+            const payload = await faturasService.getFaturaConferencia(faturaId)
+            if (seq !== cargaSeqRef.current) return
+            if (payload) setConferenciaBloco(payload)
+        } catch (error) {
+            console.error('Erro ao carregar conferência da fatura:', error)
+        } finally {
+            if (seq === cargaSeqRef.current) setLoadingConferencia(false)
+        }
+    }, [faturasService])
+
     const loadFatura = useCallback(async (opts?: { silent?: boolean; openSenhaIfNeeded?: boolean }): Promise<FaturasView | undefined> => {
         if (!id) return undefined
-        if (!opts?.silent) setLoading(true)
+        const seq = ++cargaSeqRef.current
+        if (!opts?.silent) setLoadingCabecalho(true)
+        void loadGrupos(id, seq)
+        void loadQuitacao(id, seq)
+        void loadConferencia(id, seq)
+        void loadTransacoes(id, seq)
+        void loadNumeros(id)
         let loaded: FaturasView | undefined
         try {
             const view = await faturasService.getViewFaturas({ id })
+            if (seq !== cargaSeqRef.current) return loaded
             if (view) {
                 loaded = view
-                setFatura(view)
+                setCabecalho(view)
                 setShowPdfPreview(false)
                 clearPdfBlobUrl()
-                await Promise.all([
-                    loadTransacoes(id),
-                    loadNumeros(id),
-                    resolveNavVizinhos(view),
-                ])
+                void resolveNavVizinhos(view)
                 if (
                     opts?.openSenhaIfNeeded !== false
                     && deveAbrirModalSenhaPdfDeFatura(
@@ -774,12 +898,12 @@ const FaturasViewPage = () => {
             }
         } catch (error) {
             console.error('Erro ao carregar fatura:', error)
-            if (!opts?.silent) toast.error('Erro ao carregar fatura')
+            if (!opts?.silent && seq === cargaSeqRef.current) toast.error('Erro ao carregar fatura')
         } finally {
-            if (!opts?.silent) setLoading(false)
+            if (seq === cargaSeqRef.current) setLoadingCabecalho(false)
         }
         return loaded
-    }, [id, faturasService, clearPdfBlobUrl, loadTransacoes, loadNumeros, resolveNavVizinhos, openSenhaModal, cartoesLookup])
+    }, [id, faturasService, clearPdfBlobUrl, loadGrupos, loadQuitacao, loadConferencia, loadTransacoes, loadNumeros, resolveNavVizinhos, openSenhaModal, cartoesLookup])
 
     const pollAteProcessamentoTerminar = useCallback(async (
         faturaId: string | number,
@@ -793,11 +917,17 @@ const FaturasViewPage = () => {
             try {
                 const view = await faturasService.getViewFaturas({ id: faturaId })
                 if (view) {
-                    setFatura(view)
+                    setCabecalho(view)
                     lastStatus = view.status
                     if (faturaProcessamentoTerminou(view.status)) {
                         if (seq !== pollTrocaSeqRef.current) return undefined
-                        await loadTransacoes(String(faturaId))
+                        const carga = cargaSeqRef.current
+                        await Promise.all([
+                            loadTransacoes(String(faturaId), carga),
+                            loadGrupos(String(faturaId), carga),
+                            loadQuitacao(String(faturaId), carga),
+                            loadConferencia(String(faturaId), carga),
+                        ])
                         break
                     }
                 }
@@ -806,7 +936,7 @@ const FaturasViewPage = () => {
             }
         }
         return lastStatus
-    }, [faturasService, loadTransacoes])
+    }, [faturasService, loadTransacoes, loadGrupos, loadQuitacao, loadConferencia])
 
     const handleReprocessar = async () => {
         if (!id) return
@@ -1043,7 +1173,7 @@ const FaturasViewPage = () => {
             return
         }
         if (precisaPollProcessamentoFatura(faturaData) && destinoId != null) {
-            setFatura((prev) => (
+            setCabecalho((prev) => (
                 prev && Number(prev.id) === Number(destinoId)
                     ? { ...prev, status: String(faturaData?.status ?? 'processando') }
                     : prev
@@ -1086,7 +1216,20 @@ const FaturasViewPage = () => {
         return true
     }
 
+    const iniciarEnvioAnexo = (): boolean => {
+        if (enviandoAnexoRef.current) return false
+        enviandoAnexoRef.current = true
+        setEnviandoAnexo(true)
+        return true
+    }
+
+    const encerrarEnvioAnexo = () => {
+        enviandoAnexoRef.current = false
+        setEnviandoAnexo(false)
+    }
+
     const handleUploadPdf = async (opts?: { skipHomologConfirm?: boolean }) => {
+        if (enviandoAnexoRef.current) return
         const file = fileInputRef.current?.files?.[0] ?? pendingUploadFileRef.current
         if (!file || !id) {
             toast.warning('Selecione um arquivo PDF ou CSV')
@@ -1119,6 +1262,7 @@ const FaturasViewPage = () => {
             }
         }
 
+        if (!iniciarEnvioAnexo()) return
         try {
             const result = await faturasService.uploadPdf({
                 id: Number(id),
@@ -1158,6 +1302,8 @@ const FaturasViewPage = () => {
                 return
             }
             toast.error((error as Error)?.message || 'Erro ao enviar arquivo')
+        } finally {
+            encerrarEnvioAnexo()
         }
     }
 
@@ -2190,11 +2336,13 @@ const FaturasViewPage = () => {
         return () => window.removeEventListener('keydown', onKeyDown)
     }, [navVizinhos.anteriorId, navVizinhos.proximaId, navigate])
 
-    const totalTransacoes = totalLancamentosAposReprocesso({
-        status: fatura?.status,
-        total_transacoes: fatura?.total_transacoes,
-        transacoesCount: transacoes.length,
-    })
+    const totalTransacoes = loadingTransacoes && transacoes.length === 0
+        ? Number(fatura?.total_transacoes ?? 0)
+        : totalLancamentosAposReprocesso({
+            status: fatura?.status,
+            total_transacoes: fatura?.total_transacoes,
+            transacoesCount: transacoes.length,
+        })
     const transacoesComCategoria = useMemo(
         () => transacoes.filter((tx) => tx.categoria_id != null).length,
         [transacoes]
@@ -2237,9 +2385,12 @@ const FaturasViewPage = () => {
         [transacoes, fatura?.grupos_por_cartao]
     )
 
+    const conferenciaPronta = conferenciaBloco != null
     const totaisConciliacao = useMemo(
-        () => totaisConciliacaoFatura(fatura, transacoes),
-        [fatura, transacoes]
+        () => conferenciaPronta
+            ? totaisConciliacaoFatura(fatura, transacoes)
+            : totaisConciliacaoFatura({ valor_total: cabecalho?.valor_total }, []),
+        [conferenciaPronta, fatura, transacoes, cabecalho?.valor_total]
     )
 
     const gruposVisiveis = useMemo(() => {
@@ -2254,15 +2405,9 @@ const FaturasViewPage = () => {
         }
     }, [gruposPorFinal, filtroFinalKey])
 
-    if (loading) {
-        return (
-            <div className="page-content text-center py-5">
-                <Spinner animation="border" variant="primary" />
-            </div>
-        )
-    }
-
     if (!fatura) {
+        if (loadingCabecalho) return <FaturaDetalheCarregando />
+
         return (
             <div className="page-content">
                 <Container fluid>
@@ -2570,9 +2715,19 @@ const FaturasViewPage = () => {
                                     )}
                                     <span>
                                         <strong>Quitação:</strong>{' '}
-                                        <Badge color={faturaQuitacaoColor(fatura.pago)}>
-                                            {faturaQuitacaoLabel(fatura.pago)}
-                                        </Badge>
+                                        {quitacao == null ? (
+                                            loadingQuitacao ? (
+                                                <span className="placeholder-glow" role="status" aria-label="Carregando quitação">
+                                                    <span className="placeholder" style={{ minWidth: 72 }} />
+                                                </span>
+                                            ) : (
+                                                <span className="text-muted">—</span>
+                                            )
+                                        ) : (
+                                            <Badge color={faturaQuitacaoColor(fatura.pago)}>
+                                                {faturaQuitacaoLabel(fatura.pago)}
+                                            </Badge>
+                                        )}
                                     </span>
                                     <span>
                                         <strong>Status PDF:</strong>{' '}
@@ -2600,33 +2755,63 @@ const FaturasViewPage = () => {
                                     </Col>
                                     <Col xs={6} md={3}>
                                         <small className="text-muted text-uppercase d-block">Total pago</small>
-                                        <span
-                                            className="fw-semibold text-success d-block"
-                                            style={{ fontSize: '1.5rem', lineHeight: 1.2 }}
-                                        >
-                                            {formatCurrency(fatura.valor_pago)}
-                                        </span>
+                                        {quitacao == null ? (
+                                            loadingQuitacao ? (
+                                                <span className="placeholder-glow d-block" aria-hidden="true">
+                                                    <span className="placeholder col-8" style={{ height: '1.5rem' }} />
+                                                </span>
+                                            ) : (
+                                                <span className="text-muted fw-semibold d-block" style={{ fontSize: '1.5rem' }}>—</span>
+                                            )
+                                        ) : (
+                                            <span
+                                                className="fw-semibold text-success d-block"
+                                                style={{ fontSize: '1.5rem', lineHeight: 1.2 }}
+                                            >
+                                                {formatCurrency(fatura.valor_pago)}
+                                            </span>
+                                        )}
                                     </Col>
                                     <Col xs={6} md={3}>
                                         <small className="text-muted text-uppercase d-block">Restante</small>
-                                        <span
-                                            className={`fw-semibold ${Number(fatura.valor_restante ?? 0) > 0 ? 'text-warning' : 'text-muted'} d-block`}
-                                            style={{ fontSize: '1.5rem', lineHeight: 1.2 }}
-                                        >
-                                            {formatCurrency(fatura.valor_restante)}
-                                        </span>
+                                        {quitacao == null ? (
+                                            loadingQuitacao ? (
+                                                <span className="placeholder-glow d-block" aria-hidden="true">
+                                                    <span className="placeholder col-8" style={{ height: '1.5rem' }} />
+                                                </span>
+                                            ) : (
+                                                <span className="text-muted fw-semibold d-block" style={{ fontSize: '1.5rem' }}>—</span>
+                                            )
+                                        ) : (
+                                            <span
+                                                className={`fw-semibold ${Number(fatura.valor_restante ?? 0) > 0 ? 'text-warning' : 'text-muted'} d-block`}
+                                                style={{ fontSize: '1.5rem', lineHeight: 1.2 }}
+                                            >
+                                                {formatCurrency(fatura.valor_restante)}
+                                            </span>
+                                        )}
                                     </Col>
                                     <Col xs={6} md={3} className="d-flex flex-column align-items-center justify-content-center">
                                         <small className="text-muted text-uppercase d-block mb-1">Status</small>
-                                        <Badge
-                                            color={faturaQuitacaoColor(fatura.pago)}
-                                            style={{ fontSize: '0.95rem' }}
-                                        >
-                                            {faturaQuitacaoLabel(fatura.pago)}
-                                        </Badge>
+                                        {quitacao == null ? (
+                                            loadingQuitacao ? (
+                                                <span className="placeholder-glow" aria-hidden="true">
+                                                    <span className="placeholder col-6" />
+                                                </span>
+                                            ) : (
+                                                <span className="text-muted">—</span>
+                                            )
+                                        ) : (
+                                            <Badge
+                                                color={faturaQuitacaoColor(fatura.pago)}
+                                                style={{ fontSize: '0.95rem' }}
+                                            >
+                                                {faturaQuitacaoLabel(fatura.pago)}
+                                            </Badge>
+                                        )}
                                     </Col>
                                 </Row>
-                                {Number(fatura.pagamentos_total ?? 0) > 0 && (
+                                {quitacao != null && Number(fatura.pagamentos_total ?? 0) > 0 && (
                                     <div className="text-muted small mt-3 pt-3 border-top">
                                         Dos pagamentos desta fatura ({formatCurrency(fatura.pagamentos_total)}):
                                         <ul className="mb-0 mt-1 ps-3">
@@ -2639,8 +2824,16 @@ const FaturasViewPage = () => {
                                         </ul>
                                     </div>
                                 )}
-                                <FaturaConferenciaAviso conferencia={fatura.conferencia} />
-                                <FaturaTotalizadorPendencias totais={totaisConciliacao} />
+                                {loadingConferencia && !conferenciaPronta ? (
+                                    <div className="mt-3">
+                                        <LinhasSkeleton label="Carregando conferência" lines={2} />
+                                    </div>
+                                ) : (
+                                    <>
+                                        <FaturaConferenciaAviso conferencia={fatura.conferencia} />
+                                        <FaturaTotalizadorPendencias totais={totaisConciliacao} />
+                                    </>
+                                )}
                             </div>
 
                             <Row className="align-items-center">
@@ -2713,6 +2906,7 @@ const FaturasViewPage = () => {
                                         innerRef={fileInputRef}
                                         type="file"
                                         accept={FATURA_FILE_ACCEPT}
+                                        disabled={enviandoAnexo}
                                         onChange={(e) => {
                                             pendingUploadFileRef.current = e.target.files?.[0] ?? null
                                         }}
@@ -2738,8 +2932,15 @@ const FaturasViewPage = () => {
                                     </div>
                                 </Col>
                                 <Col md={2}>
-                                    <button type="button" className="btn btn-primary mt-2" onClick={() => { void handleUploadPdf() }}>
-                                        Enviar arquivo
+                                    <button
+                                        type="button"
+                                        className="btn btn-primary mt-2"
+                                        disabled={enviandoAnexo}
+                                        aria-busy={enviandoAnexo}
+                                        onClick={() => { void handleUploadPdf() }}
+                                    >
+                                        {enviandoAnexo && <Spinner size="sm" className="me-2" />}
+                                        {enviandoAnexo ? 'Enviando…' : 'Enviar arquivo'}
                                     </button>
                                 </Col>
                             </Row>
@@ -2897,7 +3098,13 @@ const FaturasViewPage = () => {
                                     </Button>
                                 </div>
                             </div>
-                            {gruposPorFinal.length > 1 && (
+                            {loadingGrupos && gruposPorCartao === undefined ? (
+                                <div className="placeholder-glow d-flex gap-2 mb-3" role="status" aria-label="Carregando grupos">
+                                    <span className="placeholder col-2" />
+                                    <span className="placeholder col-2" />
+                                    <span className="placeholder col-2" />
+                                </div>
+                            ) : gruposPorFinal.length > 1 && (
                                 <div className="d-flex flex-wrap gap-2 mb-3">
                                     <Button
                                         type="button"
@@ -2986,7 +3193,9 @@ const FaturasViewPage = () => {
                                     </div>
                                 </div>
                             )}
-                            {transacoes.length === 0 ? (
+                            {loadingTransacoes && transacoes.length === 0 ? (
+                                <LinhasSkeleton label="Carregando lançamentos" lines={5} />
+                            ) : transacoes.length === 0 ? (
                                 <div className="text-center text-muted py-5">
                                     {isProcessing
                                         ? 'Nenhuma transação ainda. Clique em Reprocessar para processar a fatura.'

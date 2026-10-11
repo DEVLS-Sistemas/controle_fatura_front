@@ -4,6 +4,12 @@ import { UnexpectedError } from "../../libs/api/exceptions/UnexpectedError"
 import { ValidationError } from "../../libs/api/exceptions/ValidationError"
 import {
     ExcluirTodasFaturasResponse,
+    extractFaturaConferencia,
+    extractFaturaGrupos,
+    extractFaturaQuitacao,
+    FaturaConferenciaBloco,
+    FaturaGruposBloco,
+    FaturaQuitacao,
     FaturasInterface,
     FaturasModel,
     FaturasPaginate,
@@ -50,6 +56,39 @@ export class FaturasService implements FaturasInterface {
                 if (body.id != null || body.cartao_id != null) return body
                 return body.data ?? body.fatura ?? body
             }
+            case HttpStatusCode.unauthorized: throw new AccessDeniedError()
+            default: throw new UnexpectedError()
+        }
+    }
+
+    async getFaturaGrupos(id: number | string): Promise<FaturaGruposBloco | undefined> {
+        const response = await this.httpClient.get<unknown>({
+            url: `${this.url}/listar/${id}/grupos`,
+        })
+        switch (response.statusCode) {
+            case HttpStatusCode.ok: return extractFaturaGrupos(response.body)
+            case HttpStatusCode.unauthorized: throw new AccessDeniedError()
+            default: throw new UnexpectedError()
+        }
+    }
+
+    async getFaturaQuitacao(id: number | string): Promise<FaturaQuitacao | undefined> {
+        const response = await this.httpClient.get<unknown>({
+            url: `${this.url}/listar/${id}/quitacao`,
+        })
+        switch (response.statusCode) {
+            case HttpStatusCode.ok: return extractFaturaQuitacao(response.body)
+            case HttpStatusCode.unauthorized: throw new AccessDeniedError()
+            default: throw new UnexpectedError()
+        }
+    }
+
+    async getFaturaConferencia(id: number | string): Promise<FaturaConferenciaBloco | undefined> {
+        const response = await this.httpClient.get<unknown>({
+            url: `${this.url}/listar/${id}/conferencia`,
+        })
+        switch (response.statusCode) {
+            case HttpStatusCode.ok: return extractFaturaConferencia(response.body)
             case HttpStatusCode.unauthorized: throw new AccessDeniedError()
             default: throw new UnexpectedError()
         }

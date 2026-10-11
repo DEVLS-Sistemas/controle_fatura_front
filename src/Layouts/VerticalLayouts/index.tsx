@@ -4,7 +4,6 @@ import { Link } from "react-router-dom";
 import { Collapse } from 'reactstrap';
 // Import Data
 import navdata from "../LayoutMenuData";
-import { findMatchingMenuItem } from "../menuPath";
 //i18n
 import { withTranslation } from "react-i18next";
 import withRouter from "../../Components/Common/withRouter";
@@ -84,51 +83,7 @@ const VerticalLayout = (props : any) => {
 
     useEffect(() => {
         window.scrollTo({ top: 0, behavior: 'smooth' });
-        const initMenu = () => {
-            const pathName = (process.env.PUBLIC_URL || "") + path;
-            const ul = document.getElementById("navbar-nav") as HTMLElement;
-            if (!ul) return;
-            const items : any = ul.getElementsByTagName("a");
-            let itemsArray = [...items]; // converts NodeList to Array
-            removeActivation(itemsArray);
-            const matchingMenuItem = findMatchingMenuItem(itemsArray, pathName);
-            if (matchingMenuItem) {
-                activateParentDropdown(matchingMenuItem);
-            }
-        };
-        if (props.layoutType === "vertical") {
-            initMenu();
-        }
-    }, [path, props.layoutType]);
-
-    function activateParentDropdown(item : any) {
-        item.classList.add("active");
-        let parentCollapseDiv = item.closest(".collapse.menu-dropdown");
-
-        if (parentCollapseDiv) {
-            // to set aria expand true remaining
-            parentCollapseDiv.classList.add("show");
-            parentCollapseDiv.parentElement.children[0].classList.add("active");
-            parentCollapseDiv.parentElement.children[0].setAttribute("aria-expanded", "true");
-            if (parentCollapseDiv.parentElement.closest(".collapse.menu-dropdown")) {
-                parentCollapseDiv.parentElement.closest(".collapse").classList.add("show");
-                if (parentCollapseDiv.parentElement.closest(".collapse").previousElementSibling)
-                    parentCollapseDiv.parentElement.closest(".collapse").previousElementSibling.classList.add("active");
-                if (parentCollapseDiv.parentElement.closest(".collapse").previousElementSibling.closest(".collapse")) {
-                    parentCollapseDiv.parentElement.closest(".collapse").previousElementSibling.closest(".collapse").classList.add("show");
-                    parentCollapseDiv.parentElement.closest(".collapse").previousElementSibling.closest(".collapse").previousElementSibling.classList.add("active");
-                }
-            }
-            return false;
-        }
-        return false;
-    }
-
-    const removeActivation = (items :any) => {
-        items.forEach((item : any) => {
-            item.classList.remove("active");
-        });
-    };
+    }, [path]);
 
     return (
         <React.Fragment>

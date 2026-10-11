@@ -96,21 +96,26 @@
                 }
 
                 &[aria-expanded=true] {
-                    color: var(--#{$prefix}vertical-menu-item-active-color);
-
-                    .icon-dual {
-                        color: var(--#{$prefix}vertical-menu-item-hover-color);
-                        fill: rgba($primary, 0.16);
-                    }
-
                     &:after {
                         transform: rotate(90deg);
-                        color: var(--#{$prefix}vertical-menu-item-active-color);
                     }
 
-                    &:before {
-                        opacity: 1;
-                        background-color: var(--#{$prefix}vertical-menu-item-active-color);
+                    &.active {
+                        color: var(--#{$prefix}vertical-menu-item-active-color);
+
+                        .icon-dual {
+                            color: var(--#{$prefix}vertical-menu-item-hover-color);
+                            fill: rgba($primary, 0.16);
+                        }
+
+                        &:after {
+                            color: var(--#{$prefix}vertical-menu-item-active-color);
+                        }
+
+                        &:before {
+                            opacity: 1;
+                            background-color: var(--#{$prefix}vertical-menu-item-active-color);
+                        }
                     }
                 }
             }

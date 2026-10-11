@@ -1,6 +1,6 @@
-import React, { createContext, useCallback, useEffect, useRef, useState } from "react"
+import React, { createContext, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react"
 import { useSearchParams } from "react-router-dom"
-import { Container, Spinner } from 'reactstrap'
+import { Container } from 'reactstrap'
 import { SubmitHandler } from 'react-hook-form'
 import { PaginateSearch } from 'interfaces/SystemInterfaces/PaginateInterface'
 import { SelectOptions } from 'interfaces/SystemInterfaces/SelectInterface'
@@ -52,11 +52,13 @@ const parseUrlToContext = (searchParams: URLSearchParams): FaturasFilterContextT
 
 const FaturasPage = () => {
     const [searchParams, setSearchParams] = useSearchParams()
-    const [display, setDisplay] = useState<boolean>(false)
     const faturasContext = useRef<FaturasFilterContextType>(parseUrlToContext(searchParams)).current
     const [faturasList, setFaturasList] = useState<FaturasPaginate>()
+    const [listaCarregando, setListaCarregando] = useState(true)
     const faturasService = useRef(new FaturasService()).current
     const bootedRef = useRef(false)
+    const listaAtivaRef = useRef(true)
+    const listaSeqRef = useRef(0)
 
     const [competenciaAtual, setCompetenciaAtual] = useState<CompetenciaAtual | null>(null)
     const competenciaAtualRef = useRef<CompetenciaAtual | null>(null)
@@ -69,7 +71,11 @@ const FaturasPage = () => {
     const [perPage, setPerPage] = useState<number>(5)
     const [page, setPage] = useState(faturasContext.page ?? 1)
 
+    const listagemSegueNaTela = () =>
+        listaAtivaRef.current && window.location.pathname === '/faturas'
+
     const persistUrl = (filters: FaturasSearch & PaginateSearch) => {
+        if (!listagemSegueNaTela()) return
         const next = buildFaturasListagemSearchParams(filters)
         const nextQs = next.toString()
         const currentQs = new URLSearchParams(window.location.search).toString()
@@ -115,6 +121,8 @@ const FaturasPage = () => {
     }
 
     const getRemoteFaturasList: SubmitHandler<any> = useCallback(async (data): Promise<void> => {
+        const seq = ++listaSeqRef.current
+        setListaCarregando(true)
         const mesEnviado = parseMesFiltro(data.mes)
         const anoEnviado = parseAnoFiltro(data.ano)
         const usarAtalho = data.mes_atual === 1 || data.mes_atual === true
@@ -127,23 +135,30 @@ const FaturasPage = () => {
             perPage,
             page: data.page ?? 1,
         })
-        const list = await faturasService.listFaturasPaginate(apiParams)
-        applyListMeta(list, apiParams, competenciaAtualRef.current)
-        persistUrl({
-            ...faturasContext,
-            page: apiParams.page,
-            perPage,
-        })
-        if (list) setFaturasList(list)
-        setPage(apiParams.page ?? 1)
+        try {
+            const list = await faturasService.listFaturasPaginate(apiParams)
+            if (seq !== listaSeqRef.current || !listagemSegueNaTela()) return
+            applyListMeta(list, apiParams, competenciaAtualRef.current)
+            persistUrl({
+                ...faturasContext,
+                page: apiParams.page,
+                perPage,
+            })
+            if (list) setFaturasList(list)
+            setPage(apiParams.page ?? 1)
+        } finally {
+            if (seq === listaSeqRef.current && listagemSegueNaTela()) {
+                setListaCarregando(false)
+            }
+        }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [perPage])
 
-    const boot = async () => {
-        let competencia: CompetenciaAtual | null = null
+    const carregarLookups = async () => {
         try {
             const lookups = await faturasService.getLookupsFaturas()
-            competencia = extractCompetenciaAtual(lookups)
+            if (!listagemSegueNaTela()) return
+            const competencia = extractCompetenciaAtual(lookups)
             if (competencia) {
                 competenciaAtualRef.current = competencia
                 setCompetenciaAtual(competencia)
@@ -166,9 +181,11 @@ const FaturasPage = () => {
         } catch (error) {
             console.error('Erro ao carregar lookups de faturas:', error)
         }
+    }
 
+    const boot = async () => {
         const url = parseFaturasListagemSearchParams(searchParams)
-        const resolved = resolveCompetenciaInicial(url, competencia)
+        const resolved = resolveCompetenciaInicial(url, null)
         faturasContext.cartao_id = url.cartao_id
         faturasContext.pessoa_id = url.pessoa_id
         faturasContext.cartao_bandeira_id = url.cartao_bandeira_id
@@ -183,22 +200,34 @@ const FaturasPage = () => {
         setAppliedAno(resolved.ano)
 
         try {
-            await getRemoteFaturasList({
-                ...faturasContext,
-                mes: resolved.mes,
-                ano: resolved.ano,
-                mes_atual: resolved.usarAtalhoMesAtual ? 1 : undefined,
-                page: url.page,
-                perPage,
-            })
+            await Promise.all([
+                carregarLookups(),
+                getRemoteFaturasList({
+                    ...faturasContext,
+                    mes: resolved.mes,
+                    ano: resolved.ano,
+                    mes_atual: resolved.usarAtalhoMesAtual ? 1 : undefined,
+                    page: url.page,
+                    perPage,
+                }),
+            ])
         } finally {
-            bootedRef.current = true
+            if (listagemSegueNaTela()) bootedRef.current = true
         }
     }
 
+    useLayoutEffect(() => {
+        listaAtivaRef.current = true
+        return () => {
+            listaAtivaRef.current = false
+        }
+    }, [])
+
     useEffect(() => {
-        setTimeout(() => setDisplay(true), 300)
         boot()
+        return () => {
+            listaSeqRef.current += 1
+        }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
@@ -223,21 +252,16 @@ const FaturasPage = () => {
                             anosOptions={anosOptions}
                             cartoesOptions={cartoesOptions}
                         />
-                        {display ? (
-                            <FaturasTable
-                                filters={faturasContext}
-                                getData={getRemoteFaturasList}
-                                data={faturasList}
-                                setPerPage={setPerPage}
-                                perPage={perPage}
-                                setPage={setPage}
-                                page={page}
-                            />
-                        ) : (
-                            <div className="text-center py-5">
-                                <Spinner animation="border" variant="primary" />
-                            </div>
-                        )}
+                        <FaturasTable
+                            filters={faturasContext}
+                            getData={getRemoteFaturasList}
+                            data={faturasList}
+                            setPerPage={setPerPage}
+                            perPage={perPage}
+                            setPage={setPage}
+                            page={page}
+                            loading={listaCarregando}
+                        />
                     </Container>
                 </div>
             </FaturasFilterContext.Provider>

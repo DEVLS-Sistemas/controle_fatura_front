@@ -1,6 +1,6 @@
 import axios, { AxiosResponse, AxiosRequestConfig } from 'axios';
 import config from "../config";
-import { getAuthSession } from './auth_session';
+import { getAuthSession, getAuthToken } from './auth_session';
 
 const { api } = config;
 
@@ -10,8 +10,7 @@ axios.defaults.baseURL = api.API_URL;
 axios.defaults.headers.post["Content-Type"] = "application/json";
 
 // content type
-const authUser: any = sessionStorage.getItem("authUser")
-const token = JSON.parse(authUser) ? JSON.parse(authUser).token : null;
+const token = getAuthToken();
 if (token)
   axios.defaults.headers.common["Authorization"] = "Bearer " + token;
 

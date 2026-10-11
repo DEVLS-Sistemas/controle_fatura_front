@@ -85,7 +85,7 @@
                     }
                 }
 
-                &[data-bs-toggle=collapse][aria-expanded=true] {
+                &[data-bs-toggle=collapse][aria-expanded=true].active {
                     color: var(--#{$prefix}topnav-item-active-color);
 
                     .icon-dual {
