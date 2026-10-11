@@ -270,6 +270,8 @@ export class FaturasService implements FaturasInterface {
     async uploadPdf(params: {
         id: number
         arquivo_pdf?: File
+        mes?: number | string | null
+        ano?: number | string | null
         processar_automatico?: boolean
         senha_pdf?: string
         salvar_senha_pdf?: boolean
@@ -290,6 +292,12 @@ export class FaturasService implements FaturasInterface {
     }) {
         const form = new FormData()
         form.append('id', String(params.id))
+        if (params.mes != null && params.mes !== '') {
+            form.append('mes', String(params.mes))
+        }
+        if (params.ano != null && params.ano !== '') {
+            form.append('ano', String(params.ano))
+        }
         if (params.arquivo_pdf instanceof File) {
             form.append('arquivo_pdf', params.arquivo_pdf)
         }

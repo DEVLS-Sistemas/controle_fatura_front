@@ -8,7 +8,7 @@ export type CompetenciaFaturaRef = {
 }
 
 export const TOOLTIP_ICONE_PDF_LISTAGEM =
-    'O ícone indica que esta competência tem arquivo. Se o PDF for de outro ano, remova e envie de novo — o sistema ancora pelo ano escrito no arquivo.'
+    'O ícone indica que esta competência tem arquivo. O mês e o ano escolhidos no cadastro são os que ficam gravados.'
 
 export const COPY_CONFERIR_COMPETENCIA_PDF =
     'Confira o mês e o ano lidos do arquivo. Um PDF de julho/2024 não deve ir para julho/2026.'

@@ -451,6 +451,8 @@ export interface FaturasInterface {
     uploadPdf(params: {
         id: number
         arquivo_pdf?: File
+        mes?: number | string | null
+        ano?: number | string | null
         processar_automatico?: boolean
         senha_pdf?: string
         salvar_senha_pdf?: boolean
