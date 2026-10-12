@@ -79,6 +79,8 @@ import { NumeroListItem, ParserHomologado, PARSERS_HOMOLOGADOS_PADRAO } from 'in
 import { CategoriaLookup, PlataformaLookup, CandidatoConciliacao, ResponsavelLookup, TransacoesList, TransacoesModel } from 'interfaces/Transacoes/TransacoesInterface'
 import {
     AplicarSubcategoriaPergunta,
+    ehAssinaturaDaResposta,
+    parcelaDoGrupoRecebeClassificacao,
     parseAplicarSubcategoria,
 } from 'helpers/aplicar_subcategoria_helpers'
 import { linhaFaturaSemCategoria } from 'helpers/fatura_categoria_operacional_helpers'
@@ -1850,6 +1852,7 @@ const FaturasViewPage = () => {
             const pergunta = gravouClassificacao && temCategoria
                 ? parseAplicarSubcategoria(resposta)
                 : null
+            const ehAssinaturaResposta = gravouClassificacao ? ehAssinaturaDaResposta(resposta) : null
             if (pergunta) {
                 setAplicarSubcategoria({ pergunta, payload })
             }
@@ -1860,38 +1863,63 @@ const FaturasViewPage = () => {
                         && tx.compra_grupo_id
                         && item.compra_grupo_id === tx.compra_grupo_id
                     )
-                    if (item.id !== tx.id && !sameGrupo) return item
-                    const next = { ...item, ...rowPatch }
-                    if (rowPatch.categoria_id !== undefined) {
-                        const categoria = categoriasLookup.find((o) => o.id === rowPatch.categoria_id)
+                    const recebeGrupo = Boolean(
+                        gravouClassificacao
+                        && temCategoria
+                        && !sameGrupo
+                        && parcelaDoGrupoRecebeClassificacao(
+                            item,
+                            tx,
+                            { categoria_id: categoriaId, subcategoria_id: subcategoriaId },
+                        )
+                    )
+                    if (item.id !== tx.id && !sameGrupo && !recebeGrupo) return item
+                    const next = recebeGrupo
+                        ? {
+                            ...item,
+                            categoria_id: categoriaId,
+                            subcategoria_id: subcategoriaId,
+                        }
+                        : { ...item, ...rowPatch }
+                    if (item.id === tx.id && ehAssinaturaResposta !== null) {
+                        next.eh_assinatura = ehAssinaturaResposta
+                    }
+                    if (recebeGrupo || rowPatch.categoria_id !== undefined) {
+                        const categoriaAlvo = recebeGrupo ? categoriaId : rowPatch.categoria_id
+                        const categoria = categoriasLookup.find((o) => Number(o.id) === Number(categoriaAlvo))
                         next.categoria_nome = rowPatch.categoria_nome ?? categoria?.nome
                         next.categoria_cor = rowPatch.categoria_cor ?? categoria?.cor
-                        if (rowPatch.subcategoria_id === undefined && rowPatch.categoria_id !== item.categoria_id) {
+                        if (
+                            !recebeGrupo
+                            && rowPatch.subcategoria_id === undefined
+                            && rowPatch.categoria_id !== item.categoria_id
+                        ) {
                             next.subcategoria_id = null
                             next.subcategoria_nome = undefined
                             next.subcategoria_cor = undefined
                         }
                     }
-                    if (rowPatch.subcategoria_id !== undefined) {
+                    if (recebeGrupo || rowPatch.subcategoria_id !== undefined) {
+                        const subAlvo = recebeGrupo ? subcategoriaId : rowPatch.subcategoria_id
                         const opts = categoriaId ? (subcategoriasByCategoria[categoriaId] ?? []) : []
-                        const opt = opts.find((o) => Number(o.value) === rowPatch.subcategoria_id)
+                        const opt = opts.find((o) => Number(o.value) === Number(subAlvo))
                         next.subcategoria_nome = rowPatch.subcategoria_nome ?? opt?.label
-                        next.subcategoria_cor = rowPatch.subcategoria_id
+                        next.subcategoria_cor = subAlvo
                             ? (rowPatch.subcategoria_cor ?? opt?.cor ?? null)
                             : null
                     }
-                    if (rowPatch.origem_compra !== undefined) {
+                    if (!recebeGrupo && rowPatch.origem_compra !== undefined) {
                         next.origem_compra_label =
                             origensCompraOptions.find((o) => o.value === rowPatch.origem_compra)?.label
                             ?? origemCompraLabel[rowPatch.origem_compra ?? '']
                             ?? null
                     }
-                    if (rowPatch.plataforma_id !== undefined) {
+                    if (!recebeGrupo && rowPatch.plataforma_id !== undefined) {
                         const plataforma = plataformasLookup.find((o) => o.id === rowPatch.plataforma_id)
                         next.plataforma_nome = rowPatch.plataforma_nome ?? plataforma?.nome
                         next.plataforma_cor = rowPatch.plataforma_cor ?? plataforma?.cor
                     }
-                    if (rowPatch.responsavel_id !== undefined) {
+                    if (!recebeGrupo && rowPatch.responsavel_id !== undefined) {
                         const responsavel =
                             responsaveisLookup.find((r) => Number(r.id) === Number(rowPatch.responsavel_id))
                             ?? null
