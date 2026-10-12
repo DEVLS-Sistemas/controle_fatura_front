@@ -1,3 +1,4 @@
+import { ehAssinaturaParaPayload } from './assinaturas_helpers'
 import {
     AplicarSubcategoriaPergunta,
     ehAssinaturaDaResposta,
@@ -78,7 +79,7 @@ describe('aplicar subcategoria do estabelecimento', () => {
         )
     })
 
-    it('marca a assinatura com o valor devolvido na à vista', () => {
+    it('mantém o checkbox com o valor devolvido, sem ligar assinatura ao classificar', () => {
         expect(ehAssinaturaDaResposta({
             transacao: { data: { eh_assinatura: true } },
         })).toBe(true)
@@ -88,7 +89,25 @@ describe('aplicar subcategoria do estabelecimento', () => {
         expect(ehAssinaturaDaResposta({
             transacao: { data: { eh_assinatura: false } },
         })).toBe(false)
+        expect(ehAssinaturaDaResposta({
+            transacao: { data: { eh_assinatura: 0 } },
+        })).toBe(false)
+        expect(ehAssinaturaDaResposta({
+            transacao: { data: { eh_assinatura: '0' } },
+        })).toBe(false)
         expect(ehAssinaturaDaResposta({ transacao: { status: true } })).toBeNull()
+    })
+
+    it('grava o checkbox desmarcado como false, inclusive quando a API manda 0', () => {
+        expect(ehAssinaturaParaPayload(false)).toBe(false)
+        expect(ehAssinaturaParaPayload(0)).toBe(false)
+        expect(ehAssinaturaParaPayload('0')).toBe(false)
+        expect(ehAssinaturaParaPayload('false')).toBe(false)
+        expect(ehAssinaturaParaPayload(true)).toBe(true)
+        expect(ehAssinaturaParaPayload(1)).toBe(true)
+        expect(ehAssinaturaParaPayload('1')).toBe(true)
+        expect(ehAssinaturaParaPayload(null)).toBeUndefined()
+        expect(ehAssinaturaParaPayload(undefined)).toBeUndefined()
     })
 
     it('copia a classificação só para parcela da mesma compra ainda sem ela', () => {
