@@ -17,6 +17,16 @@ export const STATUS_TABS: { value: AssinaturaStatusFiltro; label: string }[] = [
 export const isEhAssinatura = (value: unknown): boolean =>
   value === true || value === 1 || value === '1' || value === 'true'
 
+/**
+ * Valor do checkbox para o PUT. `0` e `"0"` ficam desmarcados:
+ * `Boolean("0")` seria true e marcaria assinatura ao salvar a categoria.
+ * Sem valor, o campo não vai no payload.
+ */
+export const ehAssinaturaParaPayload = (value: unknown): boolean | undefined => {
+  if (value == null || value === '') return undefined
+  return isEhAssinatura(value)
+}
+
 export const isCompraAvista = (row?: {
   compra_grupo_id?: string | number | null
   parcelas_total?: number | string | null

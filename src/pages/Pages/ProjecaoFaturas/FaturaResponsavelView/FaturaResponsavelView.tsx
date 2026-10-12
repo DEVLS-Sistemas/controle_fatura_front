@@ -32,7 +32,7 @@ import {
     VALOR_TEXT_CLASS,
     isMeuResponsavelDisplay,
 } from 'helpers/fatura_helpers'
-import { isCompraAvista, isEhAssinatura } from 'helpers/assinaturas_helpers'
+import { ehAssinaturaParaPayload, isCompraAvista, isEhAssinatura } from 'helpers/assinaturas_helpers'
 import { SelectOptions } from 'interfaces/SystemInterfaces/SelectInterface'
 import { corCategoria } from 'helpers/cores_tema_helpers'
 import { ResponsaveisView } from 'interfaces/Responsaveis/ResponsaveisInterface'
@@ -601,7 +601,7 @@ const FaturaResponsavelView = () => {
                 data: tx.data ?? null,
                 tipo: tx.tipo ?? null,
                 ...(patch.origem_compra !== undefined ? { origem_compra: origemCompra } : {}),
-                eh_assinatura: ehAssinatura != null ? Boolean(ehAssinatura) : undefined,
+                eh_assinatura: ehAssinaturaParaPayload(ehAssinatura),
                 categoria_id: categoriaId,
                 subcategoria_id: subcategoriaId,
                 responsavel_id: nextResponsavelId,

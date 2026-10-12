@@ -42,7 +42,7 @@ import {
     extractFaturaMessage,
 } from 'helpers/fatura_anexo_duplicado_helpers'
 import { idFaturaAposSubstituir, idFaturaEscolhida, substituirFaturaRetryFields, totalLancamentosAposReprocesso } from 'helpers/fatura_substituir_existente_helpers'
-import { isCompraAvista, isEhAssinatura } from 'helpers/assinaturas_helpers'
+import { ehAssinaturaParaPayload, isCompraAvista, isEhAssinatura } from 'helpers/assinaturas_helpers'
 import {
     contaNoTotalLinha,
     identificadorCompraManualVinculada,
@@ -1837,7 +1837,7 @@ const FaturasViewPage = () => {
                 data: tx.data ?? null,
                 tipo: tx.tipo ?? null,
                 ...(patch.origem_compra !== undefined ? { origem_compra: origemCompra } : {}),
-                eh_assinatura: ehAssinatura != null ? Boolean(ehAssinatura) : undefined,
+                eh_assinatura: ehAssinaturaParaPayload(ehAssinatura),
                 categoria_id: categoriaId,
                 subcategoria_id: subcategoriaId,
                 plataforma_id: plataformaId,

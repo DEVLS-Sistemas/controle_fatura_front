@@ -50,8 +50,9 @@ export function parseAplicarSubcategoria(body: unknown): AplicarSubcategoriaPerg
 }
 
 /**
- * À vista classificada devolve a assinatura em `transacao.data`, mesmo se o
- * payload foi com `eh_assinatura: false`. Sem o campo, não altera o checkbox.
+ * O checkbox segue `transacao.data.eh_assinatura`.
+ * Classificar com o checkbox desmarcado devolve false e não liga a assinatura.
+ * Sem o campo, o checkbox fica como o usuário deixou.
  */
 export function ehAssinaturaDaResposta(body: unknown): boolean | null {
     if (!body || typeof body !== 'object') return null
