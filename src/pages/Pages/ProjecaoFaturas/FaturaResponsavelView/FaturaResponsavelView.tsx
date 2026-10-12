@@ -32,7 +32,7 @@ import {
     VALOR_TEXT_CLASS,
     isMeuResponsavelDisplay,
 } from 'helpers/fatura_helpers'
-import { isCompraAvista, isEhAssinatura } from 'helpers/assinaturas_helpers'
+import { ehAssinaturaParaPayload, isCompraAvista, isEhAssinatura } from 'helpers/assinaturas_helpers'
 import { SelectOptions } from 'interfaces/SystemInterfaces/SelectInterface'
 import { corCategoria } from 'helpers/cores_tema_helpers'
 import { ResponsaveisView } from 'interfaces/Responsaveis/ResponsaveisInterface'
@@ -588,6 +588,7 @@ const FaturaResponsavelView = () => {
                 : (tx.responsavel_id ?? null)
             const { propagar_grupo: propagarGrupo, ...rowPatch } = patch
 
+            const respostaOrigem = patch.origem_compra !== undefined
             await transacoesService.editTransacoes({
                 id: tx.id,
                 transacao_id: tx.id,
@@ -599,14 +600,19 @@ const FaturaResponsavelView = () => {
                 valor_parcela: valor ?? null,
                 data: tx.data ?? null,
                 tipo: tx.tipo ?? null,
-                origem_compra: origemCompra,
-                eh_assinatura: ehAssinatura != null ? Boolean(ehAssinatura) : undefined,
+                ...(patch.origem_compra !== undefined ? { origem_compra: origemCompra } : {}),
+                eh_assinatura: ehAssinaturaParaPayload(ehAssinatura),
                 categoria_id: categoriaId,
                 subcategoria_id: subcategoriaId,
                 responsavel_id: nextResponsavelId,
                 observacoes: patch.observacoes !== undefined ? patch.observacoes : (tx.observacoes ?? null),
                 propagar_grupo: propagarGrupo || undefined,
             })
+
+            if (respostaOrigem) {
+                await loadData()
+                return
+            }
 
             // Se mudou o responsável desta tela, recarrega a lista
             if (
@@ -707,22 +713,25 @@ const FaturaResponsavelView = () => {
     const handleUpdateOrigem = async (tx: TransacoesList, value: string) => {
         const origem = value === '' ? null : value
         if ((tx.origem_compra ?? null) === origem) return
+        const labelOrigem =
+            origensCompraOptions.find((o) => o.value === origem)?.label
+            ?? origemCompraLabel[origem ?? '']
+            ?? null
         setTransacoes((prev) =>
-            prev.map((item) =>
-                item.id === tx.id
-                    ? {
-                        ...item,
-                        origem_compra: origem,
-                        origem_compra_label:
-                            origensCompraOptions.find((o) => o.value === origem)?.label
-                            ?? origemCompraLabel[origem ?? '']
-                            ?? null,
-                        ...(origem === 'PAGAMENTO_SERVICOS' && isCompraAvista(tx)
-                            ? { eh_assinatura: true }
-                            : {}),
-                    }
-                    : item
-            )
+            prev.map((item) => {
+                const mesmaCompra = Boolean(
+                    tx.compra_grupo_id && item.compra_grupo_id === tx.compra_grupo_id
+                )
+                if (item.id !== tx.id && !mesmaCompra) return item
+                return {
+                    ...item,
+                    origem_compra: origem,
+                    origem_compra_label: labelOrigem,
+                    ...(item.id === tx.id && origem === 'PAGAMENTO_SERVICOS' && isCompraAvista(tx)
+                        ? { eh_assinatura: true }
+                        : {}),
+                }
+            })
         )
         await saveTransacao(tx, {
             origem_compra: origem,

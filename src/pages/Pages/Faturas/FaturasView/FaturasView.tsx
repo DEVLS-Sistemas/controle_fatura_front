@@ -42,7 +42,7 @@ import {
     extractFaturaMessage,
 } from 'helpers/fatura_anexo_duplicado_helpers'
 import { idFaturaAposSubstituir, idFaturaEscolhida, substituirFaturaRetryFields, totalLancamentosAposReprocesso } from 'helpers/fatura_substituir_existente_helpers'
-import { isCompraAvista, isEhAssinatura } from 'helpers/assinaturas_helpers'
+import { ehAssinaturaParaPayload, isCompraAvista, isEhAssinatura } from 'helpers/assinaturas_helpers'
 import {
     contaNoTotalLinha,
     identificadorCompraManualVinculada,
@@ -1836,8 +1836,8 @@ const FaturasViewPage = () => {
                 valor_parcela: valor ?? null,
                 data: tx.data ?? null,
                 tipo: tx.tipo ?? null,
-                origem_compra: origemCompra,
-                eh_assinatura: ehAssinatura != null ? Boolean(ehAssinatura) : undefined,
+                ...(patch.origem_compra !== undefined ? { origem_compra: origemCompra } : {}),
+                eh_assinatura: ehAssinaturaParaPayload(ehAssinatura),
                 categoria_id: categoriaId,
                 subcategoria_id: subcategoriaId,
                 plataforma_id: plataformaId,
@@ -1847,6 +1847,10 @@ const FaturasViewPage = () => {
             }
 
             const resposta = await transacoesService.editTransacoes(payload)
+            if (patch.origem_compra !== undefined) {
+                await loadTransacoes(id!)
+                return
+            }
             const gravouClassificacao = patch.categoria_id !== undefined || patch.subcategoria_id !== undefined
             const temCategoria = categoriaId != null && Number(categoriaId) > 0
             const pergunta = gravouClassificacao && temCategoria
@@ -2008,22 +2012,25 @@ const FaturasViewPage = () => {
     const handleUpdateOrigem = async (tx: TransacoesList, value: string) => {
         const origem = value === '' ? null : value
         if ((tx.origem_compra ?? null) === origem) return
+        const labelOrigem =
+            origensCompraOptions.find((o) => o.value === origem)?.label
+            ?? origemCompraLabel[origem ?? '']
+            ?? null
         setTransacoes((prev) =>
-            prev.map((item) =>
-                item.id === tx.id
-                    ? {
-                        ...item,
-                        origem_compra: origem,
-                        origem_compra_label:
-                            origensCompraOptions.find((o) => o.value === origem)?.label
-                            ?? origemCompraLabel[origem ?? '']
-                            ?? null,
-                        ...(origem === 'PAGAMENTO_SERVICOS' && isCompraAvista(tx)
-                            ? { eh_assinatura: true }
-                            : {}),
-                    }
-                    : item
-            )
+            prev.map((item) => {
+                const mesmaCompra = Boolean(
+                    tx.compra_grupo_id && item.compra_grupo_id === tx.compra_grupo_id
+                )
+                if (item.id !== tx.id && !mesmaCompra) return item
+                return {
+                    ...item,
+                    origem_compra: origem,
+                    origem_compra_label: labelOrigem,
+                    ...(item.id === tx.id && origem === 'PAGAMENTO_SERVICOS' && isCompraAvista(tx)
+                        ? { eh_assinatura: true }
+                        : {}),
+                }
+            })
         )
         await saveTransacao(tx, {
             origem_compra: origem,
